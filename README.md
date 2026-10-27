@@ -273,6 +273,18 @@ ShokujoDX is an independent clean-room project: no code,
 assets or file samples come from closed-source embroidery software, and the
 documentation does not name the commercial programs that it compares features with.
 
+## Contributors
+
+- **Zero** ([@K1ngNatsu](https://github.com/K1ngNatsu)): the owner. The
+  idea, the scope and the decisions, and the sew-out tests on a real
+  machine.
+- **Evan Rush** ([@rushyrush](https://github.com/rushyrush)): the review of
+  the names and trademarks of other products, the trademark notes, and the
+  list of the bundled fonts and thread charts.
+- **Claude** (Anthropic, through [Claude Code](https://claude.com/claude-code)):
+  most of the code, the tests and the documentation, made at the request
+  and under the direction of the owner.
+
 ## Contributing
 
 Bug reports, sew-out results, translations and code are welcome. Read
