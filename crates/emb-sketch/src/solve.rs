@@ -17,8 +17,10 @@ use crate::{ConstraintId, CurveId, PointId, Sketch};
 
 /// An equation is true when it is smaller than this, in mm.
 pub const TOLERANCE: f64 = 1e-10;
-/// The most Newton steps for each group.
-const MAX_STEPS: usize = 100;
+/// The most Newton steps for each group. A group that solves stops early,
+/// and so does one that cannot come nearer (a conflict). A shape near to a
+/// degenerate one (a triangle with angles of 0.3°) needs about 160 steps.
+const MAX_STEPS: usize = 500;
 /// The weight of the variables of a dragged point.
 const DRAG_WEIGHT: f64 = 1e4;
 /// A constraint whose equation is larger than this after the solution is
