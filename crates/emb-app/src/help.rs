@@ -1128,7 +1128,18 @@ mod tests {
     use crate::test_util::Harness;
 
     fn topics() -> Vec<Topic> {
-        all_topics(&egui::Context::default())
+        all_topics(&crate::test_util::ready_context())
+    }
+
+    /// On macOS the shortcuts show as symbols (⌘S); the topics of the
+    /// ribbon and the keyboard are made there too.
+    #[test]
+    fn the_topics_are_made_on_macos_too() {
+        let ctx = crate::test_util::ready_context();
+        ctx.set_os(egui::os::OperatingSystem::Mac);
+        let all = all_topics(&ctx);
+        let keys = all.iter().find(|t| t.id == KEYBOARD_ID).expect("the keyboard topic");
+        assert!(!keys.body.is_empty());
     }
 
     #[test]
@@ -1166,7 +1177,7 @@ mod tests {
         let all = topics();
         for tab in RibbonTab::ALL {
             let t = all.iter().find(|t| t.id == ribbon_id(tab)).unwrap();
-            for p in crate::ribbon::help_panels(tab, &egui::Context::default()) {
+            for p in crate::ribbon::help_panels(tab, &crate::test_util::ready_context()) {
                 assert!(t.body.contains(&format!("## {}", p.title)));
                 for c in p.commands {
                     assert!(t.body.contains(&format!("**{}**", c.label)), "{}", c.label);
@@ -1292,7 +1303,7 @@ mod tests {
             assert!(ids.contains(*topic), "{topic}");
         }
         // A window with its own id, under the pointer.
-        let ctx = egui::Context::default();
+        let ctx = crate::test_util::ready_context();
         let frame = |pointer: Option<egui::Pos2>| {
             let input = egui::RawInput {
                 screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1000.0, 800.0))),

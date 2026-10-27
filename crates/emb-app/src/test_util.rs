@@ -10,6 +10,16 @@ use crate::manipulate::ViewMap;
 
 pub const SCREEN: Vec2 = Vec2::new(1000.0, 700.0);
 
+/// A context after one empty frame, so it has its fonts. On macOS,
+/// `Context::format_shortcut` reads the fonts (to show ⌘ and ⌥), and a new
+/// context has none until its first frame.
+pub fn ready_context() -> egui::Context {
+    let ctx = egui::Context::default();
+    let mut out = ctx.run_ui(RawInput::default(), |_| {});
+    out.textures_delta.clear();
+    ctx
+}
+
 pub struct Harness {
     pub ctx: egui::Context,
     pub st: AppState,
