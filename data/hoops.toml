@@ -1,0 +1,155 @@
+# Hoop presets.
+#
+# Each size is the SEWABLE FIELD in mm, not the outer frame size.
+# The sizes are approximate industry sizes. Each brand has small differences.
+# Verify each size against the manufacturer data before a release.
+#
+# Fields:
+#   id                    a-z, 0-9, '_' and '-' only. Must be unique.
+#   name                  Text that the app shows.
+#   brand                 Optional.
+#   width_mm, height_mm   Sewable field. For a circle they must be equal.
+#   shape                 rectangle | rounded_rectangle | oval | circle
+#   corner_radius_mm      Only for rounded_rectangle.
+#   max_stitch_length_mm  Optional machine limit for this hoop.
+#   [[hoop.position]]     Only for a multi-position hoop (two or more): the
+#                         field that the machine sews in each position.
+#                         x_mm, y_mm: the center of that field from the hoop
+#                         center (Y down); width_mm, height_mm: its size. The
+#                         width and height of the hoop are then the field of
+#                         all positions together.
+#
+# Example of an oval hoop:
+#   [[hoop]]
+#   id = "oval_example"
+#   name = "Oval 200 x 140"
+#   width_mm = 200
+#   height_mm = 140
+#   shape = "oval"
+#
+# Example of a multi-position hoop (verify the sizes of your own hoop):
+#   [[hoop]]
+#   id = "multi_example"
+#   name = "Multi-position 300 x 150"
+#   width_mm = 300
+#   height_mm = 150
+#   shape = "rectangle"
+#   [[hoop.position]]
+#   x_mm = -70
+#   y_mm = 0
+#   width_mm = 160
+#   height_mm = 150
+#   [[hoop.position]]
+#   x_mm = 70
+#   y_mm = 0
+#   width_mm = 160
+#   height_mm = 150
+
+# Husqvarna Viking names its hoops "front-to-back x left-to-right": the
+# Crown hoop is 200 mm from left to right and 260 mm from the front to the
+# back. The Topaz 20 shows it upright (owner test, 2026-10-23): the top of
+# the design is at the back of the machine. Width is left to right, height
+# is front to back.
+[[hoop]]
+id = "topaz20_crown"
+name = "DESIGNER Crown Hoop 260 x 200"
+brand = "Husqvarna Viking"
+width_mm = 200
+height_mm = 260
+shape = "rectangle"
+
+[[hoop]]
+id = "topaz20_splendid_square"
+name = "DESIGNER Splendid Square Hoop 120 x 120"
+brand = "Husqvarna Viking"
+width_mm = 120
+height_mm = 120
+shape = "rectangle"
+
+[[hoop]]
+id = "small_100x100"
+name = "Small 100 x 100 (4 x 4 in)"
+width_mm = 100
+height_mm = 100
+shape = "rectangle"
+
+[[hoop]]
+id = "medium_130x180"
+name = "Medium 130 x 180 (5 x 7 in)"
+width_mm = 130
+height_mm = 180
+shape = "rectangle"
+
+[[hoop]]
+id = "square_200x200"
+name = "Square large 200 x 200 (8 x 8 in)"
+width_mm = 200
+height_mm = 200
+shape = "rectangle"
+
+[[hoop]]
+id = "long_160x260"
+name = "Long 160 x 260 (6 x 10 in)"
+width_mm = 160
+height_mm = 260
+shape = "rectangle"
+
+[[hoop]]
+id = "large_200x300"
+name = "Large 200 x 300 (8 x 12 in)"
+width_mm = 200
+height_mm = 300
+shape = "rectangle"
+
+[[hoop]]
+id = "extra_large_360x200"
+name = "Extra large 360 x 200 (14 x 8 in class)"
+width_mm = 360
+height_mm = 200
+shape = "rectangle"
+
+# Hoops and frames of multi-needle machines. Each brand has its own set;
+# these are common classes. Round tubular hoops are named by their size.
+
+[[hoop]]
+id = "round_120"
+name = "Round 120 (12 cm tubular)"
+width_mm = 120
+height_mm = 120
+shape = "circle"
+
+[[hoop]]
+id = "round_150"
+name = "Round 150 (15 cm tubular)"
+width_mm = 150
+height_mm = 150
+shape = "circle"
+
+[[hoop]]
+id = "round_180"
+name = "Round 180 (18 cm tubular)"
+width_mm = 180
+height_mm = 180
+shape = "circle"
+
+[[hoop]]
+id = "square_300x300"
+name = "Square 300 x 300 (12 x 12 in class)"
+width_mm = 300
+height_mm = 300
+shape = "rectangle"
+
+[[hoop]]
+id = "field_360x500"
+name = "Full field 360 x 500 (14 x 20 in class)"
+width_mm = 360
+height_mm = 500
+shape = "rectangle"
+
+[[hoop]]
+id = "cap_360x75"
+name = "Wide cap frame 360 x 75 (270 degree class)"
+width_mm = 360
+height_mm = 75
+shape = "rectangle"
+cap = true

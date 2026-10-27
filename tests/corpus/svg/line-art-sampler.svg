@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test corpus: line-art sampler for Milestone 1 (running stitch only).
+     Strokes only, no fills, so every object stitches today. 1 user unit = 1 mm.
+     - Navy: a 50 mm circle and a 40 mm square (closed loops, corners).
+     - Red: a five-point star (sharp corners) and a wave (curves).
+     - Green: three short lines 1 mm apart (travel stitches, no trims). -->
+<svg xmlns="http://www.w3.org/2000/svg" width="90mm" height="90mm" viewBox="0 0 90 90">
+  <g fill="none" stroke-width="0.4">
+    <circle id="circle" cx="45" cy="45" r="25" stroke="#1e3c8c"/>
+    <rect id="square" x="25" y="25" width="40" height="40" stroke="#1e3c8c"/>
+    <path id="star" stroke="#c81e2d"
+          d="M45,30 L49.4,39 L59.3,40.4 L52.1,47.4 L53.8,57.3 L45,52.6 L36.2,57.3 L37.9,47.4 L30.7,40.4 L40.6,39 Z"/>
+    <path id="wave" stroke="#c81e2d" d="M10,80 C20,70 30,90 40,80 S60,70 70,80 S80,90 85,80"/>
+    <path id="tick1" stroke="#28965a" d="M10,10 L20,10"/>
+    <path id="tick2" stroke="#28965a" d="M21,10 L31,10"/>
+    <path id="tick3" stroke="#28965a" d="M32,10 L42,10"/>
+  </g>
+</svg>

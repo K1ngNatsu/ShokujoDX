@@ -1,0 +1,22 @@
+[package]
+name = "emb-library"
+description = "Design library: an index of the design files in folders, thumbnails, search, sort and group. No UI dependency."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+emb-geom.workspace = true
+emb-model.workspace = true
+emb-stitch.workspace = true
+emb-formats.workspace = true
+emb-render.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+image.workspace = true
+
+[lints]
+workspace = true

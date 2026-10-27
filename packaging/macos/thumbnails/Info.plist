@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- The Quick Look thumbnail extension (ADR 0046). tools/package-macos.sh
+     puts the version in place of @VERSION@. The content types are declared
+     in the Info.plist of the app. -->
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key>
+	<string>org.shokujodx.app.thumbnails</string>
+	<key>CFBundleName</key>
+	<string>ShokujoDX Thumbnails</string>
+	<key>CFBundleExecutable</key>
+	<string>Thumbnails</string>
+	<key>CFBundlePackageType</key>
+	<string>XPC!</string>
+	<key>CFBundleShortVersionString</key>
+	<string>@VERSION@</string>
+	<key>CFBundleVersion</key>
+	<string>@VERSION@</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>10.15</string>
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.quicklook.thumbnail</string>
+		<key>NSExtensionPrincipalClass</key>
+		<string>Thumbnails.ThumbnailProvider</string>
+		<key>NSExtensionAttributes</key>
+		<dict>
+			<key>QLSupportedContentTypes</key>
+			<array>
+				<string>org.shokujodx.project</string>
+				<string>org.shokujodx.stitches</string>
+			</array>
+			<key>QLThumbnailMinimumDimension</key>
+			<integer>16</integer>
+		</dict>
+	</dict>
+</dict>
+</plist>

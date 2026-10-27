@@ -1,0 +1,22 @@
+[package]
+name = "emb-letter"
+description = "Lettering: TrueType and OpenType fonts, glyph strokes, satin and fill letters, text layout. No UI dependency."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+emb-geom.workspace = true
+emb-model.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ttf-parser.workspace = true
+flate2.workspace = true
+
+[build-dependencies]
+flate2.workspace = true
+
+[lints]
+workspace = true

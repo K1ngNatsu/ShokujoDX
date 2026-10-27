@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The file types of the program for the shared MIME database (ADR 0043). -->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-embroidery-project">
+    <comment>ShokujoDX project</comment>
+    <comment xml:lang="de">ShokujoDX-Projekt</comment>
+    <comment xml:lang="es">Proyecto de ShokujoDX</comment>
+    <comment xml:lang="ja">ShokujoDX プロジェクト</comment>
+    <sub-class-of type="application/json"/>
+    <glob pattern="*.embproj"/>
+  </mime-type>
+  <mime-type type="application/x-embroidery-stitches">
+    <comment>Machine embroidery file</comment>
+    <comment xml:lang="de">Maschinenstickdatei</comment>
+    <comment xml:lang="es">Archivo de bordado de máquina</comment>
+    <comment xml:lang="ja">ミシン刺しゅうファイル</comment>
+    <generic-icon name="image-x-generic"/>
+    <glob pattern="*.dst"/>
+    <glob pattern="*.dsb"/>
+    <glob pattern="*.dsz"/>
+    <glob pattern="*.hus"/>
+    <glob pattern="*.jef"/>
+    <glob pattern="*.pec"/>
+    <glob pattern="*.pes"/>
+    <glob pattern="*.sew"/>
+    <glob pattern="*.shv"/>
+    <glob pattern="*.vp3"/>
+  </mime-type>
+</mime-info>

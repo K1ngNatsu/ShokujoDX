@@ -1,0 +1,18 @@
+[Desktop Entry]
+Type=Application
+Name=ShokujoDX
+GenericName=Embroidery Digitizer
+GenericName[de]=Stickprogramm
+GenericName[es]=Programa de bordado
+GenericName[ja]=刺しゅうデザインソフト
+Comment=Make embroidery designs and machine files
+Comment[de]=Stickdesigns und Maschinendateien erstellen
+Comment[es]=Crear diseños de bordado y archivos de máquina
+Comment[ja]=刺しゅうのデザインとミシンのファイルを作る
+Exec=shokujodx %f
+Icon=shokujodx
+Terminal=false
+Categories=Graphics;VectorGraphics;
+Keywords=embroidery;stitch;digitize;sewing;DST;PES;VP3;
+MimeType=application/x-embroidery-project;application/x-embroidery-stitches;
+StartupWMClass=shokujodx

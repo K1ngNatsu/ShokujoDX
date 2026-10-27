@@ -1,0 +1,40 @@
+[package]
+name = "emb-app"
+description = "Desktop embroidery digitizer (egui)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+emb-geom.workspace = true
+emb-model.workspace = true
+emb-render.workspace = true
+eframe.workspace = true
+egui_dock.workspace = true
+egui-phosphor.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+rfd.workspace = true
+emb-formats.workspace = true
+emb-stitch.workspace = true
+emb-letter.workspace = true
+emb-art.workspace = true
+emb-library.workspace = true
+emb-script.workspace = true
+emb-sketch.workspace = true
+sysinfo.workspace = true
+image.workspace = true
+chrono.workspace = true
+flate2.workspace = true
+crc32fast.workspace = true
+toml.workspace = true
+
+[build-dependencies]
+winresource.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+emb-cli.workspace = true

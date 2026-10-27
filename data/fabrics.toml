@@ -1,0 +1,151 @@
+# Fabric presets.
+#
+# A fabric changes the stitch settings of satin and fill objects, relative
+# to the base settings. The base settings of the app are for a stable woven
+# cotton, so "cotton" changes nothing.
+#
+# The values are starting points from general digitizing practice. Do a
+# test sew-out on the real fabric before a production run.
+#
+# Fields:
+#   id                     a-z, 0-9, '_' and '-' only. Must be unique.
+#   name                   Text that the app shows.
+#   description            One or two sentences for the user.
+#   spacing_factor         The stitch spacing (satin and fill) is multiplied
+#                          by this. Less than 1 is denser. 0.5 to 2.
+#   stitch_length_factor   The fill stitch length is multiplied by this. 0.5 to 2.
+#   pull_mm                Added to the pull compensation of satin and fill,
+#                          in mm. -0.5 to 1.
+#   underlay               light | normal | heavy | lace. Objects with
+#                          automatic underlay get this weight. "lace" is
+#                          for free-standing lace: the lace underlay, and
+#                          Design info checks that no part is loose.
+#   backing                The backing (stabilizer) to use, for the worksheet.
+#   topping                Optional. The topping to use, for the worksheet.
+#   thickness_mm           The thickness of the fabric, for the thread use
+#                          estimate (Design info, worksheets). 0.05 to 10.
+#                          Optional: 0.6.
+
+[[fabric]]
+id = "cotton"
+name = "Woven cotton"
+thickness_mm = 0.4
+description = "Stable woven fabric such as shirts and poplin. The base settings."
+spacing_factor = 1.0
+stitch_length_factor = 1.0
+pull_mm = 0.0
+underlay = "normal"
+backing = "Tear-away, medium"
+
+[[fabric]]
+id = "denim"
+name = "Denim and canvas"
+thickness_mm = 0.9
+description = "Heavy, stable woven fabric such as jeans, bags and aprons."
+spacing_factor = 1.0
+stitch_length_factor = 1.0
+pull_mm = 0.05
+underlay = "normal"
+backing = "Tear-away, heavy"
+
+[[fabric]]
+id = "knit"
+name = "T-shirt knit"
+thickness_mm = 0.5
+description = "Thin knit that stretches. Fewer stitches and more underlay keep it flat."
+spacing_factor = 1.1
+stitch_length_factor = 1.0
+pull_mm = 0.15
+underlay = "heavy"
+backing = "Cut-away, medium (no-show mesh on light colors)"
+
+[[fabric]]
+id = "pique"
+name = "Piqué knit (polo shirts)"
+thickness_mm = 0.8
+description = "Knit with a textured face. A topping keeps the stitches on top of the texture."
+spacing_factor = 1.0
+stitch_length_factor = 1.0
+pull_mm = 0.15
+underlay = "heavy"
+backing = "Cut-away, medium"
+topping = "Water-soluble film"
+
+[[fabric]]
+id = "fleece"
+name = "Fleece and sweatshirt"
+thickness_mm = 2.0
+description = "Thick, soft knit with a pile. Heavy underlay flattens the pile."
+spacing_factor = 0.95
+stitch_length_factor = 1.0
+pull_mm = 0.2
+underlay = "heavy"
+backing = "Cut-away, medium"
+topping = "Water-soluble film"
+
+[[fabric]]
+id = "towel"
+name = "Towel (terry)"
+thickness_mm = 3.0
+description = "Loops of thread that hide thin stitches. Denser stitches, heavy underlay and a topping."
+spacing_factor = 0.9
+stitch_length_factor = 1.0
+pull_mm = 0.2
+underlay = "heavy"
+backing = "Tear-away, medium (cut-away for thin towels)"
+topping = "Water-soluble film (necessary)"
+
+[[fabric]]
+id = "felt"
+name = "Felt"
+thickness_mm = 1.5
+description = "Firm, non-woven fabric that does not fray. Good for patches and appliqué."
+spacing_factor = 1.05
+stitch_length_factor = 1.0
+pull_mm = 0.05
+underlay = "normal"
+backing = "Tear-away, light"
+
+[[fabric]]
+id = "leather"
+name = "Leather and vinyl"
+thickness_mm = 1.0
+description = "Each needle hole stays. Fewer, longer stitches and light underlay keep the material strong."
+spacing_factor = 1.25
+stitch_length_factor = 1.15
+pull_mm = 0.0
+underlay = "light"
+backing = "Cut-away, medium"
+
+[[fabric]]
+id = "silk"
+name = "Silk and thin woven"
+thickness_mm = 0.2
+description = "Thin, smooth fabric that puckers easily. Lighter stitches and light underlay."
+spacing_factor = 1.1
+stitch_length_factor = 1.0
+pull_mm = 0.05
+underlay = "light"
+backing = "Wash-away or light tear-away"
+
+[[fabric]]
+id = "cap"
+name = "Structured cap"
+thickness_mm = 1.5
+description = "Stiff, curved front panel. More pull compensation keeps columns full width."
+spacing_factor = 1.0
+stitch_length_factor = 1.0
+pull_mm = 0.15
+underlay = "normal"
+backing = "Cap backing (stiff tear-away)"
+
+[[fabric]]
+id = "water_soluble"
+name = "Water-soluble stabilizer (free-standing lace)"
+thickness_mm = 0.1
+description = "Lace with no fabric: the stabilizer washes away. Use a lace mesh under the design, lace underlay, and borders that touch the mesh."
+spacing_factor = 0.9
+stitch_length_factor = 1.0
+pull_mm = 0.0
+underlay = "lace"
+backing = "Water-soluble fibrous stabilizer, two layers, tight in the hoop"

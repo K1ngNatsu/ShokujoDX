@@ -1,0 +1,25 @@
+---
+source: crates/emb-cli/tests/bench.rs
+expression: "emb_cli::bench::report(&results, false)"
+---
+jpeg-logo: 600 × 360 px, simplified 255 × 128 px, 76.5 × 38.2 mm
+  colors 5, objects 7 (satins 4), stitches 2208, trims 7
+  covered 100.0 %, outside 15.1 %, color difference 5.3
+small-icon: 64 × 64 px, simplified 46 × 50 px, 28.8 × 31.2 mm
+  colors 3, objects 3 (satins 0), stitches 860, trims 3
+  covered 99.8 %, outside 3.1 %, color difference 1.6
+large-picture: 2400 × 1600 px, simplified 231 × 119 px, 92.5 × 47.5 mm
+  colors 4, objects 4 (satins 1), stitches 2849, trims 4
+  covered 99.9 %, outside 2.8 %, color difference 0.4
+soft-edges: 400 × 400 px, simplified 80 × 132 px, 24.0 × 39.6 mm
+  colors 2, objects 3 (satins 1), stitches 953, trims 2
+  covered 99.9 %, outside 3.5 %, color difference 1.6
+line-art: 500 × 400 px, simplified 264 × 144 px, 65.9 × 35.8 mm
+  colors 3, objects 7 (satins 0), stitches 2106, trims 7
+  covered 98.0 %, outside 0.0 %, color difference 2.1
+badge: 500 × 500 px, simplified 276 × 276 px, 55.2 × 55.2 mm
+  colors 4, objects 20 (satins 0), stitches 3029, trims 20
+  covered 100.0 %, outside 2.0 %, color difference 3.5
+busy-portrait: 800 × 1000 px, simplified 129 × 170 px, 51.4 × 67.9 mm
+  colors 6, objects 10 (satins 2), stitches 3450, trims 10
+  covered 99.8 %, outside 1.5 %, color difference 2.1

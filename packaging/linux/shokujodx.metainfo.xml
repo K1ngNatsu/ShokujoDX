@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The data of software centers (AppStream). -->
+<component type="desktop-application">
+  <id>shokujodx</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>ShokujoDX</name>
+  <summary>Make embroidery designs and machine files</summary>
+  <description>
+    <p>
+      Draw shapes, lettering and appliqué, or start from a picture or SVG
+      artwork. The program makes the stitches and writes the files of
+      embroidery machines (DST, PES, VP3, JEF, EXP and more).
+    </p>
+    <p>
+      Lettering with bundled embroidery fonts, Picture to design, specialty
+      stitches, thread charts, worksheets, shop tools and a parametric
+      sketch mode are included.
+    </p>
+  </description>
+  <url type="homepage">https://github.com/K1ngNatsu/ShokujoDX</url>
+  <url type="bugtracker">https://github.com/K1ngNatsu/ShokujoDX/issues</url>
+  <launchable type="desktop-id">shokujodx.desktop</launchable>
+  <provides>
+    <binary>shokujodx</binary>
+    <mediatype>application/x-embroidery-project</mediatype>
+  </provides>
+  <categories>
+    <category>Graphics</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+</component>

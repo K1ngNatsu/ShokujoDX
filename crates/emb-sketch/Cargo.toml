@@ -1,0 +1,19 @@
+[package]
+name = "emb-sketch"
+description = "Parametric sketches (P14, ADR 0068): points, lines, arcs and circles with constraints and dimensions, and the constraint solver. No UI dependency."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+emb-geom.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,19 @@
+[package]
+name = "emb-geom"
+description = "2D geometry for the embroidery engine: Bezier paths, flattening, polygons, clipping and offsets."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+geo.workspace = true
+libm.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+proptest.workspace = true
+
+[lints]
+workspace = true

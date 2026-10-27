@@ -1,0 +1,20 @@
+/target
+*.embproj.bak
+/out
+/dist
+
+# Secrets: keys, signing certificates and local settings never go in Git.
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+*.jks
+id_rsa*
+id_ed25519*
+
+# insta snapshots that wait for review
+*.pending-snap
+*.snap.new

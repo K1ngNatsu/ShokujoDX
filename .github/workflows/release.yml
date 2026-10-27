@@ -1,0 +1,146 @@
+# Builds the packages for Windows, macOS and Linux (ADR 0043).
+#
+# A tag v<version> (the version of Cargo.toml) makes a draft release with
+# all packages; the owner checks it and publishes it. "Run workflow" on the
+# Actions page makes test builds of the packages (artifacts, no release).
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Tag and version agree
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
+          test "${GITHUB_REF_NAME}" = "v$version" || { echo "Tag ${GITHUB_REF_NAME} is not v$version"; exit 1; }
+      - name: Inno Setup
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup --no-progress -y }
+      - name: Packages
+        run: powershell -ExecutionPolicy Bypass -File tools\package-windows.ps1 -Installer
+      - name: The installer installs and the program starts
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem dist\*-windows-setup.exe | Select-Object -First 1
+          Start-Process $setup.FullName -ArgumentList '/VERYSILENT', '/CURRENTUSER', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait
+          $exe = "$env:LOCALAPPDATA\Programs\ShokujoDX\ShokujoDX.exe"
+          & $exe --version | Out-String | Tee-Object -Variable v
+          if (-not $v.Contains('ShokujoDX')) { exit 1 }
+          if ((Get-ItemProperty 'HKCU:\Software\Classes\.embproj').'(default)' -ne 'ShokujoDX.Project') { exit 1 }
+          # The thumbnail handler (ADR 0046) is registered and its DLL is there.
+          $dll = (Get-ItemProperty 'HKCU:\Software\Classes\CLSID\{F1F7156E-ACB6-4891-9AC2-7E32E078B242}\InprocServer32').'(default)'
+          if (-not (Test-Path $dll)) { Write-Output "no thumbnail handler: $dll"; exit 1 }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows
+          path: |
+            dist/*-windows-portable.zip
+            dist/*-windows-setup.exe
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+      - name: Package
+        run: tools/package-macos.sh
+      - name: The disk image opens and the program starts
+        run: |
+          dmg=$(ls dist/*-macos.dmg | head -n 1)
+          hdiutil attach "$dmg" -mountpoint /tmp/emb -nobrowse
+          "/tmp/emb/ShokujoDX.app/Contents/MacOS/ShokujoDX" --version
+          lipo -archs "/tmp/emb/ShokujoDX.app/Contents/MacOS/ShokujoDX"
+          codesign --verify --deep --strict "/tmp/emb/ShokujoDX.app"
+          codesign -d --entitlements - "/tmp/emb/ShokujoDX.app/Contents/PlugIns/Thumbnails.appex"
+          cp -R "/tmp/emb/ShokujoDX.app" /Applications/
+          hdiutil detach /tmp/emb
+      - name: Quick Look makes a thumbnail (ADR 0046)
+        # The extension of an app with an ad hoc signature: this check shows
+        # if Quick Look takes it; it does not stop the release.
+        continue-on-error: true
+        run: |
+          /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "/Applications/ShokujoDX.app"
+          pluginkit -a "/Applications/ShokujoDX.app/Contents/PlugIns/Thumbnails.appex"
+          pluginkit -m -v -i org.shokujodx.app.thumbnails
+          mkdir -p /tmp/ql
+          qlmanage -t -s 128 -o /tmp/ql packaging/test/two-color-patch.embproj
+          ls -la /tmp/ql
+          test -s /tmp/ql/two-color-patch.embproj.png
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos
+          path: dist/*-macos.dmg
+
+  linux:
+    # An old system: the program runs on systems with this C library or a newer one.
+    runs-on: ubuntu-22.04
+    env:
+      # AppImages unpack themselves when the system has no FUSE.
+      APPIMAGE_EXTRACT_AND_RUN: 1
+    steps:
+      - uses: actions/checkout@v7
+      - name: Libraries for eframe and the AppImage tool
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev libfuse2
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: appimagetool
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/appimagetool" https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x "$RUNNER_TEMP/appimagetool"
+          echo "APPIMAGETOOL=$RUNNER_TEMP/appimagetool" >> "$GITHUB_ENV"
+      - name: Packages
+        run: tools/package-linux.sh
+      - name: The packages install and the program starts
+        run: |
+          sudo apt-get install -y ./dist/shokujodx_*.deb
+          shokujodx --version
+          test -f /usr/share/thumbnailers/shokujodx.thumbnailer
+          # The packages have no sample designs (ADR 0080): a test design of the repository.
+          shokujodx --thumbnail packaging/test/two-color-patch.embproj /tmp/thumb.png 128
+          test -s /tmp/thumb.png
+          image=$(ls dist/*.AppImage | head -n 1)
+          "$image" --version
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux
+          path: |
+            dist/*.deb
+            dist/*.AppImage
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [windows, macos, linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - uses: softprops/action-gh-release@v3
+        with:
+          draft: true
+          name: ShokujoDX ${{ github.ref_name }}
+          files: dist/*

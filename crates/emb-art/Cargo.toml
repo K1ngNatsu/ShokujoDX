@@ -1,0 +1,18 @@
+[package]
+name = "emb-art"
+description = "Bitmap artwork for digitizing: crop, adjust, color reduction, thread matching, auto-trace, click-to-stitch. No UI dependency."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+emb-geom.workspace = true
+emb-model.workspace = true
+# The stroke finder of the satin letters, for click-to-satin (ADR 0028).
+emb-letter.workspace = true
+# Pixel buffers and PNG/JPEG/BMP decoding. Pure Rust.
+image.workspace = true
+
+[lints]
+workspace = true

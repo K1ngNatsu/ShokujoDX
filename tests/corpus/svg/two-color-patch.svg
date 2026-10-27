@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test corpus: two-color patch (spec, "Standard test corpus").
+     A 60 mm red disc with a 6 mm white ring around it, and a white
+     running-stitch outline of a star inside. Units: 1 user unit = 1 mm. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="80mm" height="80mm" viewBox="0 0 80 80">
+  <circle id="disc" cx="40" cy="40" r="30" fill="#c81e2d"/>
+  <path id="ring" fill="#f0f0f0" fill-rule="evenodd"
+        d="M40,4 A36,36 0 1 1 39.99,4 Z M40,10 A30,30 0 1 0 40.01,10 Z"/>
+  <path id="star" fill="none" stroke="#f0f0f0" stroke-width="0.5"
+        d="M40,22 L44.7,33.5 L57.1,34.4 L47.6,42.4 L50.6,54.5 L40,48 L29.4,54.5 L32.4,42.4 L22.9,34.4 L35.3,33.5 Z"/>
+</svg>

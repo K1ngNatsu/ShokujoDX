@@ -1,0 +1,12 @@
+---
+source: crates/emb-cli/tests/golden.rs
+expression: summary(&s)
+---
+stitches: 4586
+jumps: 3
+trims: 3
+colors: 2
+extents: x -36.0 .. 36.0, y -36.0 .. 36.0 (size 72.0 x 72.0 mm)
+longest stitch: 4.37 mm
+threads: #c81e2d #f0f0f0
+fingerprint: 67af05f2c9b1a9c8

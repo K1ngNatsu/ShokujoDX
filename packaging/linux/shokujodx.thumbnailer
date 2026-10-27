@@ -1,0 +1,4 @@
+[Thumbnailer Entry]
+TryExec=shokujodx
+Exec=shokujodx --thumbnail %i %o %s
+MimeType=application/x-embroidery-project;application/x-embroidery-stitches;

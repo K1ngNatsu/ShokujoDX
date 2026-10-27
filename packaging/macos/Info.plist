@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- The data of the macOS app (ADR 0043). tools/package-macos.sh puts the
+     version in place of @VERSION@. The app declares no document types:
+     the window system (winit) does not give the program the files that
+     Finder opens, so a double-click would start the program with no file. -->
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>
+	<string>ShokujoDX</string>
+	<key>CFBundleDisplayName</key>
+	<string>ShokujoDX</string>
+	<key>CFBundleIdentifier</key>
+	<string>org.shokujodx.app</string>
+	<key>CFBundleExecutable</key>
+	<string>ShokujoDX</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>@VERSION@</string>
+	<key>CFBundleVersion</key>
+	<string>@VERSION@</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>de</string>
+		<string>es</string>
+		<string>ja</string>
+	</array>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.graphics-design</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>10.15</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>GPL-3.0-or-later</string>
+	<!-- The file types, so that Quick Look (the thumbnail extension in
+	     PlugIns, ADR 0046) knows them. -->
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>org.shokujodx.project</string>
+			<key>UTTypeDescription</key>
+			<string>ShokujoDX project</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.json</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>embproj</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
+	<key>UTImportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>org.shokujodx.stitches</string>
+			<key>UTTypeDescription</key>
+			<string>Machine embroidery file</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>dst</string>
+					<string>dsb</string>
+					<string>dsz</string>
+					<string>exp</string>
+					<string>hus</string>
+					<string>jef</string>
+					<string>pec</string>
+					<string>pes</string>
+					<string>sew</string>
+					<string>shv</string>
+					<string>vp3</string>
+					<string>xxx</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
+</dict>
+</plist>

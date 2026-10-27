@@ -1,0 +1,17 @@
+[package]
+name = "emb-render"
+description = "2D thread preview: converts stitch lists to colored line segments. No UI dependency."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+emb-geom.workspace = true
+emb-model.workspace = true
+# PNG output of the design picture. Pure Rust.
+image.workspace = true
+serde.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,27 @@
+[package]
+name = "emb-cli"
+description = "Command-line tools: convert machine files, stitch designs, write the test corpus."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+emb-geom.workspace = true
+emb-model.workspace = true
+emb-stitch.workspace = true
+emb-formats.workspace = true
+emb-render.workspace = true
+emb-letter.workspace = true
+emb-art.workspace = true
+emb-library.workspace = true
+emb-script.workspace = true
+emb-sketch.workspace = true
+chrono.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
+
+[lints]
+workspace = true

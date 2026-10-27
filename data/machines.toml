@@ -1,0 +1,152 @@
+# Machine profiles.
+#
+# Fields:
+#   id                     a-z, 0-9, '_' and '-' only. Must be unique.
+#   name                   Text that the app shows.
+#   brand                  Optional.
+#   default_format         Format that the export dialog selects first. Must be in formats.
+#   formats                Formats that the machine reads: vp3, dst, pes, exp, jef, hus, vip,
+#                          tbf, tap, dsb, dsz, 10o, 100, u01, dat. The default format must
+#                          be one that the app can write.
+#   hoops                  Hoop preset ids from hoops.toml that fit the machine.
+#   max_stitch_length_mm   The engine splits longer stitches.
+#   min_stitch_length_mm   The engine removes shorter stitches.
+#   stitches_per_minute    Used for the estimated sew time.
+#   trim_gap_mm            Optional. Same-color gaps up to this length get a
+#                          travel stitch; longer gaps get a trim. Default 2.0.
+#   trim_jumps             Optional. DST and TAP: the number of jump records that
+#                          make a trim (1 to 9). Default 3.
+#   trim_jump_mm           Optional. DST and TAP: the move of each jump of a trim,
+#                          in mm (0.2 to 6.0). Default 0.4.
+#   needles                Optional. The number of needles of a multi-needle
+#                          machine (1 to 15, ADR 0063). Not set: one needle.
+#   heads                  Optional. The number of heads of a machine that sews
+#                          more pieces at a time (1 to 50, P13). Not set: one head.
+#                          The user sets the heads of each machine in Design >
+#                          Machine Settings, because one model is sold with
+#                          different numbers of heads.
+
+# Reference machine.
+# UNVERIFIED: formats, stitch length limits and speed. Measure or confirm them
+# on the machine before Phase 1 ends (see the open questions in docs/SPEC.md).
+[[machine]]
+id = "husqvarna_topaz20"
+name = "DESIGNER TOPAZ 20"
+brand = "Husqvarna Viking"
+default_format = "vp3"
+formats = ["vp3"]
+hoops = ["topaz20_crown", "topaz20_splendid_square", "small_100x100", "medium_130x180", "square_200x200"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 800
+
+# Generic profile for machines with no profile. Uses the Tajima DST limit.
+[[machine]]
+id = "generic"
+name = "Generic machine (DST)"
+default_format = "dst"
+formats = ["dst", "pes", "vp3", "exp", "jef"]
+hoops = ["small_100x100", "medium_130x180", "square_200x200", "long_160x260", "large_200x300", "extra_large_360x200"]
+max_stitch_length_mm = 12.1
+min_stitch_length_mm = 0.3
+stitches_per_minute = 600
+
+# Multi-needle (industrial) machines. One profile for each brand.
+# UNVERIFIED: the formats come from public format lists and dealer
+# documentation, not from the machines. The speed is
+# a common running speed for the sew-time estimate, not the maximum. The
+# user can change the speed in Design > Sew time.
+# The DST limit (12.1 mm) is used for each profile, because each writes DST
+# records (TAP is DST without the header).
+# UNVERIFIED: the needles. Models of one brand have 6 to 15 needles; 15 is
+# the largest common head. The user sets the number of their machine in
+# Design > Needles.
+
+[[machine]]
+id = "tajima"
+name = "Tajima multi-needle"
+brand = "Tajima"
+default_format = "dst"
+formats = ["dst", "tbf"]
+hoops = ["round_120", "round_150", "round_180", "small_100x100", "medium_130x180", "square_200x200", "large_200x300", "square_300x300", "extra_large_360x200", "field_360x500", "cap_360x75"]
+max_stitch_length_mm = 12.1
+min_stitch_length_mm = 0.3
+stitches_per_minute = 850
+needles = 15
+
+[[machine]]
+id = "happy"
+name = "Happy multi-needle"
+brand = "Happy"
+default_format = "tap"
+formats = ["tap", "dst"]
+hoops = ["round_120", "round_150", "round_180", "small_100x100", "medium_130x180", "square_200x200", "large_200x300", "square_300x300", "extra_large_360x200", "field_360x500", "cap_360x75"]
+max_stitch_length_mm = 12.1
+min_stitch_length_mm = 0.3
+stitches_per_minute = 850
+needles = 15
+
+# Toyota machines use 10O and 100. The app reads them but cannot write them
+# (there is no open reference for a writer), so the default is DST.
+[[machine]]
+id = "toyota"
+name = "Toyota multi-needle"
+brand = "Toyota"
+default_format = "dst"
+formats = ["dst", "10o", "100"]
+hoops = ["round_120", "round_150", "round_180", "small_100x100", "medium_130x180", "square_200x200", "large_200x300", "square_300x300", "extra_large_360x200", "field_360x500", "cap_360x75"]
+max_stitch_length_mm = 12.1
+min_stitch_length_mm = 0.3
+stitches_per_minute = 850
+needles = 15
+
+[[machine]]
+id = "ricoma"
+name = "Ricoma multi-needle"
+brand = "Ricoma"
+default_format = "dst"
+formats = ["dst", "dsb"]
+hoops = ["round_120", "round_150", "round_180", "small_100x100", "medium_130x180", "square_200x200", "large_200x300", "square_300x300", "extra_large_360x200", "field_360x500", "cap_360x75"]
+max_stitch_length_mm = 12.1
+min_stitch_length_mm = 0.3
+stitches_per_minute = 850
+needles = 15
+
+[[machine]]
+id = "bai"
+name = "BAI multi-needle"
+brand = "BAI"
+default_format = "dst"
+formats = ["dst", "dsb"]
+hoops = ["round_120", "round_150", "round_180", "small_100x100", "medium_130x180", "square_200x200", "large_200x300", "square_300x300", "extra_large_360x200", "field_360x500", "cap_360x75"]
+max_stitch_length_mm = 12.1
+min_stitch_length_mm = 0.3
+stitches_per_minute = 850
+needles = 15
+
+# UNVERIFIED: no public format list found. DST is the format that almost all
+# multi-needle machines read.
+[[machine]]
+id = "highland"
+name = "Highland multi-needle"
+brand = "Highland"
+default_format = "dst"
+formats = ["dst"]
+hoops = ["round_120", "round_150", "round_180", "small_100x100", "medium_130x180", "square_200x200", "large_200x300", "square_300x300", "extra_large_360x200", "field_360x500", "cap_360x75"]
+max_stitch_length_mm = 12.1
+min_stitch_length_mm = 0.3
+stitches_per_minute = 850
+needles = 15
+
+# UNVERIFIED: Barudan machines read U01 (with the slow function) and DST.
+[[machine]]
+id = "barudan"
+name = "Barudan multi-needle"
+brand = "Barudan"
+default_format = "u01"
+formats = ["u01", "dst", "dsb", "dat"]
+hoops = ["round_120", "round_150", "round_180", "small_100x100", "medium_130x180", "square_200x200", "large_200x300", "square_300x300", "extra_large_360x200", "field_360x500", "cap_360x75"]
+max_stitch_length_mm = 12.1
+min_stitch_length_mm = 0.3
+stitches_per_minute = 850
+needles = 15

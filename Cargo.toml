@@ -1,0 +1,91 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+license = "GPL-3.0-or-later"
+repository = ""
+
+[workspace.dependencies]
+emb-geom = { path = "crates/emb-geom" }
+emb-model = { path = "crates/emb-model" }
+emb-stitch = { path = "crates/emb-stitch" }
+emb-formats = { path = "crates/emb-formats" }
+emb-render = { path = "crates/emb-render" }
+emb-letter = { path = "crates/emb-letter" }
+emb-cli = { path = "crates/emb-cli" }
+emb-art = { path = "crates/emb-art" }
+emb-library = { path = "crates/emb-library" }
+emb-thumbnail = { path = "crates/emb-thumbnail" }
+emb-script = { path = "crates/emb-script" }
+emb-sketch = { path = "crates/emb-sketch" }
+
+# Default features of geo enable multithreading (rayon). Keep it off so the
+# engine stays deterministic and single-threaded per object.
+geo = { version = "0.33", default-features = false }
+libm = "0.2"
+# Scripts (emb-script, ADR 0067). Pure Rust, MIT or Apache-2.0; a script
+# has no file, network or process functions.
+rhai = { version = "1.27", features = ["serde"] }
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+toml = "1"
+thiserror = "2"
+indexmap = { version = "2", features = ["serde"] }
+
+usvg = { version = "0.48", default-features = false }
+# PDF and PDF-based AI artwork import (emb-formats). Pure Rust, MIT. No
+# default features: no threads (rayon) and no clock (chrono). ADR 0027.
+lopdf = { version = "0.46", default-features = false }
+# Font reading for lettering (emb-letter). Pure Rust, forbids unsafe code.
+ttf-parser = { version = "0.25", default-features = false, features = ["std", "opentype-layout"] }
+base64 = "0.22"
+# Backdrop bitmaps in the app. Pure Rust decoders only.
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "bmp", "tiff", "gif"] }
+# Zip packages (send by email, the asset packages; P10 Milestone 6). Pure
+# Rust (miniz_oxide).
+flate2 = "1.1"
+crc32fast = "1.5"
+rfd = "0.17"
+
+eframe = "0.36"
+# Local date and time for worksheets and JEF headers (app and CLI only; not in engine crates).
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+egui_dock = "0.21"
+# Removable drives for Send to USB (app only; it calls the operating system,
+# ADR 0036), and the free memory for the picture decode budget (ADR 0077).
+# Only the disk and system parts.
+sysinfo = { version = "0.39", default-features = false, features = ["disk", "system"] }
+# Icon font (Phosphor, MIT) for the ribbon. See ADR 0010.
+egui-phosphor = "0.14"
+
+# The icon and the version data of the Windows program (emb-app build
+# script; it runs the resource compiler of the Windows SDK). ADR 0043.
+winresource = "0.1"
+
+proptest = "1"
+insta = "1"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+# Release builds keep the default debug data: the .pdb file (about 10 MB)
+# gives the function names in crash reports. Line tables made it 90 MB.
+
+[profile.dev.package."*"]
+# Optimize dependencies in debug builds so the prototype canvas stays fast.
+opt-level = 2
+
+# The prototype canvas draws many stitches per frame. Optimize these crates in debug builds too.
+[profile.dev.package.emb-app]
+opt-level = 2
+
+[profile.dev.package.emb-render]
+opt-level = 2
+
+# Fill and satin generation runs on each edit in the app.
+[profile.dev.package.emb-stitch]
+opt-level = 2

@@ -1,0 +1,20 @@
+[package]
+name = "emb-formats"
+description = "Read and write machine embroidery formats (VP3, DST, PES, ...)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+emb-model.workspace = true
+emb-geom.workspace = true
+usvg.workspace = true
+lopdf.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true

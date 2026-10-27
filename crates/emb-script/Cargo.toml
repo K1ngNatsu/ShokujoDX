@@ -1,0 +1,20 @@
+[package]
+name = "emb-script"
+description = "Scripts (ADR 0067): user tools in Rhai that change a copy of a design, with no access to files or the network. No UI dependency."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+emb-geom.workspace = true
+emb-model.workspace = true
+emb-stitch.workspace = true
+rhai.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
+
+[lints]
+workspace = true
