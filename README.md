@@ -275,7 +275,7 @@ documentation does not name the commercial programs that it compares features wi
 
 ## Contributors
 
-- **Zero** ([@K1ngNatsu](https://github.com/K1ngNatsu)): the owner. The
+- **[@K1ngNatsu](https://github.com/K1ngNatsu)**: the owner. The
   idea, the scope and the decisions, and the sew-out tests on a real
   machine.
 - **Evan Rush** ([@rushyrush](https://github.com/rushyrush)): the review of
