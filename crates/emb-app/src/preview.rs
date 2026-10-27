@@ -300,9 +300,12 @@ mod tests {
     fn large_design(st: &mut AppState) {
         st.doc.edit("Add fills", |d| {
             let t = d.add_thread("t", emb_model::Rgb(200, 30, 40));
-            for k in 0..64 {
-                let (x, y) = (f64::from(k % 8) * 12.0 - 48.0, f64::from(k / 8) * 12.0 - 30.0);
-                let outer = emb_geom::Path::rect(emb_geom::BBox::new(Point::new(x, y), Point::new(x + 11.0, y + 11.0)));
+            // Large enough that the thread takes much longer than a pause
+            // of the test thread on a busy computer (a CI runner): a plan of
+            // a few milliseconds was sometimes done before the first check.
+            for k in 0..256 {
+                let (x, y) = (f64::from(k % 16) * 8.0 - 100.0, f64::from(k / 16) * 8.0 - 100.0);
+                let outer = emb_geom::Path::rect(emb_geom::BBox::new(Point::new(x, y), Point::new(x + 60.0, y + 60.0)));
                 d.add_object(
                     t,
                     emb_model::ObjectKind::Fill {
