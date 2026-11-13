@@ -229,8 +229,8 @@ impl Graph {
             if !e.alive || e.closed {
                 continue;
             }
-            for k in 0..2 {
-                if e.ends[k] == n {
+            for (k, end) in e.ends.iter().enumerate() {
+                if *end == n {
                     v.push((i, k));
                 }
             }
