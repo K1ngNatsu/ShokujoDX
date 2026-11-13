@@ -64,7 +64,7 @@ fn anchor_name(a: Option<Anchor>) -> String {
 fn blank_hoop() -> HoopPreset {
     HoopPreset {
         id: String::new(),
-        name: "My hoop".into(),
+        name: tr("My hoop").into(),
         brand: None,
         width_mm: 150.0,
         height_mm: 150.0,
@@ -108,8 +108,8 @@ impl AppState {
         }
         let a = (a * 10.0).round() / 10.0;
         match key {
-            Some(k) => self.doc.edit_merged("Turn hoop", k, |d| d.hoop.angle_deg = a),
-            None => self.doc.edit("Turn hoop", |d| d.hoop.angle_deg = a),
+            Some(k) => self.doc.edit_merged(tr("Turn hoop"), k, |d| d.hoop.angle_deg = a),
+            None => self.doc.edit(tr("Turn hoop"), |d| d.hoop.angle_deg = a),
         }
         self.message = crate::i18n::fill("Hoop angle {}°", &[&a]);
     }
@@ -197,16 +197,16 @@ impl AppState {
         };
         let (id, name) = (hoop.id.clone(), hoop.name.clone());
         let rotation = turns[k];
-        self.doc.edit("Auto Hoop", |d| {
+        self.doc.edit(tr("Auto Hoop"), |d| {
             d.hoop.selection = HoopSelection::Preset { id };
             d.hoop.center = e.center();
             d.rotation = rotation;
         });
         self.fit_requested = true;
         self.message = if k == 1 {
-            format!("Auto hoop: {name}, with the design turned 90°")
+            crate::i18n::fill("Auto hoop: {}, with the design turned 90°", &[&name])
         } else {
-            format!("Auto hoop: {name}")
+            crate::i18n::fill("Auto hoop: {}", &[&name])
         };
     }
 
@@ -251,9 +251,9 @@ impl AppState {
             self.message = tr("Select a hoop first: the template shows the hoop field.").into();
             return;
         };
-        let title = format!("{} hoop template", self.doc.design().name);
+        let title = crate::i18n::fill("{} hoop template", &[&self.doc.design().name]);
         let Some(p) = rfd::FileDialog::new()
-            .set_title("Print hoop template (PDF)")
+            .set_title(tr("Print hoop template (PDF)"))
             .add_filter("PDF", &["pdf"])
             .set_directory(self.dialog_dir())
             .set_file_name(format!("{title}.pdf"))
@@ -592,7 +592,7 @@ fn options_window(ctx: &egui::Context, st: &mut AppState) {
             tr("Auto centering: the hoop center follows the center of the design"),
         );
         if ac != auto_center {
-            st.doc.edit("Hoop placement", |d| d.hoop.auto_center = ac);
+            st.doc.edit(tr("Hoop placement"), |d| d.hoop.auto_center = ac);
         }
         ui.checkbox(&mut st.show_hoop, tr("Show the hoop"));
 
@@ -685,7 +685,7 @@ fn options_window(ctx: &egui::Context, st: &mut AppState) {
                                 point: inv.apply(c + Point::new(x, y)),
                             };
                             let key = MergeKey::new(if end { "end_point" } else { "start_point" });
-                            st.doc.edit_merged("Auto start and end", key, |d| {
+                            st.doc.edit_merged(tr("Auto start and end"), key, |d| {
                                 if end {
                                     d.start_end.end = Some(p);
                                 } else {

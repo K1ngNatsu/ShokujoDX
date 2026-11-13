@@ -33,7 +33,7 @@
 //!   reader sees it as a color change.
 //! - Coordinates are rounded half away from zero, as in `dst`.
 
-use emb_geom::Point;
+use emb_geom::{Point, text};
 use emb_model::{Rgb, StitchDesign, StitchKind, StitchRecord, Thread, ThreadId};
 
 pub const UNITS_PER_MM: f64 = 10.0;
@@ -49,9 +49,9 @@ const FILLER: Rgb = Rgb(0, 0, 0);
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum Vp3Error {
-    #[error("not a VP3 file (the file does not start with \"%vsm%\")")]
+    #[error("{}", text::tr("not a VP3 file (the file does not start with \"%vsm%\")"))]
     BadMagic,
-    #[error("the VP3 file ends before the data is complete")]
+    #[error("{}", text::tr("the VP3 file ends before the data is complete"))]
     Truncated,
 }
 

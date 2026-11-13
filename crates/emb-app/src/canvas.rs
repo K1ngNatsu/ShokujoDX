@@ -182,11 +182,12 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
     // A draw tool takes the left and right clicks (see `draw`).
     let drawing = !matches!(st.tool, Tool::Select | Tool::Reshape);
     // Rulers and guides first: a drag from a ruler or on a guide is not for the tool.
+    let by_guides = st.sketch.is_none() && !st.hoopings_ui.mode && crate::workspace::guide_input(ui, &response, st);
     if st.sketch.is_some() {
         crate::sketch::handle_input(ui, &response, st, &map);
     } else if st.hoopings_ui.mode {
         crate::hooping::handle_input(ui, &response, st, &map);
-    } else if crate::workspace::guide_input(ui, &response, st) {
+    } else if by_guides {
     } else if st.tool == Tool::Reshape {
         crate::reshape::handle_input(ui, &response, st, &map);
     } else if drawing {
@@ -218,13 +219,29 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
         if response.secondary_clicked()
             && let Some(pos) = response.interact_pointer_pos()
         {
+            st.guide_menu = None;
             match pick(st, st.view.to_mm(rect, pos)) {
                 Some(id) if !st.selection.contains(id) => st.selection.set(id),
                 Some(_) => {}
-                None => st.selection.clear(),
+                None => {
+                    st.selection.clear();
+                    // A guide or a construction mark there: its menu.
+                    st.guide_menu = crate::guides::mark_at(st, rect, pos, false);
+                }
             }
         }
-        response.context_menu(|ui| commands::canvas_menu(ui, st));
+        response.context_menu(|ui| match st.guide_menu {
+            Some(target) => crate::guides::menu(ui, st, target),
+            None => commands::canvas_menu(ui, st),
+        });
+        // Double-click on a guide or a mark (no object there): type its place.
+        if response.double_clicked()
+            && let Some(pos) = response.interact_pointer_pos()
+            && pick(st, st.view.to_mm(rect, pos)).is_none()
+            && let Some(target) = crate::guides::mark_at(st, rect, pos, false)
+        {
+            st.edit_guide(target);
+        }
 
         // A click for a command that waits for an object.
         let picked = st.pick.is_some()
@@ -280,6 +297,19 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
                 None => {}
             }
         }
+    }
+    // The menu of a guide (from its ruler marker) with Reshape or a draw
+    // tool; the Select tool shows it in place of its own menu.
+    if st.sketch.is_none()
+        && !st.hoopings_ui.mode
+        && (by_guides || st.tool != Tool::Select)
+        && let Some(target) = st.guide_menu
+        && response
+            .context_menu(|ui| crate::guides::menu(ui, st, target))
+            .is_none()
+        && !by_guides
+    {
+        st.guide_menu = None;
     }
 
     // Groups are selected together; locked objects cannot be selected.
@@ -365,8 +395,9 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
         let pts: Vec<Pos2> = dir.points.iter().map(|p| map.to_screen(*p)).collect();
         painter.extend(Shape::dashed_line(&pts, Stroke::new(1.5, accent), 6.0, 4.0));
     }
-    crate::workspace::draw_guides(&painter, rect, st);
+    crate::guides::draw(&painter, rect, st);
     crate::workspace::draw_rulers(&painter, rect, st, visuals.dark_mode);
+    crate::guides::draw_ruler_markers(&painter, rect, st);
 }
 
 /// Returns the topmost object at the point (view mm), by its real shape.

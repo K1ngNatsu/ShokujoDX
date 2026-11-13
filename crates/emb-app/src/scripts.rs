@@ -136,7 +136,7 @@ impl AppState {
                 self.scripts.error = None;
                 if out.changed {
                     let new = out.design;
-                    self.doc.edit(format!("Script: {title}"), move |d| *d = new);
+                    self.doc.edit(fill("Script: {}", &[&title]), move |d| *d = new);
                     self.selection.set_all(out.selection);
                     self.message = fill("The script \"{}\" ran. Undo takes back its changes.", &[&title]);
                 } else {
@@ -270,7 +270,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         });
         ui.horizontal(|ui| {
             if ui
-                .button(tr("Run"))
+                .button(tr("Run Script"))
                 .on_hover_text(tr("Run the script. Undo takes back all its changes in one step."))
                 .clicked()
             {

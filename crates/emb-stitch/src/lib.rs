@@ -16,6 +16,8 @@ pub mod cross;
 pub mod curves;
 pub mod effects;
 pub mod fill;
+pub mod hidden;
+pub mod knockout;
 pub mod lace;
 pub mod meander;
 pub mod motifs;
@@ -35,4 +37,4 @@ pub use object::{
     MAX_OBJECT_MM, ObjectStitches, Run, RunLink, StitchCache, StitchError, StopReason, is_puff, stitch_object,
     stitch_subpaths, too_large,
 };
-pub use plan::{ObjectSpan, PlanOptions, PlanStop, PlanWarning, StitchPlan, build_plan};
+pub use plan::{ObjectSpan, PlanOptions, PlanStop, PlanWarning, StitchPlan, build_plan, build_plan_until};

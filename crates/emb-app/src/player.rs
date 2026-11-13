@@ -32,6 +32,8 @@ pub struct Player {
     pub speed: f64,
     /// The part of a record not yet moved.
     carry: f64,
+    /// The canvas showed the stitches before the player opened.
+    plan_before: bool,
 }
 
 impl Default for Player {
@@ -41,6 +43,7 @@ impl Default for Player {
             playing: false,
             speed: 200.0,
             carry: 0.0,
+            plan_before: true,
         }
     }
 }
@@ -48,12 +51,24 @@ impl Default for Player {
 impl AppState {
     /// Shows or hides the player bar. Showing it puts the cursor at the start.
     pub fn toggle_player(&mut self) {
-        self.player.shown = !self.player.shown;
-        self.player.playing = false;
         if self.player.shown {
-            self.show_plan = true;
-            self.cursor.get_or_insert(0);
+            self.close_player();
+            return;
         }
+        self.player.shown = true;
+        self.player.playing = false;
+        self.player.plan_before = self.show_plan;
+        self.show_plan = true;
+        self.cursor.get_or_insert(0);
+    }
+
+    /// Hides the player bar. The canvas shows all of the design again (no
+    /// cursor), as before the player opened.
+    pub fn close_player(&mut self) {
+        self.player.shown = false;
+        self.player.playing = false;
+        self.cursor = None;
+        self.show_plan = self.player.plan_before;
     }
 
     /// Starts or pauses. At the end, play starts again from the start.
@@ -177,8 +192,7 @@ pub fn bar(ui: &mut egui::Ui, st: &mut AppState) {
         }
         ui.label(text);
         if button(ui, ph::X, tr("Close the player")) {
-            st.player.shown = false;
-            st.player.playing = false;
+            st.close_player();
         }
     });
 }
@@ -219,6 +233,21 @@ mod tests {
         assert_eq!(st.cursor, Some(0));
         st.play_pause();
         assert!(!st.player.playing);
+        // Closed, the canvas shows all of the design again.
+        st.player_tick(0.1);
+        st.toggle_player();
+        assert!(!st.player.shown && st.cursor.is_none() && st.show_plan);
+    }
+
+    #[test]
+    fn closing_goes_back_to_the_view_before() {
+        let mut st = state();
+        st.show_plan = false;
+        st.toggle_player();
+        assert!(st.show_plan);
+        st.cursor = Some(5);
+        st.close_player();
+        assert_eq!((st.cursor, st.show_plan), (None, false));
     }
 
     #[test]

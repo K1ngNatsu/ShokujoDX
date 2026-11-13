@@ -12,7 +12,7 @@ use emb_model::{
     SatinGeometry, SatinParams, ThreadId,
 };
 
-pub const NAMES: [&str; 58] = [
+pub const NAMES: [&str; 60] = [
     "circle-fill",
     "satin-column",
     "s-curve",
@@ -42,6 +42,8 @@ pub const NAMES: [&str; 58] = [
     "effects",
     "blends",
     "buttonholes",
+    "buttonhole-shapes",
+    "mitre-corners",
     "borders",
     "vectors",
     "shaping",
@@ -110,6 +112,8 @@ pub fn build(name: &str) -> Option<Design> {
         "effects" => effects(),
         "blends" => blends(),
         "buttonholes" => buttonholes(),
+        "buttonhole-shapes" => buttonhole_shapes(),
+        "mitre-corners" => mitre_corners(),
         "borders" => borders(),
         "vectors" => vectors(),
         "shaping" => shaping(),
@@ -1283,7 +1287,7 @@ fn blends() -> Design {
 /// front), and two buttonholes along a line (a cuff).
 fn buttonholes() -> Design {
     use emb_model::ButtonholeSpec;
-    use emb_model::decor::{buttonhole, string_positions};
+    use emb_model::buttonhole::{buttonhole, string_positions};
     let mut d = Design::new("");
     let t = d.add_thread("Navy", Rgb(25, 40, 100));
     let spec = ButtonholeSpec::default();
@@ -1292,6 +1296,91 @@ fn buttonholes() -> Design {
     for (line, count, across) in [(&front[..], 5, true), (&cuff[..], 2, false)] {
         for (c, a) in string_positions(line, count, across) {
             for kind in buttonhole(&spec, c, a) {
+                d.add_object(t, kind);
+            }
+        }
+    }
+    d
+}
+
+/// ADR 0085: each buttonhole shape, upright, for a 5/8 in button (the
+/// keyhole twice: corded, and turned end for end); below, square
+/// buttonholes for five standard buttons, scaled to their size.
+fn buttonhole_shapes() -> Design {
+    use emb_model::buttonhole::{BUTTON_THICKNESS_MM, INCH_BUTTONS, buttonhole};
+    use emb_model::{ButtonholeShape, ButtonholeSpec};
+    let mut d = Design::new("");
+    let t = d.add_thread("Navy", Rgb(25, 40, 100));
+    let opening = ButtonholeSpec::opening_for(INCH_BUTTONS[6].mm, BUTTON_THICKNESS_MM);
+    let mut specs: Vec<ButtonholeSpec> = ButtonholeShape::ALL
+        .iter()
+        .map(|&shape| ButtonholeSpec {
+            shape,
+            length_mm: opening,
+            eye_mm: if shape == ButtonholeShape::Eyelet { 5.0 } else { 3.0 },
+            ..ButtonholeSpec::default()
+        })
+        .collect();
+    specs.push(ButtonholeSpec {
+        shape: ButtonholeShape::Keyhole,
+        length_mm: opening,
+        corded: true,
+        flip: true,
+        ..ButtonholeSpec::default()
+    });
+    for (i, spec) in specs.iter().enumerate() {
+        for kind in buttonhole(&spec.scaled(), p(-70.0 + 18.0 * i as f64, -25.0), 90.0) {
+            d.add_object(t, kind);
+        }
+    }
+    for (i, button) in [2, 4, 6, 8, 10].iter().map(|&k| INCH_BUTTONS[k]).enumerate() {
+        let spec = ButtonholeSpec {
+            length_mm: ButtonholeSpec::opening_for(button.mm, BUTTON_THICKNESS_MM),
+            ..ButtonholeSpec::default()
+        }
+        .scaled();
+        for kind in buttonhole(&spec, p(-60.0 + 30.0 * i as f64, 25.0), 90.0) {
+            d.add_object(t, kind);
+        }
+    }
+    d
+}
+
+/// ADR 0086: corners that stop and start (left) and mitre corners
+/// (right): letters in an embroidery font and in a TrueType font, and the
+/// buttonhole shapes that can mitre.
+fn mitre_corners() -> Design {
+    use emb_model::buttonhole::buttonhole;
+    use emb_model::{ButtonholeShape, ButtonholeSpec};
+    let mut d = Design::new("");
+    let t = d.add_thread("Navy", Rgb(25, 40, 100));
+    let block = emb_letter::bundled::embroidery("Block Sans").expect("bundled embroidery font");
+    let lato = emb_letter::bundled::font("Lato", "Bold").expect("bundled font");
+    for (mitre, x) in [(false, -50.0), (true, 50.0)] {
+        let mut l = Lettering::new("ELF 7", emb_letter::LetterSource::font_ref(&block), 20.0, p(x, -40.0));
+        l.justify = Justify::Center;
+        l.mitre_corners = mitre;
+        emb_letter::relayout(&mut l, &block);
+        d.add_object(t, ObjectKind::Lettering(Box::new(l)));
+        let mut l = Lettering::new("LEFT", lato.font_ref(), 20.0, p(x, -5.0));
+        l.justify = Justify::Center;
+        l.mitre_corners = mitre;
+        emb_letter::relayout(&mut l, &lato);
+        d.add_object(t, ObjectKind::Lettering(Box::new(l)));
+        let shapes = [
+            ButtonholeShape::Square,
+            ButtonholeShape::RoundEnd,
+            ButtonholeShape::Keyhole,
+        ];
+        for (i, shape) in shapes.into_iter().enumerate() {
+            let spec = ButtonholeSpec {
+                shape,
+                length_mm: 20.0,
+                mitre,
+                ..ButtonholeSpec::default()
+            }
+            .scaled();
+            for kind in buttonhole(&spec, p(x - 20.0 + 20.0 * i as f64, 30.0), 90.0) {
                 d.add_object(t, kind);
             }
         }
@@ -1796,7 +1885,10 @@ fn smart_logo() -> Design {
     let mut d = Design::new("");
     let threads: Vec<ThreadId> = r.palette.iter().map(|c| d.add_thread(c.to_hex(), *c)).collect();
     for o in objs {
-        d.add_object(threads[o.color as usize], o.kind);
+        let id = d.add_object(threads[o.color as usize], o.kind);
+        if let Some(o) = d.object_mut(id) {
+            o.functions = emb_art::smart::functions();
+        }
     }
     d
 }

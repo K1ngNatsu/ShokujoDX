@@ -132,6 +132,10 @@ pub struct AppState {
     pub show_options: bool,
     /// The Measure tool line, in design coordinates.
     pub measure: Option<(Point, Point)>,
+    /// The guide or construction mark whose menu is open (ADR 0089).
+    pub guide_menu: Option<crate::guides::MarkRef>,
+    /// The edit window of a guide or a construction mark.
+    pub guide_edit: Option<crate::guides::GuideEdit>,
     /// Keyboard modifiers of the current frame on the canvas.
     pub mods: Modifiers,
     /// Values of the Skew and Rotate dialog: skew X, skew Y, rotate (degrees).
@@ -301,6 +305,14 @@ pub struct AppState {
     pub corner_dialog: Option<crate::corners::CornerDialog>,
     pub hole_dialog: Option<crate::corners::HoleDialog>,
     pub simplify_dialog: Option<crate::simplify::SimplifyDialog>,
+    /// The Close Gaps window, and its last settings.
+    pub gaps_dialog: Option<crate::gaps::GapsDialog>,
+    pub gap_settings: emb_geom::gaps::Gaps,
+    /// The Clean Up window, and its last settings.
+    pub cleanup_dialog: Option<crate::cleanup::CleanupDialog>,
+    /// The Envelope window (ADR 0092).
+    pub envelope_dialog: Option<crate::drawing_aids::EnvelopeDialog>,
+    pub cleanup_settings: emb_geom::cleanup::Cleanup,
     /// The Paste special window.
     pub paste_special: Option<crate::editing::PasteSpecial>,
     /// The bundled fonts and the fonts of the computer.
@@ -319,6 +331,8 @@ pub struct AppState {
     pub letter_height: f64,
     /// The search text of the font list.
     pub font_filter: String,
+    /// The font under the pointer in a font list, with the list (`font_picker`).
+    pub font_hover: Option<(String, emb_model::FontRef)>,
     pub fonts_window: crate::fonts::FontsWindow,
     pub monogram_window: crate::monogram::MonogramWindow,
     pub team_window: crate::teamnames::TeamNamesWindow,
@@ -366,7 +380,7 @@ fn load_catalogs() -> (HoopCatalog, MachineCatalog, emb_model::FabricCatalog, St
         .and_then(|p| match HoopCatalog::load(&p) {
             Ok(c) => Some(c),
             Err(e) => {
-                notes.push(format!("{e}; using built-in hoops"));
+                notes.push(crate::i18n::fill("{}; using built-in hoops", &[&e]));
                 None
             }
         })
@@ -380,7 +394,7 @@ fn load_catalogs() -> (HoopCatalog, MachineCatalog, emb_model::FabricCatalog, St
             |p| match MachineCatalog::load(&p).and_then(|m| m.validate_hoops(&hoops).map(|_| m)) {
                 Ok(c) => Some(c),
                 Err(e) => {
-                    notes.push(format!("{e}; using built-in machines"));
+                    notes.push(crate::i18n::fill("{}; using built-in machines", &[&e]));
                     None
                 }
             },
@@ -398,7 +412,7 @@ fn load_catalogs() -> (HoopCatalog, MachineCatalog, emb_model::FabricCatalog, St
             {
                 Ok(c) => Some(c),
                 Err(e) => {
-                    notes.push(format!("{e}; using built-in fabrics"));
+                    notes.push(crate::i18n::fill("{}; using built-in fabrics", &[&e]));
                     None
                 }
             }
@@ -473,10 +487,12 @@ impl EmbApp {
             let reports = crate::crash::take_unseen(&dir);
             if !reports.is_empty() && state.notice.is_none() {
                 let mut lines = vec![
-                    "The program stopped because of an error the last time it ran. Your work is in the \
-                     automatic backups."
-                        .to_string(),
-                    "Please send this report with your feedback:".to_string(),
+                    tr(
+                        "The program stopped because of an error the last time it ran. Your work is in the \
+                     automatic backups.",
+                    )
+                    .to_string(),
+                    tr("Please send this report with your feedback:").to_string(),
                 ];
                 lines.extend(reports.iter().map(|p| p.display().to_string()));
                 state.notice = Some(crate::file::Notice {
@@ -569,6 +585,8 @@ impl AppState {
             save_settings: false,
             show_options: false,
             measure: None,
+            guide_menu: None,
+            guide_edit: None,
             mods: Modifiers::NONE,
             arrange_values: (15.0, 0.0, 45.0),
             view_filter: Default::default(),
@@ -665,6 +683,11 @@ impl AppState {
             corner_dialog: None,
             hole_dialog: None,
             simplify_dialog: None,
+            gaps_dialog: None,
+            gap_settings: emb_geom::gaps::Gaps::STANDARD,
+            cleanup_dialog: None,
+            envelope_dialog: None,
+            cleanup_settings: emb_geom::cleanup::Cleanup::STANDARD,
             paste_special: None,
             fonts: crate::lettering::FontLibrary::default(),
             lettering_dialog: None,
@@ -675,6 +698,7 @@ impl AppState {
             letter_font: emb_model::FontRef::embroidery(emb_letter::bundled::DEFAULT_EMBROIDERY, ""),
             letter_height: emb_model::lettering::DEFAULT_HEIGHT_MM,
             font_filter: String::new(),
+            font_hover: None,
             fonts_window: crate::fonts::FontsWindow::default(),
             monogram_window: crate::monogram::MonogramWindow::default(),
             team_window: Default::default(),
@@ -777,7 +801,7 @@ impl AppState {
             self.message = tr("Shortest order: no shorter order found.").into();
             return;
         }
-        let _ = self.doc.try_edit("Shortest Order", |d| {
+        let _ = self.doc.try_edit(tr("Shortest Order"), |d| {
             *d = probe;
             Ok::<(), ()>(())
         });
@@ -814,7 +838,7 @@ impl AppState {
             self.message = tr("Cap order: the order is already from the center out.").into();
             return;
         }
-        let _ = self.doc.try_edit("Cap Order", |d| {
+        let _ = self.doc.try_edit(tr("Cap Order"), |d| {
             *d = probe;
             Ok::<(), ()>(())
         });
@@ -897,7 +921,7 @@ impl AppState {
     #[cfg(test)]
     pub fn add_sample_objects(&mut self) {
         use emb_model::{FillParams, RunningParams, SatinGeometry, SatinParams};
-        let ids = self.doc.edit("Add Sample Objects", |d| {
+        let ids = self.doc.edit(tr("Add Sample Objects"), |d| {
             let red = d
                 .threads
                 .iter()
@@ -1001,7 +1025,9 @@ impl AppState {
         }
         // Esc closes the Lettering window, also when its text box has the focus.
         if self.lettering_dialog.is_some() && ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape)) {
-            self.lettering_dialog = None;
+            if let Some(d) = self.lettering_dialog.take() {
+                self.finish_lettering(d, false);
+            }
             ctx.memory_mut(|m| {
                 if let Some(id) = m.focused() {
                     m.surrender_focus(id);
@@ -1042,6 +1068,8 @@ impl AppState {
         if self.confirm.is_some() || self.notice.is_some() || self.export.is_some() {
             return;
         }
+        // A point tool takes a typed length (the text, and its keys).
+        crate::draw::take_typed(ctx, self);
         // File commands (Shift variant first).
         let (save_as, save, new, open, import, export) = ctx.input_mut(|i| {
             (
@@ -1075,12 +1103,12 @@ impl AppState {
             self.hide_selection();
         }
         // Draw tools take Enter, Backspace and Esc first; Reshape also takes
-        // Delete while a node is selected.
+        // Delete and B (Break at Node) while a node is selected.
         if self.tool != Tool::Select {
             let node = self.tool == Tool::Reshape && self.reshape.node.is_some();
             let keys = ctx.input_mut(|i| {
-                [Key::Enter, Key::Backspace, Key::Escape, Key::Delete].map(|k| {
-                    let take = k != Key::Delete || node;
+                [Key::Enter, Key::Backspace, Key::Escape, Key::Delete, Key::B].map(|k| {
+                    let take = !matches!(k, Key::Delete | Key::B) || node;
                     (k, take && i.consume_key(Modifiers::NONE, k))
                 })
             });
@@ -1254,16 +1282,16 @@ impl AppState {
             self.selection.clear();
         }
         if start {
-            self.sequence_selected("Move to Start", |d, ids| d.move_objects_to_start(ids));
+            self.sequence_selected(tr("Move to Start"), |d, ids| d.move_objects_to_start(ids));
         }
         if end {
-            self.sequence_selected("Move to End", |d, ids| d.move_objects_to_end(ids));
+            self.sequence_selected(tr("Move to End"), |d, ids| d.move_objects_to_end(ids));
         }
         if back {
-            self.sequence_selected("Move Back One", |d, ids| d.step_objects(ids, Step::Backward));
+            self.sequence_selected(tr("Move Back One"), |d, ids| d.step_objects(ids, Step::Backward));
         }
         if forward {
-            self.sequence_selected("Move Forward One", |d, ids| d.step_objects(ids, Step::Forward));
+            self.sequence_selected(tr("Move Forward One"), |d, ids| d.step_objects(ids, Step::Forward));
         }
     }
 
@@ -1287,17 +1315,11 @@ impl AppState {
                 egui::Stroke::new(1.0, ui.visuals().weak_text_color())
             };
             p.rect_stroke(rect, 3.0, ring, egui::StrokeKind::Outside);
-            let resp = resp.on_hover_text(crate::i18n::fill(
-                "{}\nClick: use for new objects{}",
-                &[
-                    &t.name,
-                    &(if self.selection.is_empty() {
-                        ""
-                    } else {
-                        " and the selection"
-                    }),
-                ],
-            ));
+            let resp = resp.on_hover_text(if self.selection.is_empty() {
+                crate::i18n::fill("{}\nClick: use for new objects", &[&t.name])
+            } else {
+                crate::i18n::fill("{}\nClick: use for new objects and the selection", &[&t.name])
+            });
             if resp.clicked() {
                 self.current_thread = Some(t.id);
                 if !self.selection.is_empty() {
@@ -1320,7 +1342,9 @@ impl AppState {
                 ui.data_mut(|d| d.insert_temp(popup_id, color));
                 if ui.button(tr("Add thread")).clicked() {
                     let rgb = Rgb(color.r(), color.g(), color.b());
-                    let id = self.doc.edit("Add thread", |d| crate::file::thread_for_color(d, rgb));
+                    let id = self
+                        .doc
+                        .edit(tr("Add thread"), |d| crate::file::thread_for_color(d, rgb));
                     self.current_thread = Some(id);
                     ui.close();
                 }
@@ -1342,7 +1366,7 @@ impl AppState {
             ui.horizontal(|ui| {
                 ui.strong(tr("Sketch:"));
                 ui.label(prompt);
-                ui.weak(format!("· {state} · Esc: cancel"));
+                ui.weak(crate::i18n::fill("· {} · Esc: cancel", &[&state]));
             });
         }
         // While drawing, the first line tells the user what to do next.
@@ -1402,12 +1426,12 @@ impl AppState {
                 ui.separator();
                 let (text, color) = if info.errors() > 0 {
                     (
-                        format!("⛔ {} problems", info.issues.len()),
+                        crate::i18n::fill("⛔ {} problems", &[&info.issues.len()]),
                         egui::Color32::from_rgb(220, 60, 50),
                     )
                 } else {
                     (
-                        format!("⚠ {} warnings", info.issues.len()),
+                        crate::i18n::fill("⚠ {} warnings", &[&info.issues.len()]),
                         egui::Color32::from_rgb(230, 150, 20),
                     )
                 };
@@ -1636,6 +1660,9 @@ impl eframe::App for EmbApp {
         crate::scripts::window(&ctx, st);
         crate::corners::windows(&ctx, st);
         crate::simplify::window(&ctx, st);
+        crate::gaps::window(&ctx, st);
+        crate::cleanup::window(&ctx, st);
+        crate::drawing_aids::envelope_window(&ctx, st);
         crate::editing::paste_special_window(&ctx, st);
         crate::help::window(&ctx, st);
         crate::palette::window(&ctx, st);
@@ -1653,6 +1680,7 @@ impl eframe::App for EmbApp {
         crate::teamnames::window(&ctx, st);
         crate::keyboard::window(&ctx, st);
         crate::alphabets::window(&ctx, st);
+        crate::guides::window(&ctx, st);
         crate::send::window(&ctx, st);
         crate::clipart::window(&ctx, st);
         // Jobs and the library scan go on while their tabs are hidden.

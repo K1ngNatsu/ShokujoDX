@@ -22,6 +22,7 @@
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, mpsc};
 
 use eframe::egui::{
@@ -231,6 +232,11 @@ pub struct Wizard {
     job: Option<Job>,
     /// The key of a preview whose job failed: it is not tried again.
     failed: Option<u64>,
+    /// The key of a preview whose job the user stopped: it is not made
+    /// again until a setting changes.
+    halted: Option<u64>,
+    /// The change of the picture that a thread makes, if one runs.
+    edit: Option<EditJob>,
     /// Finish was clicked while a job ran: finish when it ends.
     finish: bool,
     pub note: String,
@@ -293,22 +299,46 @@ pub struct Work {
     checks: Option<(u64, Arc<Vec<Check>>)>,
     /// The density limit of the Options (layers of thread), for the checks.
     pub density_limit: f64,
+    /// The stop flag of the job that has this work state (`None` in the
+    /// window): when it is set, the work stops at the next stop point.
+    stop: Option<Arc<AtomicBool>>,
 }
 
 /// A background job that makes the preview picture of a step.
 struct Job {
-    /// The preview key when the job started.
+    /// The step and the preview key when the job started.
+    step: Step,
     key: u64,
     rx: mpsc::Receiver<JobDone>,
+    /// Set: the job stops at its next stop point (ADR 0081).
+    stop: Arc<AtomicBool>,
 }
 
 /// What a job gives back: its work state (with the results it made), the
-/// preview picture and its key, and whether to show its pixels sharp.
+/// preview picture and its key, and whether to show its pixels sharp. A
+/// job that stopped has no picture; the results it made are kept.
 struct JobDone {
     work: Work,
     key: u64,
-    picture: RgbaImage,
-    sharp: bool,
+    picture: Option<(RgbaImage, bool)>,
+}
+
+/// A change of the picture in the Background step that a thread makes: on
+/// a large picture the cut-out and the edge color take up to 0.5 s, and the
+/// window must not wait (P12 audit).
+struct EditJob {
+    /// The state before the change, for Undo.
+    before: (RgbaImage, Option<Subject>),
+    /// The change cuts out the subject: the cut-out goes on from its result.
+    cutout: bool,
+    rx: mpsc::Receiver<EditDone>,
+}
+
+/// What an edit job gives back: the new picture (`None`: no change) and
+/// the note for the user.
+struct EditDone {
+    cut: Option<RgbaImage>,
+    note: String,
 }
 
 impl std::ops::Deref for Wizard {
@@ -334,6 +364,13 @@ fn hash(v: impl Hash) -> u64 {
     let mut h = DefaultHasher::new();
     v.hash(&mut h);
     h.finish()
+}
+
+/// The colors of the thread chart `c` and their key (a hash of them), for
+/// "Colors from the thread chart".
+fn chart_colors(c: &ThreadChart) -> (u64, Arc<Vec<Rgb>>) {
+    let colors: Vec<Rgb> = c.threads.iter().map(|t| t.color).collect();
+    (hash(&colors), Arc::new(colors))
 }
 
 impl Wizard {
@@ -374,6 +411,8 @@ impl Wizard {
             texture: None,
             job: None,
             failed: None,
+            halted: None,
+            edit: None,
             finish: false,
             note: String::new(),
             work: Work {
@@ -409,6 +448,7 @@ impl Wizard {
                 cross_result: None,
                 checks: None,
                 density_limit: emb_render::density::DEFAULT_LIMIT,
+                stop: None,
             },
         })
     }
@@ -442,6 +482,9 @@ impl Wizard {
     /// Cut out the subject in the box `[x0, y0, x1, y1]` (work pixels): a
     /// new cut-out of the picture as it is now.
     pub fn cut_out(&mut self, rect: [f64; 4]) {
+        if self.editing() {
+            return;
+        }
         let r = [
             rect[0].min(rect[2]),
             rect[1].min(rect[3]),
@@ -449,7 +492,7 @@ impl Wizard {
             rect[1].max(rect[3]),
         ];
         if r[2] - r[0] < 4.0 || r[3] - r[1] < 4.0 {
-            self.note = "Drag a box round the subject.".into();
+            self.note = tr("Drag a box round the subject.").into();
             return;
         }
         let before = (self.work.cut.clone(), self.subject.clone());
@@ -462,48 +505,134 @@ impl Wizard {
         self.run_cutout(before);
     }
 
-    /// Cuts again with the box and the marks of the cut-out; `before` is
-    /// the state for Undo.
+    /// Cuts again with the box and the marks of the cut-out (on a thread);
+    /// `before` is the state for Undo.
     fn run_cutout(&mut self, before: (RgbaImage, Option<Subject>)) {
         let Some(s) = self.subject.as_mut() else { return };
         // Another change since the last cut: it is the new base.
         if s.rev != self.work.rev {
             s.base = Arc::new(self.work.cut.clone());
         }
-        let base = s.base.clone();
-        let (w, h) = base.dimensions();
-        let mut marks = vec![Mark::None; (w * h) as usize];
-        for st in &s.strokes {
-            stamp_marks(&mut marks, w, h, st);
-        }
-        let Some(mask) = cutout::cutout(&base, s.rect, &marks) else {
-            self.note = "The cut found no subject: drag a box round it, with some background in the box.".into();
-            return;
-        };
-        let mut out = (*base).clone();
-        let mut kept = 0;
-        for (k, p) in out.pixels_mut().enumerate() {
-            if mask[k] {
-                kept += 1;
-                if p[3] < 128 {
-                    // A keep mark on a removed pixel brings it back.
-                    let (x, y) = (k as u32 % w, k as u32 / w);
-                    *p = *self.work.source.get_pixel(x, y);
+        let (base, rect, strokes) = (s.base.clone(), s.rect, s.strokes.clone());
+        let source = self.work.source.clone();
+        self.start_edit(before, true, move || {
+            let (w, h) = base.dimensions();
+            let mut marks = vec![Mark::None; (w * h) as usize];
+            for st in &strokes {
+                stamp_marks(&mut marks, w, h, st);
+            }
+            let Some(mask) = cutout::cutout(&base, rect, &marks) else {
+                return EditDone {
+                    cut: None,
+                    note: tr("The cut found no subject: drag a box round it, with some background in the box.").into(),
+                };
+            };
+            let mut out = (*base).clone();
+            let mut kept = 0;
+            for (k, p) in out.pixels_mut().enumerate() {
+                if mask[k] {
+                    kept += 1;
+                    if p[3] < 128 {
+                        // A keep mark on a removed pixel brings it back.
+                        let (x, y) = (k as u32 % w, k as u32 / w);
+                        *p = *source.get_pixel(x, y);
+                    }
+                } else {
+                    p[3] = 0;
                 }
-            } else {
-                p[3] = 0;
+            }
+            EditDone {
+                cut: Some(out),
+                note: crate::i18n::fill(
+                    "Subject cut out ({}% of the picture). Mark parts to keep or remove if the edge is wrong.",
+                    &[&format!("{:.0}", 100.0 * kept as f64 / f64::from(w * h))],
+                ),
+            }
+        });
+    }
+
+    /// Starts the change `make` of the picture on a thread (here if no
+    /// thread starts). The window shows the picture before the change until
+    /// it is done, and takes no other change of the picture meanwhile.
+    fn start_edit(
+        &mut self,
+        before: (RgbaImage, Option<Subject>),
+        cutout: bool,
+        make: impl FnOnce() -> EditDone + Send + 'static,
+    ) {
+        let (tx, rx) = mpsc::channel();
+        let lang = crate::i18n::active();
+        let make = Arc::new(std::sync::Mutex::new(Some(make)));
+        let job = make.clone();
+        let thread = std::thread::Builder::new()
+            .name("picture-wizard-edit".into())
+            .stack_size(crate::resources::JOB_STACK);
+        let started = thread.spawn(move || {
+            crate::i18n::set_active(lang);
+            let make = job.lock().ok().and_then(|mut m| m.take());
+            if let Some(make) = make {
+                let _ = tx.send(make());
+            }
+        });
+        let job = EditJob { before, cutout, rx };
+        match started {
+            Ok(_) => self.edit = Some(job),
+            Err(_) => {
+                // No thread: make it here.
+                let make = make.lock().ok().and_then(|mut m| m.take());
+                if let Some(make) = make {
+                    let done = make();
+                    self.apply_edit(job, done);
+                }
             }
         }
-        self.remember(before);
-        self.work.cut = out;
+    }
+
+    /// Takes the change of the edit job if it is done.
+    fn poll_edit(&mut self) {
+        let Some(got) = self.edit.as_ref().map(|j| j.rx.try_recv()) else {
+            return;
+        };
+        match got {
+            Ok(done) => {
+                if let Some(job) = self.edit.take() {
+                    self.apply_edit(job, done);
+                }
+            }
+            Err(mpsc::TryRecvError::Empty) => {}
+            Err(mpsc::TryRecvError::Disconnected) => {
+                self.edit = None;
+                self.note = tr("The change of the picture failed.").into();
+            }
+        }
+    }
+
+    /// Waits for the edit job and takes its change.
+    pub fn wait_for_edit(&mut self) {
+        if let Some(job) = self.edit.take() {
+            match job.rx.recv() {
+                Ok(done) => self.apply_edit(job, done),
+                Err(_) => self.note = tr("The change of the picture failed.").into(),
+            }
+        }
+    }
+
+    /// A change of the picture is made now.
+    pub fn editing(&self) -> bool {
+        self.edit.is_some()
+    }
+
+    fn apply_edit(&mut self, job: EditJob, done: EditDone) {
+        self.note = done.note;
+        let Some(cut) = done.cut else { return };
+        self.remember(job.before);
+        self.work.cut = cut;
         self.work.rev += 1;
-        if let Some(s) = self.subject.as_mut() {
+        if job.cutout
+            && let Some(s) = self.subject.as_mut()
+        {
             s.rev = self.work.rev;
         }
-        self.note = format!(
-            "Subject cut out ({:.0}% of the picture). Mark parts to keep or remove if the edge is wrong.",
-            100.0 * kept as f64 / f64::from(w * h)
-        );
     }
 
     /// A mark stroke to the work pixel `(x, y)`.
@@ -523,6 +652,9 @@ impl Wizard {
     /// Ends a mark stroke and cuts again with it.
     pub fn end_mark(&mut self) {
         let Some(stroke) = self.mark.take() else { return };
+        if self.editing() {
+            return;
+        }
         let before = (self.work.cut.clone(), self.subject.clone());
         let rev = self.work.rev;
         let base = Arc::new(self.work.cut.clone());
@@ -549,6 +681,9 @@ impl Wizard {
     /// says; a box of the Subject tool cuts out the subject.
     pub fn end_shape(&mut self) {
         let pts = std::mem::take(&mut self.drag);
+        if self.editing() {
+            return;
+        }
         if self.tool == BgTool::Subject {
             if let (Some(a), Some(b)) = (pts.first(), pts.last()) {
                 self.cut_out([a.0, a.1, b.0, b.1]);
@@ -562,35 +697,50 @@ impl Wizard {
         let before = self.work.cut.clone();
         let n = background::erase_shape(&mut self.work.cut, &self.work.source, &polygon, self.shape_action);
         self.note = if n == 0 {
-            "Nothing changed (draw a larger shape).".into()
+            tr("Nothing changed (draw a larger shape).").into()
         } else {
             self.changed(before);
-            format!("{n} pixels changed.")
+            crate::i18n::fill("{} pixels changed.", &[&n])
         };
     }
 
     /// Background: removes the color at the work pixel `(x, y)`.
     pub fn remove_at(&mut self, x: u32, y: u32) {
+        if self.editing() {
+            return;
+        }
         let before = self.work.cut.clone();
         let n = background::remove_at(&mut self.work.cut, x, y, self.tolerance, self.connected);
         self.note = if n == 0 {
-            "Nothing removed there (clear already, or off the picture).".into()
+            tr("Nothing removed there (clear already, or off the picture).").into()
         } else {
             self.changed(before);
-            format!("{n} pixels removed.")
+            crate::i18n::fill("{} pixels removed.", &[&n])
         };
     }
 
-    /// Background: removes the most common color at the edges.
+    /// Background: removes the most common color at the edges (on a thread).
     pub fn remove_edges(&mut self) {
-        let before = self.work.cut.clone();
-        let n = background::remove_edges(&mut self.work.cut, self.tolerance);
-        self.note = if n == 0 {
-            "No background found at the edges.".into()
-        } else {
-            self.changed(before);
-            format!("{n} pixels of the edge color removed.")
-        };
+        if self.editing() {
+            return;
+        }
+        let mut img = self.work.cut.clone();
+        let tolerance = self.tolerance;
+        let before = (self.work.cut.clone(), self.subject.clone());
+        self.start_edit(before, false, move || {
+            let n = background::remove_edges(&mut img, tolerance);
+            if n == 0 {
+                EditDone {
+                    cut: None,
+                    note: tr("No background found at the edges.").into(),
+                }
+            } else {
+                EditDone {
+                    cut: Some(img),
+                    note: crate::i18n::fill("{} pixels of the edge color removed.", &[&n]),
+                }
+            }
+        });
     }
 
     /// The brush radius in work pixels.
@@ -601,6 +751,9 @@ impl Wizard {
     /// Background: a brush stroke to the work pixel `(x, y)` (the first
     /// point starts the stroke, one undo step for each stroke).
     pub fn brush_to(&mut self, x: f64, y: f64) {
+        if self.editing() {
+            return;
+        }
         let restore = self.tool == BgTool::Restore;
         let r = self.brush_radius_px();
         let from = match self.stroke {
@@ -626,11 +779,14 @@ impl Wizard {
     /// Ends a brush stroke.
     pub fn end_stroke(&mut self) {
         if self.stroke.take().is_some() {
-            self.note = "Brush stroke done (Undo takes it back).".into();
+            self.note = tr("Brush stroke done (Undo takes it back).").into();
         }
     }
 
     pub fn undo(&mut self) {
+        if self.editing() {
+            return;
+        }
         if let Some((img, subject)) = self.history.pop() {
             self.work.cut = img;
             self.work.rev += 1;
@@ -639,19 +795,19 @@ impl Wizard {
             if let Some(s) = self.subject.as_mut() {
                 s.rev = self.work.rev;
             }
-            self.note = "Last change undone.".into();
+            self.note = tr("Last change undone.").into();
         }
     }
 
     pub fn start_again(&mut self) {
-        if self.history.is_empty() {
+        if self.history.is_empty() || self.editing() {
             return;
         }
         self.history.clear();
         self.subject = None;
         self.work.cut = (*self.work.source).clone();
         self.work.rev += 1;
-        self.note = "Back to the full picture.".into();
+        self.note = tr("Back to the full picture.").into();
     }
 
     /// Makes the texture of a preview picture.
@@ -671,7 +827,18 @@ impl Wizard {
     /// quick and are made here; the later steps are made by a background
     /// job, and the last picture stays on the screen until it is done.
     fn texture(&mut self, ctx: &egui::Context, current: &CurrentProperties) -> TextureHandle {
+        self.poll_edit();
         self.poll_job(ctx);
+        if self.editing() {
+            ctx.request_repaint_after(std::time::Duration::from_millis(30));
+        }
+        // A job whose result is old (a setting of its step changed) stops:
+        // when it ends, a job for the newest settings starts.
+        if let Some(j) = &self.job
+            && self.work.preview_key(j.step, current) != j.key
+        {
+            j.stop.store(true, Ordering::Relaxed);
+        }
         let quick: Option<(u64, MakePicture)> = match self.step {
             Step::Picture => Some((
                 hash(("source", Arc::as_ptr(&self.data) as usize)),
@@ -701,7 +868,7 @@ impl Wizard {
             return self.set_texture(ctx, key, &img, false);
         }
         // One job at a time: when it ends, a job for the newest settings starts.
-        if self.job.is_none() && self.failed != Some(key) {
+        if self.job.is_none() && self.failed != Some(key) && self.halted != Some(key) {
             self.start_job(ctx, key, current);
         }
         if self.job.is_some() {
@@ -719,28 +886,29 @@ impl Wizard {
     /// Starts a background job for the preview of the current step.
     fn start_job(&mut self, ctx: &egui::Context, key: u64, current: &CurrentProperties) {
         let (tx, rx) = mpsc::channel();
+        let stop = Arc::new(AtomicBool::new(false));
         let mut work = self.work.clone();
+        work.stop = Some(stop.clone());
         let (step, cur) = (self.step, current.clone());
+        let lang = crate::i18n::active();
         let job = move || {
-            let (picture, sharp) = work.preview(step, &cur);
+            crate::i18n::set_active(lang);
+            let picture = work.preview(step, &cur);
             let key = work.preview_key(step, &cur);
-            let _ = tx.send(JobDone {
-                work,
-                key,
-                picture,
-                sharp,
-            });
+            work.stop = None;
+            let _ = tx.send(JobDone { work, key, picture });
         };
         let thread = std::thread::Builder::new()
             .name("picture-wizard".into())
             .stack_size(crate::resources::JOB_STACK);
         match thread.spawn(job) {
-            Ok(_) => self.job = Some(Job { key, rx }),
+            Ok(_) => self.job = Some(Job { step, key, rx, stop }),
             Err(_) => {
                 // No thread: make it here.
-                let (img, sharp) = self.work.preview(self.step, current);
-                let key = self.work.preview_key(self.step, current);
-                let _ = self.set_texture(ctx, key, &img, sharp);
+                if let Some((img, sharp)) = self.work.preview(self.step, current) {
+                    let key = self.work.preview_key(self.step, current);
+                    let _ = self.set_texture(ctx, key, &img, sharp);
+                }
             }
         }
     }
@@ -752,9 +920,15 @@ impl Wizard {
         };
         match got {
             Ok(done) => {
-                self.job = None;
+                // A stopped job can bring new colors (new choices): its
+                // preview has a new key, and that one is not made either.
+                if self.job.take().is_some_and(|j| self.halted == Some(j.key)) {
+                    self.halted = Some(done.key);
+                }
                 self.work.adopt(done.work);
-                let _ = self.set_texture(ctx, done.key, &done.picture, done.sharp);
+                if let Some((picture, sharp)) = &done.picture {
+                    let _ = self.set_texture(ctx, done.key, picture, *sharp);
+                }
             }
             Err(mpsc::TryRecvError::Empty) => {}
             Err(mpsc::TryRecvError::Disconnected) => {
@@ -764,9 +938,44 @@ impl Wizard {
         }
     }
 
+    /// "Colors from the thread chart" follows the chart of the Threads panel
+    /// (`chart`): another chart or a change of the chart (the thread stock)
+    /// gives its colors; with no chart, the colors of the picture.
+    pub fn follow_chart(&mut self, chart: Option<&ThreadChart>) {
+        let Some((key, _)) = &self.work.chart else { return };
+        match chart {
+            None => {
+                self.work.chart = None;
+                self.note = tr("No thread chart: the colors come from the picture.").into();
+            }
+            Some(c) => {
+                // A hash of the colors, made with no copy of them (as `chart_colors`).
+                let mut h = DefaultHasher::new();
+                c.threads.len().hash(&mut h);
+                for t in &c.threads {
+                    t.color.hash(&mut h);
+                }
+                if h.finish() != *key {
+                    self.work.chart = Some(chart_colors(c));
+                }
+            }
+        }
+    }
+
     /// A background job makes a preview now.
     pub fn working(&self) -> bool {
         self.job.is_some()
+    }
+
+    /// Stops the job that makes the preview: it is not made again until a
+    /// setting changes. Finish waits no more.
+    pub fn stop_job(&mut self) {
+        if let Some(j) = &self.job {
+            j.stop.store(true, Ordering::Relaxed);
+            self.halted = Some(j.key);
+            self.finish = false;
+            self.note = tr("Stopped. Change a setting to make the preview again.").into();
+        }
     }
 
     /// Waits for the job and takes its results (Finish uses them).
@@ -785,6 +994,12 @@ fn ready<T>(slot: &Option<(u64, Arc<T>)>, key: u64) -> Option<Arc<T>> {
 }
 
 impl Work {
+    /// The job that has this work state is stopped: the work stops at the
+    /// next stop point.
+    fn stopped(&self) -> bool {
+        self.stop.as_ref().is_some_and(|s| s.load(Ordering::Relaxed))
+    }
+
     /// The cut picture with the edge shrunk and small bits cleaned up.
     fn cleaned(&mut self) -> Arc<RgbaImage> {
         let key = hash((self.rev, self.shrink_px, self.bits_mm2.to_bits()));
@@ -950,7 +1165,13 @@ impl Work {
         }
         let order = self.final_order();
         let t = self.pixels_to_mm();
-        let objs = Arc::new(smart::digitize(&r, &t, &self.choices, &order, &self.spec, current));
+        let stop = self.stop.clone();
+        let stopped = move || stop.as_ref().is_some_and(|s| s.load(Ordering::Relaxed));
+        let Some(objs) = smart::digitize_until(&r, &t, &self.choices, &order, &self.spec, current, &stopped) else {
+            // The job stopped: no result is kept.
+            return Arc::new(Vec::new());
+        };
+        let objs = Arc::new(objs);
         self.result = Some((key, objs.clone()));
         objs
     }
@@ -1038,23 +1259,34 @@ impl Work {
     }
 
     /// The preview picture of `step` (a step after Background), and whether
-    /// to show its pixels sharp.
-    fn preview(&mut self, step: Step, current: &CurrentProperties) -> (RgbaImage, bool) {
+    /// to show its pixels sharp. `None` if the job stopped: there are stop
+    /// points between the parts of the work and before each object of the
+    /// stitch plan.
+    fn preview(&mut self, step: Step, current: &CurrentProperties) -> Option<(RgbaImage, bool)> {
         match step {
-            Step::Simplify => (self.reduced().to_image(), true),
+            Step::Simplify => Some((self.reduced().to_image(), true)),
             Step::Colors | Step::Stitches => {
                 let r = self.reduced();
-                (smart::merge_colors(&r, &self.choices).to_image(), true)
+                Some((smart::merge_colors(&r, &self.choices).to_image(), true))
             }
             _ => {
+                if self.make == Make::Areas {
+                    self.reduced();
+                }
+                if self.stopped() {
+                    return None;
+                }
                 let objs = self.result(current);
-                let (picture, stitches) = self.stitch_picture(&objs);
+                if self.stopped() {
+                    return None;
+                }
+                let (picture, stitches) = self.stitch_picture(&objs)?;
                 if self.make == Make::Areas {
                     let key = self.objects_key(current);
                     let checks = self.checks_of(&objs, &stitches);
                     self.checks = Some((key, Arc::new(checks)));
                 }
-                (picture, false)
+                Some((picture, false))
             }
         }
     }
@@ -1256,20 +1488,27 @@ impl Work {
     }
 
     /// A picture of the stitches of `objs`.
-    /// Also gives the stitches.
-    fn stitch_picture(&mut self, objs: &[(Rgb, ObjectKind)]) -> (RgbaImage, emb_model::StitchDesign) {
+    /// Also gives the stitches. `None` if the job stopped.
+    fn stitch_picture(&mut self, objs: &[(Rgb, ObjectKind)]) -> Option<(RgbaImage, emb_model::StitchDesign)> {
         let mut d = Design::new("");
         for (color, kind) in objs {
             let t = d.thread_for_color(*color);
-            d.add_object(t, kind.clone());
+            let id = d.add_object(t, kind.clone());
+            if self.make == Make::Areas
+                && let Some(o) = d.object_mut(id)
+            {
+                o.functions = smart::functions();
+            }
         }
-        let plan = emb_stitch::build_plan(&d, &Default::default(), &mut Default::default());
+        let stop = self.stop.clone();
+        let stopped = move || stop.as_ref().is_some_and(|s| s.load(Ordering::Relaxed));
+        let plan = emb_stitch::build_plan_until(&d, &Default::default(), &mut Default::default(), &stopped)?;
         let segs = emb_render::segments(&plan.stitches);
         let width = self.design_width_mm().max(1.0);
         let px_per_mm = (RESULT_PX / width).clamp(2.0, 20.0);
         let p = emb_render::raster::picture(&segs, &[], px_per_mm, 0.35, 1.0, Some(Rgb(255, 255, 255)));
         let img = RgbaImage::from_raw(p.width, p.height, p.rgba).unwrap_or_else(|| RgbaImage::new(1, 1));
-        (img, plan.stitches)
+        Some((img, plan.stitches))
     }
 }
 
@@ -1303,6 +1542,7 @@ impl AppState {
     /// threads for their colors (the nearest chart threads when the Threads
     /// panel has a chart).
     pub fn finish_wizard(&mut self, w: &mut Wizard) -> usize {
+        w.wait_for_edit();
         w.wait_for_job();
         let current = self.doc.design().current.clone();
         let objs = w.result(&current);
@@ -1311,8 +1551,8 @@ impl AppState {
             return 0;
         }
         let chart: Option<ThreadChart> = self.charts.get(self.chart_index).cloned();
-        let (group, hide) = (w.group, w.hide_backdrop);
-        let ids: Vec<ObjectId> = self.doc.edit("Picture to Design", |d| {
+        let (group, hide, areas) = (w.group, w.hide_backdrop, w.make == Make::Areas);
+        let ids: Vec<ObjectId> = self.doc.edit(tr("Picture to Design"), |d| {
             let mut threads = std::collections::HashMap::new();
             let mut ids = Vec::new();
             for (color, kind) in objs {
@@ -1333,7 +1573,11 @@ impl AppState {
                         None => crate::vectors::nearest_thread(d, color),
                     }
                 });
-                ids.push(d.add_object(t, kind));
+                let id = d.add_object(t, kind);
+                if areas && let Some(o) = d.object_mut(id) {
+                    o.functions = smart::functions();
+                }
+                ids.push(id);
             }
             if group && ids.len() > 1 {
                 let g = d.new_group_id();
@@ -1483,6 +1727,7 @@ fn show_window(ctx: &egui::Context, st: &mut AppState) {
             }
         }
     }
+    w.follow_chart(st.charts.get(st.chart_index));
     let current = st.doc.design().current.clone();
     let mut open = true;
     let mut done = Done::No;
@@ -1541,6 +1786,16 @@ fn show_window(ctx: &egui::Context, st: &mut AppState) {
                     }
                     if i > 0 && ui.button(tr("‹ Back")).clicked() {
                         w.step = steps[i - 1];
+                    }
+                    if w.working()
+                        && ui
+                            .button(tr("Stop"))
+                            .on_hover_text(tr(
+                                "Stops the preview that is made now. Change a setting to make it again.",
+                            ))
+                            .clicked()
+                    {
+                        w.stop_job();
                     }
                     ui.weak(&w.note);
                 });
@@ -1710,7 +1965,7 @@ fn controls(ui: &mut egui::Ui, st: &mut AppState, w: &mut Wizard, current: &Curr
                 }
             }
             if ui
-                .button(tr("Remove the edge color"))
+                .add_enabled(!w.editing(), egui::Button::new(tr("Remove the edge color")))
                 .on_hover_text(tr(
                     "Removes the most common color at the edges of the picture, where it touches the edges. \
                      A wall that shades slowly goes too.",
@@ -1721,13 +1976,16 @@ fn controls(ui: &mut egui::Ui, st: &mut AppState, w: &mut Wizard, current: &Curr
             }
             ui.horizontal(|ui| {
                 if ui
-                    .add_enabled(!w.history.is_empty(), egui::Button::new(tr("Undo")))
+                    .add_enabled(!w.history.is_empty() && !w.editing(), egui::Button::new(tr("Undo")))
                     .clicked()
                 {
                     w.undo();
                 }
                 if ui
-                    .add_enabled(!w.history.is_empty(), egui::Button::new(tr("Start again")))
+                    .add_enabled(
+                        !w.history.is_empty() && !w.editing(),
+                        egui::Button::new(tr("Start again")),
+                    )
                     .clicked()
                 {
                     w.start_again();
@@ -1840,10 +2098,7 @@ fn controls(ui: &mut egui::Ui, st: &mut AppState, w: &mut Wizard, current: &Curr
                 ))
                 .changed()
             {
-                w.chart = chart.filter(|_| use_chart).map(|c| {
-                    let colors: Vec<Rgb> = c.threads.iter().map(|t| t.color).collect();
-                    (hash(&colors), Arc::new(colors))
-                });
+                w.chart = chart.filter(|_| use_chart).map(chart_colors);
             }
         }
         Step::Colors => {
@@ -1912,7 +2167,7 @@ fn controls(ui: &mut egui::Ui, st: &mut AppState, w: &mut Wizard, current: &Curr
                         .width(150.0)
                         .show_ui(ui, |ui| {
                             for s in SmartStitch::ALL {
-                                ui.selectable_value(&mut choice.stitch, s, s.name());
+                                ui.selectable_value(&mut choice.stitch, s, tr(s.name()));
                             }
                         });
                     let up = egui::Button::new(egui_phosphor::regular::ARROW_UP).small();
@@ -1961,7 +2216,7 @@ fn controls(ui: &mut egui::Ui, st: &mut AppState, w: &mut Wizard, current: &Curr
                 .selected_text(tr(p.style.name()))
                 .show_ui(ui, |ui| {
                     for s in PhotoStyle::ALL {
-                        ui.selectable_value(&mut p.style, s, s.name());
+                        ui.selectable_value(&mut p.style, s, tr(s.name()));
                     }
                 });
             let spacing = if p.style == PhotoStyle::Scribble {
@@ -2174,7 +2429,7 @@ fn preview(ui: &mut egui::Ui, w: &mut Wizard, size: egui::Vec2, current: &Curren
         painter.image(src.id(), rect, uv, Color32::from_white_alpha(70));
     }
     painter.image(tex.id(), rect, uv, Color32::WHITE);
-    if w.working() {
+    if w.working() || w.editing() {
         let at = outer.left_top() + vec2(8.0, 8.0);
         let text = painter.layout_no_wrap(tr("Working…").into(), egui::FontId::proportional(14.0), Color32::WHITE);
         let back = Rect::from_min_size(at, text.size()).expand(4.0);
@@ -2182,6 +2437,11 @@ fn preview(ui: &mut egui::Ui, w: &mut Wizard, size: egui::Vec2, current: &Curren
         painter.galley(at, text, Color32::WHITE);
     }
     if w.step != Step::Background {
+        return;
+    }
+    if w.editing() {
+        // No other change of the picture until this one is done.
+        w.drag.clear();
         return;
     }
     let (cw, ch) = w.cut.dimensions();
@@ -2350,6 +2610,7 @@ mod tests {
         let mut w = h.st.wizard.take().unwrap();
         // Background: the gray wall goes; the content is cut to the shapes.
         w.remove_edges();
+        w.wait_for_edit();
         let (img, at) = &*w.content();
         assert_eq!(at.0, 15, "the disk starts at x = 15 px");
         assert!(img.width() < 200);
@@ -2373,8 +2634,14 @@ mod tests {
                 .iter()
                 .any(|o| matches!(o.kind, emb_model::ObjectKind::Satin { .. }))
         );
-        // Grouped, the backdrop hidden, and the disk where it was on the backdrop.
+        // Grouped, with hidden travel, the backdrop hidden, and the disk
+        // where it was on the backdrop.
         assert!(d.objects().iter().all(|o| o.group.is_some()));
+        assert!(
+            d.objects()
+                .iter()
+                .all(|o| o.functions.trim == emb_model::TrimMode::Hidden)
+        );
         assert!(!d.backdrop.as_ref().unwrap().visible);
         let fill = d
             .objects()
@@ -2391,6 +2658,7 @@ mod tests {
         h.st.open_wizard();
         let mut w = h.st.wizard.take().unwrap();
         w.remove_edges();
+        w.wait_for_edit();
         w.colors = 2;
         let r = w.reduced();
         assert_eq!(r.palette.len(), 2);
@@ -2484,6 +2752,7 @@ mod tests {
         let ctx = egui::Context::default();
         let w = h.st.wizard.as_mut().unwrap();
         w.remove_edges();
+        w.wait_for_edit();
         w.colors = 3;
         w.step = Step::Colors;
         // The first frame starts a job and does not wait for it.
@@ -2521,6 +2790,69 @@ mod tests {
     }
 
     #[test]
+    fn a_job_stops_when_its_settings_change_or_on_stop() {
+        let mut h = with_photo();
+        h.st.open_wizard();
+        let ctx = egui::Context::default();
+        let current = h.st.doc.design().current.clone();
+        let w = h.st.wizard.as_mut().unwrap();
+        w.remove_edges();
+        w.wait_for_edit();
+        // A stopped job makes no picture.
+        let mut work = w.work.clone();
+        work.stop = Some(Arc::new(AtomicBool::new(true)));
+        assert!(work.preview(Step::Finish, &current).is_none());
+        // A setting changes while the job runs: the old job stops (or it
+        // ended and the job for the new setting runs).
+        w.step = Step::Finish;
+        draw(&ctx, &mut h.st);
+        let w = h.st.wizard.as_mut().unwrap();
+        assert!(w.working());
+        w.spec.overlap_mm += 0.1;
+        draw(&ctx, &mut h.st);
+        let w = h.st.wizard.as_ref().unwrap();
+        if let Some(j) = &w.job {
+            assert!(j.stop.load(Ordering::Relaxed) || j.key == w.work.preview_key(Step::Finish, &current));
+        }
+        draw_until_done(&ctx, &mut h.st);
+        // Stop: no new job until a setting changes.
+        let w = h.st.wizard.as_mut().unwrap();
+        w.spec.overlap_mm += 0.1;
+        draw(&ctx, &mut h.st);
+        let w = h.st.wizard.as_mut().unwrap();
+        assert!(w.working());
+        w.finish = true;
+        w.stop_job();
+        assert!(!w.finish, "Finish waits no more");
+        draw_until_done(&ctx, &mut h.st);
+        draw(&ctx, &mut h.st);
+        let w = h.st.wizard.as_mut().unwrap();
+        assert!(!w.working(), "the stopped preview is not made again");
+        w.spec.overlap_mm += 0.1;
+        draw(&ctx, &mut h.st);
+        assert!(h.st.wizard.as_ref().unwrap().working(), "a new setting makes it again");
+        draw_until_done(&ctx, &mut h.st);
+    }
+
+    #[test]
+    fn the_edge_color_goes_on_a_thread() {
+        let mut h = with_photo();
+        h.st.open_wizard();
+        let w = h.st.wizard.as_mut().unwrap();
+        w.remove_edges();
+        assert!(w.editing());
+        // No other change of the picture until it is done.
+        w.undo();
+        w.remove_at(5, 5);
+        assert!(w.history.is_empty());
+        w.wait_for_edit();
+        assert!(!w.editing());
+        assert_eq!(w.history.len(), 1, "{}", w.note);
+        w.undo();
+        assert!(w.history.is_empty());
+    }
+
+    #[test]
     fn the_finish_step_checks_the_result_and_fixes_it() {
         let mut h = with_photo();
         h.st.open_wizard();
@@ -2529,6 +2861,7 @@ mod tests {
         // The wall goes; four colors for a red disk and a blue bar: the
         // grain gives reds or blues that are almost the same.
         w.remove_edges();
+        w.wait_for_edit();
         w.colors = 4;
         w.step = Step::Finish;
         assert!(w.ready_checks(&current).is_none());
@@ -2573,6 +2906,7 @@ mod tests {
         h.st.open_wizard();
         let mut w = h.st.wizard.take().unwrap();
         w.remove_edges();
+        w.wait_for_edit();
         w.colors = 4;
         let own = w.reduced().palette.clone();
         let chart = h.st.charts.first().expect("a built-in chart").clone();
@@ -2583,6 +2917,22 @@ mod tests {
         assert!(r.palette.len() <= own.len());
         // New colors: new choices for them.
         assert_eq!(w.choices.len(), r.palette.len());
+        assert_eq!(w.chart.as_ref().unwrap().0, chart_colors(&chart).0);
+        // The same chart: no change.
+        let key = w.chart.as_ref().unwrap().0;
+        w.follow_chart(Some(&chart));
+        assert_eq!(w.chart.as_ref().unwrap().0, key);
+        // A change of the chart (a thread less) gives the new colors.
+        let mut smaller = chart.clone();
+        smaller.threads.pop();
+        w.follow_chart(Some(&smaller));
+        assert_eq!(w.chart.as_ref().unwrap().1.len(), colors.len() - 1);
+        assert_ne!(w.chart.as_ref().unwrap().0, key);
+        // No chart: the colors of the picture.
+        w.follow_chart(None);
+        assert!(w.chart.is_none());
+        w.follow_chart(Some(&chart));
+        assert!(w.chart.is_none(), "unticked stays unticked");
     }
 
     #[test]
@@ -2593,6 +2943,7 @@ mod tests {
         let mut w = h.st.wizard.take().unwrap();
         w.make = Make::Cross;
         w.remove_edges();
+        w.wait_for_edit();
         w.cross.colors = 3;
         let objs = w.cross_objects();
         assert!(!objs.is_empty() && objs.len() <= 3);
@@ -2621,6 +2972,7 @@ mod tests {
         let mut w = h.st.wizard.take().unwrap();
         w.make = Make::Photo;
         w.remove_edges();
+        w.wait_for_edit();
         // Rows: one stitch object in the thread color.
         let objs = w.photo_objects();
         assert_eq!(objs.len(), 1);
@@ -2691,6 +3043,7 @@ mod tests {
         w.shape_to(10.0, 10.0);
         w.shape_to(90.0, 90.0);
         w.end_shape();
+        w.wait_for_edit();
         assert_eq!(w.cut.get_pixel(50, 50)[3], 255, "{}", w.note);
         assert_eq!(w.cut.get_pixel(150, 50)[3], 0);
         assert_eq!(w.cut.get_pixel(12, 12)[3], 0);
@@ -2700,6 +3053,7 @@ mod tests {
         w.mark_to(50.0, 50.0);
         w.mark_to(52.0, 50.0);
         w.end_mark();
+        w.wait_for_edit();
         assert_eq!(w.cut.get_pixel(51, 50)[3], 0);
         // Undo brings the disk back and the mark goes.
         w.undo();
@@ -2711,6 +3065,7 @@ mod tests {
         w.shape_to(0.0, 0.0);
         w.shape_to(50.0, 100.0);
         w.end_shape();
+        w.wait_for_edit();
         assert_eq!(w.cut.get_pixel(30, 50)[3], 0);
         assert_eq!(w.cut.get_pixel(70, 50)[3], 255);
         // A lasso "keep only inside" round the right part keeps only it.
@@ -2721,6 +3076,7 @@ mod tests {
             w.shape_to(x, y);
         }
         w.end_shape();
+        w.wait_for_edit();
         assert_eq!(w.cut.get_pixel(70, 50)[3], 255);
         assert_eq!(w.cut.get_pixel(30, 50)[3], 0);
         assert_eq!(w.cut.get_pixel(150, 50)[3], 0);
@@ -2746,6 +3102,7 @@ mod tests {
         h.st.open_wizard();
         let mut w = h.st.wizard.take().unwrap();
         w.remove_edges();
+        w.wait_for_edit();
         let before = w.cut.clone();
         // An erase stroke through the disk, one undo step.
         w.tool = BgTool::Erase;
@@ -2844,6 +3201,7 @@ mod tests {
         let wz = hs.st.wizard.as_mut().expect("the wizard opens");
         assert_eq!(wz.source.dimensions(), (smart::WORK_PX, 800));
         wz.remove_edges();
+        wz.wait_for_edit();
         through_the_steps(&mut hs);
         hs.st.wizard.as_mut().unwrap().make = Make::Areas;
         let mut wz = hs.st.wizard.take().unwrap();

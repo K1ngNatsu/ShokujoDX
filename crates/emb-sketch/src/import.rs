@@ -18,7 +18,7 @@
 use std::collections::BTreeMap;
 use std::f64::consts::{PI, TAU};
 
-use emb_geom::{Path, PathCmd, Point, math};
+use emb_geom::{Path, PathCmd, Point, math, text};
 
 use crate::shape::{cubic_at, cubic_d1};
 use crate::{Constraint, CurveId, Geometry, PointId, Sketch};
@@ -45,9 +45,9 @@ pub enum Piece {
 /// Why a drawing does not become a sketch.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum ImportError {
-    #[error("the file is not a DXF drawing in text form")]
+    #[error("{}", text::tr("the file is not a DXF drawing in text form"))]
     NotDxf,
-    #[error("the drawing has no lines, arcs or circles")]
+    #[error("{}", text::tr("the drawing has no lines, arcs or circles"))]
     Empty,
 }
 

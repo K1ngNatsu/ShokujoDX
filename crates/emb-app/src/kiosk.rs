@@ -179,7 +179,7 @@ impl AppState {
             });
         let product_color = PRODUCT_COLORS[c.product_color.min(PRODUCT_COLORS.len() - 1)].1;
         let fabrics = self.fabrics.clone();
-        self.doc.edit_merged("Kiosk", MergeKey::new("kiosk"), |d| {
+        self.doc.edit_merged(tr("Kiosk"), MergeKey::new("kiosk"), |d| {
             let existing = d.objects().iter().find_map(|o| match o.kind {
                 ObjectKind::Lettering(_) => Some((o.id, o.thread)),
                 _ => None,
@@ -426,14 +426,16 @@ pub fn screen(ui: &mut egui::Ui, st: &mut AppState) {
             let info = match d.view_extents() {
                 Some(b) => {
                     let pv = st.shown_plan();
-                    format!(
+                    crate::i18n::fill(
                         "{} × {} mm · {} stitches",
-                        b.width().round(),
-                        b.height().round(),
-                        pv.plan.stitches.stitch_count()
+                        &[
+                            &b.width().round(),
+                            &b.height().round(),
+                            &pv.plan.stitches.stitch_count(),
+                        ],
                     )
                 }
-                None => "Type a name to start.".into(),
+                None => tr("Type a name to start.").into(),
             };
             ui.label(big(&info, 16.0));
             // A design larger than the place on the product.
@@ -445,9 +447,9 @@ pub fn screen(ui: &mut egui::Ui, st: &mut AppState) {
                 ui.colored_label(
                     ui.visuals().warn_fg_color,
                     big(
-                        &format!(
+                        &crate::i18n::fill(
                             "The name is larger than the place ({} × {} mm). Make it smaller.",
-                            p.max.0, p.max.1
+                            &[&p.max.0, &p.max.1],
                         ),
                         16.0,
                     ),

@@ -9,6 +9,7 @@
 //! Money is a number with two decimals; the currency is text (the
 //! currency of the thread prices, `ThreadPrices::currency`).
 
+use emb_geom::text;
 use serde::{Deserialize, Serialize};
 
 use crate::{SewTimes, StitchDesign, ThreadLook};
@@ -80,7 +81,7 @@ impl PriceList {
         let table: toml::Table = toml::from_str(s).map_err(|e| e.to_string())?;
         let known = toml::Table::try_from(PriceList::default()).map_err(|e| e.to_string())?;
         if let Some(k) = table.keys().find(|k| !known.contains_key(*k)) {
-            return Err(format!("unknown field {k:?} in the price list"));
+            return Err(text::fill("unknown field {} in the price list", &[&format!("{:?}", k)]));
         }
         table.try_into().map_err(|e: toml::de::Error| e.to_string())
     }
@@ -451,9 +452,9 @@ pub fn run_time(t: &SewTimes, piece_minutes: f64, quantity: u32) -> RunTime {
 pub fn duration_text(minutes: f64) -> String {
     let m = minutes.max(0.0).round() as u64;
     if m < 60 {
-        format!("{m} min")
+        text::fill("{} min", &[&m])
     } else {
-        format!("{} h {:02} min", m / 60, m % 60)
+        text::fill("{} h {} min", &[&(m / 60), &format!("{:02}", m % 60)])
     }
 }
 

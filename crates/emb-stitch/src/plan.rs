@@ -5,11 +5,14 @@
 //! stitch-length limits. The output follows the `StitchDesign` contract:
 //! mm, Y down, origin at the hoop center, design rotation applied.
 
-use emb_geom::{Point, Transform};
+use emb_geom::{Point, Transform, text};
 use emb_model::{
     Design, MachineProfile, ObjectId, RunPass, RunStyle, StitchDesign, StitchKind, StitchRecord, Thread, TrimMode,
 };
 
+use std::collections::HashMap;
+
+use crate::hidden::{Cover, TRAVEL_STITCH_MM};
 use crate::object::{Run, RunLink, StitchCache, StitchError, StopReason};
 use crate::running;
 
@@ -101,6 +104,18 @@ struct Routed {
 
 /// Builds the stitch plan for the design.
 pub fn build_plan(design: &Design, opts: &PlanOptions, cache: &mut StitchCache) -> StitchPlan {
+    build_plan_until(design, opts, cache, &|| false).unwrap_or_default()
+}
+
+/// As [`build_plan`], with a stop point before each object: when `stop`
+/// gives `true`, the work stops and the result is `None`. A background job
+/// whose result is not wanted any more stops with it (ADR 0081).
+pub fn build_plan_until(
+    design: &Design,
+    opts: &PlanOptions,
+    cache: &mut StitchCache,
+    stop: &dyn Fn() -> bool,
+) -> Option<StitchPlan> {
     let to_out = design.output_transform();
     let to_design = to_out.inverse().unwrap_or(Transform::IDENTITY);
     let mut b = Builder::new(opts);
@@ -110,17 +125,31 @@ pub fn build_plan(design: &Design, opts: &PlanOptions, cache: &mut StitchCache) 
     if let Some(p) = anchor(design.start_end.start) {
         b.jump(p);
     }
+    let blocks = design.sewn_color_blocks();
+    // Hidden travel (ADR 0082) needs the cover of the objects that sew later.
+    let places: HashMap<ObjectId, u32> = blocks
+        .iter()
+        .flat_map(|(_, ids)| ids.iter().copied())
+        .enumerate()
+        .map(|(k, id)| (id, k as u32))
+        .collect();
+    if design.objects().iter().any(|o| o.functions.trim == TrimMode::Hidden) {
+        b.cover = Cover::new(design, &places, &to_out);
+    }
     let mut threads: Vec<Thread> = Vec::new();
     let mut warnings = Vec::new();
     // The object before sews over foam.
     let mut last_puff = false;
     let mut spans = Vec::new();
 
-    for (thread_id, ids) in design.sewn_color_blocks() {
+    for (thread_id, ids) in blocks {
         // The runs of this block, routed in sew order.
         let mut block: Vec<Routed> = Vec::new();
         let mut needle = b.needle;
         for id in ids {
+            if stop() {
+                return None;
+            }
             let Some(obj) = design.object(id) else { continue };
             let stitches = cache.get(obj, to_design.apply(needle));
             let runs = match stitches.as_ref() {
@@ -219,6 +248,7 @@ pub fn build_plan(design: &Design, opts: &PlanOptions, cache: &mut StitchCache) 
                 b.pending_stop = Some((*id, *reason));
             }
             let before = b.recs.len();
+            b.place = places.get(id).copied().unwrap_or(0);
             b.long_jumps = *long_jumps;
             b.want_slow = f.slow;
             b.sew_run(pts, join, f.tie_in, *exact);
@@ -261,7 +291,7 @@ pub fn build_plan(design: &Design, opts: &PlanOptions, cache: &mut StitchCache) 
     }
     b.push(StitchKind::End, b.needle);
 
-    StitchPlan {
+    Some(StitchPlan {
         stitches: StitchDesign {
             threads,
             records: b.recs,
@@ -269,7 +299,7 @@ pub fn build_plan(design: &Design, opts: &PlanOptions, cache: &mut StitchCache) 
         warnings,
         spans,
         stops: b.stops,
-    }
+    })
 }
 
 impl StitchPlan {
@@ -287,9 +317,9 @@ impl StitchPlan {
                 let n = design.index_of(s.object).map_or(0, |i| i + 1);
                 let name = design
                     .object(s.object)
-                    .map(|o| o.name.clone().unwrap_or_else(|| o.type_name().to_string()))
+                    .map(|o| o.name.clone().unwrap_or_else(|| text::tr(o.type_name()).to_string()))
                     .unwrap_or_default();
-                format!("Color {color}, object #{n} {name}: {}", s.reason.text())
+                text::fill("Color {}, object #{} {}: {}", &[&color, &n, &name, &s.reason.text()])
             })
             .collect()
     }
@@ -386,6 +416,11 @@ struct Builder<'a> {
     /// The object that sews next wants the slow speed (the `slow`
     /// function); the speed changes before its first stitch.
     want_slow: bool,
+    /// The cells that the objects cover, for hidden travel (only if an
+    /// object has the trim mode `Hidden`).
+    cover: Option<Cover>,
+    /// The place in the sew order of the object of the run that sews now.
+    place: u32,
 }
 
 impl<'a> Builder<'a> {
@@ -402,6 +437,8 @@ impl<'a> Builder<'a> {
             long_jumps: false,
             slow: false,
             want_slow: false,
+            cover: None,
+            place: 0,
         }
     }
 
@@ -480,6 +517,17 @@ impl<'a> Builder<'a> {
         }
     }
 
+    /// Travel stitches along `way` (from the needle), at most
+    /// [`TRAVEL_STITCH_MM`] long.
+    fn travel(&mut self, way: &[Point]) {
+        for w in way.windows(2) {
+            let n = (w[0].distance(w[1]) / TRAVEL_STITCH_MM).ceil().max(1.0) as usize;
+            for k in 1..=n {
+                self.stitch(w[0].lerp(w[1], k as f64 / n as f64), true);
+            }
+        }
+    }
+
     fn trim(&mut self) {
         self.push(StitchKind::Trim, self.needle);
         self.sewing = false;
@@ -542,24 +590,33 @@ impl<'a> Builder<'a> {
             self.stitch(first, true);
         } else if self.sewing {
             let near = self.needle.distance(first) <= self.opts.trim_mm;
+            // Hidden travel: a way that later objects cover, if there is one.
+            let hidden = match (&self.cover, mode) {
+                (Some(c), TrimMode::Hidden) if !near => c.way(self.needle, first, self.place),
+                _ => None,
+            };
             match mode {
                 TrimMode::Always => {
                     self.tie_off();
                     self.trim();
                     self.stop_here();
                 }
-                TrimMode::Auto if !near => {
+                TrimMode::Hidden if hidden.is_some() => {
+                    self.stop_here();
+                    self.travel(hidden.as_deref().unwrap_or_default());
+                }
+                TrimMode::Auto | TrimMode::Hidden if !near => {
                     self.tie_off();
                     self.trim();
                     self.stop_here();
                 }
                 // Travel stitch to the next run of the same color.
-                TrimMode::Auto | TrimMode::Never if near => {
+                TrimMode::Auto | TrimMode::Never | TrimMode::Hidden if near => {
                     self.stop_here();
                     self.stitch(first, true);
                 }
                 // A long gap with no trim: the thread stays and the needle jumps.
-                TrimMode::Never | TrimMode::Auto => {
+                TrimMode::Never | TrimMode::Auto | TrimMode::Hidden => {
                     self.stop_here();
                     self.jump(first);
                     self.stitch(first, true);
@@ -642,7 +699,11 @@ mod tests {
         // No slow object: no speed records, so the other designs do not change.
         d.object_mut(b).unwrap().functions.slow = false;
         let p = build_plan(&d, &PlanOptions::default(), &mut StitchCache::default());
-        assert!(!kinds(&p).iter().any(|x| x.is_speed()));
+        assert!(
+            !kinds(&p)
+                .iter()
+                .any(|x| matches!(x, StitchKind::Slow | StitchKind::Fast))
+        );
     }
 
     fn add_line(d: &mut Design, t: emb_model::ThreadId, a: (f64, f64), b: (f64, f64), len: f64) -> ObjectId {
@@ -1174,6 +1235,27 @@ mod tests {
         let c = plan(&d);
         assert_eq!(a.stitches, b.stitches);
         assert_eq!(a.stitches, c.stitches);
+    }
+
+    #[test]
+    fn a_stop_point_before_each_object() {
+        let mut d = Design::new("t");
+        let t = d.add_thread("Red", Rgb(255, 0, 0));
+        add_line(&mut d, t, (0.0, 0.0), (17.3, 4.1), 2.7);
+        add_line(&mut d, t, (25.0, 3.0), (2.0, 30.0), 3.1);
+        let asked = std::cell::Cell::new(0);
+        let full = build_plan_until(&d, &PlanOptions::default(), &mut StitchCache::default(), &|| {
+            asked.set(asked.get() + 1);
+            false
+        });
+        assert_eq!(asked.get(), 2, "one stop point for each object");
+        assert_eq!(full.unwrap().stitches, plan(&d).stitches);
+        asked.set(0);
+        let stopped = build_plan_until(&d, &PlanOptions::default(), &mut StitchCache::default(), &|| {
+            asked.set(asked.get() + 1);
+            asked.get() > 1
+        });
+        assert!(stopped.is_none(), "stopped before the second object");
     }
 
     #[test]

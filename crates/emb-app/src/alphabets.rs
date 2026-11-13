@@ -8,6 +8,7 @@
 //!   font: BDF or Windows `.fon`), export, delete a letter.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use eframe::egui;
 use emb_letter::EmbFont;
@@ -36,6 +37,19 @@ pub struct AlphabetsWindow {
     pub baseline_y: f64,
     /// The stitch type of imported bitmap fonts.
     pub import_stitch: LetterStitch,
+    /// The alphabets and the selected font, read when the window opens and
+    /// after a change of the files (not on each frame).
+    pub cache: Option<Arc<AlphabetsCache>>,
+}
+
+/// The files that the Alphabets window shows.
+#[derive(Debug)]
+pub struct AlphabetsCache {
+    /// The user's alphabets: (file, family), by name.
+    pub list: Vec<(PathBuf, String)>,
+    /// The file that `font` is from.
+    pub font_path: Option<PathBuf>,
+    pub font: Option<EmbFont>,
 }
 
 impl Default for AlphabetsWindow {
@@ -50,6 +64,7 @@ impl Default for AlphabetsWindow {
             height_mm: 25.0,
             baseline_y: 12.5,
             import_stitch: LetterStitch::Auto,
+            cache: None,
         }
     }
 }
@@ -92,7 +107,7 @@ impl AppState {
             .alphabets_dir_override
             .clone()
             .or_else(user_fonts_dir)
-            .ok_or("No folder for fonts.")?;
+            .ok_or(tr("No folder for fonts."))?;
         std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         Ok(dir)
     }
@@ -102,10 +117,14 @@ impl AppState {
     fn save_alphabet(&mut self, f: &EmbFont, old: Option<&Path>) -> Result<PathBuf, String> {
         let path = self.alphabets_dir()?.join(file_name(&f.family));
         if old != Some(path.as_path()) && path.exists() {
-            return Err(format!("An alphabet named {} is there already.", f.family));
+            return Err(crate::i18n::fill(
+                "An alphabet named {} is there already.",
+                &[&f.family],
+            ));
         }
         f.save(&path)?;
         self.fonts.add_user_font(&path)?;
+        self.alphabets_window.cache = None;
         Ok(path)
     }
 
@@ -113,7 +132,7 @@ impl AppState {
     pub fn alphabet_new(&mut self, name: &str) -> Result<PathBuf, String> {
         let name = name.trim();
         if name.is_empty() {
-            return Err("Type a name for the alphabet.".into());
+            return Err(tr("Type a name for the alphabet.").into());
         }
         let mut f = EmbFont::empty(name, "");
         f.notes = "Made with the alphabet creator.".into();
@@ -123,7 +142,7 @@ impl AppState {
     pub fn alphabet_rename(&mut self, path: &Path, name: &str) -> Result<PathBuf, String> {
         let name = name.trim();
         if name.is_empty() {
-            return Err("Type the new name.".into());
+            return Err(tr("Type the new name.").into());
         }
         let mut f = EmbFont::load(path)?;
         let old = FontRef::embroidery(&f.family, &f.style);
@@ -140,6 +159,7 @@ impl AppState {
         let f = EmbFont::load(path)?;
         std::fs::remove_file(path).map_err(|e| format!("{}: {e}", path.display()))?;
         self.fonts.forget(&FontRef::embroidery(&f.family, &f.style));
+        self.alphabets_window.cache = None;
         Ok(())
     }
 
@@ -178,11 +198,12 @@ impl AppState {
             .collect();
         let w = &self.alphabets_window;
         let letter = emb_letter::embfont::letter_from_objects(&kinds, w.baseline_y, w.height_mm)
-            .ok_or("Select the satin, fill or running objects of the letter.")?;
+            .ok_or(tr("Select the satin, fill or running objects of the letter."))?;
         let mut f = EmbFont::load(path)?;
         f.set_letter(c, letter);
         f.save(path)?;
         self.fonts.add_user_font(path)?;
+        self.alphabets_window.cache = None;
         Ok(())
     }
 
@@ -191,16 +212,17 @@ impl AppState {
         f.remove_letter(c);
         f.save(path)?;
         self.fonts.add_user_font(path)?;
+        self.alphabets_window.cache = None;
         Ok(())
     }
 
     /// Guides at the baseline and at the capital height of the window.
     pub fn alphabet_guides(&mut self) {
         let (b, h) = (self.alphabets_window.baseline_y, self.alphabets_window.height_mm);
-        self.doc.edit("Add letter guides", |d| {
+        self.doc.edit(tr("Add letter guides"), |d| {
             for pos in [b, b - h] {
                 if !d.guides.iter().any(|g| !g.vertical && (g.pos - pos).abs() < 1e-6) {
-                    d.guides.push(Guide { vertical: false, pos });
+                    d.guides.push(Guide::new(false, pos));
                 }
             }
         });
@@ -210,14 +232,38 @@ impl AppState {
 /// The Alphabets window.
 pub fn window(ctx: &egui::Context, st: &mut AppState) {
     if !st.alphabets_window.open {
+        st.alphabets_window.cache = None;
         return;
     }
-    let list = st.alphabets_dir().map(|d| alphabets(&d)).unwrap_or_default();
+    let cache = match st.alphabets_window.cache.clone() {
+        Some(c) => c,
+        None => {
+            let list = st.alphabets_dir().map(|d| alphabets(&d)).unwrap_or_default();
+            Arc::new(AlphabetsCache {
+                list,
+                font_path: None,
+                font: None,
+            })
+        }
+    };
+    let list = &cache.list;
     let mut w = st.alphabets_window.clone();
     if w.selected.as_ref().is_none_or(|p| !list.iter().any(|(q, _)| q == p)) {
         w.selected = list.first().map(|(p, _)| p.clone());
     }
-    let font = w.selected.as_deref().and_then(|p| EmbFont::load(p).ok());
+    // The selected font: loaded again only when the selection changes.
+    let cache = if cache.font_path != w.selected {
+        Arc::new(AlphabetsCache {
+            list: cache.list.clone(),
+            font_path: w.selected.clone(),
+            font: w.selected.as_deref().and_then(|p| EmbFont::load(p).ok()),
+        })
+    } else {
+        cache
+    };
+    w.cache = Some(cache.clone());
+    let list = &cache.list;
+    let font = cache.font.as_ref();
     let mut open = true;
     #[derive(PartialEq)]
     enum Act {
@@ -250,10 +296,10 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                     w.selected
                         .as_ref()
                         .and_then(|p| list.iter().find(|(q, _)| q == p))
-                        .map_or("(none yet)", |(_, n)| n.as_str()),
+                        .map_or(tr("(none yet)"), |(_, n)| n.as_str()),
                 )
                 .show_ui(ui, |ui| {
-                    for (p, n) in &list {
+                    for (p, n) in list {
                         ui.selectable_value(&mut w.selected, Some(p.clone()), n);
                     }
                 });
@@ -280,9 +326,9 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                     act = Act::Rename;
                 }
                 let del = if w.confirm_delete {
-                    "Click again to delete"
+                    tr("Click again to delete")
                 } else {
-                    "Delete"
+                    tr("Delete")
                 };
                 if ui
                     .button(del)
@@ -306,9 +352,9 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
             }
             egui::ComboBox::from_id_salt("import_stitch")
                 .selected_text(match w.import_stitch {
-                    LetterStitch::Auto => "Bitmap fonts: automatic",
-                    LetterStitch::Satin => "Bitmap fonts: satin",
-                    LetterStitch::Fill => "Bitmap fonts: fill (pixel look)",
+                    LetterStitch::Auto => tr("Bitmap fonts: automatic"),
+                    LetterStitch::Satin => tr("Bitmap fonts: satin"),
+                    LetterStitch::Fill => tr("Bitmap fonts: fill (pixel look)"),
                 })
                 .show_ui(ui, |ui| {
                     ui.selectable_value(&mut w.import_stitch, LetterStitch::Auto, tr("Automatic"));
@@ -319,7 +365,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                 act = Act::Export;
             }
         });
-        if let Some(f) = &font {
+        if let Some(f) = font {
             ui.separator();
             ui.horizontal(|ui| {
                 ui.strong(crate::i18n::fill(
@@ -389,13 +435,13 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         Act::New => st.alphabet_new(&w.new_name).map(|p| {
             st.alphabets_window.selected = Some(p);
             st.alphabets_window.new_name.clear();
-            "New alphabet.".into()
+            tr("New alphabet.").into()
         }),
         Act::Rename => match &sel {
             Some(p) => st.alphabet_rename(p, &w.rename).map(|n| {
                 st.alphabets_window.selected = Some(n);
                 st.alphabets_window.rename.clear();
-                "Renamed.".into()
+                tr("Renamed.").into()
             }),
             None => Ok(String::new()),
         },
@@ -403,36 +449,36 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
             Some(p) if w.confirm_delete => st.alphabet_delete(p).map(|()| {
                 st.alphabets_window.confirm_delete = false;
                 st.alphabets_window.selected = None;
-                "Alphabet deleted.".into()
+                tr("Alphabet deleted.").into()
             }),
             Some(_) => {
                 st.alphabets_window.confirm_delete = true;
-                Ok("Click Delete again to delete the alphabet.".into())
+                Ok(tr("Click Delete again to delete the alphabet.").into())
             }
             None => Ok(String::new()),
         },
         Act::Import => match rfd::FileDialog::new()
-            .set_title("Import an alphabet")
-            .add_filter("Embroidery and bitmap fonts", &[FILE_EXTENSION, "bdf", "fon"])
+            .set_title(tr("Import an alphabet"))
+            .add_filter(tr("Embroidery and bitmap fonts"), &[FILE_EXTENSION, "bdf", "fon"])
             .set_directory(st.dialog_dir())
             .pick_file()
         {
             Some(src) => st.alphabet_import(&src, w.import_stitch).map(|p| {
                 st.alphabets_window.selected = Some(p);
-                "Imported.".into()
+                tr("Imported.").into()
             }),
             None => Ok(String::new()),
         },
         Act::Export => match (&sel, sel.as_ref().and_then(|p| p.file_name()).map(|n| n.to_owned())) {
             (Some(p), Some(name)) => match rfd::FileDialog::new()
-                .set_title("Export the alphabet")
+                .set_title(tr("Export the alphabet"))
                 .set_file_name(name.to_string_lossy())
                 .set_directory(st.dialog_dir())
                 .save_file()
             {
                 Some(dest) => st
                     .alphabet_export(p, &dest)
-                    .map(|()| format!("Exported {}", dest.display())),
+                    .map(|()| crate::i18n::fill("Exported {}", &[&dest.display()])),
                 None => Ok(String::new()),
             },
             _ => Ok(String::new()),
@@ -440,22 +486,27 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         Act::Create => match (&sel, w.ch.chars().next()) {
             (Some(p), Some(c)) => st
                 .alphabet_letter_from_selection(p, c)
-                .map(|()| format!("\"{c}\" is now a letter of the alphabet.")),
+                .map(|()| crate::i18n::fill("\"{}\" is now a letter of the alphabet.", &[&c])),
             _ => Ok(String::new()),
         },
         Act::Guides => {
             st.alphabet_guides();
-            Ok("Guides at the baseline and the capital height.".into())
+            Ok(tr("Guides at the baseline and the capital height.").into())
         }
         Act::RemoveLetter(c) => match &sel {
-            Some(p) => st.alphabet_remove_letter(p, c).map(|()| format!("\"{c}\" deleted.")),
+            Some(p) => st
+                .alphabet_remove_letter(p, c)
+                .map(|()| crate::i18n::fill("\"{}\" deleted.", &[&c])),
             None => Ok(String::new()),
         },
         Act::LetterWith => match font {
             Some(f) => {
                 st.letter_font = FontRef::embroidery(&f.family, &f.style);
                 st.set_tool(crate::draw::Tool::Lettering);
-                Ok(format!("Lettering with {}: click where the text starts.", f.family))
+                Ok(crate::i18n::fill(
+                    "Lettering with {}: click where the text starts.",
+                    &[&f.family],
+                ))
             }
             None => Ok(String::new()),
         },
@@ -576,6 +627,39 @@ mod tests {
             out.textures_delta.clear();
         }
         assert!(st.alphabets_window.selected.is_some());
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn the_window_reads_the_files_only_after_a_change() {
+        let (mut st, dir) = state("cache");
+        let one = st.alphabet_new("One").unwrap();
+        st.alphabets_window.open = true;
+        let ctx = egui::Context::default();
+        let frame = |st: &mut AppState| {
+            let mut out = ctx.run_ui(egui::RawInput::default(), |ui| window(ui.ctx(), st));
+            out.textures_delta.clear();
+        };
+        frame(&mut st);
+        let first = st.alphabets_window.cache.clone().expect("read on the first frame");
+        assert_eq!(first.font.as_ref().map(|f| f.family.as_str()), Some("One"));
+        frame(&mut st);
+        assert!(
+            Arc::ptr_eq(&first, st.alphabets_window.cache.as_ref().unwrap()),
+            "not read again"
+        );
+        // A new alphabet: the list is read again, with it.
+        let two = st.alphabet_new("Two").unwrap();
+        assert!(st.alphabets_window.cache.is_none());
+        frame(&mut st);
+        assert_eq!(st.alphabets_window.cache.as_ref().unwrap().list.len(), 2);
+        // Another selection loads its font.
+        st.alphabets_window.selected = Some(two);
+        frame(&mut st);
+        let c = st.alphabets_window.cache.clone().unwrap();
+        assert_eq!(c.font.as_ref().map(|f| f.family.as_str()), Some("Two"));
+        st.alphabet_delete(&one).unwrap();
+        assert!(st.alphabets_window.cache.is_none());
         std::fs::remove_dir_all(dir).ok();
     }
 }

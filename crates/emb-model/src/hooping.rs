@@ -29,7 +29,7 @@
 //! the design continues.
 
 use emb_geom::region::{self, Join, Region};
-use emb_geom::{BBox, Path, Point, Polyline, Transform};
+use emb_geom::{BBox, Path, Point, Polyline, Transform, text};
 use serde::{Deserialize, Serialize};
 
 use crate::shaping::{area_of, clean, rebuild};
@@ -504,7 +504,7 @@ impl Design {
             .collect();
         for (index, it) in items.iter().enumerate() {
             let o = it.obj;
-            let label = format!("object #{} ({})", index + 1, o.type_name());
+            let label = text::fill("object #{} ({})", &[&(index + 1), &text::tr(o.type_name())]);
             let shares: Vec<f64> = zone_d
                 .iter()
                 .map(|z| area(&region::intersection(&it.measure, z)))
@@ -546,9 +546,9 @@ impl Design {
                 }
                 _ => {
                     outs[main].design.objects.push(self.objects[index].clone());
-                    outs[main].warnings.push(format!(
-                        "Hooping {}: {label} does not fit the hoop and cannot be split.",
-                        main + 1
+                    outs[main].warnings.push(text::fill(
+                        "Hooping {}: {} does not fit the hoop and cannot be split.",
+                        &[&(main + 1), &label],
                     ));
                     continue;
                 }
@@ -567,9 +567,9 @@ impl Design {
                 piece.start = None;
                 piece.end = None;
                 if !fits(k, &outs[k].design, piece.control_bbox()) {
-                    outs[k].warnings.push(format!(
-                        "Hooping {}: a part of {label} goes outside the hoop field.",
-                        k + 1
+                    outs[k].warnings.push(text::fill(
+                        "Hooping {}: a part of {} goes outside the hoop field.",
+                        &[&(k + 1), &label],
                     ));
                 }
                 outs[k].design.objects.push(std::sync::Arc::new(piece));
@@ -598,11 +598,7 @@ impl Design {
                         continue;
                     }
                     if over {
-                        outs[j].warnings.push(format!(
-                            "Hooping {}: the registration marks with hooping {} sew over the design (no free space in both fields).",
-                            j + 1,
-                            i + 1
-                        ));
+                        outs[j].warnings.push(text::fill("Hooping {}: the registration marks with hooping {} sew over the design (no free space in both fields).", &[&(j + 1), &(i + 1)]));
                     }
                     for p in points {
                         let at = inv.apply(p);
@@ -656,6 +652,7 @@ impl Design {
         d.monograms.clear();
         d.team_names = None;
         d.blends.clear();
+        d.buttonholes.clear();
         d.border_traces.clear();
         d.shape_links.clear();
         d.sketch_links.clear();

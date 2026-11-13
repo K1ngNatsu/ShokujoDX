@@ -97,7 +97,7 @@ tab to show it again.
   **Ctrl+Minus** and **Ctrl+0** change it too.
 - **High contrast**: black or white panels with strong lines.
 - **Language**: English, Deutsch, Español or 日本語. The help topics are
-  in English.
+  in the same language (a topic with no translation is in English).
 
 See [Options](options) for all the settings.
 

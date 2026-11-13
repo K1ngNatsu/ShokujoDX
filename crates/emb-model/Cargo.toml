@@ -15,8 +15,5 @@ toml.workspace = true
 thiserror.workspace = true
 base64.workspace = true
 
-[dev-dependencies]
-proptest.workspace = true
-
 [lints]
 workspace = true

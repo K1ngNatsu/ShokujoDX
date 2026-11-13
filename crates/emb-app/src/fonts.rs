@@ -86,7 +86,7 @@ impl AppState {
             return 0;
         }
         let count = changed.len();
-        self.doc.edit("Change font", |d| {
+        self.doc.edit(tr("Change font"), |d| {
             for (id, n) in changed {
                 if let Some(o) = d.object_mut(id) {
                     o.kind = ObjectKind::Lettering(Box::new(n));
@@ -115,6 +115,28 @@ impl AppState {
     }
 }
 
+/// The outline of a letter part as rings (filled even-odd): a fill, or a
+/// satin column between its rails.
+pub(crate) fn part_rings(part: &ObjectKind) -> Vec<Vec<Point>> {
+    let ring =
+        |path: &emb_geom::Path| -> Vec<Vec<Point>> { path.flatten(0.05).into_iter().map(|pl| pl.points).collect() };
+    match part {
+        ObjectKind::Satin { geometry, .. } => {
+            let (a, b) = (ring(&geometry.rail_a), ring(&geometry.rail_b));
+            let closed = geometry.rail_a.flatten(0.05).first().is_some_and(|p| p.closed);
+            if closed {
+                a.into_iter().chain(b).collect()
+            } else {
+                let mut r: Vec<Point> = a.into_iter().flatten().collect();
+                r.extend(b.into_iter().flatten().rev());
+                vec![r]
+            }
+        }
+        ObjectKind::Fill { outer, holes, .. } => ring(outer).into_iter().chain(holes.iter().flat_map(ring)).collect(),
+        _ => Vec::new(),
+    }
+}
+
 /// The shapes of the letters, as screen rings (each part alone).
 fn draw_letters(painter: &egui::Painter, rect: Rect, letters: &[Letter], color: Color32) {
     let Some(bb) = letters
@@ -133,30 +155,11 @@ fn draw_letters(painter: &egui::Painter, rect: Rect, letters: &[Letter], color: 
         (rect.height() - (bb.height() * s) as f32) / 2.0,
     );
     let to = |p: Point| rect.min + off + Vec2::new(((p.x - bb.min.x) * s) as f32, ((p.y - bb.min.y) * s) as f32);
-    let ring = |path: &emb_geom::Path| -> Vec<Vec<Pos2>> {
-        path.flatten(0.05)
-            .into_iter()
-            .map(|pl| pl.points.into_iter().map(to).collect())
-            .collect()
-    };
     for part in letters.iter().flat_map(|l| l.parts.iter()) {
-        let rings: Vec<Vec<Pos2>> = match part {
-            ObjectKind::Satin { geometry, .. } => {
-                let (a, b) = (ring(&geometry.rail_a), ring(&geometry.rail_b));
-                let closed = geometry.rail_a.flatten(0.05).first().is_some_and(|p| p.closed);
-                if closed {
-                    a.into_iter().chain(b).collect()
-                } else {
-                    let mut r: Vec<Pos2> = a.into_iter().flatten().collect();
-                    r.extend(b.into_iter().flatten().rev());
-                    vec![r]
-                }
-            }
-            ObjectKind::Fill { outer, holes, .. } => {
-                ring(outer).into_iter().chain(holes.iter().flat_map(&ring)).collect()
-            }
-            _ => Vec::new(),
-        };
+        let rings: Vec<Vec<Pos2>> = part_rings(part)
+            .into_iter()
+            .map(|r| r.into_iter().map(to).collect())
+            .collect();
         painter.add(Shape::mesh(crate::applique::scanline_mesh(&rings, color, rect)));
     }
 }

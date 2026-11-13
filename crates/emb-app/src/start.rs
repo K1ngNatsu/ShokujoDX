@@ -23,6 +23,10 @@ use crate::ribbon::Cmd;
 /// The size of a design picture on the start page, points.
 const THUMB: f32 = 96.0;
 
+/// The start page checks again after this time which recent files are on
+/// the disk, in seconds.
+const RECHECK_S: f64 = 2.0;
+
 /// The state of the start page.
 #[derive(Default)]
 pub struct StartState {
@@ -34,6 +38,26 @@ pub struct StartState {
     incoming: Option<Receiver<(PathBuf, Option<egui::ColorImage>)>>,
     /// The question box.
     pub question: String,
+    /// The recent files that are on the disk: the list that was checked,
+    /// the time of the check, and the files found. Not checked on each
+    /// frame: a file on a network drive can be slow to find.
+    recent: Option<(Vec<PathBuf>, f64, Vec<PathBuf>)>,
+}
+
+impl StartState {
+    /// The files of `list` that are on the disk, checked again when the
+    /// list changes or after `RECHECK_S` seconds.
+    fn recent_files(&mut self, list: &[PathBuf], now: f64) -> Vec<PathBuf> {
+        if let Some((l, at, found)) = &self.recent
+            && l == list
+            && (0.0..RECHECK_S).contains(&(now - at))
+        {
+            return found.clone();
+        }
+        let found: Vec<PathBuf> = list.iter().filter(|p| p.is_file()).cloned().collect();
+        self.recent = Some((list.to_vec(), now, found.clone()));
+        found
+    }
 }
 
 /// The picture of a design file, for the start page.
@@ -174,7 +198,8 @@ fn cards(ui: &mut egui::Ui, st: &AppState, paths: &[PathBuf]) -> Option<PathBuf>
 /// The start page.
 pub fn page(ui: &mut egui::Ui, st: &mut AppState) {
     let ctx = ui.ctx().clone();
-    let recent: Vec<PathBuf> = st.settings.recent.iter().filter(|p| p.is_file()).cloned().collect();
+    let now = ctx.input(|i| i.time);
+    let recent = st.start.recent_files(&st.settings.recent, now);
     st.ask_thumbnails(&recent);
     if st.take_thumbnails(&ctx) {
         ctx.request_repaint_after(std::time::Duration::from_millis(100));
@@ -201,9 +226,9 @@ pub fn page(ui: &mut egui::Ui, st: &mut AppState) {
                     ] {
                         let (_, label, tip) = cmd.meta();
                         let text = match cmd {
-                            Cmd::New => "New design",
-                            Cmd::Open => "Open a design…",
-                            Cmd::Library => "Design Library",
+                            Cmd::New => tr("New design"),
+                            Cmd::Open => tr("Open a design…"),
+                            Cmd::Library => tr("Design Library"),
                             _ => label,
                         };
                         if ui
@@ -297,6 +322,27 @@ pub fn page(ui: &mut egui::Ui, st: &mut AppState) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_recent_files_are_checked_again_after_a_time() {
+        let dir = std::env::temp_dir().join(format!("emb-start-recent-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let a = dir.join("a.embproj");
+        std::fs::write(&a, "x").unwrap();
+        let list = vec![a.clone(), dir.join("gone.embproj")];
+        let mut s = StartState::default();
+        assert_eq!(s.recent_files(&list, 10.0), vec![a.clone()]);
+        std::fs::remove_file(&a).unwrap();
+        assert_eq!(
+            s.recent_files(&list, 11.0),
+            vec![a.clone()],
+            "not checked again so soon"
+        );
+        assert!(s.recent_files(&list, 10.0 + RECHECK_S).is_empty());
+        std::fs::write(&a, "x").unwrap();
+        assert_eq!(s.recent_files(&list[..1], 12.5), vec![a], "a new list is checked");
+        std::fs::remove_dir_all(dir).ok();
+    }
 
     #[test]
     fn the_pictures_of_designs() {

@@ -76,11 +76,11 @@ impl AppState {
     pub fn toggle_func(&mut self, func: Func) {
         let on = !self.func_on(func);
         let label = match func {
-            Func::Stop => "Stop After",
-            Func::TrimAlways => "Trim after",
-            Func::TrimNever => "No trim after",
-            Func::TieIn => "Tie-In",
-            Func::TieOff => "Tie-Off",
+            Func::Stop => tr("Stop After"),
+            Func::TrimAlways => tr("Trim after"),
+            Func::TrimNever => tr("No trim after"),
+            Func::TieIn => tr("Tie-In"),
+            Func::TieOff => tr("Tie-Off"),
         };
         self.edit_functions(label, |f| func.set(f, on));
     }
@@ -143,7 +143,7 @@ impl AppState {
             self.message = tr("Cannot split the object here. Move the stitch cursor into the object.").into();
             return;
         };
-        let new = self.doc.edit("Split at Needle", |d| replace_with(d, id, parts));
+        let new = self.doc.edit(tr("Split at Needle"), |d| replace_with(d, id, parts));
         self.message = crate::i18n::fill("Split into {} objects.", &[&(new.len())]);
         self.selection.set_all(new);
     }
@@ -244,9 +244,10 @@ pub fn section(ui: &mut egui::Ui, st: &mut AppState) {
         ui.label(tr("Trim after"));
         egui::ComboBox::from_id_salt("trim_mode")
             .selected_text(match f.trim {
-                TrimMode::Auto => "Automatic",
-                TrimMode::Always => "Always",
-                TrimMode::Never => "Never",
+                TrimMode::Auto => tr("Automatic"),
+                TrimMode::Always => tr("Always"),
+                TrimMode::Never => tr("Never"),
+                TrimMode::Hidden => tr("Hidden travel"),
             })
             .show_ui(ui, |ui| {
                 ui.selectable_value(&mut f.trim, TrimMode::Auto, tr("Automatic"))
@@ -254,6 +255,10 @@ pub fn section(ui: &mut egui::Ui, st: &mut AppState) {
                 ui.selectable_value(&mut f.trim, TrimMode::Always, tr("Always"));
                 ui.selectable_value(&mut f.trim, TrimMode::Never, tr("Never"))
                     .on_hover_text(tr("A long gap becomes a jump; the thread is not cut"));
+                ui.selectable_value(&mut f.trim, TrimMode::Hidden, tr("Hidden travel"))
+                    .on_hover_text(tr(
+                        "Travel stitches to the next object of the same color where objects that sew later cover them; else a trim",
+                    ));
             });
     });
     ui.checkbox(&mut f.stop, tr("Stop After")).on_hover_text(tr(
@@ -289,23 +294,24 @@ pub fn section(ui: &mut egui::Ui, st: &mut AppState) {
 pub fn summary(f: &Functions) -> String {
     let mut parts = Vec::new();
     match f.trim {
-        TrimMode::Always => parts.push("trim"),
-        TrimMode::Never => parts.push("no trim"),
+        TrimMode::Always => parts.push(tr("trim")),
+        TrimMode::Never => parts.push(tr("no trim")),
+        TrimMode::Hidden => parts.push(tr("hidden travel")),
         TrimMode::Auto => {}
     }
     if f.stop {
-        parts.push("stop");
+        parts.push(tr("stop"));
     }
     if f.slow {
-        parts.push("slow");
+        parts.push(tr("slow"));
     }
     if !f.tie_in || !f.tie_off {
-        parts.push("no tie");
+        parts.push(tr("no tie"));
     }
     parts.join(", ")
 }
 
-fn kind_name(k: StitchKind) -> &'static str {
+pub fn kind_name(k: StitchKind) -> &'static str {
     match k {
         StitchKind::Stitch => tr("Stitch"),
         StitchKind::Jump => tr("Jump"),

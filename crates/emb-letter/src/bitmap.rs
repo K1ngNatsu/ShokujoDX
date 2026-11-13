@@ -6,7 +6,7 @@
 
 use std::collections::BTreeMap;
 
-use emb_geom::{Point, Transform};
+use emb_geom::{Point, Transform, text};
 use emb_model::LetterStitch;
 
 use crate::embfont::{DESIGN_CAP_MM, EmbFont, EmbLetter, round_part};
@@ -70,7 +70,7 @@ pub fn read_bdf(text: &str) -> Result<BitmapFont, String> {
     };
     let mut lines = text.lines();
     if !lines.clone().next().is_some_and(|l| l.starts_with("STARTFONT")) {
-        return Err("not a BDF font".into());
+        return Err(text::tr("not a BDF font").into());
     }
     let mut font_name = String::new();
     let mut unicode = true;
@@ -146,7 +146,7 @@ pub fn read_bdf(text: &str) -> Result<BitmapFont, String> {
         f.ascent = f.glyphs.values().map(|g| -g.top).max().unwrap_or(1);
     }
     if f.glyphs.is_empty() {
-        return Err("the BDF font has no characters".into());
+        return Err(text::tr("the BDF font has no characters").into());
     }
     Ok(f)
 }
@@ -167,7 +167,7 @@ fn u32_at(b: &[u8], o: usize) -> Option<u32> {
 
 /// Reads the raster fonts of a Windows `.fon` file (each size is one face).
 pub fn read_fon(bytes: &[u8]) -> Result<Vec<BitmapFont>, String> {
-    let bad = || "not a Windows raster font file".to_string();
+    let bad = || text::tr("not a Windows raster font file").to_string();
     if bytes.get(0..2) != Some(b"MZ") {
         return Err(bad());
     }
@@ -201,7 +201,7 @@ pub fn read_fon(bytes: &[u8]) -> Result<Vec<BitmapFont>, String> {
         at += count * 12;
     }
     if fonts.is_empty() {
-        return Err("the file has no raster fonts (vector fonts are not read)".into());
+        return Err(text::tr("the file has no raster fonts (vector fonts are not read)").into());
     }
     Ok(fonts)
 }

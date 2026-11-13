@@ -2,7 +2,7 @@
 id: canvas
 title: The canvas and the selection
 group: design
-keywords: dock, docked, command window, corner, canvas, zoom, pan, move, view, select, selection, crossing, box, lasso, nudge, arrow, handles, scale, hide, grid, guides, rulers, snap, measure, views, split view, overview, other design, compare, side by side, panels, dark mode
+keywords: dock, docked, command window, corner, canvas, zoom, pan, move, view, select, selection, crossing, box, lasso, nudge, arrow, handles, scale, hide, grid, guides, ruler marker, construction line, construction point, dashed, lock guide, guide color, intersection, rulers, snap, measure, views, split view, overview, other design, compare, side by side, panels, dark mode
 ---
 # The canvas and the selection
 
@@ -52,11 +52,15 @@ back of the machine.
 ## Move and change the selection
 
 - Drag the selection to move it. The corner handles scale it; the round
-  handle turns it.
+  handle turns it. Scaling keeps the center in place (the small cross);
+  **Object Properties > Position and size > Scale from** sets another
+  point. **Alt** while you drag a handle: from the opposite side.
 - The arrow keys move the selection a little. **Shift** and an arrow key
   move it more. Options sets the distances.
 - **Object Properties > Position and size** sets the place, width and
-  height as numbers. **Keep proportions** keeps the shape.
+  height as numbers. **Keep proportions** keeps the shape. **Slant**
+  leans the selection: ↔ moves the top to the right, ↕ moves the right
+  side down (degrees).
 - **H** and **V** mirror the selection; **Ctrl+R** turns it 90°. See
   [Arranging and the sew order](arranging) for all the ways to turn,
   align and copy.
@@ -79,10 +83,27 @@ back of the machine.
 
 - **View > Grid** shows a grid. Options sets the spacing and a major line.
 - **View > Rulers** shows rulers at the top and the left side. Drag from a
-  ruler to make a guide. **Remove Guides** removes all guides.
+  ruler to make a guide. Each guide has a marker on its ruler: drag the
+  marker to move the guide, and drag it off the canvas to delete the
+  guide. With the Select tool, you can also drag a guide line, and drop
+  it on a ruler to delete it.
+- Double-click a marker (or a guide line with the Select tool) to type the
+  place of the guide, from the hoop center.
+- Right-click a marker (or a guide line or a construction mark with the
+  Select tool) for its menu: **Position…**, **Move to Hoop Center**,
+  **Color**, **Dashed** (else solid), **Locked** (a drag does not move
+  it), **Duplicate** (a copy one grid step away) and **Delete**.
+- **View > Construction Line** draws a dashed help line through two
+  points, at any angle (Shift: steps of 15°). **View > Construction
+  Point** puts a help point. They do not sew.
+- **Remove Guides** removes all guides, construction lines and
+  construction points.
 - **Snap to Grid**, **Snap to Guides** and **Snap to Objects** make points
-  and moves go to the grid, to the guides, or to the nodes of other
-  objects.
+  and moves go to the grid, to the guides, or to other objects. With
+  **Snap to Guides**, points also go to the construction lines and
+  points, and to the places where they cross the guides and each other.
+  With **Snap to Objects**, points go to the nodes, the midpoints, the
+  centers and the edges of other objects.
 - **View > Measure** measures a distance and an angle. Drag.
 
 ## Command windows

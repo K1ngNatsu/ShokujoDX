@@ -163,8 +163,6 @@ nothing is selected. Set the **Space round the objects**, then click
 
 ## Buttonholes
 
-**Digitize > Buttonholes** makes one buttonhole, or a string of
-buttonholes along the selected line (the line is used up). Set the
-**Opening**, **Leg width**, **Gap for the cut**, **Bar tack**,
-**Density** and the **Number**. **Across the line** turns them. Cut each
-opening between the legs after sewing.
+**Digitize > Buttonholes** makes buttonholes and eyelets in seven shapes
+and in standard sizes: one, or a string along the selected line. See
+[Buttonholes and eyelets](buttonholes).

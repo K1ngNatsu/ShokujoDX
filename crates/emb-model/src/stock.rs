@@ -10,6 +10,7 @@
 //! - [`threads_to_buy`]: for an order, the top thread of each thread of
 //!   the design against the stock.
 
+use emb_geom::text;
 use serde::{Deserialize, Serialize};
 
 use crate::chart::{ChartThread, Lab, ThreadChart};
@@ -228,7 +229,7 @@ impl ThreadStock {
                 if i == 0 {
                     continue;
                 }
-                return Err(format!("line {}: expected brand,code,name,#rrggbb", i + 1));
+                return Err(text::fill("line {}: expected brand,code,name,#rrggbb", &[&(i + 1)]));
             };
             let number = |k: usize, default: u32| -> Result<u32, String> {
                 match cell(k) {
@@ -236,7 +237,7 @@ impl ThreadStock {
                     v => v
                         .parse::<u32>()
                         .map(|n| n.min(MAX_SPOOLS))
-                        .map_err(|_| format!("line {}: {v:?} is not a whole number", i + 1)),
+                        .map_err(|_| text::fill("line {}: {} is not a whole number", &[&(i + 1), &format!("{:?}", v)])),
                 }
             };
             let spool_m = match cell(5) {
@@ -245,7 +246,9 @@ impl ThreadStock {
                     v.parse::<f64>()
                         .ok()
                         .filter(|m| m.is_finite() && *m > 0.0)
-                        .ok_or_else(|| format!("line {}: {v:?} is not a length in m", i + 1))?
+                        .ok_or_else(|| {
+                            text::fill("line {}: {} is not a length in m", &[&(i + 1), &format!("{:?}", v)])
+                        })?
                         .min(MAX_SPOOL_M),
                 ),
             };

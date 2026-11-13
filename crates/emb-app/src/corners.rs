@@ -214,7 +214,7 @@ impl AppState {
     pub fn set_corners(&mut self, id: ObjectId, c: &Corners, merge: bool) {
         let path = c.to_path();
         let key = emb_model::MergeKey::new(format!("{}:corners", id.0));
-        self.doc.edit_merged("Corner Radius", key, |d| {
+        self.doc.edit_merged(tr("Corner Radius"), key, |d| {
             if let Some(o) = d.object_mut(id).and_then(|o| outline_mut(&mut o.kind)) {
                 *o = path;
             }
@@ -264,7 +264,7 @@ impl AppState {
             );
             return false;
         }
-        self.doc.edit("Hole Inside the Outline", |dsg| {
+        self.doc.edit(tr("Hole Inside the Outline"), |dsg| {
             match dsg.object_mut(id).map(|o| &mut o.kind) {
                 Some(ObjectKind::Fill { holes: h, .. }) => h.extend(holes),
                 Some(ObjectKind::Applique { pieces, .. }) => {

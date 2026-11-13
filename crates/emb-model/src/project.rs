@@ -9,6 +9,7 @@
 //! The loader rejects a file with a different `format` or a newer `version`.
 //! It migrates older versions step by step before it reads the design.
 
+use emb_geom::text;
 use std::collections::BTreeSet;
 
 use serde::Serialize;
@@ -56,20 +57,23 @@ pub fn from_str(s: &str) -> Result<Design, ModelError> {
     let version = root
         .get("version")
         .and_then(Value::as_u64)
-        .ok_or_else(|| ModelError::UnsupportedProject("version is missing".into()))?;
+        .ok_or_else(|| ModelError::UnsupportedProject(text::tr("version is missing").into()))?;
     if version > VERSION {
-        return Err(ModelError::UnsupportedProject(format!(
-            "file version {version} is newer than this program (version {VERSION}). Update the program"
+        return Err(ModelError::UnsupportedProject(text::fill(
+            "file version {} is newer than this program (version {}). Update the program",
+            &[&version, &VERSION],
         )));
     }
     if version == 0 {
-        return Err(ModelError::UnsupportedProject("version 0 is not valid".into()));
+        return Err(ModelError::UnsupportedProject(
+            text::tr("version 0 is not valid").into(),
+        ));
     }
     migrate(&mut root, version)?;
     let design_value = root
         .get_mut("design")
         .map(Value::take)
-        .ok_or_else(|| ModelError::UnsupportedProject("design is missing".into()))?;
+        .ok_or_else(|| ModelError::UnsupportedProject(text::tr("design is missing").into()))?;
     let design: Design = serde_json::from_value(design_value)?;
     validate(&design)?;
     Ok(design)
@@ -95,31 +99,34 @@ pub fn load(path: &std::path::Path) -> Result<Design, ModelError> {
 fn migrate(_root: &mut Value, version: u64) -> Result<(), ModelError> {
     match version {
         VERSION => Ok(()),
-        v => Err(ModelError::UnsupportedProject(format!("no migration from version {v}"))),
+        v => Err(ModelError::UnsupportedProject(text::fill(
+            "no migration from version {}",
+            &[&v],
+        ))),
     }
 }
 
 /// Checks references in a design that serde cannot check.
 fn validate(design: &Design) -> Result<(), ModelError> {
     let invalid = |message| ModelError::Invalid {
-        what: "project file",
+        what: text::tr("project file"),
         message,
     };
     let mut thread_ids = BTreeSet::new();
     for t in &design.threads {
         if !thread_ids.insert(t.id) {
-            return Err(invalid(format!("thread id {} is used more than once", t.id.0)));
+            return Err(invalid(text::fill("thread id {} is used more than once", &[&t.id.0])));
         }
     }
     let mut object_ids = BTreeSet::new();
     for o in design.objects() {
         if !object_ids.insert(o.id) {
-            return Err(invalid(format!("object id {} is used more than once", o.id.0)));
+            return Err(invalid(text::fill("object id {} is used more than once", &[&o.id.0])));
         }
         if !thread_ids.contains(&o.thread) {
-            return Err(invalid(format!(
+            return Err(invalid(text::fill(
                 "object {} uses thread {}, which is not in the palette",
-                o.id.0, o.thread.0
+                &[&o.id.0, &o.thread.0],
             )));
         }
     }
@@ -127,20 +134,19 @@ fn validate(design: &Design) -> Result<(), ModelError> {
         !p.x.is_finite() || !p.y.is_finite() || p.x.abs() > MAX_COORD_MM || p.y.abs() > MAX_COORD_MM
     };
     if far(design.hoop.center) {
-        return Err(invalid("the hoop center is out of range".into()));
+        return Err(invalid(text::tr("the hoop center is out of range").into()));
     }
     for o in design.objects() {
         if let Some(b) = o.control_bbox()
             && (far(b.min) || far(b.max))
         {
-            return Err(invalid(format!("object {} is out of range", o.id.0)));
+            return Err(invalid(text::fill("object {} is out of range", &[&o.id.0])));
         }
     }
     if !design.colorways.is_empty() && design.colorway >= design.colorways.len() {
-        return Err(invalid(format!(
+        return Err(invalid(text::fill(
             "colorway {} does not exist (the design has {})",
-            design.colorway,
-            design.colorways.len()
+            &[&design.colorway, &design.colorways.len()],
         )));
     }
     Ok(())

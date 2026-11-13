@@ -64,8 +64,8 @@ impl AppState {
             }
         };
         match key {
-            Some(key) => self.doc.edit_merged("Simplify", key, change),
-            None => self.doc.edit("Simplify", change),
+            Some(key) => self.doc.edit_merged(tr("Simplify"), key, change),
+            None => self.doc.edit(tr("Simplify"), change),
         }
     }
 
@@ -80,9 +80,9 @@ impl AppState {
         self.apply_simplify(&objs, &Simplify::QUICK, None);
         let after = nodes(&self.simplify_targets());
         self.message = if after < before {
-            format!("Simplified: {before} nodes to {after}.")
+            crate::i18n::fill("Simplified: {} nodes to {}.", &[&before, &after])
         } else {
-            "These objects are already simple.".into()
+            tr("These objects are already simple.").into()
         };
     }
 

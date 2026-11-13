@@ -42,6 +42,7 @@ pub mod vp3;
 pub mod wmf;
 pub mod xxx;
 
+use emb_geom::text;
 use emb_model::StitchDesign;
 
 /// Machine formats that can be read, by file extension.
@@ -94,7 +95,7 @@ pub fn read_machine(ext: &str, bytes: &[u8]) -> Result<StitchDesign, String> {
         "stc" => Ok(minor::read_stc(bytes)),
         "zhs" => Ok(minor::read_zhs(bytes)),
         "zxy" => Ok(minor::read_zxy(bytes)),
-        _ => Err(format!("unknown machine format .{ext}")),
+        _ => Err(text::fill("unknown machine format .{}", &[&ext])),
     }
 }
 

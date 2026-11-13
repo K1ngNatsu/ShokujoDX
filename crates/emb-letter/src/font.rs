@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use emb_geom::{Path, Point};
+use emb_geom::{Path, Point, text};
 use emb_model::FontRef;
 use ttf_parser::gpos::{PairAdjustment, PositioningSubtable};
 use ttf_parser::{Face, GlyphId, Tag};
@@ -15,7 +15,7 @@ use crate::glyph::GlyphShapes;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum FontError {
-    #[error("not a TrueType or OpenType font: {0}")]
+    #[error("{}", text::fill("not a TrueType or OpenType font: {}", &[.0]))]
     Parse(String),
 }
 

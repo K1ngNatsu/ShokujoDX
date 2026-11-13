@@ -92,8 +92,8 @@ impl AppState {
             .collect();
         if ids.is_empty() {
             self.message = match how {
-                ToStones::Outline => "Select objects with an outline or a line to change into a rhinestone run.",
-                _ => "Select a fill, a satin, an appliqué, lettering or a closed vector.",
+                ToStones::Outline => tr("Select objects with an outline or a line to change into a rhinestone run."),
+                _ => tr("Select a fill, a satin, an appliqué, lettering or a closed vector."),
             }
             .into();
             return;
@@ -102,7 +102,7 @@ impl AppState {
             return;
         }
         let n = ids.len();
-        self.doc.edit("Convert to rhinestones", |d| {
+        self.doc.edit(tr("Convert to rhinestones"), |d| {
             for id in ids {
                 if let Some(o) = d.object_mut(id)
                     && let Some(k) = make(&o.kind)
@@ -170,7 +170,7 @@ pub fn add_stone(st: &mut AppState, p: Point) {
             .is_some_and(|b| matches!(b.layout, BlingLayout::Stones { .. }) && b.stone == stone)
     });
     let current = st.current_thread;
-    let id = st.doc.edit("Add rhinestone", |d| match target {
+    let id = st.doc.edit(tr("Add rhinestone"), |d| match target {
         Some(id) => {
             if let Some(ObjectKind::Bling(b)) = d.object_mut(id).map(|o| &mut o.kind)
                 && let BlingLayout::Stones { points } = &mut b.layout
@@ -391,15 +391,14 @@ impl AppState {
     /// Adds the sewn template marks (or puts them back at the corners of
     /// the stones). One undo step.
     pub fn add_template_marks(&mut self) {
-        let mut test = self.doc.design().clone();
-        if test.add_template_marks().is_none() {
+        let Ok(id) = self
+            .doc
+            .try_edit(tr("Template Marks"), |d| d.add_template_marks().ok_or(()))
+        else {
             self.message = tr("The design has no rhinestones.").into();
             return;
-        }
-        let id = self.doc.edit("Template Marks", |d| d.add_template_marks());
-        if let Some(id) = id {
-            self.selection.set(id);
-        }
+        };
+        self.selection.set(id);
         self.message = tr(
             "The last color sews four crosses: the marks to put the rhinestone template in place. \
                         Pull them out after the press.",
@@ -417,10 +416,10 @@ impl AppState {
         };
         let name = format!("{} template.svg", self.doc.design().name);
         let Some(p) = rfd::FileDialog::new()
-            .set_title("Rhinestone template")
-            .add_filter("SVG (cutting machines)", &["svg"])
-            .add_filter("DXF (cutter and laser programs)", &["dxf"])
-            .add_filter("PDF (on paper, at full size)", &["pdf"])
+            .set_title(tr("Rhinestone template"))
+            .add_filter(tr("SVG (cutting machines)"), &["svg"])
+            .add_filter(tr("DXF (cutter and laser programs)"), &["dxf"])
+            .add_filter(tr("PDF (on paper, at full size)"), &["pdf"])
             .set_directory(self.dialog_dir())
             .set_file_name(name)
             .save_file()
@@ -495,12 +494,15 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, b: &Bling)
         &[
             &(here.len()),
             &(if all > here.len() {
-                format!(" ({} left out: they overlap stones before them)", all - here.len())
+                crate::i18n::fill(
+                    " ({} left out: they overlap stones before them)",
+                    &[&(all - here.len())],
+                )
             } else {
                 String::new()
             }),
             &(if overlaps > 0 {
-                format!("; {overlaps} overlap other stones (red)")
+                crate::i18n::fill("; {} overlap other stones (red)", &[&overlaps])
             } else {
                 String::new()
             }),
@@ -535,7 +537,7 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, b: &Bling)
         .changed();
     if changed && n != *b {
         st.doc.edit_merged(
-            "Change rhinestones",
+            tr("Change rhinestones"),
             emb_model::MergeKey::new(format!("{}:bling", id.0)),
             |d| {
                 if let Some(o) = d.object_mut(id) {
@@ -559,11 +561,11 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, b: &Bling)
 /// A short description for the Sequence panel.
 pub fn detail(b: &Bling) -> String {
     let kind = match b.layout {
-        BlingLayout::Stones { .. } => "single stones",
-        BlingLayout::Run { .. } => "run",
-        BlingLayout::Fill { .. } => "fill",
+        BlingLayout::Stones { .. } => tr("single stones"),
+        BlingLayout::Run { .. } => tr("run"),
+        BlingLayout::Fill { .. } => tr("fill"),
     };
-    format!("Rhinestones · {} · {kind} · no stitches", b.stone.label())
+    crate::i18n::fill("Rhinestones · {} · {} · no stitches", &[&b.stone.label(), &kind])
 }
 
 #[cfg(test)]

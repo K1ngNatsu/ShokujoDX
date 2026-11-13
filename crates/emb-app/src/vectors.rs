@@ -97,7 +97,7 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, path: &Pat
     });
     if s != *style {
         st.doc.edit_merged(
-            "Change artwork",
+            tr("Change artwork"),
             emb_model::MergeKey::new(format!("{}:vector", id.0)),
             |d| {
                 if let Some(ObjectKind::Vector { style, .. }) = d.object_mut(id).map(|o| &mut o.kind) {
@@ -168,8 +168,8 @@ impl AppState {
             .collect();
         if work.is_empty() {
             self.message = match to {
-                ConvertTo::Fill => "Select vectors with closed shapes first.".into(),
-                _ => "Select vectors first.".into(),
+                ConvertTo::Fill => tr("Select vectors with closed shapes first.").into(),
+                _ => tr("Select vectors first.").into(),
             };
             return;
         }
@@ -183,35 +183,35 @@ impl AppState {
             _ => None,
         };
         let linked: Vec<ObjectId> = work.iter().map(|w| w.0).filter(|id| design.is_linked(*id)).collect();
-        let mut probe = design.clone();
-        for id in &linked {
-            if probe.convert_linked(*id, None, &one).is_err() {
-                self.message = crate::i18n::fill(
-                    "A linked vector cannot become more than one {}: unlink it first (Artwork > Shaping > Unlink).",
-                    &[&(to.name().to_lowercase())],
-                );
-                return;
-            }
-        }
-        let new = self.doc.edit(format!("Convert to {}", to.name().to_lowercase()), |d| {
-            let mut new = Vec::new();
-            for (id, kinds, color) in work {
-                let thread = color.map(|c| nearest_thread(d, c));
-                if linked.contains(&id) {
-                    let _ = d.convert_linked(id, thread, &one);
-                    new.push(id);
-                    continue;
-                }
-                let ids = crate::actions::replace_with(d, id, kinds);
-                for nid in &ids {
-                    if let (Some(t), Some(o)) = (thread, d.object_mut(*nid)) {
-                        o.thread = t;
+        let new = self.doc.try_edit(
+            crate::i18n::fill("Convert to {}", &[&crate::i18n::in_sentence(tr(to.name()))]),
+            |d| {
+                let mut new = Vec::new();
+                for (id, kinds, color) in work {
+                    let thread = color.map(|c| nearest_thread(d, c));
+                    if linked.contains(&id) {
+                        d.convert_linked(id, thread, &one)?;
+                        new.push(id);
+                        continue;
                     }
+                    let ids = crate::actions::replace_with(d, id, kinds);
+                    for nid in &ids {
+                        if let (Some(t), Some(o)) = (thread, d.object_mut(*nid)) {
+                            o.thread = t;
+                        }
+                    }
+                    new.extend(ids);
                 }
-                new.extend(ids);
-            }
-            new
-        });
+                Ok::<_, emb_model::ShapeError>(new)
+            },
+        );
+        let Ok(new) = new else {
+            self.message = crate::i18n::fill(
+                "A linked vector cannot become more than one {}: unlink it first (Artwork > Shaping > Unlink).",
+                &[&crate::i18n::in_sentence(tr(to.name()))],
+            );
+            return;
+        };
         self.message = crate::i18n::fill("{} embroidery objects made.", &[&(new.len())]);
         self.selection.set_all(new);
     }
@@ -261,7 +261,7 @@ impl AppState {
             self.message = tr("Select stitch objects (from a machine file or a photo stitch) first.").into();
             return;
         }
-        let new = self.doc.edit("Recognize Outlines", |d| {
+        let new = self.doc.edit(tr("Recognize Outlines"), |d| {
             work.into_iter()
                 .flat_map(|(id, k)| crate::actions::replace_with(d, id, vec![k]))
                 .collect::<Vec<_>>()
@@ -289,31 +289,23 @@ impl AppState {
             return;
         }
         let linked: Vec<ObjectId> = work.iter().map(|w| w.0).filter(|id| design.is_linked(*id)).collect();
-        let mut probe = design.clone();
-        for (id, _, color) in work.iter().filter(|w| linked.contains(&w.0)) {
-            let c = *color;
-            if probe
-                .convert_linked(*id, None, &|k: &ObjectKind| to_vector(k, c))
-                .is_err()
-            {
-                self.message =
-                    tr("The border of a border trace cannot change: unlink it first (Artwork > Shaping > Unlink).")
-                        .into();
-                return;
-            }
-        }
-        let new = self.doc.edit("Convert to vector", |d| {
+        let new = self.doc.try_edit(tr("Convert to vector"), |d| {
             let mut new = Vec::new();
             for (id, k, color) in work {
                 if linked.contains(&id) {
-                    let _ = d.convert_linked(id, None, &|k: &ObjectKind| to_vector(k, color));
+                    d.convert_linked(id, None, &|k: &ObjectKind| to_vector(k, color))?;
                     new.push(id);
                 } else {
                     new.extend(crate::actions::replace_with(d, id, vec![k]));
                 }
             }
-            new
+            Ok::<_, emb_model::ShapeError>(new)
         });
+        let Ok(new) = new else {
+            self.message =
+                tr("The border of a border trace cannot change: unlink it first (Artwork > Shaping > Unlink).").into();
+            return;
+        };
         self.selection.set_all(new);
     }
 
@@ -323,14 +315,13 @@ impl AppState {
         let ids = self.sel();
         let opts = self.shaping;
         // Try on a copy first, so a failed command makes no undo step.
-        let mut probe = self.doc.design().clone();
-        if let Err(e) = probe.shape(&ids, op, opts) {
-            self.message = e.to_string();
-            return;
-        }
-        let new = self
-            .doc
-            .edit(op.name(), |d| d.shape(&ids, op, opts).unwrap_or_default());
+        let new = match self.doc.try_edit(op.name(), |d| d.shape(&ids, op, opts)) {
+            Ok(new) => new,
+            Err(e) => {
+                self.message = e.to_string();
+                return;
+            }
+        };
         self.message = crate::i18n::fill("{}: {} objects.", &[&tr(op.name()), &(new.len())]);
         self.selection.set_all(new);
     }
@@ -341,11 +332,11 @@ impl AppState {
             self.message = tr("The design has no shapes to write.").into();
             return;
         };
-        let name = format!("{} outlines.svg", self.doc.design().name);
+        let name = crate::i18n::fill("{} outlines.svg", &[&self.doc.design().name]);
         let Some(p) = rfd::FileDialog::new()
-            .set_title("Export outlines (SVG or EMF)")
-            .add_filter("SVG vector file", &["svg"])
-            .add_filter("EMF Windows metafile", &["emf"])
+            .set_title(tr("Export outlines (SVG or EMF)"))
+            .add_filter(tr("SVG vector file"), &["svg"])
+            .add_filter(tr("EMF Windows metafile"), &["emf"])
             .set_directory(self.dialog_dir())
             .set_file_name(name)
             .save_file()

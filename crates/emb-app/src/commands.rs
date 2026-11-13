@@ -102,7 +102,7 @@ impl AppState {
             .unwrap_or(Transform::IDENTITY);
         let d = inv.apply_vector(Point::new(dx, dy));
         self.doc
-            .edit_merged("Nudge", emb_model::MergeKey::new("nudge"), |design| {
+            .edit_merged(tr("Nudge"), emb_model::MergeKey::new("nudge"), |design| {
                 design.transform_objects(&ids, &Transform::translate(d.x, d.y))
             });
     }
@@ -120,7 +120,7 @@ impl AppState {
             .unwrap_or(Transform::IDENTITY);
         let o = self.settings.editing.duplicate_offset_mm;
         let off = inv.apply_vector(Point::new(o, o));
-        let new = self.doc.edit("Duplicate", |d| d.duplicate_objects(&ids, off));
+        let new = self.doc.edit(tr("Duplicate"), |d| d.duplicate_objects(&ids, off));
         self.selection.set_all(new);
         self.message = tr("Duplicate").into();
     }
@@ -154,7 +154,7 @@ impl AppState {
         if ids.is_empty() {
             return;
         }
-        self.doc.edit("Cut", |d| {
+        self.doc.edit(tr("Cut"), |d| {
             for id in &ids {
                 d.remove_object(*id);
             }
@@ -226,7 +226,7 @@ impl AppState {
 
     pub fn set_thread(&mut self, thread: emb_model::ThreadId) {
         let ids = self.selected();
-        self.doc.edit("Change thread", |d| {
+        self.doc.edit(tr("Change thread"), |d| {
             for id in &ids {
                 if let Some(o) = d.object_mut(*id) {
                     o.thread = thread;
@@ -264,6 +264,14 @@ fn undo_redo_items(ui: &mut egui::Ui, st: &mut AppState) {
         .unwrap_or_else(|| tr("Redo").into());
     if item(ui, st.doc.can_redo(), redo, &redo_key) {
         st.redo();
+    }
+    // The last ribbon command again (Space).
+    if let Some(cmd) = st.last_cmd.filter(|c| *c != crate::ribbon::Cmd::RepeatLast) {
+        let can = st.can(cmd, &crate::ribbon::SelInfo::of(st));
+        if item(ui, can, crate::i18n::fill("Repeat {}", &[&(cmd.meta().1)]), tr("Space")) {
+            let ctx = ui.ctx().clone();
+            st.run(cmd, &ctx);
+        }
     }
 }
 
@@ -387,7 +395,7 @@ pub fn object_menu(ui: &mut egui::Ui, st: &mut AppState) {
             (tr("Move Forward One"), SEQ_FORWARD, Step::Forward),
         ];
         if item(ui, true, tr("Move to Start"), &fmt(&SEQ_START)) {
-            st.sequence_selected("Move to Start", |d, ids| d.move_objects_to_start(ids));
+            st.sequence_selected(tr("Move to Start"), |d, ids| d.move_objects_to_start(ids));
         }
         for (label, key, step) in ops {
             if item(ui, true, label, &fmt(&key)) {
@@ -395,11 +403,11 @@ pub fn object_menu(ui: &mut egui::Ui, st: &mut AppState) {
             }
         }
         if item(ui, true, tr("Move to End"), &fmt(&SEQ_END)) {
-            st.sequence_selected("Move to End", |d, ids| d.move_objects_to_end(ids));
+            st.sequence_selected(tr("Move to End"), |d, ids| d.move_objects_to_end(ids));
         }
         if item(ui, n > 1, tr("Sequence by Click Order"), "") {
             let ids = st.selection.ids().to_vec();
-            st.resequence("Sequence by Click Order", |d| d.sequence_in_order(&ids));
+            st.resequence(tr("Sequence by Click Order"), |d| d.sequence_in_order(&ids));
         }
     });
     ui.menu_button(tr("Thread"), |ui| {
@@ -468,8 +476,9 @@ pub fn canvas_menu(ui: &mut egui::Ui, st: &mut AppState) {
         st.center_in_hoop();
     }
     if item(ui, true, tr("Rotate Design 90° in Hoop"), "") {
-        st.doc
-            .edit("Rotate Design", |d: &mut Design| d.rotation = d.rotation.turned_cw());
+        st.doc.edit(tr("Rotate Design"), |d: &mut Design| {
+            d.rotation = d.rotation.turned_cw()
+        });
     }
     ui.separator();
     if item(

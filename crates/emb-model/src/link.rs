@@ -20,7 +20,7 @@ use emb_geom::Transform;
 use emb_geom::region::{self, Region};
 use serde::{Deserialize, Serialize};
 
-use crate::shaping::{Part, ShapeError, area_of, clean, rebuild, shrink};
+use crate::shaping::{Part, ShapeError, area_of, clean, cut_area_of, rebuild, shrink};
 use crate::trace::TraceCut;
 use crate::{Design, DesignObject, ObjectId, ObjectKind, ShapeOp};
 
@@ -50,7 +50,8 @@ pub struct ShapeLink {
     pub op: LinkOp,
     #[serde(default)]
     pub overlap_mm: f64,
-    /// The objects that cut and stay as they are (Remove overlaps).
+    /// The objects that cut and stay as they are (Remove overlaps; for
+    /// Flatten, the lettering of the selection, ADR 0093).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub cutters: Vec<ObjectId>,
     pub cuts: Vec<TraceCut>,
@@ -87,7 +88,15 @@ impl Design {
     pub(crate) fn kept_ids(&self) -> impl Iterator<Item = ObjectId> + '_ {
         let traces = self.border_traces.iter().flat_map(|t| t.cuts.iter());
         let links = self.shape_links.iter().flat_map(|l| l.cuts.iter());
-        traces.chain(links).map(|c| c.original.id)
+        let origins = self.applique_origins.iter();
+        let origin_cuts = origins
+            .clone()
+            .flat_map(|o| o.traces.iter().flat_map(|t| t.cuts.iter()));
+        traces
+            .chain(links)
+            .chain(origin_cuts)
+            .map(|c| c.original.id)
+            .chain(origins.flat_map(|o| o.originals.iter().map(|x| x.id)))
     }
 
     /// Puts the cut objects back in the place of their first piece, with
@@ -196,28 +205,29 @@ impl Design {
                 })
             })
             .collect();
+        let cutters: Vec<(usize, Vec<Region>)> = link
+            .cutters
+            .iter()
+            .filter_map(|id| Some((self.index_of(*id)?, cut_area_of(&self.object(*id)?.kind)?)))
+            .collect();
+        // The cutters in front of part `i`, made smaller by the overlap.
+        let front = |i: usize| -> Vec<Region> {
+            let at = self.index_of(parts[i].id).unwrap_or(0);
+            let all = cutters
+                .iter()
+                .filter(|(ci, _)| *ci > at)
+                .fold(Vec::new(), |acc, (_, a)| region::union(&acc, a));
+            shrink(&all, link.overlap_mm)
+        };
         let results: Vec<(usize, Vec<Region>)> = match link.op {
-            LinkOp::Flatten => crate::shaping::op_results(&parts, ShapeOp::Flatten, link.overlap_mm),
+            LinkOp::Flatten => crate::shaping::op_results(&parts, ShapeOp::Flatten, link.overlap_mm)
+                .into_iter()
+                .map(|(i, r)| (i, region::difference(&r, &front(i))))
+                .collect(),
             LinkOp::Divide => crate::shaping::op_results(&parts, ShapeOp::Divide, link.overlap_mm),
-            LinkOp::RemoveOverlaps => {
-                let cutters: Vec<(usize, Vec<Region>)> = link
-                    .cutters
-                    .iter()
-                    .filter_map(|id| Some((self.index_of(*id)?, area_of(&self.object(*id)?.kind)?)))
-                    .collect();
-                parts
-                    .iter()
-                    .enumerate()
-                    .map(|(i, p)| {
-                        let at = self.index_of(p.id).unwrap_or(0);
-                        let cutter = cutters
-                            .iter()
-                            .filter(|(ci, _)| *ci > at)
-                            .fold(Vec::new(), |acc, (_, a)| region::union(&acc, a));
-                        (i, region::difference(&p.area, &shrink(&cutter, link.overlap_mm)))
-                    })
-                    .collect()
-            }
+            LinkOp::RemoveOverlaps => (0..parts.len())
+                .map(|i| (i, region::difference(&parts[i].area, &front(i))))
+                .collect(),
         };
         let mut by_owner: Vec<Vec<Region>> = vec![Vec::new(); parts.len()];
         for (o, r) in results {
@@ -333,9 +343,16 @@ impl Design {
     }
 
     /// After objects `ids` moved by `delta`: the stored originals of moved
-    /// pieces move too, and each link and border trace with a moved object
-    /// is made again.
+    /// pieces and of moved appliqué made from a selection move too, and
+    /// each link and border trace with a moved object is made again.
     pub fn linked_objects_moved(&mut self, ids: &[ObjectId], delta: &Transform) {
+        for o in &mut self.applique_origins {
+            if ids.contains(&o.applique) {
+                for x in &mut o.originals {
+                    x.transform(delta);
+                }
+            }
+        }
         if !self.sketch_links.is_empty() {
             self.sketch_objects_moved(ids, delta);
         }

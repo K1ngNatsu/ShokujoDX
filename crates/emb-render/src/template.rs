@@ -3,7 +3,7 @@
 //! that is larger than the paper goes on more sheets; the user cuts them
 //! on their frame lines and joins them so the lines meet.
 
-use emb_geom::{BBox, Point};
+use emb_geom::{BBox, Point, text};
 use emb_model::Rgb;
 
 use crate::page::{Op, Page, Paper, text_width_mm};
@@ -150,21 +150,21 @@ pub fn hoop_template(spec: &TemplateSpec) -> Vec<Page> {
             let x = MARGIN_MM;
             let y = MARGIN_MM + 4.0;
             let sheet = if many {
-                format!(
+                text::fill(
                     "  ·  Sheet {} of {} (row {}, column {})",
-                    r * cols + c + 1,
-                    cols * rows,
-                    r + 1,
-                    c + 1
+                    &[&(r * cols + c + 1), &(cols * rows), &(r + 1), &(c + 1)],
                 )
             } else {
                 String::new()
             };
-            page.text(x, y, 10.0, true, format!("Hoop template: {}", spec.name));
+            page.text(x, y, 10.0, true, text::fill("Hoop template: {}", &[&spec.name]));
             page.gray_text(x, y + 5.0, 8.0, format!("{}{sheet}", spec.hoop_name));
             if r == 0 && c == 0 {
                 // The scale test: the user measures this line.
-                let note = format!("This line is {SCALE_MM:.0} mm. Print at 100 % (no fit to page).");
+                let note = text::fill(
+                    "This line is {} mm. Print at 100 % (no fit to page).",
+                    &[&format!("{:.0}", SCALE_MM)],
+                );
                 let x1 = w - MARGIN_MM;
                 let x0 = x1 - SCALE_MM;
                 page.line(Point::new(x0, y), Point::new(x1, y), 0.5, INK);
@@ -177,7 +177,7 @@ pub fn hoop_template(spec: &TemplateSpec) -> Vec<Page> {
                     x,
                     h - MARGIN_MM + 5.0,
                     7.0,
-                    "Cut each sheet on its gray frame and join the sheets so the lines meet.",
+                    text::tr("Cut each sheet on its gray frame and join the sheets so the lines meet."),
                 );
             }
             pages.push(page);

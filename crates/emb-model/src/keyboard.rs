@@ -3,6 +3,7 @@
 //! Unlike an embroidery font, a key design can have more than one color
 //! (for example a letter with an outline, or an appliqué letter).
 
+use emb_geom::text;
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
@@ -65,7 +66,7 @@ impl KeyboardCollection {
     pub fn from_json(s: &str) -> Result<KeyboardCollection, String> {
         let k: KeyboardCollection = serde_json::from_str(s).map_err(|e| e.to_string())?;
         if k.format != "emb-keyboard-collection" {
-            return Err("not a keyboard design collection".into());
+            return Err(text::tr("not a keyboard design collection").into());
         }
         Ok(k)
     }

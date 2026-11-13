@@ -208,7 +208,7 @@ impl AppState {
             c.dedup();
             c.len()
         };
-        let ids: Vec<ObjectId> = self.doc.edit("Trace Picture", |d| {
+        let ids: Vec<ObjectId> = self.doc.edit(tr("Trace Picture"), |d| {
             areas
                 .iter()
                 .map(|a| {
@@ -228,9 +228,9 @@ impl AppState {
             &[&(ids.len()), &colors],
         );
         if reduced {
-            self.message += &format!(
+            self.message += &crate::i18n::fill(
                 " The picture had many colors: it was reduced to {} (Prepare colors gives more control).",
-                r.palette.len()
+                &[&r.palette.len()],
             );
         }
         self.selection.set_all(ids);
@@ -281,7 +281,10 @@ impl AppState {
             &[&tr(how.name()), &(ids.len()), &(if ids.len() == 1 { "" } else { "s" })],
         );
         if widest > WIDE_SATIN_MM {
-            self.message += &format!(" The satin is up to {widest:.1} mm wide: a fill sews better.");
+            self.message += &crate::i18n::fill(
+                " The satin is up to {} mm wide: a fill sews better.",
+                &[&format!("{widest:.1}")],
+            );
         }
         self.selection.set_all(ids);
     }
@@ -307,7 +310,7 @@ impl AppState {
                 .collect(),
             None => palette.iter().map(|c| plain_look(*c)).collect(),
         };
-        let n = self.doc.edit("Threads from picture", |d| {
+        let n = self.doc.edit(tr("Threads from picture"), |d| {
             let mut n = 0;
             for look in looks {
                 if d.threads.iter().any(|t| t.color == look.color) {
@@ -397,8 +400,8 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
                 ui.separator();
                 let chart = st.charts.get(st.chart_index);
                 ui.label(match chart {
-                    Some(c) => format!("Nearest threads ({}):", c.name),
-                    None => "Colors:".to_string(),
+                    Some(c) => crate::i18n::fill("Nearest threads ({}):", &[&c.name]),
+                    None => tr("Colors:").to_string(),
                 });
                 let matched = chart.map(|c| match_threads(&st.picture.palette, c));
                 for (i, c) in st.picture.palette.iter().enumerate() {

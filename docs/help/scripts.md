@@ -16,7 +16,7 @@ runs the sample scripts of the program and your own scripts.
    design).
 2. Click **Edit > Scripts** and choose a script. The window shows what it
    does and its settings.
-3. Set the settings and click **Run**.
+3. Set the settings and click **Run Script**.
 
 The messages of the script show under **Messages**. **Undo** takes back
 all the changes of the script in one step. If the script stops with an

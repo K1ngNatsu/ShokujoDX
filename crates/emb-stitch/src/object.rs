@@ -8,7 +8,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use emb_geom::{Point, Polyline};
+use emb_geom::{Point, Polyline, text};
 use emb_model::{
     DesignObject, FillParams, FillPattern, LineBorder, ObjectId, ObjectKind, RunPass, RunStyle, SatinGeometry,
     Underlay, UnderlayLayer,
@@ -85,11 +85,11 @@ impl StopReason {
     /// What the operator does at the stop.
     pub fn text(self) -> &'static str {
         match self {
-            StopReason::Function => "Stop",
-            StopReason::PlaceFabric => "Put the appliqué fabric on",
-            StopReason::TrimFabric => "Cut away the appliqué fabric outside the tack-down",
-            StopReason::PlaceCord => "Lay the cord along the sewn line",
-            StopReason::PlaceFoam => "Put the foam on (puff); tear the foam away after the puff objects",
+            StopReason::Function => text::tr("Stop"),
+            StopReason::PlaceFabric => text::tr("Put the appliqué fabric on"),
+            StopReason::TrimFabric => text::tr("Cut away the appliqué fabric outside the tack-down"),
+            StopReason::PlaceCord => text::tr("Lay the cord along the sewn line"),
+            StopReason::PlaceFoam => text::tr("Put the foam on (puff); tear the foam away after the puff objects"),
         }
     }
 }
@@ -158,9 +158,12 @@ pub struct ObjectStitches {
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum StitchError {
-    #[error("the object has no stitchable geometry")]
+    #[error("{}", text::tr("the object has no stitchable geometry"))]
     Empty,
-    #[error("the object is too large to sew (more than 3 m, or a setting that makes it so large)")]
+    #[error(
+        "{}",
+        text::tr("the object is too large to sew (more than 3 m, or a setting that makes it so large)")
+    )]
     TooLarge,
 }
 
@@ -891,6 +894,9 @@ impl LetterSewer<'_> {
 /// it), then the shortest travel, ending near the next letter.
 fn lettering_runs(l: &emb_model::Lettering, entry: Point, exit: Option<Point>) -> Vec<Run> {
     use emb_model::{LetterConnection, LetterOrder};
+    // A knockout leaves out the area that objects in front cut (ADR 0093).
+    let cut = crate::knockout::knocked_out(l);
+    let l = cut.as_ref().unwrap_or(l);
     let smart = l.order != LetterOrder::Text;
     let mut w = LetterSewer {
         l,

@@ -22,6 +22,7 @@
 //!   random color, so the output is the same each time.
 //! - The date comes from the caller, so tests can fix it.
 
+use emb_geom::text;
 use emb_model::{Rgb, StitchDesign, Thread};
 
 use crate::common::{Bytes, Low, Pattern, encode, interpolate_trims, signed8, table_thread, to_design};
@@ -35,7 +36,7 @@ const BRAND: &str = "Janome";
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum JefError {
-    #[error("file is shorter than the JEF header")]
+    #[error("{}", text::tr("file is shorter than the JEF header"))]
     TooShort,
 }
 

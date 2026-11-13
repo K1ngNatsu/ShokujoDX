@@ -212,16 +212,14 @@ pub fn network_runs(lines: &[Polyline], entry: Point, stitch_len: f64, branch: b
             }
         }
         let mut out = vec![nodes[root]];
-        walk(
-            root,
-            &edges,
-            &adj,
-            &parent,
-            &last_path,
-            &mut edge_done,
+        let tree = Tree {
+            edges: &edges,
+            adj: &adj,
+            parent: &parent,
+            last_path: &last_path,
             stitch_len,
-            &mut out,
-        );
+        };
+        tree.walk(root, &mut edge_done, &mut out);
         needle = *out.last().unwrap_or(&needle);
         if out.len() >= 2 {
             runs.push(out);
@@ -230,35 +228,39 @@ pub fn network_runs(lines: &[Polyline], entry: Point, stitch_len: f64, branch: b
     runs
 }
 
-/// Sews all edges below node `n`. Edges on the last path are sewn last and
-/// not back; all others go out and back.
-#[allow(clippy::too_many_arguments)]
-fn walk(
-    n: usize,
-    edges: &[Edge],
-    adj: &[Vec<usize>],
-    parent: &[Option<usize>],
-    last_path: &[bool],
-    done: &mut [bool],
+/// The depth-first tree of one connected part of the network: the edges,
+/// the edges at each node, the tree edge to each node, and the edges of the
+/// last path (sewn last, one time).
+struct Tree<'a> {
+    edges: &'a [Edge],
+    adj: &'a [Vec<usize>],
+    parent: &'a [Option<usize>],
+    last_path: &'a [bool],
     stitch_len: f64,
-    out: &mut Vec<Point>,
-) {
-    let other = |k: usize| if edges[k].a == n { edges[k].b } else { edges[k].a };
-    let mut ks: Vec<usize> = adj[n].iter().copied().filter(|&k| !done[k]).collect();
-    // The last-path edge goes last.
-    ks.sort_by_key(|&k| last_path[k]);
-    for k in ks {
-        if done[k] {
-            continue;
-        }
-        done[k] = true;
-        let m = other(k);
-        sew_edge(&edges[k], n, stitch_len, out);
-        if parent[m] == Some(k) {
-            walk(m, edges, adj, parent, last_path, done, stitch_len, out);
-        }
-        if !last_path[k] {
-            sew_edge(&edges[k], m, stitch_len, out);
+}
+
+impl Tree<'_> {
+    /// Sews all edges below node `n`. Edges on the last path are sewn last
+    /// and not back; all others go out and back.
+    fn walk(&self, n: usize, done: &mut [bool], out: &mut Vec<Point>) {
+        let edges = self.edges;
+        let other = |k: usize| if edges[k].a == n { edges[k].b } else { edges[k].a };
+        let mut ks: Vec<usize> = self.adj[n].iter().copied().filter(|&k| !done[k]).collect();
+        // The last-path edge goes last.
+        ks.sort_by_key(|&k| self.last_path[k]);
+        for k in ks {
+            if done[k] {
+                continue;
+            }
+            done[k] = true;
+            let m = other(k);
+            sew_edge(&edges[k], n, self.stitch_len, out);
+            if self.parent[m] == Some(k) {
+                self.walk(m, done, out);
+            }
+            if !self.last_path[k] {
+                sew_edge(&edges[k], m, self.stitch_len, out);
+            }
         }
     }
 }

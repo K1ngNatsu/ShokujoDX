@@ -30,7 +30,7 @@ pub fn set_outline(st: &mut AppState, ids: &[ObjectId], pattern: Option<ColumnPa
     if lines.is_empty() {
         return 0;
     }
-    let label = format!("Outline type {}", pattern.map_or("Line", |p| p.name()));
+    let label = crate::i18n::fill("Outline type {}", &[&tr(pattern.map_or("Line", |p| p.name()))]);
     st.doc.edit(label, |d| {
         for id in &lines {
             if let Some(ObjectKind::Running { params, .. }) = d.object_mut(*id).map(|o| &mut o.kind) {
@@ -70,17 +70,18 @@ pub fn set_column(st: &mut AppState, ids: &[ObjectId], pattern: ColumnPattern) -
     if targets.is_empty() {
         return 0;
     }
-    st.doc.edit(format!("Column type {}", pattern.name()), |d| {
-        for id in &targets {
-            if let Some(c) = d.object_mut(*id).and_then(|o| column_params(&mut o.kind)) {
-                *c = SatinParams {
-                    pull_compensation_mm: c.pull_compensation_mm,
-                    split_mm: c.split_mm,
-                    ..SatinParams::with_pattern(pattern)
-                };
+    st.doc
+        .edit(crate::i18n::fill("Column type {}", &[&tr(pattern.name())]), |d| {
+            for id in &targets {
+                if let Some(c) = d.object_mut(*id).and_then(|o| column_params(&mut o.kind)) {
+                    *c = SatinParams {
+                        pull_compensation_mm: c.pull_compensation_mm,
+                        split_mm: c.split_mm,
+                        ..SatinParams::with_pattern(pattern)
+                    };
+                }
             }
-        }
-    });
+        });
     targets.len()
 }
 
@@ -101,13 +102,14 @@ pub fn set_fill(st: &mut AppState, ids: &[ObjectId], pattern: FillPattern) -> us
     if fills.is_empty() {
         return 0;
     }
-    st.doc.edit(format!("Fill type {}", pattern.name()), |d| {
-        for id in &fills {
-            if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(*id).map(|o| &mut o.kind) {
-                *params = params.with_pattern(pattern.clone());
+    st.doc
+        .edit(crate::i18n::fill("Fill type {}", &[&tr(pattern.name())]), |d| {
+            for id in &fills {
+                if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(*id).map(|o| &mut o.kind) {
+                    *params = params.with_pattern(pattern.clone());
+                }
             }
-        }
-    });
+        });
     fills.len()
 }
 
@@ -136,7 +138,7 @@ pub fn florentine_guide(st: &mut AppState) -> bool {
     }) else {
         return false;
     };
-    st.doc.edit("Guide Line", |d| {
+    st.doc.edit(tr("Guide Line"), |d| {
         if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(fill).map(|o| &mut o.kind) {
             if !matches!(params.pattern, FillPattern::Florentine { .. }) {
                 *params = params.with_pattern(FillPattern::Florentine { guide: Vec::new() });
@@ -171,7 +173,7 @@ pub fn split_lines(st: &mut AppState) -> bool {
         v.dedup();
         v
     };
-    st.doc.edit("Split Lines", |d| {
+    st.doc.edit(tr("Split Lines"), |d| {
         if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(fill).map(|o| &mut o.kind) {
             let mut all = match &params.pattern {
                 FillPattern::UserSplit { lines } => lines.clone(),
@@ -234,7 +236,7 @@ pub fn guide_lines(st: &mut AppState) -> bool {
     let fill = *fill;
     let mut line_ids: Vec<ObjectId> = lines.iter().map(|(id, _)| *id).collect();
     line_ids.dedup();
-    st.doc.edit("Guide Lines", |d| {
+    st.doc.edit(tr("Guide Lines"), |d| {
         if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(fill).map(|o| &mut o.kind) {
             let mut all = match &params.pattern {
                 FillPattern::Guided { guides } => guides.clone(),
@@ -300,7 +302,7 @@ pub fn ripple_guide(st: &mut AppState) -> bool {
         st.message = tr("Select two lines: the second line becomes the guide of a ripple of the first.").into();
         return false;
     };
-    st.doc.edit("Ripple Guide", |d| {
+    st.doc.edit(tr("Ripple Guide"), |d| {
         if let Some(ObjectKind::Running { params, .. }) = d.object_mut(line).map(|o| &mut o.kind) {
             let mut r = params.ripple.take().unwrap_or_default();
             if r.guide.is_empty() {
@@ -409,7 +411,7 @@ pub fn add_laydown(st: &mut AppState) -> Option<ObjectId> {
         layers: 1,
         angle_deg: 90.0,
     });
-    let id = st.doc.edit("Laydown", |d| {
+    let id = st.doc.edit(tr("Laydown"), |d| {
         let t = d.add_thread("Laydown", color);
         let id = d.insert_object(
             0,

@@ -2,7 +2,7 @@
 id: lettering
 title: Lettering and monograms
 group: design
-keywords: lettering, text, name, font, embroidery font, truetype, opentype, size range, small text, height, letter spacing, line spacing, kerning, align, baseline, arc, circle, line, envelope, lettering art, sew order, trims, jumps, letter, reshape, alphabet, bitmap font, monogram, initials, team names, names list, csv, keyboard designs, kiosk, shop
+keywords: lettering, text, name, font, knockout, overlap, overlapping text, embroidery font, truetype, opentype, size range, small text, height, letter spacing, line spacing, kerning, align, baseline, arc, circle, line, envelope, lettering art, sew order, trims, jumps, letter, reshape, alphabet, bitmap font, monogram, initials, team names, names list, csv, keyboard designs, kiosk, shop, mitre, mitre corners, corner
 ---
 # Lettering and monograms
 
@@ -14,9 +14,12 @@ arc](tutorial-lettering) shows the first steps.
 1. Click **Lettering > Lettering**, then click on the canvas where the
    text starts.
 2. In the Lettering window, type the text. **Enter** starts a new line.
-3. Select a font, set the **Height** and the **Stitch type**.
+   The canvas shows the lettering as you type.
+3. Select a font, set the **Height** and the **Stitch type**. The font
+   list shows each name in its own font. Point to a name, and the canvas
+   shows your text in that font.
 4. Click **OK** (or **Ctrl+Enter**). **Esc** or **Cancel** closes the
-   window with no change.
+   window and takes back what it shows.
 
 To change the text later, double-click the lettering, or right-click it
 and select **Edit text**.
@@ -66,6 +69,12 @@ Select the lettering. Object Properties has:
   with no trimmer.
 - The **Satin** and **Fill** settings of the letters: density, pull
   compensation and underlay.
+- **Mitre corners** (under Satin): columns that meet at a corner, as in
+  "L", "E" or "7", sew as one column that turns. Off, one column stops and
+  the next column starts over it. A sharp corner, as at the top of an "A",
+  and a stroke that ends on another stroke, as in "T", do not change. The
+  stitches stay in the shape of the letter: a corner that cannot turn in
+  it stays as a stop and a start.
 
 ## Lettering on a line
 
@@ -81,6 +90,19 @@ Click **Reshape**, then click a letter. Drag the letter, or set its
 Object Properties. A letter of a TrueType font can have its own stitch
 type and underlay. **Reset letter** and **Reset all letters** remove the
 changes by hand.
+
+## Overlapping lettering
+
+When two texts overlap, select one or both of them and click **Artwork >
+Shaping > Remove overlaps** (or select both and click **Flatten**). The
+text behind gets a **knockout**: it does not sew where objects that sew
+after it cover it. Satin letters stay satin.
+
+The knockout follows each change: move, turn or type in a text, add a
+text in front or change the sew order, and the cut changes with it. In
+**Object Properties > Knockout**, **Sew round objects in front** turns the
+knockout on or off for the selected lettering. **Overlap** sets how far
+the letters go under the objects in front.
 
 ## Alphabets
 

@@ -160,12 +160,6 @@ pub fn picture_at_look(
     pic
 }
 
-/// Draws the stitches over the picture `pic`, which shows the area `b` at
-/// `px_per_mm`.
-pub fn stitches_onto(pic: &mut Picture, b: BBox, segments: &[Segment], px_per_mm: f64, thread_mm: f64) {
-    stitches_onto_look(pic, b, segments, px_per_mm, thread_mm, None);
-}
-
 /// Blends `color` with coverage `a` over the pixel `dst`.
 fn blend(dst: &mut [u8], color: [f64; 3], a: f64) {
     let da = f64::from(dst[3]) / 255.0;
@@ -221,8 +215,9 @@ fn each_pixel(
     }
 }
 
-/// As [`stitches_onto`]; with a `lighting`, each stitch has light and
-/// shade, the twist of its plies and a shadow (the 3D thread look).
+/// Draws the stitches over the picture `pic`, which shows the area `b` at
+/// `px_per_mm`. With a `lighting`, each stitch has light and shade, the
+/// twist of its plies and a shadow (the 3D thread look).
 pub fn stitches_onto_look(
     pic: &mut Picture,
     b: BBox,

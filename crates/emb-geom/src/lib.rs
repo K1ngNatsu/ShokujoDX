@@ -5,13 +5,18 @@
 #![forbid(unsafe_code)]
 
 pub mod bbox;
+pub mod cleanup;
+pub mod gaps;
+pub mod linework;
 pub mod math;
 pub mod nodes;
 pub mod path;
 pub mod point;
+pub mod recognize;
 pub mod region;
 pub mod simplify;
 pub mod spine;
+pub mod text;
 pub mod transform;
 
 pub use bbox::BBox;

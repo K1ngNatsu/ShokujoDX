@@ -83,6 +83,12 @@ The options of the panel:
   no fabric shows between the pieces. Remove overlaps and the knife use
   it too.
 
+Lettering stays lettering in Flatten and Remove overlaps. Lettering in
+front cuts the objects under it by its letters. Lettering under other
+objects gets a knockout: its stitches leave out the area of the objects
+in front, and the text, the font and the letters stay open to change.
+The other shaping commands do not use lettering.
+
 ## Border trace
 
 **Artwork > Border Trace** adds a border round the selected objects, a

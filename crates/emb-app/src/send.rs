@@ -32,11 +32,14 @@ impl Drive {
     /// "KINGSTON (E:\) · 14.2 GB free".
     pub fn title(&self) -> String {
         let name = if self.label.is_empty() {
-            "USB drive".to_string()
+            tr("USB drive").to_string()
         } else {
             self.label.clone()
         };
-        format!("{name} ({}) · {} free", self.mount.display(), size_text(self.free))
+        crate::i18n::fill(
+            "{} ({}) · {} free",
+            &[&name, &self.mount.display(), &size_text(self.free)],
+        )
     }
 }
 
@@ -129,7 +132,7 @@ impl SendFile {
         let label = name.trim_end_matches(&format!(".{ext}")[..]).to_string();
         let stamp = crate::output::local_stamp();
         let bytes = emb_formats::write_machine_with(ext, stitches, &label, &stamp, machine, needles)
-            .ok_or_else(|| format!("The program cannot write .{ext} files."))?;
+            .ok_or_else(|| crate::i18n::fill("The program cannot write .{} files.", &[&ext]))?;
         let s = emb_formats::read_machine(ext, &bytes)?;
         Ok(SendFile {
             name: name.to_string(),
@@ -173,10 +176,9 @@ pub fn write_and_check(dir: &Path, files: &[SendFile], free: Option<u64>, ext: &
     if let Some(free) = free
         && need > free
     {
-        return Err(format!(
+        return Err(crate::i18n::fill(
             "The stick has {} free; the files need {}.",
-            size_text(free),
-            size_text(need)
+            &[&size_text(free), &size_text(need)],
         ));
     }
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
@@ -193,14 +195,16 @@ pub fn write_and_check(dir: &Path, files: &[SendFile], free: Option<u64>, ext: &
         let back = std::fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
         let s = emb_formats::read_machine(ext, &back).map_err(|e| format!("{}: {e}", path.display()))?;
         if back != f.bytes || s.stitch_count() != f.stitches || s.color_count() != f.colors {
-            return Err(format!(
+            return Err(crate::i18n::fill(
                 "{} does not read back as it was written ({} stitches, {} colors; {} and {} were sent). \
                  The stick can be full or damaged.",
-                path.display(),
-                s.stitch_count(),
-                s.color_count(),
-                f.stitches,
-                f.colors
+                &[
+                    &path.display(),
+                    &s.stitch_count(),
+                    &s.color_count(),
+                    &f.stitches,
+                    &f.colors,
+                ],
             ));
         }
         out.push(Sent { path, replaced });
@@ -416,7 +420,7 @@ impl AppState {
         let key = self.send_key();
         let what = match files.as_slice() {
             [one] => one.name.clone(),
-            many => format!("{} files", many.len()),
+            many => crate::i18n::fill("{} files", &[&many.len()]),
         };
         let (d, free) = (dir.clone(), drive.free);
         let work: crate::jobs::Work = Box::new(move || {
@@ -433,10 +437,9 @@ impl AppState {
                 })
                 .collect();
             Ok(crate::jobs::JobOutput {
-                message: format!(
+                message: crate::i18n::fill(
                     "Sent {} to {} and read back. Eject the stick before you take it out.",
-                    names.join(", "),
-                    d.display()
+                    &[&names.join(", "), &d.display()],
                 ),
                 files: sent.into_iter().map(|x| x.path).collect(),
                 lines: Vec::new(),

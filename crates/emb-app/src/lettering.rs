@@ -10,10 +10,11 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, channel};
 
 use eframe::egui;
-use emb_geom::{Point, Transform};
+use emb_geom::{BBox, Point, Transform};
 use emb_letter::{AnyFont, EmbFont, Font};
 use emb_model::{
     Baseline, EnvelopeShape, FontKind, FontRef, Justify, LetterConnection, LetterEdit, LetterOrder, LetterStitch,
@@ -54,6 +55,131 @@ pub struct FontLibrary {
     scan: Option<Receiver<Vec<FontEntry>>>,
     /// The fonts of the computer are in `entries`.
     pub scanned: bool,
+    /// The name of each family in its own font, for the font lists
+    /// (`None`: the font cannot show its name).
+    samples: HashMap<(String, FontKind), Option<Arc<NameSample>>>,
+}
+
+/// A font name in its own font: the outlines of the letters, each letter
+/// (or part) filled alone, even-odd.
+#[derive(Debug)]
+pub struct NameSample {
+    pub parts: Vec<Vec<Vec<Point>>>,
+    pub bbox: BBox,
+}
+
+/// New samples that one frame of a font list makes, at most.
+pub const SAMPLES_PER_FRAME: usize = 6;
+
+/// The height of a row of the font list, in points.
+const FONT_ROW: f32 = 26.0;
+
+/// Reads a font.
+fn load(source: &FontSource) -> Option<AnyFont> {
+    Some(match source {
+        FontSource::Bundled(i) => AnyFont::TrueType(Arc::new(
+            Font::from_bytes(emb_letter::bundled::FILES.get(*i)?.1.to_vec(), 0).ok()?,
+        )),
+        FontSource::File(path, face) => {
+            AnyFont::TrueType(Arc::new(Font::from_bytes(std::fs::read(path).ok()?, *face).ok()?))
+        }
+        FontSource::EmbBundled(i) => AnyFont::Embroidery(Arc::new(
+            EmbFont::from_json(&emb_letter::bundled::embroidery_text(*i)?).ok()?,
+        )),
+        FontSource::EmbFile(path) => AnyFont::Embroidery(Arc::new(EmbFont::load(path).ok()?)),
+    })
+}
+
+/// `name` in the font `font`, or `None` if the font has fewer than half
+/// of its characters.
+fn name_sample(font: &AnyFont, name: &str) -> Option<NameSample> {
+    let mut parts: Vec<Vec<Vec<Point>>> = Vec::new();
+    match font {
+        AnyFont::TrueType(f) => {
+            let (mut x, mut prev, mut missing) = (0.0, None, 0);
+            for c in name.chars() {
+                let Some(g) = f.glyph(c) else {
+                    missing += 1;
+                    continue;
+                };
+                if let Some(p) = prev {
+                    x += f.kerning(p, g);
+                }
+                let rings: Vec<Vec<Point>> = f
+                    .contours(g)
+                    .into_iter()
+                    .map(|r| r.into_iter().map(|q| Point::new(q.x + x, q.y)).collect())
+                    .collect();
+                if !rings.is_empty() {
+                    parts.push(rings);
+                }
+                x += f.advance(g);
+                prev = Some(g);
+            }
+            if 2 * missing > name.chars().filter(|c| !c.is_whitespace()).count() {
+                return None;
+            }
+        }
+        AnyFont::Embroidery(e) => {
+            let l = Lettering::new(name, font.source().font_ref(), 10.0, Point::ZERO);
+            for letter in emb_letter::layout(&l, e.as_ref()) {
+                parts.extend(letter.parts.iter().map(crate::fonts::part_rings));
+            }
+        }
+    }
+    let bbox = parts.iter().flatten().flatten().fold(None::<BBox>, |b, p| {
+        Some(b.map_or(BBox::new(*p, *p), |b| b.union(BBox::new(*p, *p))))
+    })?;
+    (bbox.width() > 0.0 && bbox.height() > 0.0).then_some(NameSample { parts, bbox })
+}
+
+/// A row of a font list: the name in its own font (`sample`), or as text.
+fn font_row(ui: &mut egui::Ui, name: &str, sample: Option<&NameSample>, on: bool) -> egui::Response {
+    let size = egui::vec2(ui.available_width().max(160.0), FONT_ROW);
+    let (rect, r) = ui.allocate_exact_size(size, egui::Sense::click());
+    let visuals = ui.style().interact_selectable(&r, on);
+    if on || r.hovered() || r.has_focus() {
+        ui.painter()
+            .rect_filled(rect, visuals.corner_radius, visuals.weak_bg_fill);
+    }
+    let color = visuals.text_color();
+    match sample {
+        Some(s) => {
+            let inner = rect.shrink2(egui::vec2(6.0, 4.0));
+            let scale = f64::from(inner.height()) / s.bbox.height();
+            let to = |p: &Point| {
+                egui::pos2(
+                    inner.left() + ((p.x - s.bbox.min.x) * scale) as f32,
+                    inner.top() + ((p.y - s.bbox.min.y) * scale) as f32,
+                )
+            };
+            for part in &s.parts {
+                let rings: Vec<Vec<egui::Pos2>> = part.iter().map(|r| r.iter().map(to).collect()).collect();
+                ui.painter()
+                    .add(egui::Shape::mesh(crate::applique::scanline_mesh(&rings, color, inner)));
+            }
+        }
+        None => {
+            ui.painter().text(
+                rect.left_center() + egui::vec2(6.0, 0.0),
+                egui::Align2::LEFT_CENTER,
+                name,
+                egui::TextStyle::Body.resolve(ui.style()),
+                color,
+            );
+        }
+    }
+    let name = name.to_string();
+    r.widget_info(move || egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, true, on, &name));
+    r.on_hover_text(name_tip(sample.is_some()))
+}
+
+fn name_tip(sample: bool) -> &'static str {
+    if sample {
+        tr("The name is in the font. The canvas shows your text in this font.")
+    } else {
+        tr("The canvas shows your text in this font.")
+    }
 }
 
 impl Default for FontLibrary {
@@ -83,6 +209,7 @@ impl Default for FontLibrary {
             loaded: HashMap::new(),
             scan: None,
             scanned: false,
+            samples: HashMap::new(),
         };
         if let Some(dir) = user_fonts_dir() {
             lib.add_user_fonts(&dir);
@@ -176,25 +303,67 @@ impl FontLibrary {
             return Some(f.clone());
         }
         let e = self.entries.iter().find(|e| e.font.same(r))?.clone();
-        let font = match e.source {
-            FontSource::Bundled(i) => AnyFont::TrueType(Arc::new(
-                Font::from_bytes(emb_letter::bundled::FILES.get(i)?.1.to_vec(), 0).ok()?,
-            )),
-            FontSource::File(path, face) => {
-                AnyFont::TrueType(Arc::new(Font::from_bytes(std::fs::read(path).ok()?, face).ok()?))
-            }
-            FontSource::EmbBundled(i) => AnyFont::Embroidery(Arc::new(
-                EmbFont::from_json(&emb_letter::bundled::embroidery_text(i)?).ok()?,
-            )),
-            FontSource::EmbFile(path) => AnyFont::Embroidery(Arc::new(EmbFont::load(&path).ok()?)),
-        };
+        let font = load(&e.source)?;
         self.loaded.insert(e.font, font.clone());
         Some(font)
+    }
+
+    /// The name of a family in its own font. `None` while it is not made
+    /// yet: each call makes a new one only while `budget` is more than 0.
+    /// A font that is not in use is read and then let go, so a long list
+    /// does not keep all the fonts of the computer.
+    pub fn sample(&mut self, family: &str, kind: FontKind, budget: &mut usize) -> Option<Option<Arc<NameSample>>> {
+        let key = (family.to_lowercase(), kind);
+        if let Some(s) = self.samples.get(&key) {
+            return Some(s.clone());
+        }
+        if *budget == 0 {
+            return None;
+        }
+        *budget -= 1;
+        let entries: Vec<&FontEntry> = self
+            .entries
+            .iter()
+            .filter(|e| e.font.kind == kind && e.font.family.eq_ignore_ascii_case(family))
+            .collect();
+        let entry = entries
+            .iter()
+            .find(|e| e.font.style.eq_ignore_ascii_case("regular") || e.font.style.is_empty())
+            .or(entries.first())
+            .map(|e| (*e).clone());
+        let font = entry.and_then(|e| {
+            self.loaded
+                .iter()
+                .find(|(k, _)| k.same(&e.font))
+                .map(|(_, f)| f.clone())
+                .or_else(|| load(&e.source))
+        });
+        let sample = font.and_then(|f| name_sample(&f, family)).map(Arc::new);
+        self.samples.insert(key, sample.clone());
+        Some(sample)
     }
 
     /// The default font (a bundled embroidery font).
     pub fn default_font(&mut self) -> Option<AnyFont> {
         self.get(&FontRef::embroidery(emb_letter::bundled::DEFAULT_EMBROIDERY, ""))
+    }
+
+    /// Family `family` of kind `kind` in the style `style` if it has it,
+    /// else its regular style, else its first style.
+    pub fn font_of(&self, family: &str, kind: FontKind, style: &str) -> FontRef {
+        let styles = self.styles(family, kind);
+        let style = styles
+            .iter()
+            .find(|s| s.eq_ignore_ascii_case(style))
+            .or_else(|| styles.iter().find(|s| s.eq_ignore_ascii_case("regular")))
+            .or(styles.first())
+            .cloned()
+            .unwrap_or_default();
+        FontRef {
+            family: family.to_string(),
+            style,
+            kind,
+        }
     }
 
     /// The families, embroidery fonts first, each with its kind.
@@ -293,7 +462,21 @@ pub struct LetteringDialog {
     /// The lettering object that the window changes (double-click); `None`:
     /// the window adds a new one.
     pub edit: Option<ObjectId>,
+    /// Live preview (owner request, 2026-11-13): the object that the canvas
+    /// shows while the window is open (the new object, or `edit`).
+    shown: Option<ObjectId>,
+    /// The text, the font and the height that the canvas shows.
+    applied: Option<(String, FontRef, f64)>,
+    /// The changes of the window are one undo step.
+    key: MergeKey,
+    /// The object `edit` when the window opened.
+    original: Option<Box<Lettering>>,
+    /// The font under the pointer in the font list: the canvas shows it.
+    pub hover: Option<FontRef>,
 }
+
+/// Makes the merge keys of the Lettering windows different.
+static NEXT_KEY: AtomicU64 = AtomicU64::new(0);
 
 impl LetteringDialog {
     pub fn new(at: Point, text: &str, font: FontRef, height_mm: f64) -> LetteringDialog {
@@ -304,6 +487,11 @@ impl LetteringDialog {
             height_mm,
             focus: true,
             edit: None,
+            shown: None,
+            applied: None,
+            key: MergeKey::new(format!("lettering-{}", NEXT_KEY.fetch_add(1, Ordering::Relaxed))),
+            original: None,
+            hover: None,
         }
     }
 
@@ -311,6 +499,9 @@ impl LetteringDialog {
     pub fn for_object(id: ObjectId, l: &Lettering) -> LetteringDialog {
         LetteringDialog {
             edit: Some(id),
+            shown: Some(id),
+            applied: Some((l.text.clone(), l.font.clone(), l.height_mm)),
+            original: Some(Box::new(l.clone())),
             ..LetteringDialog::new(l.placement.apply(Point::ZERO), &l.text, l.font.clone(), l.height_mm)
         }
     }
@@ -323,13 +514,16 @@ pub enum Pick {
     LineFor(ObjectId),
     /// Lettering on line: the lettering object for this line.
     LetteringFor(ObjectId),
+    /// Copy Properties: the object to copy from (ADR 0092).
+    PropertiesFrom,
 }
 
 impl Pick {
     pub fn prompt(self) -> &'static str {
         match self {
-            Pick::LineFor(_) => "Click the line that becomes the baseline. Esc: cancel.",
-            Pick::LetteringFor(_) => "Click the lettering to put on this line. Esc: cancel.",
+            Pick::LineFor(_) => tr("Click the line that becomes the baseline. Esc: cancel."),
+            Pick::LetteringFor(_) => tr("Click the lettering to put on this line. Esc: cancel."),
+            Pick::PropertiesFrom => tr("Click the object whose properties the selection gets. Esc: cancel."),
         }
     }
 }
@@ -341,7 +535,8 @@ pub fn tool_input(response: &egui::Response, st: &mut AppState, map: &ViewMap) {
     {
         let at = st.snap(map, map.to_design(pos));
         st.fonts.start_scan();
-        st.lettering_dialog = Some(LetteringDialog::new(at, "", st.letter_font.clone(), st.letter_height));
+        let d = LetteringDialog::new(at, "", st.letter_font.clone(), st.letter_height);
+        st.open_lettering_dialog(d);
     }
 }
 
@@ -398,6 +593,11 @@ impl AppState {
                 self.pick = None;
                 self.put_on_line(l, line);
             }
+            (Pick::PropertiesFrom, Some((src, _))) => {
+                self.pick = None;
+                self.copy_properties_from(src);
+            }
+            (Pick::PropertiesFrom, None) => self.message = tr("Click an object, or press Esc.").into(),
             (Pick::LineFor(_), _) => {
                 self.message = tr("That is not a line. Click a running-stitch line, or press Esc.").into()
             }
@@ -426,7 +626,7 @@ impl AppState {
             self.message = crate::i18n::fill("{} is not on this computer: choose another font.", &[&(l.font.label())]);
             return;
         }
-        self.doc.edit("Lettering on Line", |d| {
+        self.doc.edit(tr("Lettering on Line"), |d| {
             if let Some(o) = d.object_mut(id) {
                 o.kind = ObjectKind::Lettering(Box::new(l));
             }
@@ -471,62 +671,138 @@ impl AppState {
     pub fn edit_lettering(&mut self, id: ObjectId) {
         if let Some(ObjectKind::Lettering(l)) = self.doc.design().object(id).map(|o| &o.kind) {
             self.fonts.start_scan();
-            self.lettering_dialog = Some(LetteringDialog::for_object(id, l));
+            let d = LetteringDialog::for_object(id, l);
+            self.open_lettering_dialog(d);
         }
     }
 
-    /// Changes the text, the font and the height of the object of the
-    /// window. The letters keep their changes by hand where the text stays.
-    pub fn apply_lettering_dialog(&mut self, d: LetteringDialog) {
-        let Some(id) = d.edit else {
-            return self.add_lettering(d);
-        };
-        let Some(ObjectKind::Lettering(l)) = self.doc.design().object(id).map(|o| o.kind.clone()) else {
-            return;
-        };
-        let mut n = (*l).clone();
-        n.retarget_edits(&d.text);
-        n.text = d.text.clone();
-        n.height_mm = d.height_mm;
-        if self.fonts.get(&d.font).is_some() {
-            n.font = d.font.clone();
+    /// Opens the Lettering window. A window that is open keeps its text.
+    pub fn open_lettering_dialog(&mut self, d: LetteringDialog) {
+        if let Some(old) = self.lettering_dialog.take() {
+            self.finish_lettering(old, true);
         }
-        if !relayout(self, &mut n) {
-            self.message = crate::i18n::fill("{} is not on this computer: choose another font.", &[&(n.font.label())]);
+        self.lettering_dialog = Some(d);
+    }
+
+    /// Shows the text of the Lettering window on the canvas, in the font
+    /// under the pointer in the font list or else in the font of the
+    /// window. All the changes of one window are one undo step.
+    pub fn preview_lettering(&mut self, d: &mut LetteringDialog) {
+        let text = d.text.trim_end_matches(['\n', '\r']).to_string();
+        let font = d.hover.clone().unwrap_or_else(|| d.font.clone());
+        let state = (text.clone(), font.clone(), d.height_mm);
+        if d.applied.as_ref() == Some(&state) {
             return;
         }
-        if n.letters.is_empty() {
-            self.message = crate::i18n::fill("{} has none of these characters.", &[&(n.font.label())]);
-            return;
-        }
-        self.letter_font = n.font.clone();
-        self.letter_height = n.height_mm;
-        self.reshape.letter = None;
-        self.doc.edit("Change lettering", |dd| {
-            if let Some(o) = dd.object_mut(id) {
-                o.kind = ObjectKind::Lettering(Box::new(n));
+        d.applied = Some(state);
+        if text.trim().is_empty() {
+            if d.edit.is_none() {
+                self.take_back_lettering(d);
             }
-        });
-    }
-
-    /// Adds a lettering object from the Lettering window.
-    pub fn add_lettering(&mut self, d: LetteringDialog) {
-        let font = match self.fonts.get(&d.font) {
-            Some(f) => f,
-            None => match self.fonts.default_font() {
-                Some(f) => f,
-                None => return,
-            },
-        };
-        let mut l = Lettering::new(&d.text, font.source().font_ref(), d.height_mm, d.at);
-        emb_letter::relayout(&mut l, font.source());
-        self.letter_font = l.font.clone();
-        self.letter_height = d.height_mm;
-        if l.letters.is_empty() {
-            self.message = crate::i18n::fill("{} has none of these characters.", &[&(l.font.label())]);
             return;
         }
-        self.add_drawn(ObjectKind::Lettering(Box::new(l)));
+        // A font that is not on this computer: the font of the object, or
+        // for new lettering the default font.
+        let any = match (self.fonts.get(&font), &d.original) {
+            (Some(f), _) => Some(f),
+            (None, Some(orig)) => self.fonts.get(&orig.font),
+            (None, None) => self.fonts.default_font(),
+        };
+        let Some(any) = any else {
+            self.message = crate::i18n::fill("{} is not on this computer: choose another font.", &[&(font.label())]);
+            return;
+        };
+        let l = match &d.original {
+            Some(orig) => {
+                let mut n = (**orig).clone();
+                n.retarget_edits(&text);
+                n.text = text;
+                n.height_mm = d.height_mm;
+                n.font = any.source().font_ref();
+                emb_letter::relayout(&mut n, any.source());
+                n
+            }
+            None => {
+                let mut l = Lettering::new(&text, any.source().font_ref(), d.height_mm, d.at);
+                emb_letter::relayout(&mut l, any.source());
+                l
+            }
+        };
+        if l.letters.is_empty() {
+            self.message = crate::i18n::fill("{} has none of these characters.", &[&(font.label())]);
+            return;
+        }
+        let kind = ObjectKind::Lettering(Box::new(l));
+        let label = match d.edit {
+            Some(_) => tr("Change lettering").to_string(),
+            None => crate::i18n::fill("Draw {}", &[&crate::i18n::in_sentence(tr("Lettering"))]),
+        };
+        self.reshape.letter = None;
+        match d.shown.filter(|id| self.doc.design().object(*id).is_some()) {
+            Some(id) => self.doc.edit_merged(label, d.key.clone(), |dd| {
+                if let Some(o) = dd.object_mut(id) {
+                    o.kind = kind;
+                }
+            }),
+            None if d.edit.is_none() => {
+                let current = self.current_thread;
+                let id = self.doc.edit_merged(label, d.key.clone(), |dd| {
+                    let t = crate::draw::thread_for_new(dd, current);
+                    dd.add_object(t, kind)
+                });
+                self.current_thread = self.doc.design().object(id).map(|o| o.thread);
+                self.selection.set(id);
+                d.shown = Some(id);
+            }
+            None => {}
+        }
+    }
+
+    /// Takes back what the window shows on the canvas, if it is still the
+    /// last undo step.
+    fn take_back_lettering(&mut self, d: &mut LetteringDialog) {
+        if self.doc.is_merging(&d.key) {
+            self.doc.end_merge();
+            self.undo();
+        }
+        if d.edit.is_none() {
+            d.shown = None;
+        }
+    }
+
+    /// OK (`keep`) or Cancel of the Lettering window.
+    pub fn finish_lettering(&mut self, mut d: LetteringDialog, keep: bool) {
+        if !keep {
+            self.take_back_lettering(&mut d);
+            return;
+        }
+        d.hover = None;
+        self.preview_lettering(&mut d);
+        self.doc.end_merge_of(&d.key);
+        let shown = d
+            .shown
+            .and_then(|id| self.doc.design().object(id))
+            .map(|o| o.kind.clone());
+        if let Some(ObjectKind::Lettering(l)) = shown {
+            self.letter_font = l.font.clone();
+            self.letter_height = l.height_mm;
+            if d.edit.is_none() {
+                self.draw = crate::draw::DrawState::default();
+                self.message = crate::i18n::fill("{} added. Draw the next one, or press Esc.", &[&(self.tool.label())]);
+            }
+        }
+    }
+
+    /// OK of the Lettering window with `d` (tests).
+    #[cfg(test)]
+    pub fn apply_lettering_dialog(&mut self, d: LetteringDialog) {
+        self.finish_lettering(d, true);
+    }
+
+    /// Adds a lettering object as the Lettering window does (tests).
+    #[cfg(test)]
+    pub fn add_lettering(&mut self, d: LetteringDialog) {
+        self.finish_lettering(d, true);
     }
 }
 
@@ -579,7 +855,13 @@ pub fn windows(ctx: &egui::Context, st: &mut AppState) {
             d.focus = false;
         }
         let ctrl_enter = r.has_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter) && i.modifiers.command);
+        st.font_hover = None;
         font_picker(ui, st, &mut d.font, "dialog");
+        d.hover = st
+            .font_hover
+            .take()
+            .filter(|(salt, _)| salt == "dialog")
+            .map(|(_, f)| f);
         ui.horizontal(|ui| {
             ui.label(tr("Height"))
                 .on_hover_text(tr("The height of the capital letters."));
@@ -591,6 +873,9 @@ pub fn windows(ctx: &egui::Context, st: &mut AppState) {
                     .suffix(" mm"),
             );
         });
+        ui.weak(tr(
+            "The canvas shows the lettering as you type. Point to a font in the list to see it.",
+        ));
         ui.separator();
         ui.horizontal(|ui| {
             let ok = ui
@@ -605,10 +890,13 @@ pub fn windows(ctx: &egui::Context, st: &mut AppState) {
         });
     });
     if done {
-        // Ctrl+Enter may have added a new line to the text.
-        let text = d.text.trim_end_matches(['\n', '\r']).to_string();
-        st.apply_lettering_dialog(LetteringDialog { text, ..d });
-    } else if open && !cancel {
+        // Ctrl+Enter may have added a new line to the text: the preview
+        // does not use it.
+        st.finish_lettering(d, true);
+    } else if !open || cancel {
+        st.finish_lettering(d, false);
+    } else {
+        st.preview_lettering(&mut d);
         st.lettering_dialog = Some(d);
     }
 }
@@ -642,32 +930,54 @@ pub fn font_picker(ui: &mut egui::Ui, st: &mut AppState, font: &mut FontRef, sal
                     ui.weak(tr("Finding the fonts of this computer…"));
                 }
                 let filter = st.font_filter.to_lowercase();
-                let mut last_kind = None;
+                // The rows: a title (`None`) before the fonts of each kind.
+                let mut rows: Vec<(Option<&String>, FontKind)> = Vec::new();
                 for (f, kind) in families.iter().filter(|(f, _)| f.to_lowercase().contains(&filter)) {
-                    if last_kind != Some(*kind) {
-                        ui.weak(match kind {
-                            FontKind::Embroidery => "Embroidery fonts",
-                            FontKind::TrueType => "TrueType fonts",
-                        });
-                        last_kind = Some(*kind);
+                    if rows.last().is_none_or(|(_, k)| k != kind) {
+                        rows.push((None, *kind));
                     }
-                    let on = font.kind == *kind && font.family.eq_ignore_ascii_case(f);
-                    if ui.selectable_label(on, f).clicked() {
-                        let styles = st.fonts.styles(f, *kind);
-                        let style = styles
-                            .iter()
-                            .find(|s| s.eq_ignore_ascii_case(&font.style))
-                            .or_else(|| styles.iter().find(|s| s.eq_ignore_ascii_case("regular")))
-                            .or(styles.first())
-                            .cloned()
-                            .unwrap_or_default();
-                        *font = FontRef {
-                            family: f.clone(),
-                            style,
-                            kind: *kind,
-                        };
-                        changed = true;
-                    }
+                    rows.push((Some(f), *kind));
+                }
+                let mut budget = SAMPLES_PER_FRAME;
+                let mut pending = false;
+                let mut clicked = None;
+                egui::ScrollArea::vertical()
+                    .id_salt(("font_rows", salt))
+                    .max_height(300.0)
+                    .show_rows(ui, FONT_ROW, rows.len(), |ui, range| {
+                        for (f, kind) in &rows[range] {
+                            let Some(f) = f else {
+                                ui.add_sized(
+                                    [ui.available_width(), FONT_ROW],
+                                    egui::Label::new(
+                                        egui::RichText::new(match kind {
+                                            FontKind::Embroidery => tr("Embroidery fonts"),
+                                            FontKind::TrueType => tr("TrueType fonts"),
+                                        })
+                                        .weak(),
+                                    ),
+                                );
+                                continue;
+                            };
+                            let on = font.kind == *kind && font.family.eq_ignore_ascii_case(f);
+                            let sample = st.fonts.sample(f, *kind, &mut budget);
+                            pending |= sample.is_none();
+                            let r = font_row(ui, f, sample.flatten().as_deref(), on);
+                            if r.hovered() || r.clicked() {
+                                let picked = st.fonts.font_of(f, *kind, &font.style);
+                                if r.clicked() {
+                                    clicked = Some(picked.clone());
+                                }
+                                st.font_hover = Some((salt.to_string(), picked));
+                            }
+                        }
+                    });
+                if pending {
+                    ui.ctx().request_repaint();
+                }
+                if let Some(f) = clicked {
+                    *font = f;
+                    changed = true;
                 }
             });
         let styles = st.fonts.styles(&font.family, font.kind);
@@ -758,15 +1068,15 @@ impl BaselineKind {
 
     fn help(self) -> &'static str {
         match self {
-            BaselineKind::Straight => "The letters stand on a straight line.",
-            BaselineKind::ArcOver => "The letters stand on top of an arc. Drag the center of the arc to change it.",
-            BaselineKind::ArcUnder => "The letters hang under an arc. Drag the center of the arc to change it.",
-            BaselineKind::CircleCw => "The letters go round a circle, outside it, from the top.",
-            BaselineKind::CircleCcw => "The letters go round a circle, inside it, from the bottom.",
-            BaselineKind::Line => {
+            BaselineKind::Straight => tr("The letters stand on a straight line."),
+            BaselineKind::ArcOver => tr("The letters stand on top of an arc. Drag the center of the arc to change it."),
+            BaselineKind::ArcUnder => tr("The letters hang under an arc. Drag the center of the arc to change it."),
+            BaselineKind::CircleCw => tr("The letters go round a circle, outside it, from the top."),
+            BaselineKind::CircleCcw => tr("The letters go round a circle, inside it, from the bottom."),
+            BaselineKind::Line => tr(
                 "Draw a line (Run tool), select the lettering, use Lettering > Lettering > \
-                 Lettering on line, then click the line."
-            }
+                 Lettering on line, then click the line.",
+            ),
         }
     }
 }
@@ -856,11 +1166,9 @@ fn letter_ui(ui: &mut egui::Ui, n: &mut Lettering, letter: usize, drag: &mut boo
     let old = n.edit(l.index).cloned().unwrap_or(LetterEdit::new(l.index));
     let mut e = old.clone();
     ui.separator();
-    ui.strong(format!(
+    ui.strong(crate::i18n::fill(
         "Letter \u{201c}{}\u{201d} ({} of {})",
-        l.text,
-        letter + 1,
-        n.letters.len()
+        &[&l.text, &(letter + 1), &n.letters.len()],
     ));
     let mut value = |ui: &mut egui::Ui, label: &str, help: &str, v: &mut f64, speed: f64, suffix: &str| {
         ui.horizontal(|ui| {
@@ -965,7 +1273,7 @@ fn letter_ui(ui: &mut egui::Ui, n: &mut Lettering, letter: usize, drag: &mut boo
 }
 
 /// A small picture of an envelope shape.
-fn envelope_icon(ui: &mut egui::Ui, shape: EnvelopeShape, on: bool) -> egui::Response {
+pub(crate) fn envelope_icon(ui: &mut egui::Ui, shape: EnvelopeShape, on: bool) -> egui::Response {
     let (rect, resp) = ui.allocate_exact_size(egui::vec2(40.0, 30.0), egui::Sense::click());
     let v = ui.visuals();
     let stroke = if on {
@@ -1132,9 +1440,9 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, l: &Letter
     if !has_font {
         ui.colored_label(
             ui.visuals().warn_fg_color,
-            format!(
+            crate::i18n::fill(
                 "{} is not on this computer. The letters stay as they are until you choose another font.",
-                l.font.label()
+                &[&l.font.label()],
             ),
         );
     }
@@ -1230,6 +1538,9 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, l: &Letter
     if satins > 0 {
         ui.separator();
         ui.strong(tr("Satin"));
+        ui.checkbox(&mut n.mitre_corners, tr("Mitre corners")).on_hover_text(tr(
+            "Columns that meet at a corner sew as one column that turns. Off: one column stops and the next column starts over it.",
+        ));
         let mut row = |ui: &mut egui::Ui,
                        label: &str,
                        v: &mut f64,
@@ -1289,6 +1600,7 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, l: &Letter
         });
         crate::panels::underlay_combo(ui, "letter_fill_underlay", &mut n.fill.underlay);
     }
+    knockout_ui(ui, &mut n, st.shaping.overlap_mm, &mut drag);
 
     // Only the merge of this panel ends here: a drag on the canvas (move,
     // turn, scale) keeps its one undo step.
@@ -1317,6 +1629,7 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, l: &Letter
         || n.line_spacing != l.line_spacing
         || n.justify != l.justify
         || n.kerning != l.kerning
+        || n.mitre_corners != l.mitre_corners
         || n.stitch != l.stitch;
     if shape_changed && !relayout(st, &mut n) {
         st.message = crate::i18n::fill("{} is not on this computer: choose another font.", &[&(n.font.label())]);
@@ -1330,7 +1643,7 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, l: &Letter
     }
     st.letter_font = n.font.clone();
     st.letter_height = n.height_mm;
-    st.doc.edit_merged("Change lettering", key.clone(), |d| {
+    st.doc.edit_merged(tr("Change lettering"), key.clone(), |d| {
         if let Some(o) = d.object_mut(id) {
             o.kind = ObjectKind::Lettering(Box::new(n));
         }
@@ -1338,6 +1651,42 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, l: &Letter
     if !typing && !drag {
         st.doc.end_merge_of(&key);
     }
+}
+
+/// The knockout of the lettering (ADR 0093): on or off, and the overlap.
+/// A new knockout takes the overlap of the shaping commands.
+fn knockout_ui(ui: &mut egui::Ui, n: &mut Lettering, overlap_mm: f64, drag: &mut bool) {
+    ui.separator();
+    ui.strong(tr("Knockout"));
+    let mut on = n.knockout.is_some();
+    if ui
+        .checkbox(&mut on, tr("Sew round objects in front"))
+        .on_hover_text(tr(
+            "The letters do not sew where objects that sew after them cover them. The cut follows each change.",
+        ))
+        .changed()
+    {
+        n.knockout = on.then(|| emb_model::Knockout {
+            overlap_mm,
+            area: Vec::new(),
+        });
+    }
+    let Some(k) = &mut n.knockout else { return };
+    if k.area.is_empty() {
+        ui.weak(tr("No object in front covers the letters."));
+    }
+    ui.horizontal(|ui| {
+        ui.label(tr("Overlap")).on_hover_text(tr(
+            "How far the letters stay under the objects in front, so that no fabric shows at the edge.",
+        ));
+        let r = ui.add(
+            egui::Slider::new(&mut k.overlap_mm, 0.0..=2.0)
+                .clamping(egui::SliderClamping::Edits)
+                .suffix(" mm")
+                .fixed_decimals(2),
+        );
+        *drag |= r.dragged();
+    });
 }
 
 /// "Lettering · Lato Bold · 25 mm · Anna", for the Sequence panel.
@@ -1482,7 +1831,7 @@ mod tests {
         // The text starts at the start of the line: the base point of the
         // first letter is half its width along the line.
         let c = l.letters[0].center;
-        let base = l.letter_to_design(0).unwrap().apply(Point::new(c.x, 0.0));
+        let base = l.letter_point(0, Point::new(c.x, 0.0)).unwrap();
         let start = Point::new(-40.0, 30.0);
         assert!((base.distance(start) - c.x).abs() < 1.0, "{base:?} {}", c.x);
         st.doc.undo();
@@ -1611,16 +1960,84 @@ mod tests {
     }
 
     #[test]
+    fn overlapping_lettering_gets_a_live_knockout() {
+        let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        for (at, text) in [(Point::new(-30.0, 10.0), "MMM"), (Point::new(-25.0, 15.0), "OOO")] {
+            st.add_lettering(LetteringDialog::new(at, text, FontRef::new("Lato", "Bold"), 20.0));
+        }
+        let ids: Vec<ObjectId> = st.doc.design().objects().iter().map(|o| o.id).collect();
+        let (back, front) = (ids[0], ids[1]);
+        // The needle points of the back text under the text `f`.
+        let under_text = |st: &AppState, f: ObjectId| -> usize {
+            let d = st.doc.design();
+            let area = emb_model::shaping::cut_area_of(&d.object(f).unwrap().kind).unwrap();
+            // Inside by 0.5 mm: the pull compensation of the cut columns and
+            // the ends of the fill rows touch the edge.
+            let area = emb_geom::region::offset(&area, -0.5, emb_geom::region::Join::Round);
+            let sewn = emb_stitch::object::stitch_object(d.object(back).unwrap(), Point::ZERO).unwrap();
+            sewn.runs
+                .iter()
+                .flat_map(|r| &r.points)
+                .filter(|p| area.iter().any(|r| r.contains(**p)))
+                .count()
+        };
+        let under = |st: &AppState| under_text(st, front);
+        let total = |st: &AppState| -> usize {
+            let d = st.doc.design();
+            let sewn = emb_stitch::object::stitch_object(d.object(back).unwrap(), Point::ZERO).unwrap();
+            sewn.runs.iter().map(|r| r.points.len()).sum()
+        };
+        let (before, whole) = (under(&st), total(&st));
+        assert!(before > 20, "{before}");
+        // Both texts are selected: the text behind gets the knockout.
+        st.selection.set_all([back, front]);
+        st.remove_overlaps();
+        assert!(st.message.contains("1 lettering"), "{}", st.message);
+        let ObjectKind::Lettering(l) = &st.doc.design().object(back).unwrap().kind else {
+            panic!()
+        };
+        assert!(l.knockout.is_some());
+        assert_eq!(l.text, "MMM");
+        let after = under(&st);
+        assert!(after * 10 < before, "{before} -> {after}");
+        // The front text moves away: the back text sews whole again.
+        st.doc.edit("Move", |d| {
+            d.transform_objects(&[front], &emb_geom::Transform::translate(200.0, 0.0));
+        });
+        assert_eq!(total(&st), whole);
+        st.doc.undo();
+        assert_eq!(under(&st), after);
+        st.doc.undo();
+        assert_eq!(under(&st), before);
+        st.doc.redo();
+        let cut_area = |st: &AppState| -> f64 {
+            match &st.doc.design().object(back).unwrap().kind {
+                ObjectKind::Lettering(l) => l.knockout.as_ref().unwrap().regions().iter().map(|r| r.area()).sum(),
+                _ => 0.0,
+            }
+        };
+        let two = cut_area(&st);
+        // A text that is added later in front cuts with no command.
+        st.add_lettering(LetteringDialog::new(
+            Point::new(-34.0, 8.0),
+            "XHK",
+            FontRef::new("Lato", "Bold"),
+            20.0,
+        ));
+        let third = st.doc.design().objects().last().unwrap().id;
+        assert!(cut_area(&st) > two + 10.0, "{two} -> {}", cut_area(&st));
+        assert_eq!(under_text(&st, third), 0);
+    }
+
+    #[test]
     fn add_lettering_and_change_it_with_undo() {
         let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
-        st.add_lettering(LetteringDialog {
-            at: Point::new(-30.0, 10.0),
-            text: "Anna".into(),
-            font: FontRef::new("Lato", "Bold"),
-            height_mm: 20.0,
-            focus: false,
-            edit: None,
-        });
+        st.add_lettering(LetteringDialog::new(
+            Point::new(-30.0, 10.0),
+            "Anna",
+            FontRef::new("Lato", "Bold"),
+            20.0,
+        ));
         let d = st.doc.design().clone();
         assert_eq!(d.objects().len(), 1);
         let o = &d.objects()[0];
@@ -1665,5 +2082,122 @@ mod tests {
         };
         assert_eq!(l.text, "Anna");
         assert_eq!(summary(l), "Lato Bold · 20 mm · Anna");
+    }
+
+    #[test]
+    fn the_canvas_shows_the_lettering_while_the_window_is_open() {
+        let mut h = crate::test_util::Harness::empty();
+        let before = h.st.doc.undo_len();
+        let mut d = LetteringDialog::new(Point::ZERO, "", FontRef::embroidery("Block Sans", ""), 15.0);
+        h.st.preview_lettering(&mut d);
+        assert!(h.st.doc.design().objects().is_empty());
+        d.text = "An".into();
+        h.st.preview_lettering(&mut d);
+        assert_eq!(only_lettering(&h.st).1.letters.len(), 2);
+        d.text = "Ann".into();
+        h.st.preview_lettering(&mut d);
+        assert_eq!(h.st.doc.design().objects().len(), 1);
+        assert_eq!(h.st.doc.undo_len(), before + 1, "one undo step");
+        // A font under the pointer shows, and goes when the pointer goes.
+        d.hover = Some(FontRef::new("Lato", "Bold"));
+        h.st.preview_lettering(&mut d);
+        assert_eq!(only_lettering(&h.st).1.font.family, "Lato");
+        d.hover = None;
+        h.st.preview_lettering(&mut d);
+        assert_eq!(only_lettering(&h.st).1.font.family, "Block Sans");
+        // No text: nothing shows.
+        d.text = " ".into();
+        h.st.preview_lettering(&mut d);
+        assert!(h.st.doc.design().objects().is_empty());
+        d.text = "Ann".into();
+        h.st.preview_lettering(&mut d);
+        // Cancel takes it back.
+        h.st.finish_lettering(d, false);
+        assert!(h.st.doc.design().objects().is_empty());
+        assert_eq!(h.st.doc.undo_len(), before);
+        // OK keeps it as one undo step.
+        let mut d = LetteringDialog::new(Point::ZERO, "Ann", FontRef::embroidery("Block Sans", ""), 15.0);
+        h.st.preview_lettering(&mut d);
+        h.st.finish_lettering(d, true);
+        assert_eq!(only_lettering(&h.st).1.text, "Ann");
+        assert_eq!(h.st.doc.undo_len(), before + 1);
+        assert_eq!(h.st.letter_font.family, "Block Sans");
+        h.st.undo();
+        assert!(h.st.doc.design().objects().is_empty());
+    }
+
+    #[test]
+    fn the_edit_window_shows_the_change_and_cancel_keeps_the_old_text() {
+        let mut h = crate::test_util::Harness::empty();
+        h.st.add_lettering(LetteringDialog::new(
+            Point::ZERO,
+            "Anna",
+            FontRef::embroidery("Block Sans", ""),
+            15.0,
+        ));
+        let (id, l) = only_lettering(&h.st);
+        let before = h.st.doc.undo_len();
+        let mut d = LetteringDialog::for_object(id, &l);
+        // Opening the window changes nothing.
+        h.st.preview_lettering(&mut d);
+        assert_eq!(h.st.doc.undo_len(), before);
+        d.text = "Anne".into();
+        d.height_mm = 20.0;
+        h.st.preview_lettering(&mut d);
+        let (same, n) = only_lettering(&h.st);
+        assert_eq!((same, n.text.as_str(), n.height_mm), (id, "Anne", 20.0));
+        h.st.finish_lettering(d, false);
+        assert_eq!(only_lettering(&h.st).1.text, "Anna");
+        assert_eq!(h.st.doc.undo_len(), before);
+    }
+
+    #[test]
+    fn font_names_are_drawn_in_their_own_font() {
+        let mut lib = FontLibrary::default();
+        let mut budget = 2;
+        let emb = lib.sample("Block Sans", FontKind::Embroidery, &mut budget);
+        assert!(emb.flatten().is_some_and(|s| !s.parts.is_empty()));
+        let tt = lib.sample("Lato", FontKind::TrueType, &mut budget);
+        let tt = tt.flatten().expect("a sample of Lato");
+        assert!(tt.bbox.width() > 2.0 * tt.bbox.height(), "a word, not one letter");
+        // The budget of the frame is used up; the samples that are made stay.
+        assert_eq!(budget, 0);
+        assert!(lib.sample("Some Font", FontKind::TrueType, &mut budget).is_none());
+        assert!(lib.sample("Lato", FontKind::TrueType, &mut budget).is_some());
+        // A font that is not there shows its name as text.
+        let mut budget = 1;
+        assert_eq!(
+            lib.sample("No Such Font", FontKind::TrueType, &mut budget)
+                .map(|s| s.is_none()),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn a_font_row_paints_the_name_with_the_glyphs() {
+        let mut lib = FontLibrary::default();
+        let mut budget = 1;
+        let sample = lib.sample("Lato", FontKind::TrueType, &mut budget).flatten().unwrap();
+        let ctx = eframe::egui::Context::default();
+        let count = |sample: Option<&NameSample>| {
+            let mut out = ctx.run_ui(eframe::egui::RawInput::default(), |ui| {
+                font_row(ui, "Lato", sample, false);
+            });
+            out.textures_delta.clear();
+            let meshes = out
+                .shapes
+                .iter()
+                .filter(|c| matches!(&c.shape, eframe::egui::Shape::Mesh(m) if !m.vertices.is_empty()))
+                .count();
+            let texts = out
+                .shapes
+                .iter()
+                .filter(|c| matches!(c.shape, eframe::egui::Shape::Text(_)))
+                .count();
+            (meshes, texts)
+        };
+        let (meshes, texts) = count(Some(&sample));
+        assert!(meshes >= 4 && texts == 0, "one mesh for each letter: {meshes}, {texts}");
+        assert_eq!(count(None), (0, 1), "no sample: the name as text");
     }
 }

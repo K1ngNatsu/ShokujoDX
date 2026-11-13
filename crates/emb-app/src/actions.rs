@@ -5,6 +5,8 @@
 //!
 //! Each command is one undo step. Geometry is in design coordinates.
 
+use std::collections::{HashMap, HashSet};
+
 use emb_geom::region::{self, Region};
 use emb_geom::{BBox, Path, Point, Polyline, Transform, math};
 use emb_model::edit::scale_about;
@@ -296,7 +298,7 @@ impl AppState {
             self.message = tr("The knife line does not cut the objects.").into();
             return;
         }
-        let new = self.doc.edit("Knife", |d| {
+        let new = self.doc.edit(tr("Knife"), |d| {
             cuts.into_iter()
                 .flat_map(|(id, parts)| replace_with(d, id, parts))
                 .collect::<Vec<_>>()
@@ -318,8 +320,8 @@ impl AppState {
         // Fill angles are 0° to 180° (a row has no direction).
         let angle = math::to_degrees(math::atan2(v.y, v.x)).rem_euclid(180.0);
         let label = match self.doc.design().object(id).map(|o| &o.kind) {
-            Some(ObjectKind::Fill { .. }) => "Set stitch angle",
-            Some(ObjectKind::Satin { .. }) => "Add stitch angle",
+            Some(ObjectKind::Fill { .. }) => tr("Set stitch angle"),
+            Some(ObjectKind::Satin { .. }) => tr("Add stitch angle"),
             _ => {
                 self.message = tr("Stitch angles are for fills and satins.").into();
                 return;
@@ -359,7 +361,7 @@ impl AppState {
                     self.message = tr("The direction line must go through the column.").into();
                     return;
                 };
-                self.doc.edit("Direction Line", |d| {
+                self.doc.edit(tr("Direction Line"), |d| {
                     if let Some(ObjectKind::Satin { geometry, .. }) = d.object_mut(id).map(|o| &mut o.kind) {
                         *geometry = g;
                     }
@@ -376,19 +378,19 @@ impl AppState {
                     points: pts.to_vec(),
                     angle_deg: angle,
                 };
-                self.doc.edit("Direction Line", |d| {
+                self.doc.edit(tr("Direction Line"), |d| {
                     if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(id).map(|o| &mut o.kind) {
                         params.direction = Some(dir);
                     }
                 });
                 self.message =
-                    "Direction line: the stitches go across the line. Object Properties can change or remove it."
+                    tr("Direction line: the stitches go across the line. Object Properties can change or remove it.")
                         .into();
             }
             ObjectKind::Fill { .. } => {
                 let v = pts[pts.len() - 1] - pts[0];
                 let fill_angle = (math::to_degrees(math::atan2(v.y, v.x)) + angle).rem_euclid(180.0);
-                self.doc.edit("Direction Line", |d| {
+                self.doc.edit(tr("Direction Line"), |d| {
                     if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(id).map(|o| &mut o.kind) {
                         params.angle_deg = fill_angle;
                     }
@@ -417,7 +419,7 @@ impl AppState {
             return;
         }
         let hole = Path::polygon(pts);
-        self.doc.edit("Add Hole", |d| {
+        self.doc.edit(tr("Add Hole"), |d| {
             if let Some(ObjectKind::Fill { holes, .. }) = d.object_mut(id).map(|o| &mut o.kind) {
                 holes.push(hole);
             }
@@ -427,7 +429,7 @@ impl AppState {
     /// Removes the holes of the selected fills.
     pub fn remove_holes(&mut self) {
         let ids = self.sel();
-        self.doc.edit("Remove Holes", |d| {
+        self.doc.edit(tr("Remove Holes"), |d| {
             for id in &ids {
                 if let Some(ObjectKind::Fill { holes, .. }) = d.object_mut(*id).map(|o| &mut o.kind) {
                     holes.clear();
@@ -439,7 +441,7 @@ impl AppState {
     /// Makes a new fill object in each hole of the selected fills. The holes stay.
     pub fn fill_holes(&mut self) {
         let ids = self.sel();
-        let new = self.doc.edit("Fill Holes", |d| {
+        let new = self.doc.edit(tr("Fill Holes"), |d| {
             let mut new = Vec::new();
             for id in &ids {
                 let Some(o) = d.object(*id).cloned() else { continue };
@@ -569,7 +571,7 @@ impl AppState {
         }
         let split: Vec<ObjectId> = parts.iter().map(|(id, _)| *id).collect();
         let (n_split, n_grouped) = (parts.len(), grouped.len());
-        let new = self.doc.edit("Break Apart", |d| {
+        let new = self.doc.edit(tr("Break Apart"), |d| {
             for id in &grouped {
                 if let Some(o) = d.object_mut(*id) {
                     o.group = None;
@@ -584,9 +586,9 @@ impl AppState {
         keep.extend(new);
         self.selection.set_all(keep);
         self.message = match (n_split, n_grouped) {
-            (0, g) => format!("{g} objects are out of their group: click one to edit it alone."),
-            (s, 0) => format!("Broke {s} objects apart."),
-            (s, g) => format!("Broke {s} objects apart; {g} objects are out of their group."),
+            (0, g) => crate::i18n::fill("{} objects are out of their group: click one to edit it alone.", &[&g]),
+            (s, 0) => crate::i18n::fill("Broke {} objects apart.", &[&s]),
+            (s, g) => crate::i18n::fill("Broke {} objects apart; {} objects are out of their group.", &[&s, &g]),
         };
     }
 
@@ -651,7 +653,7 @@ impl AppState {
                 points.push((w[0].id, w[1].id, p, q));
             }
         }
-        self.doc.edit("Closest Join", |d| {
+        self.doc.edit(tr("Closest Join"), |d| {
             for (a, b, p, q) in &points {
                 if let Some(o) = d.object_mut(*a) {
                     o.end = Some(*p);
@@ -760,7 +762,7 @@ impl AppState {
                 (id, d)
             })
             .collect();
-        self.doc.edit("Align", |d| {
+        self.doc.edit(tr("Align"), |d| {
             for (id, m) in &moves {
                 d.transform_objects(&[*id], &Transform::translate(m.x, m.y));
             }
@@ -801,7 +803,7 @@ impl AppState {
             ));
             at += size(b) + gap;
         }
-        self.doc.edit("Space Evenly", |d| {
+        self.doc.edit(tr("Space Evenly"), |d| {
             for (id, m) in &moves {
                 d.transform_objects(&[*id], &Transform::translate(m.x, m.y));
             }
@@ -833,7 +835,7 @@ impl AppState {
                 (id, scale_about(b.center(), sx, sy))
             })
             .collect();
-        self.doc.edit("Make Same Size", |d| {
+        self.doc.edit(tr("Make Same Size"), |d| {
             for (id, t) in &scales {
                 d.transform_objects(&[*id], t);
             }
@@ -874,7 +876,7 @@ impl AppState {
             .then(Transform::translate(a.x, a.y));
         if self.mods.command || self.reflect_copy {
             let ids = self.sel();
-            let new = self.doc.edit("Mirror copy", |d| {
+            let new = self.doc.edit(tr("Mirror copy"), |d| {
                 let new = d.duplicate_objects(&ids, Point::ZERO);
                 d.transform_objects(&new, &t);
                 new
@@ -907,7 +909,7 @@ impl AppState {
             self.message = tr("Select two or more objects to group them.").into();
             return;
         }
-        self.doc.edit("Group", |d| {
+        self.doc.edit(tr("Group"), |d| {
             let g = d.new_group_id();
             for id in &ids {
                 if let Some(o) = d.object_mut(*id) {
@@ -919,7 +921,7 @@ impl AppState {
 
     pub fn ungroup_selection(&mut self) {
         let ids = self.sel();
-        self.doc.edit("Ungroup", |d| {
+        self.doc.edit(tr("Ungroup"), |d| {
             for id in &ids {
                 if let Some(o) = d.object_mut(*id) {
                     o.group = None;
@@ -931,7 +933,7 @@ impl AppState {
     /// Locks the selected objects. Locked objects cannot be selected on the canvas.
     pub fn lock_selection(&mut self) {
         let ids = self.sel();
-        self.doc.edit("Lock", |d| {
+        self.doc.edit(tr("Lock"), |d| {
             for id in &ids {
                 if let Some(o) = d.object_mut(*id) {
                     o.locked = true;
@@ -953,7 +955,7 @@ impl AppState {
         if locked.is_empty() {
             return;
         }
-        self.doc.edit("Unlock All", |d| {
+        self.doc.edit(tr("Unlock All"), |d| {
             for id in &locked {
                 if let Some(o) = d.object_mut(*id) {
                     o.locked = false;
@@ -968,31 +970,43 @@ impl AppState {
     /// entered (a double-click), the objects stay one at a time while all
     /// the selected objects are in that group.
     pub fn apply_groups_and_locks(&mut self) {
-        let d = self.doc.design();
-        let ids = self.selection.ids().to_vec();
-        let entered = self
-            .selection
-            .entered_group()
-            .filter(|g| !ids.is_empty() && ids.iter().all(|id| d.object(*id).is_some_and(|o| o.group == Some(*g))));
-        if entered.is_none() && self.selection.entered_group().is_some() {
-            self.selection.leave_group();
+        let ids = self.selection.ids();
+        if ids.is_empty() && self.selection.entered_group().is_none() {
+            return;
         }
-        let groups: Vec<u32> = ids
+        // This runs on each frame: look the objects up once (a selection
+        // can have thousands of objects).
+        let d = self.doc.design();
+        let objects: HashMap<ObjectId, &DesignObject> = d.objects().iter().map(|o| (o.id, &**o)).collect();
+        let entered = self.selection.entered_group().filter(|g| {
+            !ids.is_empty()
+                && ids
+                    .iter()
+                    .all(|id| objects.get(id).is_some_and(|o| o.group == Some(*g)))
+        });
+        let groups: HashSet<u32> = ids
             .iter()
-            .filter_map(|id| d.object(*id).and_then(|o| o.group))
+            .filter_map(|id| objects.get(id).and_then(|o| o.group))
             .filter(|g| Some(*g) != entered)
             .collect();
         let mut want: Vec<ObjectId> = ids
             .iter()
             .copied()
-            .filter(|id| d.object(*id).is_some_and(|o| !o.locked))
+            .filter(|id| objects.get(id).is_some_and(|o| !o.locked))
             .collect();
-        for o in d.objects() {
-            if o.group.is_some_and(|g| groups.contains(&g)) && !want.contains(&o.id) && !o.locked {
-                want.push(o.id);
+        if !groups.is_empty() {
+            let mut have: HashSet<ObjectId> = want.iter().copied().collect();
+            for o in d.objects() {
+                if o.group.is_some_and(|g| groups.contains(&g)) && !o.locked && have.insert(o.id) {
+                    want.push(o.id);
+                }
             }
         }
-        if want != ids {
+        let changed = want != ids;
+        if entered.is_none() && self.selection.entered_group().is_some() {
+            self.selection.leave_group();
+        }
+        if changed {
             self.selection.set_all(want);
         }
     }

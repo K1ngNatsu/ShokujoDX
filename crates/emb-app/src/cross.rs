@@ -98,25 +98,19 @@ impl AppState {
         let at: Vec<(i32, i32)> = cells.iter().map(|&(c, r, _)| (c, r)).collect();
         // Test on a copy first: a click that changes nothing makes no undo step.
         let mut test = self.doc.design().clone();
-        let changes = if erase {
-            test.cross_erase(grid, &at)
+        let (changes, id) = if erase {
+            (test.cross_erase(grid, &at), None)
         } else {
             let t = thread_for_new(&mut test, current);
-            test.cross_paint(grid, t, &cells).is_some()
+            let id = test.cross_paint(grid, t, &cells);
+            (id.is_some(), id)
         };
         if !changes {
             return;
         }
+        // The copy is the new design: the stroke is not made again.
         let key = MergeKey::new(format!("cross-stroke-{key}"));
-        let id = self.doc.edit_merged(label, key, |d| {
-            if erase {
-                d.cross_erase(grid, &at);
-                None
-            } else {
-                let t = thread_for_new(d, current);
-                d.cross_paint(grid, t, &cells)
-            }
-        });
+        self.doc.edit_merged(label, key, |d| *d = test);
         if let Some(id) = id {
             self.current_thread = self.doc.design().object(id).map(|o| o.thread);
             self.selection.set(id);
@@ -135,7 +129,7 @@ impl AppState {
             .collect();
         if ids.is_empty() {
             self.message =
-                "Select a fill, an appliqué, a satin column or a closed vector to change into cross stitch.".into();
+                tr("Select a fill, an appliqué, a satin column or a closed vector to change into cross stitch.").into();
             return;
         }
         if self.refuse_linked(&ids) {
@@ -144,7 +138,7 @@ impl AppState {
         let grid = self.cross_grid();
         let mut made = Vec::new();
         let mut cells = 0;
-        self.doc.edit("Convert to cross stitch", |d| {
+        self.doc.edit(tr("Convert to cross stitch"), |d| {
             for id in ids {
                 let Some(o) = d.object(id).cloned() else { continue };
                 let Some(regions) = emb_model::shaping::area_of(&o.kind) else {
@@ -180,13 +174,16 @@ impl AppState {
         });
         self.selection.set_all(made.iter().copied());
         self.message = if made.is_empty() {
-            "The shapes are smaller than one cell: no cross stitch. Use a smaller cell size.".into()
+            tr("The shapes are smaller than one cell: no cross stitch. Use a smaller cell size.").into()
         } else {
-            format!(
-                "{cells} cells in {} cross-stitch object{} ({:.1} mm cells).",
-                made.len(),
-                if made.len() == 1 { "" } else { "s" },
-                grid.cell_mm()
+            crate::i18n::fill(
+                "{} cells in {} cross-stitch object{} ({} mm cells).",
+                &[
+                    &cells,
+                    &made.len(),
+                    &(if made.len() == 1 { "" } else { "s" }),
+                    &format!("{:.1}", grid.cell_mm()),
+                ],
             )
         };
     }
@@ -219,7 +216,7 @@ impl AppState {
         };
         let name = format!("{} chart.pdf", self.doc.design().name);
         let Some(p) = rfd::FileDialog::new()
-            .set_title("Cross-stitch chart")
+            .set_title(tr("Cross-stitch chart"))
             .add_filter("PDF", &["pdf"])
             .set_directory(self.dialog_dir())
             .set_file_name(name)
@@ -275,7 +272,7 @@ pub fn tool_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState, m
         let mut test = st.doc.design().clone();
         if test.cross_erase_lines(&grid, q, tol) {
             st.doc
-                .edit_merged("Erase Cells", MergeKey::new(format!("cross-stroke-{key}")), |d| {
+                .edit_merged(tr("Erase Cells"), MergeKey::new(format!("cross-stroke-{key}")), |d| {
                     d.cross_erase_lines(&grid, q, tol)
                 });
         }
@@ -309,7 +306,7 @@ fn line_input(response: &egui::Response, st: &mut AppState, map: &ViewMap) {
         let mut test = st.doc.design().clone();
         let t = thread_for_new(&mut test, current);
         if test.cross_add_line(&grid, t, a, h).is_some() {
-            let id = st.doc.edit("Add backstitch line", |d| {
+            let id = st.doc.edit(tr("Add backstitch line"), |d| {
                 let t = thread_for_new(d, current);
                 d.cross_add_line(&grid, t, a, h)
             });
@@ -449,9 +446,9 @@ pub fn bar(ui: &mut egui::Ui, cross: &mut CrossUi, cell_mm: &mut f64, tool: Tool
         }
     }
     let hint = match tool {
-        Tool::CrossStitch => "Drag over cells to put crosses in them. Shift+drag: erase.",
-        Tool::CrossErase => "Drag over cells and lines to remove them.",
-        _ => "Click corners or cell centers. Right click or Esc: end the line.",
+        Tool::CrossStitch => tr("Drag over cells to put crosses in them. Shift+drag: erase."),
+        Tool::CrossErase => tr("Drag over cells and lines to remove them."),
+        _ => tr("Click corners or cell centers. Right click or Esc: end the line."),
     };
     ui.weak(hint);
 }
@@ -525,14 +522,17 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, x: &CrossS
     });
     if changed && (mm - x.cell_mm()).abs() > 1e-9 {
         let grid = x.same_grid_empty();
-        st.doc
-            .edit_merged("Change cell size", MergeKey::new(format!("{}:cross-cell", id.0)), |d| {
+        st.doc.edit_merged(
+            tr("Change cell size"),
+            MergeKey::new(format!("{}:cross-cell", id.0)),
+            |d| {
                 for oid in d.cross_objects_on(&grid) {
                     if let Some(ObjectKind::CrossStitch(y)) = d.object_mut(oid).map(|o| &mut o.kind) {
                         y.set_cell_mm(mm);
                     }
                 }
-            });
+            },
+        );
         st.settings.defaults.cross_cell_mm = mm.clamp(MIN_CELL_MM, MAX_CELL_MM);
     }
     let mut p = x.params;
@@ -560,7 +560,7 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, x: &CrossS
         }
     });
     if p != x.params {
-        st.doc.edit("Change cross stitch", |d| {
+        st.doc.edit(tr("Change cross stitch"), |d| {
             if let Some(ObjectKind::CrossStitch(y)) = d.object_mut(id).map(|o| &mut o.kind) {
                 y.params = p;
             }
@@ -572,15 +572,17 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, x: &CrossS
 
 /// A short description for the Sequence panel.
 pub fn detail(x: &CrossStitch) -> String {
-    format!(
-        "Cross stitch · {} cells · {:.1} mm{}",
-        x.cells.len(),
-        x.cell_mm(),
-        if x.lines.is_empty() {
-            String::new()
-        } else {
-            format!(" · {} lines", x.lines.len())
-        }
+    crate::i18n::fill(
+        "Cross stitch · {} cells · {} mm{}",
+        &[
+            &x.cells.len(),
+            &format!("{:.1}", x.cell_mm()),
+            &(if x.lines.is_empty() {
+                String::new()
+            } else {
+                crate::i18n::fill(" · {} lines", &[&x.lines.len()])
+            }),
+        ],
     )
 }
 

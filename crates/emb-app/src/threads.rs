@@ -74,8 +74,8 @@ impl AppState {
     /// chart folder and shows it.
     pub fn import_chart_dialog(&mut self) {
         let Some(p) = rfd::FileDialog::new()
-            .set_title("Import thread chart")
-            .add_filter("Thread charts (GIMP palette, CSV)", &["gpl", "csv"])
+            .set_title(tr("Import thread chart"))
+            .add_filter(tr("Thread charts (GIMP palette, CSV)"), &["gpl", "csv"])
             .set_directory(self.dialog_dir())
             .pick_file()
         else {
@@ -128,18 +128,21 @@ impl AppState {
             return;
         }
         self.doc
-            .edit("Match threads to chart", |d| d.match_threads(&chart, &ids));
+            .edit(tr("Match threads to chart"), |d| d.match_threads(&chart, &ids));
         self.message = crate::i18n::fill("{} threads matched to {}", &[&(ids.len()), &chart.name]);
     }
 
     pub fn remove_unused_threads(&mut self) {
-        let mut probe = self.doc.design().clone();
-        let n = probe.remove_unused_threads();
-        if n == 0 {
+        let Ok(n) = self
+            .doc
+            .try_edit(tr("Remove unused threads"), |d| match d.remove_unused_threads() {
+                0 => Err(()),
+                n => Ok(n),
+            })
+        else {
             self.message = tr("No unused threads").into();
             return;
-        }
-        self.doc.edit("Remove unused threads", |d| d.remove_unused_threads());
+        };
         self.message = crate::i18n::fill("{} unused threads removed", &[&n]);
     }
 
@@ -148,13 +151,13 @@ impl AppState {
             self.message = tr("Cycle colors needs two or more colors").into();
             return;
         }
-        self.doc.edit("Cycle used colors", |d| d.cycle_used_colors());
+        self.doc.edit(tr("Cycle used colors"), |d| d.cycle_used_colors());
     }
 
     /// Gives the selection its own thread.
     pub fn split_thread(&mut self) {
         let ids = self.selection.ids().to_vec();
-        if let Some(t) = self.doc.edit("Split Thread", |d| d.split_thread(&ids)) {
+        if let Some(t) = self.doc.edit(tr("Split Thread"), |d| d.split_thread(&ids)) {
             self.current_thread = Some(t);
         }
     }
@@ -162,12 +165,12 @@ impl AppState {
     pub fn new_colorway(&mut self) {
         let n = self.doc.design().colorways.len().max(1) + 1;
         self.doc
-            .edit("New Colorway", |d| d.add_colorway(format!("Colorway {n}")));
+            .edit(tr("New Colorway"), |d| d.add_colorway(format!("Colorway {n}")));
     }
 
     pub fn delete_colorway(&mut self) {
         let i = self.doc.design().colorway;
-        self.doc.edit("Delete Colorway", |d| d.remove_colorway(i));
+        self.doc.edit(tr("Delete Colorway"), |d| d.remove_colorway(i));
     }
 
     /// Moves the current colorway one place up or down the list.
@@ -175,13 +178,13 @@ impl AppState {
         let i = self.doc.design().colorway;
         let n = self.doc.design().colorways.len();
         if (up && i > 0) || (!up && i + 1 < n) {
-            self.doc.edit("Move colorway", |d| d.move_colorway(i, up));
+            self.doc.edit(tr("Move colorway"), |d| d.move_colorway(i, up));
         }
     }
 
     pub fn switch_colorway(&mut self, i: usize) {
         if i != self.doc.design().colorway || self.doc.design().colorways.is_empty() {
-            self.doc.edit("Change colorway", |d| d.switch_colorway(i));
+            self.doc.edit(tr("Change colorway"), |d| d.switch_colorway(i));
         }
     }
 
@@ -203,7 +206,7 @@ impl AppState {
         match self.current_thread_id() {
             Some(id) if !add => self.set_look(id, look, "Set thread from chart", None),
             _ => {
-                let id = self.doc.edit("Add thread from chart", |d| {
+                let id = self.doc.edit(tr("Add thread from chart"), |d| {
                     let id = d.add_thread(look.name.clone(), look.color);
                     let i = d.colorway;
                     d.set_colorway_look(i, id, look);
@@ -311,7 +314,7 @@ fn colorway_section(ui: &mut egui::Ui, st: &mut AppState) {
             ui.label(tr("Name"));
             if ui.text_edit_singleline(&mut text).changed() {
                 st.doc.edit_merged(
-                    "Rename colorway",
+                    tr("Rename colorway"),
                     MergeKey::new(format!("colorway-name-{current}")),
                     |d| {
                         if let Some(c) = d.colorways.get_mut(current) {
@@ -328,7 +331,7 @@ fn colorway_section(ui: &mut egui::Ui, st: &mut AppState) {
         let tip = "The fabric color, inside the hoop. It changes with the colorway.";
         if let Some(c) = swatch_picker(ui, ui.id().with("background"), shown, 18.0, false, tip) {
             st.doc
-                .edit_merged("Background color", MergeKey::new("background"), |d| {
+                .edit_merged(tr("Background color"), MergeKey::new("background"), |d| {
                     d.background = Some(c)
                 });
         }
@@ -336,7 +339,7 @@ fn colorway_section(ui: &mut egui::Ui, st: &mut AppState) {
             .add_enabled(background.is_some(), egui::Button::new(tr("None")))
             .clicked()
         {
-            st.doc.edit("Background color", |d| d.background = None);
+            st.doc.edit(tr("Background color"), |d| d.background = None);
         }
     });
 }
@@ -399,7 +402,7 @@ fn threads_section(ui: &mut egui::Ui, st: &mut AppState) {
     });
     ui.horizontal_wrapped(|ui| {
         if ui.button(tr("Add thread")).clicked() {
-            let id = st.doc.edit("Add thread", |d| {
+            let id = st.doc.edit(tr("Add thread"), |d| {
                 let n = d.threads.len() + 1;
                 d.add_thread(format!("Thread {n}"), Rgb(128, 128, 128))
             });
@@ -455,10 +458,11 @@ fn threads_section(ui: &mut egui::Ui, st: &mut AppState) {
                         if let Some(c) = swatch_picker(ui, id, look.color, 16.0, false, &tip) {
                             let mut l = look.clone();
                             l.color = c;
-                            st.doc
-                                .edit_merged("Colorway color", MergeKey::new(format!("cw-{i}-{}", t.id.0)), |d| {
-                                    d.set_colorway_look(i, t.id, l)
-                                });
+                            st.doc.edit_merged(
+                                tr("Colorway color"),
+                                MergeKey::new(format!("cw-{i}-{}", t.id.0)),
+                                |d| d.set_colorway_look(i, t.id, l),
+                            );
                         }
                     }
                     ui.end_row();
@@ -671,5 +675,27 @@ mod tests {
             });
             out.textures_delta.clear();
         }
+    }
+
+    /// The commands run their change once, and a command that changes
+    /// nothing makes no undo step.
+    #[test]
+    fn commands_that_change_nothing_make_no_undo_step() {
+        let mut st = state();
+        st.remove_unused_threads();
+        let n = st.doc.undo_len();
+        st.remove_unused_threads();
+        st.add_template_marks();
+        st.selection.clear();
+        st.apply_current_properties();
+        st.make_properties_current();
+        assert_eq!(st.doc.undo_len(), n);
+        // A change is one step.
+        st.select_all();
+        st.doc.edit("Other", |d| d.current.fill.angle_deg += 10.0);
+        let n = st.doc.undo_len();
+        st.apply_current_properties();
+        assert_eq!(st.doc.undo_len(), n + 1);
+        assert_eq!(st.doc.undo_label(), Some("Apply current properties"));
     }
 }

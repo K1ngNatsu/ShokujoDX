@@ -19,8 +19,8 @@ impl AppState {
         match merge {
             Some(k) => self
                 .doc
-                .edit_merged("Repeats", MergeKey::new(format!("repeat-{k}")), change),
-            None => self.doc.edit("Repeats", change),
+                .edit_merged(tr("Repeats"), MergeKey::new(format!("repeat-{k}")), change),
+            None => self.doc.edit(tr("Repeats"), change),
         }
     }
 
@@ -28,7 +28,7 @@ impl AppState {
     pub fn open_repeats(&mut self) {
         if self.doc.design().repeat.is_none() {
             let spec = RepeatSpec::side_by_side(self.doc.design(), 0.0);
-            self.doc.edit("Repeats", |d| d.repeat = Some(spec));
+            self.doc.edit(tr("Repeats"), |d| d.repeat = Some(spec));
         }
         self.repeats_window = true;
     }
@@ -36,7 +36,7 @@ impl AppState {
     /// Sets the start at the left and the end at the right of the design,
     /// and the step from the start to the end: a continuous border.
     pub fn join_end_to_start(&mut self) {
-        self.doc.edit("Join end to start", |d| {
+        self.doc.edit(tr("Join end to start"), |d| {
             if d.start_end.start.is_none() || d.start_end.end.is_none() {
                 d.start_end = StartEnd {
                     start: Some(Anchor::DesignBox { x: 0.0, y: 0.5 }),
@@ -57,7 +57,7 @@ impl AppState {
             self.message = tr("Set the repeats first (Design > Repeats).").into();
             return;
         }
-        let new = self.doc.edit("Make Repeats", |d| d.make_repeats());
+        let new = self.doc.edit(tr("Make Repeats"), |d| d.make_repeats());
         self.message = crate::i18n::fill(
             "Made the repeats: {} new objects, copy by copy (Arrange > Group by Color puts each color together).",
             &[&(new.len())],
@@ -179,9 +179,12 @@ fn contents(ui: &mut egui::Ui, st: &mut AppState) {
     if let Some(step) = st.doc.design().join_step() {
         let gap = step.distance(r.step_x);
         let text = if gap < 0.05 {
-            "The end of each copy is the start of the next.".to_string()
+            tr("The end of each copy is the start of the next.").to_string()
         } else {
-            format!("The end of a copy is {} from the start of the next.", units.fmt(gap))
+            crate::i18n::fill(
+                "The end of a copy is {} from the start of the next.",
+                &[&units.fmt(gap)],
+            )
         };
         ui.weak(text);
     }

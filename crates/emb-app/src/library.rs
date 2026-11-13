@@ -172,11 +172,15 @@ impl AppState {
                             &report.read,
                             &report.removed,
                             &(if report.failed > 0 {
-                                format!(", {} cannot be read", report.failed)
+                                crate::i18n::fill(", {} cannot be read", &[&report.failed])
                             } else {
                                 String::new()
                             }),
-                            &(if report.stopped { "; the scan was stopped" } else { "" }),
+                            &(if report.stopped {
+                                tr("; the scan was stopped")
+                            } else {
+                                ""
+                            }),
                         ],
                     );
                 }
@@ -293,7 +297,7 @@ impl AppState {
             return;
         }
         let Some(folder) = rfd::FileDialog::new()
-            .set_title("Output selected: folder for the files")
+            .set_title(tr("Output selected: folder for the files"))
             .set_directory(self.dialog_dir())
             .pick_folder()
         else {
@@ -318,7 +322,7 @@ impl AppState {
     /// Asks for a file and queues the catalog of the found designs.
     pub fn library_catalog_dialog(&mut self) {
         let Some(path) = rfd::FileDialog::new()
-            .set_title("Design catalog")
+            .set_title(tr("Design catalog"))
             .add_filter("PDF", &["pdf"])
             .set_file_name("Design catalog.pdf")
             .save_file()
@@ -340,16 +344,16 @@ impl AppState {
     fn catalog_title(&self) -> String {
         let date = chrono::Local::now().format("%Y-%m-%d");
         if self.library.text.trim().is_empty() {
-            format!("Design catalog · {date}")
+            crate::i18n::fill("Design catalog · {}", &[&date])
         } else {
-            format!("Design catalog: {} · {date}", self.library.text.trim())
+            crate::i18n::fill("Design catalog: {} · {}", &[&self.library.text.trim(), &date])
         }
     }
 
     /// Asks for a file and writes the list of the found designs (CSV).
     pub fn library_csv_dialog(&mut self) {
         let Some(path) = rfd::FileDialog::new()
-            .set_title("Design list")
+            .set_title(tr("Design list"))
             .add_filter("CSV", &["csv"])
             .set_file_name("Design list.csv")
             .save_file()
@@ -358,8 +362,8 @@ impl AppState {
         };
         let text = emb_library::csv::design_list(&self.library.index, &self.library.shown());
         self.message = match std::fs::write(&path, text) {
-            Ok(()) => format!("Wrote {}", path.display()),
-            Err(e) => format!("Cannot write {}: {e}", path.display()),
+            Ok(()) => crate::i18n::fill("Wrote {}", &[&path.display()]),
+            Err(e) => crate::i18n::fill("Cannot write {}: {}", &[&path.display(), &e]),
         };
     }
 
@@ -470,7 +474,7 @@ pub fn show_in_file_manager(path: &Path) {
 fn summary(st: &AppState, e: &emb_library::Entry) -> String {
     let format = format_label(e);
     if e.error.is_some() {
-        return format!("{format} · cannot be read");
+        return crate::i18n::fill("{} · cannot be read", &[&format]);
     }
     let u = st.settings.units;
     let decimals = if u == crate::workspace::Units::Mm { 0 } else { 1 };
@@ -487,7 +491,7 @@ fn summary(st: &AppState, e: &emb_library::Entry) -> String {
 /// "Project" for a project file, else the format in capitals.
 fn format_label(e: &emb_library::Entry) -> String {
     if e.format == emb_model::project::FILE_EXTENSION {
-        "Project".into()
+        tr("Project").into()
     } else {
         e.format.to_uppercase()
     }
@@ -498,24 +502,25 @@ fn details(st: &AppState, e: &emb_library::Entry) -> String {
     let u = st.settings.units;
     let mut lines = vec![e.name.clone(), e.path.display().to_string()];
     match &e.error {
-        Some(err) => lines.push(format!("Cannot read the file: {err}")),
+        // The index keeps the English text (the scan has no language).
+        Some(err) => lines.push(crate::i18n::fill("Cannot read the file: {}", &[&crate::i18n::tr(err)])),
         None => {
             lines.push(format!("{} × {}", u.fmt(e.width_mm), u.fmt(e.height_mm)));
-            lines.push(format!(
+            lines.push(crate::i18n::fill(
                 "{} stitches, {} colors, {} trims",
-                e.stitches, e.colors, e.trims
+                &[&e.stitches, &e.colors, &e.trims],
             ));
             if !e.threads.is_empty() {
                 let names: Vec<&str> = e.threads.iter().map(|t| t.name.as_str()).collect();
-                lines.push(format!("Threads: {}", names.join(", ")));
+                lines.push(crate::i18n::fill("Threads: {}", &[&names.join(", ")]));
             }
         }
     }
     if let Some(m) = &e.machine {
-        lines.push(format!("Machine: {m}"));
+        lines.push(crate::i18n::fill("Machine: {}", &[&m]));
     }
     if !e.notes.is_empty() {
-        lines.push(format!("Notes: {}", e.notes));
+        lines.push(crate::i18n::fill("Notes: {}", &[&e.notes]));
     }
     lines.join("\n")
 }
@@ -546,7 +551,7 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
             ));
             ui.add_space(6.0);
             if ui.button(tr("Add a library folder…")).clicked()
-                && let Some(p) = rfd::FileDialog::new().set_title("Library folder").pick_folder()
+                && let Some(p) = rfd::FileDialog::new().set_title(tr("Library folder")).pick_folder()
             {
                 st.add_library_folder(p);
             }
@@ -581,7 +586,7 @@ fn toolbar(ui: &mut egui::Ui, st: &mut AppState) {
             }
             if ui.button(tr("Add folder…")).clicked() {
                 ui.close();
-                if let Some(p) = rfd::FileDialog::new().set_title("Library folder").pick_folder() {
+                if let Some(p) = rfd::FileDialog::new().set_title(tr("Library folder")).pick_folder() {
                     st.add_library_folder(p);
                 }
             }
@@ -615,10 +620,10 @@ fn toolbar(ui: &mut egui::Ui, st: &mut AppState) {
             st.library.list_view,
         );
         egui::ComboBox::from_id_salt("library-sort")
-            .selected_text(format!("Sort: {}", sort.label()))
+            .selected_text(crate::i18n::fill("Sort: {}", &[&tr(sort.label())]))
             .show_ui(ui, |ui| {
                 for k in SortKey::ALL {
-                    ui.selectable_value(&mut sort, k, k.label());
+                    ui.selectable_value(&mut sort, k, tr(k.label()));
                 }
             });
         let arrow = if desc { ph::SORT_DESCENDING } else { ph::SORT_ASCENDING };
@@ -639,10 +644,10 @@ fn toolbar(ui: &mut egui::Ui, st: &mut AppState) {
             desc = !desc;
         }
         egui::ComboBox::from_id_salt("library-group")
-            .selected_text(format!("Group: {}", group.label()))
+            .selected_text(crate::i18n::fill("Group: {}", &[&tr(group.label())]))
             .show_ui(ui, |ui| {
                 for k in GroupKey::ALL {
-                    ui.selectable_value(&mut group, k, k.label());
+                    ui.selectable_value(&mut group, k, tr(k.label()));
                 }
             });
         ui.selectable_value(&mut list, false, ph::SQUARES_FOUR)
@@ -687,7 +692,7 @@ fn toolbar(ui: &mut egui::Ui, st: &mut AppState) {
             st.output_library_selection();
         }
         if ui
-            .add_enabled(n > 0, egui::Button::new(format!("{}  Send to USB", ph::USB)))
+            .add_enabled(n > 0, egui::Button::new(format!("{}  {}", ph::USB, tr("Send to USB"))))
             .on_hover_text(
                 tr("Send the selected designs to the USB stick of the machine of the open design, in its format."),
             )
@@ -721,9 +726,9 @@ fn toolbar(ui: &mut egui::Ui, st: &mut AppState) {
             let (d, t) = (job.done.load(Ordering::Relaxed), job.total.load(Ordering::Relaxed));
             ui.add(egui::Spinner::new());
             ui.weak(if t > 0 {
-                format!("Reading designs: {d} of {t}")
+                crate::i18n::fill("Reading designs: {} of {}", &[&d, &t])
             } else {
-                "Looking for designs…".into()
+                tr("Looking for designs…").into()
             });
             if ui.small_button(tr("Stop")).clicked() {
                 st.stop_library_scan();

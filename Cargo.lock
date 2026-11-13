@@ -1336,7 +1336,6 @@ dependencies = [
  "base64",
  "emb-geom",
  "emb-sketch",
- "proptest",
  "serde",
  "serde_json",
  "thiserror 2.0.21",

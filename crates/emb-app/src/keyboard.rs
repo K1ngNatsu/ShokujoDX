@@ -6,6 +6,7 @@
 //! `.embkdc` files in the `keyboard` folder next to the settings file.
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use eframe::egui;
 use emb_geom::Point;
@@ -27,7 +28,13 @@ pub struct KeyboardWindow {
     pub key: String,
     /// The name of a new collection.
     pub new_name: String,
+    /// The collections, read when the window opens and after a change of
+    /// their files (not on each frame: the built-in one takes some time).
+    pub cache: Option<Collections>,
 }
+
+/// The collections of the window (with their files).
+pub type Collections = Arc<Vec<(KeyboardCollection, Option<PathBuf>)>>;
 
 impl Default for KeyboardWindow {
     fn default() -> Self {
@@ -39,6 +46,7 @@ impl Default for KeyboardWindow {
             spacing_mm: 1.0,
             key: "A".into(),
             new_name: String::new(),
+            cache: None,
         }
     }
 }
@@ -90,7 +98,7 @@ impl AppState {
             .unwrap_or(emb_geom::BBox::new(Point::ZERO, Point::ZERO));
         let c = self.doc.design().hoop.center;
         let t = emb_geom::Transform::translate(c.x - b.center().x, c.y - b.center().y);
-        let ids = self.doc.edit("Keyboard Designs", |d| {
+        let ids = self.doc.edit(tr("Keyboard Designs"), |d| {
             let g = d.new_group_id();
             objs.into_iter()
                 .map(|(color, mut kind)| {
@@ -127,12 +135,14 @@ impl AppState {
             .map(|o| (d.thread(o.thread).map_or(Rgb(0, 0, 0), |t| t.color), o.kind.clone()))
             .collect();
         if objs.is_empty() {
-            return Err("Select the objects of the key design first.".into());
+            return Err(tr("Select the objects of the key design first.").into());
         }
         let mut k = KeyboardCollection::from_json(&std::fs::read_to_string(path).map_err(|e| e.to_string())?)?;
-        let design = emb_letter::keyboard::key_from_objects(&objs, k.height_mm).ok_or("The selection has no size.")?;
+        let design =
+            emb_letter::keyboard::key_from_objects(&objs, k.height_mm).ok_or(tr("The selection has no size."))?;
         k.keys.insert(key.to_string(), design);
         std::fs::write(path, k.to_json()).map_err(|e| e.to_string())?;
+        self.keyboard_window.cache = None;
         Ok(())
     }
 
@@ -140,9 +150,9 @@ impl AppState {
     pub fn new_keyboard_collection(&mut self, name: &str) -> Result<PathBuf, String> {
         let name = name.trim();
         if name.is_empty() {
-            return Err("Type a name for the collection.".into());
+            return Err(tr("Type a name for the collection.").into());
         }
-        let dir = collections_dir().ok_or("No folder for collections.")?;
+        let dir = collections_dir().ok_or(tr("No folder for collections."))?;
         std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
         let file: String = name
             .chars()
@@ -156,6 +166,7 @@ impl AppState {
             .collect();
         let path = dir.join(format!("{file}.{FILE_EXTENSION}"));
         std::fs::write(&path, KeyboardCollection::new(name, 25.0).to_json()).map_err(|e| e.to_string())?;
+        self.keyboard_window.cache = None;
         Ok(path)
     }
 }
@@ -163,9 +174,14 @@ impl AppState {
 /// The Keyboard designs window.
 pub fn window(ctx: &egui::Context, st: &mut AppState) {
     if !st.keyboard_window.open {
+        st.keyboard_window.cache = None;
         return;
     }
-    let all = collections();
+    let all = st
+        .keyboard_window
+        .cache
+        .get_or_insert_with(|| Arc::new(collections()))
+        .clone();
     let mut w = st.keyboard_window.clone();
     w.selected = w.selected.min(all.len().saturating_sub(1));
     let mut open = true;
@@ -187,7 +203,11 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                 .selected_text(all.get(w.selected).map_or("", |(k, _)| k.name.as_str()))
                 .show_ui(ui, |ui| {
                     for (i, (k, _)) in all.iter().enumerate() {
-                        ui.selectable_value(&mut w.selected, i, format!("{} ({} keys)", k.name, k.keys.len()));
+                        ui.selectable_value(
+                            &mut w.selected,
+                            i,
+                            crate::i18n::fill("{} ({} keys)", &[&k.name, &k.keys.len()]),
+                        );
                     }
                 });
         });
@@ -249,14 +269,17 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
     }
     if map && let (Some((_, Some(path))), Some(c)) = (all.get(w.selected), w.key.chars().next()) {
         st.message = match st.map_selection_to_key(path, c) {
-            Ok(()) => format!("The selection is now the design of \"{c}\"."),
+            Ok(()) => crate::i18n::fill("The selection is now the design of \"{}\".", &[&c]),
             Err(e) => e,
         };
     }
     if create {
         match st.new_keyboard_collection(&w.new_name) {
             Ok(p) => {
-                let i = collections()
+                let i = st
+                    .keyboard_window
+                    .cache
+                    .get_or_insert_with(|| Arc::new(collections()))
                     .iter()
                     .position(|(_, q)| q.as_deref() == Some(p.as_path()));
                 st.keyboard_window.selected = i.unwrap_or(0);
@@ -318,5 +341,40 @@ mod tests {
             out.textures_delta.clear();
         }
         assert!(st.keyboard_window.open);
+    }
+
+    #[test]
+    fn the_window_reads_the_collections_once() {
+        let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        st.keyboard_window.open = true;
+        let ctx = egui::Context::default();
+        let frame = |st: &mut AppState| {
+            let mut out = ctx.run_ui(egui::RawInput::default(), |ui| window(ui.ctx(), st));
+            out.textures_delta.clear();
+        };
+        frame(&mut st);
+        let first = st.keyboard_window.cache.clone().expect("read on the first frame");
+        frame(&mut st);
+        assert!(
+            Arc::ptr_eq(&first, st.keyboard_window.cache.as_ref().unwrap()),
+            "not read again"
+        );
+        // A change of the files reads them again.
+        st.keyboard_window.cache = Some(first.clone());
+        let dir = std::env::temp_dir().join(format!("emb-kdc-cache-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("mine.embkdc");
+        std::fs::write(&path, KeyboardCollection::new("Mine", 20.0).to_json()).unwrap();
+        st.keyboard_window.text = "A".into();
+        st.type_keyboard(&first[0].0);
+        st.select_all();
+        st.map_selection_to_key(&path, 'Z').unwrap();
+        assert!(st.keyboard_window.cache.is_none());
+        // Closed, the window keeps nothing.
+        st.keyboard_window.open = false;
+        st.keyboard_window.cache = Some(first);
+        frame(&mut st);
+        assert!(st.keyboard_window.cache.is_none());
+        std::fs::remove_dir_all(dir).ok();
     }
 }

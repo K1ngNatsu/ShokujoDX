@@ -60,10 +60,10 @@ impl AppState {
         match key {
             Some(k) => self
                 .doc
-                .edit_merged("Change team names", MergeKey::new(format!("team-{k}")), |d| {
+                .edit_merged(tr("Change team names"), MergeKey::new(format!("team-{k}")), |d| {
                     d.team_names = Some(tn)
                 }),
-            None => self.doc.edit("Change team names", |d| d.team_names = Some(tn)),
+            None => self.doc.edit(tr("Change team names"), |d| d.team_names = Some(tn)),
         }
     }
 
@@ -96,7 +96,7 @@ impl AppState {
             .team_names
             .clone()
             .filter(|t| !t.rows.is_empty())
-            .ok_or("The list has no names.")?;
+            .ok_or(tr("The list has no names."))?;
         std::fs::create_dir_all(folder).map_err(|e| format!("{}: {e}", folder.display()))?;
         let opts = d
             .machine
@@ -145,7 +145,7 @@ impl AppState {
                     machine.as_ref(),
                     needles.as_ref(),
                 )
-                .ok_or_else(|| format!(".{ext} cannot be written"))?;
+                .ok_or_else(|| crate::i18n::fill(".{} cannot be written", &[&ext]))?;
                 let path = folder.join(format!("{name}.{ext}"));
                 std::fs::write(&path, bytes).map_err(|e| format!("{}: {e}", path.display()))?;
                 written.push(path);
@@ -161,13 +161,13 @@ impl AppState {
             .team_names
             .clone()
             .filter(|t| !t.rows.is_empty())
-            .ok_or("The list has no names.")?;
+            .ok_or(tr("The list has no names."))?;
         let width = match &d.hoop.selection {
             HoopSelection::Preset { id } => self.hoops.get(id).map_or(200.0, |h| h.width_mm),
             HoopSelection::OpenField => 200.0,
         };
         let mut all = emb_letter::teamnames::layout_design(&d, &tn, &mut self.fonts_fn(), width, LAYOUT_GAP_MM)?;
-        all.name = format!("{} (all names)", d.name);
+        all.name = crate::i18n::fill("{} (all names)", &[&d.name]);
         self.start_design(all);
         self.message = crate::i18n::fill(
             "{} names in one design. Check that they fit the hoop.",
@@ -179,8 +179,8 @@ impl AppState {
     /// Shows a row in the design: the column objects get its values.
     pub fn team_show_row(&mut self, i: usize) -> Result<(), String> {
         let d = self.doc.design().clone();
-        let tn = d.team_names.clone().ok_or("No team names.")?;
-        let row = tn.rows.get(i).ok_or("No such row.")?.clone();
+        let tn = d.team_names.clone().ok_or(tr("No team names."))?;
+        let row = tn.rows.get(i).ok_or(tr("No such row."))?.clone();
         // Show every column, also an empty one, so that the objects stay.
         let filled = TeamRow {
             values: row
@@ -198,7 +198,7 @@ impl AppState {
             quantity: 1,
         };
         let rd = emb_letter::teamnames::row_design(&d, &tn, &filled, &mut self.fonts_fn())?;
-        self.doc.edit("Show name", |dd| {
+        self.doc.edit(tr("Show name"), |dd| {
             for c in &tn.columns {
                 if let (Some(o), Some(n)) = (rd.object(c.object), dd.object_mut(c.object)) {
                     n.kind = o.kind.clone();
@@ -383,8 +383,8 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
     }
     if import_file
         && let Some(p) = rfd::FileDialog::new()
-            .set_title("Import names")
-            .add_filter("Name lists", &["csv", "txt", "tsv"])
+            .set_title(tr("Import names"))
+            .add_filter(tr("Name lists"), &["csv", "txt", "tsv"])
             .set_directory(st.dialog_dir())
             .pick_file()
     {
@@ -405,12 +405,12 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
     }
     if save_each
         && let Some(folder) = rfd::FileDialog::new()
-            .set_title("Save each name: folder")
+            .set_title(tr("Save each name: folder"))
             .set_directory(st.dialog_dir())
             .pick_folder()
     {
         st.message = match st.team_save_each(&folder) {
-            Ok(files) => format!("Saved {} files in {}", files.len(), folder.display()),
+            Ok(files) => crate::i18n::fill("Saved {} files in {}", &[&files.len(), &folder.display()]),
             Err(e) => e,
         };
     }

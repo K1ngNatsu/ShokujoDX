@@ -6,6 +6,7 @@
 //! fabrics. Thus the differences that the user made between objects stay,
 //! and a change back to the first fabric gives the first settings again.
 
+use emb_geom::text;
 use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
@@ -109,22 +110,26 @@ impl Fabric {
                 .chars()
                 .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
         {
-            return Err(format!("fabric id {id:?} must use only a-z, 0-9, '_' and '-'"));
+            return Err(text::fill(
+                "fabric id {} must use only a-z, 0-9, '_' and '-'",
+                &[&format!("{:?}", id)],
+            ));
         }
         if self.name.trim().is_empty() {
-            return Err(format!("fabric {id}: name is empty"));
+            return Err(text::fill("fabric {}: name is empty", &[&id]));
         }
         let factor = |v: f64| v.is_finite() && (0.5..=2.0).contains(&v);
         if !factor(self.spacing_factor) || !factor(self.stitch_length_factor) {
-            return Err(format!(
-                "fabric {id}: spacing_factor and stitch_length_factor must be from 0.5 to 2"
+            return Err(text::fill(
+                "fabric {}: spacing_factor and stitch_length_factor must be from 0.5 to 2",
+                &[&id],
             ));
         }
         if !(self.pull_mm.is_finite() && (-0.5..=1.0).contains(&self.pull_mm)) {
-            return Err(format!("fabric {id}: pull_mm must be from -0.5 to 1"));
+            return Err(text::fill("fabric {}: pull_mm must be from -0.5 to 1", &[&id]));
         }
         if !(self.thickness_mm.is_finite() && (0.05..=10.0).contains(&self.thickness_mm)) {
-            return Err(format!("fabric {id}: thickness_mm must be from 0.05 to 10"));
+            return Err(text::fill("fabric {}: thickness_mm must be from 0.05 to 10", &[&id]));
         }
         Ok(())
     }
@@ -211,7 +216,7 @@ impl FabricCatalog {
     /// Parses and validates a fabric catalog in TOML.
     pub fn from_toml_str(s: &str) -> Result<Self, ModelError> {
         let cat: FabricCatalog = toml::from_str(s).map_err(|source| ModelError::Toml {
-            what: "fabric catalog",
+            what: text::tr("fabric catalog"),
             source,
         })?;
         cat.validate()?;
@@ -225,14 +230,17 @@ impl FabricCatalog {
 
     pub fn validate(&self) -> Result<(), ModelError> {
         let invalid = |message| ModelError::Invalid {
-            what: "fabric catalog",
+            what: text::tr("fabric catalog"),
             message,
         };
         let mut ids = BTreeSet::new();
         for f in &self.fabrics {
             f.validate().map_err(invalid)?;
             if !ids.insert(f.id.as_str()) {
-                return Err(invalid(format!("fabric id {:?} is used more than once", f.id)));
+                return Err(invalid(text::fill(
+                    "fabric id {} is used more than once",
+                    &[&format!("{:?}", f.id)],
+                )));
             }
         }
         Ok(())

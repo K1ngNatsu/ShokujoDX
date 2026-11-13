@@ -16,7 +16,8 @@
 //!
 //! View > Stitch cursor shows and hides the cursor.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
+use std::sync::Arc;
 
 use eframe::egui::{self, Color32, InputState, Key, Modifiers, Pos2, Rect, Stroke};
 use emb_geom::Point;
@@ -24,6 +25,7 @@ use emb_model::{DesignObject, ObjectId, StitchKind, ThreadId};
 use emb_render::{Segment, SegmentKind};
 
 use crate::app::AppState;
+use crate::i18n::tr;
 
 pub const KEYS_HELP: &str =
     ", .: stitch (Shift 10, Ctrl 100) · PgUp/PgDn: object (Ctrl: color, Shift: function, Alt: segment)";
@@ -172,44 +174,49 @@ impl AppState {
         let what = owner
             .and_then(|id| self.doc.design().object(id))
             .map(|o| o.name.clone().unwrap_or_else(|| o.type_name().to_string()))
-            .unwrap_or_else(|| "connection".into());
+            .unwrap_or_else(|| tr("connection").into());
         let u = self.settings.units;
-        Some(format!(
-            "record {} of {} · stitch {} · color {} · {:?} at X {} Y {} · {}",
-            i + 1,
-            recs.len(),
-            stitch,
-            color,
-            r.kind,
-            u.fmt(r.pos.x),
-            u.fmt(r.pos.y),
-            what
+        Some(crate::i18n::fill(
+            "record {} of {} · stitch {} · color {} · {} at X {} Y {} · {}",
+            &[
+                &(i + 1),
+                &recs.len(),
+                &stitch,
+                &color,
+                &crate::functions::kind_name(r.kind),
+                &u.fmt(r.pos.x),
+                &u.fmt(r.pos.y),
+                &what,
+            ],
         ))
     }
 }
 
 /// The plan segments to draw: filtered by the view filter, and dimmed after the cursor.
-pub fn visible_segments(st: &mut AppState) -> Vec<(Segment, Color32)> {
+pub fn visible_segments(st: &mut AppState) -> Arc<Vec<(Segment, Color32)>> {
     let pv = st.shown_plan();
     let segs = pv.segments.clone();
     let plan = pv.plan.clone();
     if !st.view_filter.is_active() && st.cursor.is_none() {
-        return segs.as_ref().clone();
+        return segs;
     }
     let back = st.doc.design().from_hoop_transform();
-    // Owner of each record, from the object spans.
-    let mut owner: Vec<Option<ObjectId>> = vec![None; plan.stitches.records.len()];
+    // Whether each record shows: the records of an object if the filter
+    // shows the object, the connections between objects if no filter is on.
+    // (An object of the plan that is not in the design any more shows.)
+    let filter = &st.view_filter;
+    let objects: HashMap<ObjectId, bool> = st
+        .doc
+        .design()
+        .objects()
+        .iter()
+        .map(|o| (o.id, filter.shows(o)))
+        .collect();
+    let mut show = vec![!filter.is_active(); plan.stitches.records.len()];
     for s in &plan.spans {
-        for o in &mut owner[s.records.clone()] {
-            *o = Some(s.object);
-        }
+        let v = objects.get(&s.object).copied().unwrap_or(true);
+        show[s.records.clone()].fill(v);
     }
-    let design = st.doc.design();
-    let shown = |id: Option<ObjectId>| {
-        id.and_then(|id| design.object(id))
-            .is_none_or(|o| st.view_filter.shows(o))
-            && (id.is_some() || !st.view_filter.is_active())
-    };
     let cursor = st.cursor.unwrap_or(usize::MAX);
     let mut out = Vec::with_capacity(segs.len());
     let mut thread = 0usize;
@@ -221,7 +228,7 @@ pub fn visible_segments(st: &mut AppState) -> Vec<(Segment, Color32)> {
             StitchKind::Stitch | StitchKind::Jump => {
                 if let Some(a) = last
                     && a != r.pos
-                    && shown(owner[i])
+                    && show[i]
                 {
                     let kind = if r.kind == StitchKind::Jump || cut {
                         SegmentKind::Jump
@@ -261,7 +268,7 @@ pub fn visible_segments(st: &mut AppState) -> Vec<(Segment, Color32)> {
             StitchKind::Stop | StitchKind::End => {}
         }
     }
-    out
+    Arc::new(out)
 }
 
 /// Draws the stitch cursor, needle points and function symbols.

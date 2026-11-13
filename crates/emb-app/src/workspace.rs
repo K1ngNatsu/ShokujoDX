@@ -59,6 +59,14 @@ impl Units {
     pub fn fmt(self, mm: f64) -> String {
         format!("{:.*} {}", self.decimals(), self.of_mm(mm), self.suffix())
     }
+
+    /// A length as a number in the units, for a text field: no unit and no
+    /// zeros at the end, for example "20" or "12.25".
+    pub fn fmt_plain(self, mm: f64) -> String {
+        let s = format!("{:.*}", self.decimals() + 1, self.of_mm(mm));
+        let s = s.trim_end_matches('0').trim_end_matches('.');
+        if s == "-0" { "0".into() } else { s.into() }
+    }
 }
 
 /// A drag value for a length in mm, shown and typed in `units`.
@@ -354,7 +362,8 @@ pub struct Settings {
     pub snap_grid: bool,
     pub show_rulers: bool,
     pub snap_guides: bool,
-    /// Points snap to the nodes of other objects.
+    /// Points snap to the nodes, midpoints, centers and edges of other
+    /// objects, and line up with the points of the object being drawn.
     pub snap_objects: bool,
     /// Snap distance to guides, in screen points.
     pub snap_px: f32,
@@ -434,6 +443,9 @@ pub struct Settings {
     pub price_lists: Vec<emb_model::quote::PriceList>,
     /// The threads of the shop (Design > Thread Stock, ADR 0066).
     pub thread_stock: emb_model::stock::ThreadStock,
+    /// The point of the selection that scaling keeps in place (Object
+    /// Properties, Scale from; the center unless the user changes it).
+    pub scale_from: crate::manipulate::ScaleFrom,
 }
 
 impl Default for Settings {
@@ -482,6 +494,7 @@ impl Default for Settings {
             thread_prices: Default::default(),
             price_lists: vec![Default::default()],
             thread_stock: Default::default(),
+            scale_from: Default::default(),
         }
     }
 }
@@ -655,46 +668,166 @@ impl Settings {
     }
 }
 
+/// What a point snapped to, for the marks while drawing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SnapKind {
+    /// A node of another object.
+    Node,
+    /// The middle of a segment of another object.
+    Midpoint,
+    /// The center of a closed shape of another object.
+    Center,
+    /// The nearest point on an outline of another object.
+    Edge,
+    /// A construction point (ADR 0089).
+    Mark,
+    /// A place where construction lines and guides cross.
+    Intersection,
+}
+
+impl SnapKind {
+    pub fn label(self) -> &'static str {
+        match self {
+            SnapKind::Node => tr("Node"),
+            SnapKind::Midpoint => tr("Midpoint"),
+            SnapKind::Center => tr("Center"),
+            SnapKind::Edge => tr("Edge"),
+            SnapKind::Mark => tr("Construction Point"),
+            SnapKind::Intersection => tr("Intersection"),
+        }
+    }
+}
+
+/// A snapped point, and what it snapped to.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SnapHit {
+    pub at: Point,
+    /// The part of another object (none: the grid, the guides or nothing).
+    pub kind: Option<SnapKind>,
+    /// The drawn points that the point lines up with: across (the same Y)
+    /// and up and down (the same X), in view coordinates of the design.
+    pub align: [Option<Point>; 2],
+}
+
+/// Tolerance to flatten the outlines of other objects for the edge snap, in mm.
+const SNAP_FLATTEN_MM: f64 = 0.05;
+
+/// The best point of `kind` near `p` in the objects, within `tol`.
+fn object_snap<'a>(
+    objs: impl Iterator<Item = &'a emb_model::DesignObject>,
+    p: Point,
+    tol: f64,
+) -> Option<(SnapKind, Point)> {
+    use emb_geom::path::PathCmd;
+    let mut best: [Option<(f64, Point)>; 4] = [None; 4];
+    let mut keep = |k: SnapKind, q: Point| {
+        let d = q.distance(p);
+        let slot = &mut best[k as usize];
+        if d <= tol && slot.is_none_or(|(b, _)| d < b) {
+            *slot = Some((d, q));
+        }
+    };
+    for o in objs {
+        if o.control_bbox().is_none_or(|b| !b.expand(tol).contains(p)) {
+            continue;
+        }
+        for path in o.kind.paths() {
+            let (mut pen, mut start) = (Point::ZERO, Point::ZERO);
+            for c in &path.cmds {
+                match *c {
+                    PathCmd::MoveTo(q) => {
+                        keep(SnapKind::Node, q);
+                        (pen, start) = (q, q);
+                    }
+                    PathCmd::LineTo(q) => {
+                        keep(SnapKind::Node, q);
+                        keep(SnapKind::Midpoint, pen.midpoint(q));
+                        pen = q;
+                    }
+                    PathCmd::CubicTo(c1, c2, q) => {
+                        keep(SnapKind::Node, q);
+                        // The point of the curve at t = 0.5.
+                        keep(SnapKind::Midpoint, (pen + c1 * 3.0 + c2 * 3.0 + q) * 0.125);
+                        pen = q;
+                    }
+                    PathCmd::Close => {
+                        if start != pen {
+                            keep(SnapKind::Midpoint, pen.midpoint(start));
+                        }
+                        pen = start;
+                    }
+                }
+            }
+            for line in path.flatten(SNAP_FLATTEN_MM) {
+                if line.closed
+                    && let Some(b) = BBox::from_points(line.points.iter().copied())
+                {
+                    keep(SnapKind::Center, b.center());
+                }
+                let n = line.points.len();
+                let segs = if line.closed { n } else { n.saturating_sub(1) };
+                for i in 0..segs {
+                    let (a, b) = (line.points[i], line.points[(i + 1) % n]);
+                    keep(SnapKind::Edge, p.nearest_on_segment(a, b));
+                }
+            }
+        }
+    }
+    [SnapKind::Node, SnapKind::Midpoint, SnapKind::Center, SnapKind::Edge]
+        .into_iter()
+        .find_map(|k| best[k as usize].map(|(_, q)| (k, q)))
+}
+
 impl AppState {
     /// Snaps a design point to the grid and the guides, as the settings say.
-    /// Guides win over the grid.
+    /// Guides win over the grid; a part of another object wins over both.
     pub fn snap(&self, map: &ViewMap, p: Point) -> Point {
+        self.snap_hit(map, p, &[]).at
+    }
+
+    /// As [`AppState::snap`], and with the object snap on, the point also
+    /// lines up with the points `drawn` (the points of the object being
+    /// drawn) when it is near their X or Y.
+    pub fn snap_hit(&self, map: &ViewMap, p: Point, drawn: &[Point]) -> SnapHit {
         let s = &self.settings;
         let d = self.doc.design();
+        let tol = f64::from(s.snap_px) / map.view.scale();
+        if s.snap_objects {
+            // A part of an object that is not selected (a moved object does
+            // not snap to itself). Distances do not change with the rotation.
+            let objs = d
+                .objects()
+                .iter()
+                .filter(|o| !self.selection.contains(o.id))
+                .map(|o| &**o);
+            if let Some((kind, q)) = object_snap(objs, p, tol) {
+                return SnapHit {
+                    at: q,
+                    kind: Some(kind),
+                    align: [None; 2],
+                };
+            }
+        }
         let rot = d.rotation_transform();
-        let mut v = rot.apply(p);
+        let raw = rot.apply(p);
+        let inv = rot.inverse();
+        let back = |q: Point| inv.map_or(q, |i| i.apply(q));
+        if s.snap_guides
+            && let Some((kind, q)) = crate::guides::snap_point(d, raw, tol)
+        {
+            return SnapHit {
+                at: back(q),
+                kind: Some(kind),
+                align: [None; 2],
+            };
+        }
+        let mut v = raw;
         if s.snap_grid && s.grid_mm > 0.0 {
             let c = d.hoop.center;
             let g = s.grid_mm;
             v = Point::new(c.x + ((v.x - c.x) / g).round() * g, c.y + ((v.y - c.y) / g).round() * g);
         }
-        if s.snap_objects {
-            // The nearest node of an object that is not selected (a moved
-            // object does not snap to itself).
-            let tol = f64::from(s.snap_px) / map.view.scale();
-            let raw = rot.apply(p);
-            let near = d
-                .objects()
-                .iter()
-                .filter(|o| !self.selection.contains(o.id))
-                .flat_map(|o| o.kind.paths())
-                .flat_map(|path| path.cmds.iter())
-                .filter_map(|c| match *c {
-                    emb_geom::path::PathCmd::MoveTo(q)
-                    | emb_geom::path::PathCmd::LineTo(q)
-                    | emb_geom::path::PathCmd::CubicTo(_, _, q) => Some(rot.apply(q)),
-                    emb_geom::path::PathCmd::Close => None,
-                })
-                .map(|q| (q.distance(raw), q))
-                .filter(|(dist, _)| *dist <= tol)
-                .min_by(|a, b| a.0.total_cmp(&b.0));
-            if let Some((_, q)) = near {
-                return rot.inverse().map_or(p, |inv| inv.apply(q));
-            }
-        }
         if s.snap_guides {
-            let tol = f64::from(s.snap_px) / map.view.scale();
-            let raw = rot.apply(p);
             for g in &d.guides {
                 if g.vertical && (raw.x - g.pos).abs() <= tol {
                     v.x = g.pos;
@@ -702,8 +835,35 @@ impl AppState {
                     v.y = g.pos;
                 }
             }
+            if let Some(q) = crate::guides::snap_line(d, raw, tol) {
+                v = q;
+            }
         }
-        rot.inverse().map_or(p, |inv| inv.apply(v))
+        let mut align = [None; 2];
+        if s.snap_objects {
+            let near = |f: fn(Point) -> f64| {
+                drawn
+                    .iter()
+                    .map(|q| rot.apply(*q))
+                    .map(|q| ((f(q) - f(raw)).abs(), q))
+                    .filter(|(dist, _)| *dist <= tol)
+                    .min_by(|a, b| a.0.total_cmp(&b.0))
+                    .map(|(_, q)| q)
+            };
+            if let Some(q) = near(|q| q.y) {
+                v.y = q.y;
+                align[0] = Some(q);
+            }
+            if let Some(q) = near(|q| q.x) {
+                v.x = q.x;
+                align[1] = Some(q);
+            }
+        }
+        SnapHit {
+            at: back(v),
+            kind: None,
+            align: align.map(|a| a.map(back)),
+        }
     }
 
     /// The hoop field, or the design extents if there is no hoop.
@@ -897,25 +1057,6 @@ pub fn draw_grid(painter: &egui::Painter, rect: Rect, st: &AppState, dark: bool)
     }
 }
 
-pub fn draw_guides(painter: &egui::Painter, rect: Rect, st: &AppState) {
-    let c = st.settings.display.guides();
-    for g in &st.doc.design().guides {
-        if g.vertical {
-            let x = st.view.to_screen(rect, Point::new(g.pos, 0.0)).x;
-            painter.line_segment(
-                [Pos2::new(x, rect.top()), Pos2::new(x, rect.bottom())],
-                Stroke::new(1.0, c),
-            );
-        } else {
-            let y = st.view.to_screen(rect, Point::new(0.0, g.pos)).y;
-            painter.line_segment(
-                [Pos2::new(rect.left(), y), Pos2::new(rect.right(), y)],
-                Stroke::new(1.0, c),
-            );
-        }
-    }
-}
-
 fn in_top_ruler(rect: Rect, p: Pos2) -> bool {
     p.y < rect.min.y + RULER && p.x > rect.min.x + RULER
 }
@@ -924,9 +1065,12 @@ fn in_left_ruler(rect: Rect, p: Pos2) -> bool {
     p.x < rect.min.x + RULER && p.y > rect.min.y + RULER
 }
 
+/// The guide under `p` on the canvas that a drag can move (not locked).
 fn guide_at(st: &AppState, rect: Rect, p: Pos2) -> Option<usize> {
     st.doc.design().guides.iter().position(|g| {
-        if g.vertical {
+        if g.style.locked {
+            false
+        } else if g.vertical {
             (st.view.to_screen(rect, Point::new(g.pos, 0.0)).x - p.x).abs() <= GUIDE_HIT
         } else {
             (st.view.to_screen(rect, Point::new(0.0, g.pos)).y - p.y).abs() <= GUIDE_HIT
@@ -940,10 +1084,41 @@ fn guide_at(st: &AppState, rect: Rect, p: Pos2) -> Option<usize> {
 pub fn guide_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState) -> bool {
     let rect = response.rect;
     let view: CanvasView = st.view;
+    let on_ruler = |p: Pos2| st.settings.show_rulers && (in_top_ruler(rect, p) || in_left_ruler(rect, p));
+    // A right click on a ruler: the menu of the guide of the marker there
+    // (a right click on a ruler is never a curve point).
+    if response.secondary_clicked()
+        && let Some(p) = response.interact_pointer_pos()
+        && on_ruler(p)
+    {
+        st.guide_menu = crate::guides::marker_at(st, rect, p).map(crate::guides::MarkRef::Guide);
+        return true;
+    }
+    // A double click on a marker: type the place of the guide.
+    if response.double_clicked()
+        && let Some(p) = response.interact_pointer_pos()
+        && let Some(i) = crate::guides::marker_at(st, rect, p)
+    {
+        st.edit_guide(crate::guides::MarkRef::Guide(i));
+        return true;
+    }
+    // A click on a ruler is not for the tool (it places no point there).
+    if (response.clicked() || response.double_clicked()) && response.interact_pointer_pos().is_some_and(on_ruler) {
+        return true;
+    }
     if response.drag_started_by(egui::PointerButton::Primary)
         && let Some(o) = ui.input(|i| i.pointer.press_origin())
     {
-        let start = if st.settings.show_rulers && in_top_ruler(rect, o) {
+        let marker = crate::guides::marker_at(st, rect, o);
+        let locked = marker.is_some_and(|i| st.doc.design().guides[i].style.locked);
+        let start = if locked {
+            // A locked guide stays, and its marker makes no new guide.
+            st.message = tr("The guide is locked. Right-click its marker to unlock it.").into();
+            // A drag that moves nothing (no guide has this index).
+            Some((Some(usize::MAX), false))
+        } else if let Some(i) = marker {
+            Some((Some(i), st.doc.design().guides[i].vertical))
+        } else if st.settings.show_rulers && in_top_ruler(rect, o) {
             Some((None, false))
         } else if st.settings.show_rulers && in_left_ruler(rect, o) {
             Some((None, true))
@@ -960,16 +1135,20 @@ pub fn guide_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState) 
                 None => {
                     let mm = view.to_mm(rect, o);
                     let pos = if vertical { mm.x } else { mm.y };
-                    st.doc.edit_merged("Add guide", key.clone(), |d| {
-                        d.guides.push(Guide { vertical, pos });
+                    st.doc.edit_merged(tr("Add guide"), key.clone(), |d| {
+                        d.guides.push(Guide::new(vertical, pos));
                         d.guides.len() - 1
                     })
                 }
             };
-            st.drag = Some(DragOp::Guide { index, key });
+            st.drag = Some(DragOp::Guide {
+                index,
+                key,
+                marker: marker.is_some(),
+            });
         }
     }
-    let Some(DragOp::Guide { index, key }) = st.drag.clone() else {
+    let Some(DragOp::Guide { index, key, marker }) = st.drag.clone() else {
         // A guide under the pointer shows a move cursor.
         if let Some(p) = response.hover_pos()
             && let Some(i) = guide_at(st, rect, p)
@@ -984,9 +1163,11 @@ pub fn guide_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState) 
         }
         return false;
     };
-    if let Some(p) = response.interact_pointer_pos() {
+    if let Some(p) = response.interact_pointer_pos()
+        && index < st.doc.design().guides.len()
+    {
         let mm = view.to_mm(rect, p);
-        st.doc.edit_merged("Move guide", key.clone(), |d| {
+        st.doc.edit_merged(tr("Move guide"), key.clone(), |d| {
             if let Some(g) = d.guides.get_mut(index) {
                 g.pos = if g.vertical { mm.x } else { mm.y };
             }
@@ -995,10 +1176,14 @@ pub fn guide_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState) 
     if response.drag_stopped() {
         let drop = response.interact_pointer_pos();
         st.drag = None;
+        // A guide dropped on a ruler goes; a marker moves along its ruler,
+        // so it goes only off the canvas.
+        let gone = |p: Pos2| !rect.contains(p) || (!marker && (in_top_ruler(rect, p) || in_left_ruler(rect, p)));
         if let Some(p) = drop
-            && (in_top_ruler(rect, p) || in_left_ruler(rect, p) || !rect.contains(p))
+            && index < st.doc.design().guides.len()
+            && gone(p)
         {
-            st.doc.edit_merged("Delete guide", key, |d| {
+            st.doc.edit_merged(tr("Delete guide"), key, |d| {
                 if index < d.guides.len() {
                     d.guides.remove(index);
                 }
@@ -1106,8 +1291,8 @@ pub fn options_window(ctx: &egui::Context, st: &mut AppState) {
                 .show(ui, |ui| {
                     ui.label(tr("Appearance"));
                     ui.horizontal(|ui| {
-                        ui.radio_value(&mut s.dark_mode, true, tr("Dark"));
-                        ui.radio_value(&mut s.dark_mode, false, tr("Light"));
+                        ui.radio_value(&mut s.dark_mode, true, tr("Dark theme"));
+                        ui.radio_value(&mut s.dark_mode, false, tr("Light theme"));
                         ui.checkbox(&mut s.high_contrast, tr("High contrast"))
                             .on_hover_text(tr("Black and white panels with strong lines, for low vision."));
                     });
@@ -1385,14 +1570,15 @@ pub fn property_bar(ui: &mut egui::Ui, st: &mut AppState) {
         ui.toggle_value(&mut s.snap_guides, tr("Snap guides"))
             .on_hover_text(tr("Points snap to guides. Drag from a ruler to add a guide."));
         ui.toggle_value(&mut s.snap_objects, tr("Snap objects"))
-            .on_hover_text(tr("Points snap to the nodes of other objects."));
+            .on_hover_text(tr("Points snap to the nodes, midpoints, centers and edges of other objects, and line up with the points that you placed."));
     });
     st.set_settings(s);
     if cur != st.doc.design().current {
-        st.doc
-            .edit_merged("Change current properties", MergeKey::new("current-properties"), |d| {
-                d.current = cur
-            });
+        st.doc.edit_merged(
+            tr("Change current properties"),
+            MergeKey::new("current-properties"),
+            |d| d.current = cur,
+        );
         if !ui.input(|i| i.pointer.any_down()) {
             st.doc.end_merge();
         }
@@ -1596,14 +1782,50 @@ mod tests {
         let p = h.st.snap(&map, c + Point::new(6.8, -2.4));
         assert!(p.distance(c + Point::new(5.0, 0.0)) < 1e-9, "{p:?}");
         // A guide near the point wins over the grid.
-        h.st.doc.edit("Add guide", |d| {
-            d.guides.push(Guide {
-                vertical: true,
-                pos: c.x + 7.0,
-            })
-        });
+        h.st.doc
+            .edit("Add guide", |d| d.guides.push(Guide::new(true, c.x + 7.0)));
         let p = h.st.snap(&map, c + Point::new(6.8, -2.4));
         assert!((p.x - (c.x + 7.0)).abs() < 1e-9, "{p:?}");
+    }
+
+    #[test]
+    fn the_object_snap_finds_midpoints_centers_edges_and_lines_up() {
+        let mut h = Harness::empty();
+        let c = h.st.doc.design().hoop.center;
+        h.st.doc.edit("Add", |d| {
+            let t = d.add_thread("red", emb_model::Rgb(200, 0, 0));
+            d.add_object(
+                t,
+                emb_model::ObjectKind::Fill {
+                    outer: emb_geom::Path::rect(BBox::new(c, c + Point::new(20.0, 10.0))),
+                    holes: Vec::new(),
+                    params: Default::default(),
+                },
+            )
+        });
+        h.st.settings.snap_objects = true;
+        let map = h.map();
+        // Less than one screen point off.
+        let off = 0.5 / h.st.view.scale();
+        let hit = |p: Point| h.st.snap_hit(&map, c + p, &[]);
+        let k = hit(Point::new(10.0, off));
+        assert_eq!((k.kind, k.at), (Some(SnapKind::Midpoint), c + Point::new(10.0, 0.0)));
+        let k = hit(Point::new(10.0 + off, 5.0));
+        assert_eq!((k.kind, k.at), (Some(SnapKind::Center), c + Point::new(10.0, 5.0)));
+        let k = hit(Point::new(4.0, off));
+        assert_eq!(k.kind, Some(SnapKind::Edge));
+        assert!(k.at.distance(c + Point::new(4.0, 0.0)) < 1e-9);
+        let k = hit(Point::new(off, off));
+        assert_eq!((k.kind, k.at), (Some(SnapKind::Node), c));
+        // Far from the object: the point lines up with a drawn point.
+        let drawn = [c + Point::new(50.0, 30.0)];
+        let k = h.st.snap_hit(&map, c + Point::new(80.0, 30.0 + off), &drawn);
+        assert_eq!(k.kind, None);
+        assert_eq!(k.at, c + Point::new(80.0, 30.0));
+        assert_eq!(k.align, [Some(drawn[0]), None]);
+        // Off: no help.
+        h.st.settings.snap_objects = false;
+        assert_eq!(h.st.snap_hit(&map, c + Point::new(10.0, off), &[]).kind, None);
     }
 
     #[test]

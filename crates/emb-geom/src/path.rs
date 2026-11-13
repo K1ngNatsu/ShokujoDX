@@ -159,6 +159,17 @@ impl Path {
     /// This is the usual "left click = corner, right click = curve" input of
     /// digitizing software.
     pub fn through_points(points: &[(Point, bool)], closed: bool) -> Path {
+        Path::through_points_with(points, closed, |_| None)
+    }
+
+    /// As [`Path::through_points`], but `tangent_of` can give a curve point
+    /// its own tangent `t` (a dragged handle): the curve leaves the point
+    /// toward `p + t / 3` and comes in from `p - t / 3`.
+    pub fn through_points_with(
+        points: &[(Point, bool)],
+        closed: bool,
+        tangent_of: impl Fn(Point) -> Option<Point>,
+    ) -> Path {
         let n = points.len();
         let mut path = Path::new();
         if n == 0 {
@@ -168,6 +179,9 @@ impl Path {
             let (p, curve) = points[i];
             if !curve {
                 return Point::ZERO;
+            }
+            if let Some(t) = tangent_of(p) {
+                return t;
             }
             let prev = if i > 0 {
                 Some(points[i - 1].0)
@@ -540,6 +554,24 @@ mod tests {
         // Perimeter: straight parts plus one full circle.
         let expected = 2.0 * (14.0 + 4.0) + 2.0 * core::f64::consts::PI * 3.0;
         assert!((lines[0].length() - expected).abs() < 0.05);
+    }
+
+    #[test]
+    fn a_curve_point_with_its_own_tangent() {
+        let p = Point::new;
+        let pts = [(p(0.0, 0.0), false), (p(5.0, 5.0), true), (p(10.0, 0.0), false)];
+        // A handle that points up and to the right, 3 mm long.
+        let path = Path::through_points_with(&pts, false, |q| (q == p(5.0, 5.0)).then_some(p(9.0, 0.0)));
+        let (PathCmd::CubicTo(_, c2, _), PathCmd::CubicTo(c3, _, _)) = (path.cmds[1], path.cmds[2]) else {
+            panic!()
+        };
+        assert_eq!(c2, p(2.0, 5.0), "the curve comes in from the point minus the handle");
+        assert_eq!(c3, p(8.0, 5.0), "the curve leaves toward the handle");
+        // With no tangent, it is the same as `through_points`.
+        assert_eq!(
+            Path::through_points_with(&pts, false, |_| None),
+            Path::through_points(&pts, false)
+        );
     }
 
     #[test]

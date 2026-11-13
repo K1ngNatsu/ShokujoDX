@@ -35,7 +35,7 @@
 //! - Coordinates are rounded half away from zero, as in `dst`. With that
 //!   rounding, the corpus designs give the same bytes as pyembroidery.
 
-use emb_geom::Point;
+use emb_geom::{Point, text};
 use emb_model::{Rgb, StitchDesign, StitchKind, StitchRecord, Thread, ThreadId};
 
 pub const UNITS_PER_MM: f64 = 10.0;
@@ -117,9 +117,9 @@ pub const PEC_THREADS: [(u8, u8, u8, &str); 64] = [
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum PesError {
-    #[error("not a PES or PEC file")]
+    #[error("{}", text::tr("not a PES or PEC file"))]
     BadMagic,
-    #[error("the PES file ends before the data is complete")]
+    #[error("{}", text::tr("the PES file ends before the data is complete"))]
     Truncated,
 }
 

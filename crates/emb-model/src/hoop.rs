@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use emb_geom::{BBox, Path, Point};
+use emb_geom::{BBox, Path, Point, text};
 use serde::{Deserialize, Serialize};
 
 use crate::ModelError;
@@ -146,55 +146,75 @@ impl HoopPreset {
                 .chars()
                 .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
         {
-            return Err(format!("hoop id {id:?} must use only a-z, 0-9, '_' and '-'"));
+            return Err(text::fill(
+                "hoop id {} must use only a-z, 0-9, '_' and '-'",
+                &[&format!("{:?}", id)],
+            ));
         }
         if self.name.trim().is_empty() {
-            return Err(format!("hoop {id}: name is empty"));
+            return Err(text::fill("hoop {}: name is empty", &[&id]));
         }
         let positive = |v: f64| v.is_finite() && v > 0.0;
         if !positive(self.width_mm) || !positive(self.height_mm) {
-            return Err(format!("hoop {id}: width_mm and height_mm must be more than 0"));
+            return Err(text::fill(
+                "hoop {}: width_mm and height_mm must be more than 0",
+                &[&id],
+            ));
         }
         if self.shape == HoopShape::Circle && self.width_mm != self.height_mm {
-            return Err(format!("hoop {id}: a circle must have width_mm equal to height_mm"));
+            return Err(text::fill(
+                "hoop {}: a circle must have width_mm equal to height_mm",
+                &[&id],
+            ));
         }
         match (self.shape, self.corner_radius_mm) {
             (HoopShape::RoundedRectangle, None) => {
-                return Err(format!("hoop {id}: rounded_rectangle needs corner_radius_mm"));
+                return Err(text::fill("hoop {}: rounded_rectangle needs corner_radius_mm", &[&id]));
             }
             (HoopShape::RoundedRectangle, Some(r)) => {
                 let max = self.width_mm.min(self.height_mm) / 2.0;
                 if !positive(r) || r > max {
-                    return Err(format!(
-                        "hoop {id}: corner_radius_mm must be more than 0 and not more than {max}"
+                    return Err(text::fill(
+                        "hoop {}: corner_radius_mm must be more than 0 and not more than {}",
+                        &[&id, &max],
                     ));
                 }
             }
             (_, Some(_)) => {
-                return Err(format!("hoop {id}: corner_radius_mm is only for rounded_rectangle"));
+                return Err(text::fill(
+                    "hoop {}: corner_radius_mm is only for rounded_rectangle",
+                    &[&id],
+                ));
             }
             _ => {}
         }
         if let Some(l) = self.max_stitch_length_mm
             && !positive(l)
         {
-            return Err(format!("hoop {id}: max_stitch_length_mm must be more than 0"));
+            return Err(text::fill("hoop {}: max_stitch_length_mm must be more than 0", &[&id]));
         }
         if self.positions.len() == 1 {
-            return Err(format!("hoop {id}: a multi-position hoop needs two positions or more"));
+            return Err(text::fill(
+                "hoop {}: a multi-position hoop needs two positions or more",
+                &[&id],
+            ));
         }
         for (i, p) in self.positions.iter().enumerate() {
             let n = i + 1;
             if !positive(p.width_mm) || !positive(p.height_mm) || !p.x_mm.is_finite() || !p.y_mm.is_finite() {
-                return Err(format!(
-                    "hoop {id}: position {n} needs a width and a height more than 0"
+                return Err(text::fill(
+                    "hoop {}: position {} needs a width and a height more than 0",
+                    &[&id, &n],
                 ));
             }
             let tol = 1e-6;
             if p.x_mm.abs() + p.width_mm / 2.0 > self.width_mm / 2.0 + tol
                 || p.y_mm.abs() + p.height_mm / 2.0 > self.height_mm / 2.0 + tol
             {
-                return Err(format!("hoop {id}: position {n} goes outside the field of the hoop"));
+                return Err(text::fill(
+                    "hoop {}: position {} goes outside the field of the hoop",
+                    &[&id, &n],
+                ));
             }
         }
         Ok(())
@@ -212,7 +232,7 @@ impl HoopCatalog {
     /// Parses and validates a hoop catalog in TOML.
     pub fn from_toml_str(s: &str) -> Result<Self, ModelError> {
         let cat: HoopCatalog = toml::from_str(s).map_err(|source| ModelError::Toml {
-            what: "hoop catalog",
+            what: text::tr("hoop catalog"),
             source,
         })?;
         cat.validate()?;
@@ -234,14 +254,17 @@ impl HoopCatalog {
 
     pub fn validate(&self) -> Result<(), ModelError> {
         let invalid = |message| ModelError::Invalid {
-            what: "hoop catalog",
+            what: text::tr("hoop catalog"),
             message,
         };
         let mut ids = BTreeSet::new();
         for h in &self.hoops {
             h.validate().map_err(invalid)?;
             if !ids.insert(h.id.as_str()) {
-                return Err(invalid(format!("hoop id {:?} is used more than once", h.id)));
+                return Err(invalid(text::fill(
+                    "hoop id {} is used more than once",
+                    &[&format!("{:?}", h.id)],
+                )));
             }
         }
         Ok(())

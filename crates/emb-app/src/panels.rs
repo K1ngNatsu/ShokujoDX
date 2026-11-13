@@ -15,21 +15,31 @@ use crate::app::AppState;
 use crate::canvas::color32;
 use crate::words;
 
+/// What the slider of a parameter shows: the key of its undo step, its
+/// label, its range (mm), and the word for a value with its tooltip.
+struct Param<'a> {
+    key: &'a str,
+    label: &'a str,
+    range: RangeInclusive<f64>,
+    word: (fn(f64) -> &'static str, &'a str),
+}
+
 /// A slider for one parameter. A drag is one undo step; see `Document::edit_merged`.
-#[allow(clippy::too_many_arguments)]
 fn param_slider(
     ui: &mut egui::Ui,
     st: &mut AppState,
     id: ObjectId,
-    key: &str,
-    label: &str,
+    param: Param,
     value: f64,
-    range: RangeInclusive<f64>,
-    word: (fn(f64) -> &'static str, &str),
     set: impl FnOnce(&mut ObjectKind, f64),
 ) {
+    let Param {
+        key,
+        label,
+        range,
+        word: (word, help),
+    } = param;
     let mut v = value;
-    let (word, help) = word;
     ui.horizontal(|ui| {
         ui.label(label).on_hover_text(help);
         let resp = ui.add(
@@ -41,7 +51,7 @@ fn param_slider(
         ui.weak(format!("({})", word(v)));
         if resp.changed() {
             st.doc.edit_merged(
-                format!("Change {}", label.to_lowercase()),
+                crate::i18n::fill("Change {}", &[&crate::i18n::in_sentence(label)]),
                 MergeKey::new(format!("{}:{key}", id.0)),
                 |d| {
                     if let Some(o) = d.object_mut(id) {
@@ -94,7 +104,7 @@ fn thread_picker(ui: &mut egui::Ui, st: &mut AppState, ids: &[ObjectId]) {
     });
     if let Some(t) = new_thread {
         let ids = ids.to_vec();
-        st.doc.edit("Change thread", |d| {
+        st.doc.edit(tr("Change thread"), |d| {
             for id in ids {
                 if let Some(o) = d.object_mut(id) {
                     o.thread = t;
@@ -138,7 +148,7 @@ fn group_members(ui: &mut egui::Ui, st: &mut AppState, ids: &[emb_model::ObjectI
                 *id,
                 format!(
                     "#{n} {} ({thread})",
-                    o.name.clone().unwrap_or_else(|| o.type_name().to_string())
+                    o.name.clone().unwrap_or_else(|| tr(o.type_name()).to_string())
                 ),
             ))
         })
@@ -183,7 +193,7 @@ fn object_properties(ui: &mut egui::Ui, st: &mut AppState) {
         return;
     };
 
-    ui.heading(obj.type_name());
+    ui.heading(tr(obj.type_name()));
     thread_picker(ui, st, &[id]);
     ui.separator();
     transform_section(ui, st, &[id]);
@@ -204,11 +214,13 @@ fn object_properties(ui: &mut egui::Ui, st: &mut AppState) {
                             ui,
                             st,
                             id,
-                            "len",
-                            tr("Stitch length"),
+                            Param {
+                                key: "len",
+                                label: tr("Stitch length"),
+                                range: 1.0..=7.0,
+                                word: (words::length, tr(words::LENGTH_HELP)),
+                            },
                             params.stitch_length_mm,
-                            1.0..=7.0,
-                            (words::length, tr(words::LENGTH_HELP)),
                             |k, v| {
                                 if let ObjectKind::Running { params, .. } = k {
                                     params.stitch_length_mm = v;
@@ -218,7 +230,7 @@ fn object_properties(ui: &mut egui::Ui, st: &mut AppState) {
                         let mut p = params.clone();
                         let changed = ui.horizontal(|ui| crate::draw::run_type_combo(ui, &mut p)).inner;
                         if changed {
-                            st.doc.edit("Change run type", |d| {
+                            st.doc.edit(tr("Change run type"), |d| {
                                 if let Some(ObjectKind::Running { params, .. }) = d.object_mut(id).map(|o| &mut o.kind)
                                 {
                                     *params = p;
@@ -232,11 +244,13 @@ fn object_properties(ui: &mut egui::Ui, st: &mut AppState) {
                             ui,
                             st,
                             id,
-                            "width",
-                            tr("Width"),
+                            Param {
+                                key: "width",
+                                label: tr("Width"),
+                                range: 0.5..=12.0,
+                                word: (words::width, tr(words::WIDTH_HELP)),
+                            },
                             border.width_mm,
-                            0.5..=12.0,
-                            (words::width, tr(words::WIDTH_HELP)),
                             |k, v| {
                                 if let ObjectKind::Running { params, .. } = k
                                     && let Some(b) = params.border.as_mut()
@@ -285,7 +299,7 @@ fn object_properties(ui: &mut egui::Ui, st: &mut AppState) {
 fn underlay_ui(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, current: &Underlay) {
     let mut value = current.clone();
     if underlay_combo(ui, "props_underlay", &mut value) {
-        st.doc.edit("Change underlay", |d| {
+        st.doc.edit(tr("Change underlay"), |d| {
             let Some(o) = d.object_mut(id) else { return };
             if let ObjectKind::Fill { params, .. } = &mut o.kind {
                 params.underlay = value;
@@ -440,7 +454,7 @@ fn ripple_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, r: &emb_mo
             middle_again = r.target.is_some() && ui.small_button(tr("Middle")).clicked();
         });
         if middle_again {
-            st.doc.edit("Ripple point", |d| {
+            st.doc.edit(tr("Ripple point"), |d| {
                 if let Some(ObjectKind::Running { params, .. }) = d.object_mut(id).map(|o| &mut o.kind)
                     && let Some(r) = params.ripple.as_mut()
                 {
@@ -467,7 +481,7 @@ fn ripple_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, r: &emb_mo
         }
     });
     if remove {
-        st.doc.edit("Remove ripple guide", |d| {
+        st.doc.edit(tr("Remove ripple guide"), |d| {
             if let Some(ObjectKind::Running { params, .. }) = d.object_mut(id).map(|o| &mut o.kind)
                 && let Some(r) = params.ripple.as_mut()
             {
@@ -479,11 +493,13 @@ fn ripple_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, r: &emb_mo
         ui,
         st,
         id,
-        "len",
-        tr("Stitch length"),
+        Param {
+            key: "len",
+            label: tr("Stitch length"),
+            range: 1.0..=7.0,
+            word: (words::length, tr(words::LENGTH_HELP)),
+        },
         len,
-        1.0..=7.0,
-        (words::length, tr(words::LENGTH_HELP)),
         |k, v| {
             if let ObjectKind::Running { params, .. } = k {
                 params.stitch_length_mm = v;
@@ -518,44 +534,52 @@ fn motif_run_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, r: &emb
         ui,
         st,
         id,
-        "motif_len",
-        tr("Motif length"),
+        Param {
+            key: "motif_len",
+            label: tr("Motif length"),
+            range: 1.0..=30.0,
+            word: (words::length, tr(words::LENGTH_HELP)),
+        },
         r.length_mm,
-        1.0..=30.0,
-        (words::length, tr(words::LENGTH_HELP)),
         |k, v| set(k, &|r| r.length_mm = v),
     );
     param_slider(
         ui,
         st,
         id,
-        "motif_height",
-        tr("Motif height"),
+        Param {
+            key: "motif_height",
+            label: tr("Motif height"),
+            range: 0.5..=20.0,
+            word: (words::width, tr(words::WIDTH_HELP)),
+        },
         r.height_mm,
-        0.5..=20.0,
-        (words::width, tr(words::WIDTH_HELP)),
         |k, v| set(k, &|r| r.height_mm = v),
     );
     param_slider(
         ui,
         st,
         id,
-        "motif_gap",
-        tr("Gap"),
+        Param {
+            key: "motif_gap",
+            label: tr("Gap"),
+            range: 0.0..=15.0,
+            word: (words::open_spacing, tr(words::SPACING_HELP)),
+        },
         r.gap_mm,
-        0.0..=15.0,
-        (words::open_spacing, tr(words::SPACING_HELP)),
         |k, v| set(k, &|r| r.gap_mm = v),
     );
     param_slider(
         ui,
         st,
         id,
-        "len",
-        tr("Longest stitch"),
+        Param {
+            key: "len",
+            label: tr("Longest stitch"),
+            range: 1.0..=7.0,
+            word: (words::length, tr(words::LENGTH_HELP)),
+        },
         len,
-        1.0..=7.0,
-        (words::length, tr(words::LENGTH_HELP)),
         |k, v| {
             if let ObjectKind::Running { params, .. } = k {
                 params.stitch_length_mm = v;
@@ -580,7 +604,7 @@ fn count_slider(
         let resp = ui.add(egui::Slider::new(&mut v, range).clamping(egui::SliderClamping::Edits));
         if resp.changed() {
             st.doc.edit_merged(
-                format!("Change {}", label.to_lowercase()),
+                crate::i18n::fill("Change {}", &[&crate::i18n::in_sentence(label)]),
                 MergeKey::new(format!("{}:{label}", id.0)),
                 |d| {
                     if let Some(c) = d.object_mut(id).and_then(|o| column_params(&mut o.kind)) {
@@ -639,11 +663,13 @@ fn column_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &S
             ui,
             st,
             id,
-            "density",
-            tr("Density"),
+            Param {
+                key: "density",
+                label: tr("Density"),
+                range: 0.2..=1.5,
+                word: (words::density, tr(words::DENSITY_HELP)),
+            },
             params.spacing_mm,
-            0.2..=1.5,
-            (words::density, tr(words::DENSITY_HELP)),
             set_spacing,
         ),
         ColumnPattern::Zigzag
@@ -652,20 +678,22 @@ fn column_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &S
         | ColumnPattern::Coil
         | ColumnPattern::String { .. } => {
             let label = match pattern {
-                ColumnPattern::Zigzag | ColumnPattern::String { .. } => "Spacing",
-                ColumnPattern::EStitch => "Prong spacing",
-                ColumnPattern::Square => "Tooth width",
-                _ => "Loop spacing",
+                ColumnPattern::Zigzag | ColumnPattern::String { .. } => tr("Spacing"),
+                ColumnPattern::EStitch => tr("Prong spacing"),
+                ColumnPattern::Square => tr("Tooth width"),
+                _ => tr("Loop spacing"),
             };
             param_slider(
                 ui,
                 st,
                 id,
-                "density",
-                label,
+                Param {
+                    key: "density",
+                    label,
+                    range: 0.5..=5.0,
+                    word: (words::open_spacing, tr(words::SPACING_HELP)),
+                },
                 params.spacing_mm,
-                0.5..=5.0,
-                (words::open_spacing, tr(words::SPACING_HELP)),
                 set_spacing,
             );
         }
@@ -675,11 +703,13 @@ fn column_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &S
             ui,
             st,
             id,
-            "density",
-            tr("Density"),
+            Param {
+                key: "density",
+                label: tr("Density"),
+                range: 0.2..=1.5,
+                word: (words::density, tr(words::DENSITY_HELP)),
+            },
             params.spacing_mm,
-            0.2..=1.5,
-            (words::density, tr(words::DENSITY_HELP)),
             set_spacing,
         ),
     }
@@ -687,11 +717,13 @@ fn column_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &S
         ui,
         st,
         id,
-        "pull",
-        tr("Pull compensation"),
+        Param {
+            key: "pull",
+            label: tr("Pull compensation"),
+            range: 0.0..=1.0,
+            word: (words::pull, tr(words::PULL_HELP)),
+        },
         params.pull_compensation_mm,
-        0.0..=1.0,
-        (words::pull, tr(words::PULL_HELP)),
         |k, v| {
             if let Some(c) = column_params(k) {
                 c.pull_compensation_mm = v;
@@ -703,11 +735,13 @@ fn column_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &S
             ui,
             st,
             id,
-            "split",
-            tr("Split stitches over"),
+            Param {
+                key: "split",
+                label: tr("Split stitches over"),
+                range: 1.0..=12.0,
+                word: (words::split, tr(words::SPLIT_HELP)),
+            },
             params.split_mm,
-            1.0..=12.0,
-            (words::split, tr(words::SPLIT_HELP)),
             |k, v| {
                 if let Some(c) = column_params(k) {
                     c.split_mm = v;
@@ -718,11 +752,13 @@ fn column_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &S
             ui,
             st,
             id,
-            "pattern_len",
-            tr("Stitch length"),
+            Param {
+                key: "pattern_len",
+                label: tr("Stitch length"),
+                range: 1.0..=7.0,
+                word: (words::length, tr(words::LENGTH_HELP)),
+            },
             stitch_mm,
-            1.0..=7.0,
-            (words::length, tr(words::LENGTH_HELP)),
             |k, v| {
                 if let Some(c) = column_params(k)
                     && let ColumnPattern::Tatami { stitch_mm } | ColumnPattern::Contour { stitch_mm } = &mut c.pattern
@@ -752,11 +788,13 @@ fn column_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &S
             ui,
             st,
             id,
-            "chord",
-            tr("Chord length"),
+            Param {
+                key: "chord",
+                label: tr("Chord length"),
+                range: 1.0..=12.0,
+                word: (words::width, tr(words::CHORD_HELP)),
+            },
             chord_mm,
-            1.0..=12.0,
-            (words::width, tr(words::CHORD_HELP)),
             |k, v| {
                 if let Some(c) = column_params(k)
                     && let ColumnPattern::String { chord_mm } = &mut c.pattern
@@ -780,7 +818,7 @@ fn column_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &S
             .on_hover_text(tr(words::LIQUID_HELP))
             .changed()
         {
-            st.doc.edit("Change liquid", |d| {
+            st.doc.edit(tr("Change liquid"), |d| {
                 if let Some(c) = d.object_mut(id).and_then(|o| column_params(&mut o.kind)) {
                     c.liquid = liquid;
                 }
@@ -794,7 +832,7 @@ fn column_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &S
             .on_hover_text(tr(words::SHORT_HELP))
             .changed()
         {
-            st.doc.edit("Change short stitches", |d| {
+            st.doc.edit(tr("Change short stitches"), |d| {
                 if let Some(c) = d.object_mut(id).and_then(|o| column_params(&mut o.kind)) {
                     c.short_stitches = short;
                 }
@@ -824,7 +862,7 @@ fn column_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &S
             )
             .changed()
         {
-            st.doc.edit("Change last stitch", |d| {
+            st.doc.edit(tr("Change last stitch"), |d| {
                 if let Some(c) = d.object_mut(id).and_then(|o| column_params(&mut o.kind)) {
                     c.omit_last = omit;
                 }
@@ -870,6 +908,76 @@ pub fn underlay_combo(ui: &mut egui::Ui, salt: &str, value: &mut Underlay) -> bo
     changed
 }
 
+/// The change from slant `from` to slant `to` (degrees, horizontal and
+/// vertical, in screen directions) about `anchor` (design coordinates), in
+/// design coordinates. `rot` is the design rotation.
+fn slant_change(
+    rot: emb_geom::Transform,
+    anchor: emb_geom::Point,
+    from: (f64, f64),
+    to: (f64, f64),
+) -> emb_geom::Transform {
+    use emb_geom::Transform;
+    let skew = |(h, v): (f64, f64)| Transform {
+        a: 1.0,
+        b: emb_geom::math::tan(v.to_radians()),
+        c: -emb_geom::math::tan(h.to_radians()),
+        d: 1.0,
+        e: 0.0,
+        f: 0.0,
+    };
+    let a = rot.apply(anchor);
+    let about = |t: Transform| {
+        Transform::translate(-a.x, -a.y)
+            .then(t)
+            .then(Transform::translate(a.x, a.y))
+    };
+    let undo = about(skew(from)).inverse().unwrap_or(Transform::IDENTITY);
+    let inv = rot.inverse().unwrap_or(Transform::IDENTITY);
+    rot.then(undo).then(about(skew(to))).then(inv)
+}
+
+/// Nine points in a square: the Scale from point of the selection. Returns
+/// the point that was clicked.
+fn scale_from_picker(ui: &mut egui::Ui, on: crate::manipulate::ScaleFrom) -> Option<crate::manipulate::ScaleFrom> {
+    const STEP: f32 = 10.0;
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(3.0 * STEP + 4.0, 3.0 * STEP + 4.0), egui::Sense::hover());
+    let stroke = ui.visuals().widgets.inactive.fg_stroke;
+    ui.painter().rect_stroke(
+        rect.shrink(STEP / 2.0 + 2.0),
+        0.0,
+        egui::Stroke::new(1.0, stroke.color.gamma_multiply(0.5)),
+        egui::StrokeKind::Middle,
+    );
+    let mut picked = None;
+    for (p, name) in crate::manipulate::ScaleFrom::ALL {
+        let c = rect.center() + egui::vec2(f32::from(p.x) * STEP, f32::from(p.y) * STEP);
+        let id = ui.id().with(("scale_from", p.x, p.y));
+        let r = ui.interact(
+            egui::Rect::from_center_size(c, egui::Vec2::splat(STEP)),
+            id,
+            egui::Sense::click(),
+        );
+        let name = tr(name);
+        let selected = p == on;
+        r.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::RadioButton, true, selected, name));
+        let color = if selected || r.hovered() {
+            ui.visuals().selection.bg_fill
+        } else {
+            stroke.color
+        };
+        if selected {
+            ui.painter().circle_filled(c, 3.5, color);
+        } else {
+            ui.painter().circle_stroke(c, 2.5, egui::Stroke::new(1.0, color));
+        }
+        if r.on_hover_text(name).clicked() {
+            picked = Some(p);
+        }
+    }
+    picked
+}
+
 /// Position, size, rotation and mirror for the selection, in screen
 /// directions (the design-level rotation is taken into account).
 /// X and Y are the center of the selection, measured from the hoop center.
@@ -887,6 +995,8 @@ fn transform_section(ui: &mut egui::Ui, st: &mut AppState, ids: &[ObjectId]) {
         emb_model::Rotation::Deg90 | emb_model::Rotation::Deg270
     );
     let c = b.center();
+    // The point that stays when the size changes.
+    let anchor = st.settings.scale_from.point(design, b);
     let offset = rot.apply(c) - hoop_c;
     let (w, h) = if quarter {
         (b.height(), b.width())
@@ -933,9 +1043,21 @@ fn transform_section(ui: &mut egui::Ui, st: &mut AppState, ids: &[ObjectId]) {
             field(ui, "H", &mut new_h, 0.5, "h");
             ui.end_row();
         });
-    if ui.checkbox(&mut lock, tr("Keep proportions")).changed() {
-        ui.data_mut(|d| d.insert_persisted(lock_id, lock));
-    }
+    ui.horizontal(|ui| {
+        if ui.checkbox(&mut lock, tr("Keep proportions")).changed() {
+            ui.data_mut(|d| d.insert_persisted(lock_id, lock));
+        }
+        ui.add_space(12.0);
+        ui.label(tr("Scale from")).on_hover_text(tr(
+            "The point that stays in place when you change the size here or with the handles on the canvas. \
+             Alt while you drag a handle: from the opposite side.",
+        ));
+        if let Some(from) = scale_from_picker(ui, st.settings.scale_from) {
+            let mut s = st.settings.clone();
+            s.scale_from = from;
+            st.set_settings(s);
+        }
+    });
 
     if let Some(which) = changed {
         let t = match which {
@@ -960,7 +1082,7 @@ fn transform_section(ui: &mut egui::Ui, st: &mut AppState, ids: &[ObjectId]) {
                     fy = 1.0;
                 }
                 let (sx, sy) = if quarter { (fy, fx) } else { (fx, fy) };
-                scale_about(c, sx, sy)
+                scale_about(anchor, sx, sy)
             }
         };
         let label = if matches!(which, "x" | "y") { "Move" } else { "Resize" };
@@ -971,6 +1093,45 @@ fn transform_section(ui: &mut egui::Ui, st: &mut AppState, ids: &[ObjectId]) {
             });
     }
     if stop {
+        st.doc.end_merge();
+    }
+
+    // Slant (owner request, 2026-11-13, ADR 0092): in screen directions,
+    // about the Scale from point. The fields show the slant of the change
+    // in progress, and go back to 0 when it ends.
+    let slant_id = ui.id().with(("slant", key_base.as_str()));
+    let (h0, v0): (f64, f64) = ui.data(|d| d.get_temp(slant_id).unwrap_or((0.0, 0.0)));
+    let (mut h1, mut v1) = (h0, v0);
+    let mut slant_stop = false;
+    ui.horizontal(|ui| {
+        ui.label(tr("Slant")).on_hover_text(tr(
+            "Slant the selection, in degrees: ↔ moves the top to the right, ↕ moves the right side down. The Scale from point stays.",
+        ));
+        for (v, arrow) in [(&mut h1, "↔"), (&mut v1, "↕")] {
+            ui.label(arrow);
+            let r = ui.add(
+                egui::DragValue::new(v)
+                    .speed(0.5)
+                    .range(-60.0..=60.0)
+                    .suffix("°")
+                    .fixed_decimals(1),
+            );
+            if r.drag_stopped() || r.lost_focus() {
+                slant_stop = true;
+            }
+        }
+    });
+    if (h1, v1) != (h0, v0) {
+        let t = slant_change(rot, anchor, (h0, v0), (h1, v1));
+        let ids = ids.to_vec();
+        st.doc
+            .edit_merged(tr("Slant"), MergeKey::new(format!("{key_base}-slant")), |d| {
+                d.transform_objects(&ids, &t)
+            });
+        ui.data_mut(|d| d.insert_temp(slant_id, (h1, v1)));
+    }
+    if slant_stop {
+        ui.data_mut(|d| d.remove::<(f64, f64)>(slant_id));
         st.doc.end_merge();
     }
 
@@ -1058,11 +1219,13 @@ fn fill_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &Fil
             ui,
             st,
             id,
-            "density",
-            label,
+            Param {
+                key: "density",
+                label,
+                range,
+                word: (word, tr(words::DENSITY_HELP)),
+            },
             params.spacing_mm,
-            range,
-            (word, tr(words::DENSITY_HELP)),
             |k, v| set_fill(k, &|p| p.spacing_mm = v),
         );
     }
@@ -1080,11 +1243,13 @@ fn fill_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &Fil
             ui,
             st,
             id,
-            "len",
-            label,
+            Param {
+                key: "len",
+                label,
+                range,
+                word: (word, tr(words::LENGTH_HELP)),
+            },
             params.stitch_length_mm,
-            range,
-            (word, tr(words::LENGTH_HELP)),
             |k, v| set_fill(k, &|p| p.stitch_length_mm = v),
         );
     }
@@ -1106,11 +1271,13 @@ fn fill_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &Fil
             ui,
             st,
             id,
-            "pull",
-            tr("Pull compensation"),
+            Param {
+                key: "pull",
+                label: tr("Pull compensation"),
+                range: 0.0..=1.0,
+                word: (words::pull, tr(words::PULL_HELP)),
+            },
             params.pull_compensation_mm,
-            0.0..=1.0,
-            (words::pull, tr(words::PULL_HELP)),
             |k, v| set_fill(k, &|p| p.pull_compensation_mm = v),
         );
     }
@@ -1150,14 +1317,17 @@ fn fill_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &Fil
                 .on_hover_text(tr("The stitches go at the fill angle again."))
                 .clicked();
             if resp.changed() {
-                st.doc
-                    .edit_merged("Change direction angle", MergeKey::new(format!("{}:dir", id.0)), |d| {
+                st.doc.edit_merged(
+                    tr("Change direction angle"),
+                    MergeKey::new(format!("{}:dir", id.0)),
+                    |d| {
                         if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(id).map(|o| &mut o.kind)
                             && let Some(dir) = &mut params.direction
                         {
                             dir.angle_deg = angle;
                         }
-                    });
+                    },
+                );
                 if !resp.dragged() {
                     st.doc.end_merge();
                 }
@@ -1167,7 +1337,7 @@ fn fill_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &Fil
             }
         });
         if remove {
-            st.doc.edit("Remove direction line", |d| {
+            st.doc.edit(tr("Remove direction line"), |d| {
                 if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(id).map(|o| &mut o.kind) {
                     params.direction = None;
                 }
@@ -1187,7 +1357,7 @@ fn fill_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &Fil
             ui.weak(format!("({})", words::angle(angle)));
             if resp.changed() {
                 st.doc
-                    .edit_merged("Change angle", MergeKey::new(format!("{}:angle", id.0)), |d| {
+                    .edit_merged(tr("Change angle"), MergeKey::new(format!("{}:angle", id.0)), |d| {
                         if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(id).map(|o| &mut o.kind) {
                             params.angle_deg = angle;
                         }
@@ -1204,29 +1374,51 @@ fn fill_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &Fil
     match pattern {
         FillPattern::Columns {
             column: ColumnPattern::Raised { layers },
-        } => fill_slider(ui, st, id, tr("Layers"), f64::from(*layers), 1.0..=5.0, "", |p, v| {
-            if let FillPattern::Columns {
-                column: ColumnPattern::Raised { layers },
-            } = p
-            {
-                *layers = v.round() as u32;
-            }
-        }),
-        FillPattern::DoubleSquare { angle_deg } => {
-            fill_slider(ui, st, id, tr("Second layer"), *angle_deg, 0.0..=179.0, "°", |p, v| {
+        } => fill_slider(
+            ui,
+            st,
+            id,
+            FillSetting {
+                label: tr("Layers"),
+                range: 1.0..=5.0,
+                suffix: "",
+            },
+            f64::from(*layers),
+            |p, v| {
+                if let FillPattern::Columns {
+                    column: ColumnPattern::Raised { layers },
+                } = p
+                {
+                    *layers = v.round() as u32;
+                }
+            },
+        ),
+        FillPattern::DoubleSquare { angle_deg } => fill_slider(
+            ui,
+            st,
+            id,
+            FillSetting {
+                label: tr("Second layer"),
+                range: 0.0..=179.0,
+                suffix: "°",
+            },
+            *angle_deg,
+            |p, v| {
                 if let FillPattern::DoubleSquare { angle_deg } = p {
                     *angle_deg = v;
                 }
-            })
-        }
+            },
+        ),
         FillPattern::Mesh { angle_deg } => fill_slider(
             ui,
             st,
             id,
-            tr("Second layer"),
+            FillSetting {
+                label: tr("Second layer"),
+                range: 30.0..=150.0,
+                suffix: "°",
+            },
             *angle_deg,
-            30.0..=150.0,
-            "°",
             |p, v| {
                 if let FillPattern::Mesh { angle_deg } = p {
                     *angle_deg = v;
@@ -1234,25 +1426,58 @@ fn fill_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &Fil
             },
         ),
         FillPattern::Laydown { layers, angle_deg } => {
-            fill_slider(ui, st, id, tr("Layers"), f64::from(*layers), 1.0..=2.0, "", |p, v| {
-                if let FillPattern::Laydown { layers, .. } = p {
-                    *layers = v.round() as u32;
-                }
-            });
-            if *layers >= 2 {
-                fill_slider(ui, st, id, tr("Second layer"), *angle_deg, 0.0..=179.0, "°", |p, v| {
-                    if let FillPattern::Laydown { angle_deg, .. } = p {
-                        *angle_deg = v;
+            fill_slider(
+                ui,
+                st,
+                id,
+                FillSetting {
+                    label: tr("Layers"),
+                    range: 1.0..=2.0,
+                    suffix: "",
+                },
+                f64::from(*layers),
+                |p, v| {
+                    if let FillPattern::Laydown { layers, .. } = p {
+                        *layers = v.round() as u32;
                     }
-                });
+                },
+            );
+            if *layers >= 2 {
+                fill_slider(
+                    ui,
+                    st,
+                    id,
+                    FillSetting {
+                        label: tr("Second layer"),
+                        range: 0.0..=179.0,
+                        suffix: "°",
+                    },
+                    *angle_deg,
+                    |p, v| {
+                        if let FillPattern::Laydown { angle_deg, .. } = p {
+                            *angle_deg = v;
+                        }
+                    },
+                );
             }
         }
         FillPattern::CrossStitch { cell_mm, style, passes } => {
-            fill_slider(ui, st, id, tr("Cross size"), *cell_mm, 1.0..=8.0, " mm", |p, v| {
-                if let FillPattern::CrossStitch { cell_mm, .. } = p {
-                    *cell_mm = v;
-                }
-            });
+            fill_slider(
+                ui,
+                st,
+                id,
+                FillSetting {
+                    label: tr("Cross size"),
+                    range: 1.0..=8.0,
+                    suffix: " mm",
+                },
+                *cell_mm,
+                |p, v| {
+                    if let FillPattern::CrossStitch { cell_mm, .. } = p {
+                        *cell_mm = v;
+                    }
+                },
+            );
             let mut new_style = *style;
             let mut bold = *passes >= 3;
             let mut changed = false;
@@ -1271,7 +1496,7 @@ fn fill_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &Fil
                     .changed();
             });
             if changed {
-                st.doc.edit("Change crosses", |d| {
+                st.doc.edit(tr("Change crosses"), |d| {
                     if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(id).map(|o| &mut o.kind)
                         && let FillPattern::CrossStitch { style, passes, .. } = &mut params.pattern
                     {
@@ -1290,42 +1515,77 @@ fn fill_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &Fil
             globe,
         } => {
             motif_row(ui, st, motif);
-            fill_slider(ui, st, id, tr("Motif length"), *length_mm, 1.0..=30.0, " mm", |p, v| {
-                if let FillPattern::Motif { length_mm, .. } = p {
-                    *length_mm = v;
-                }
-            });
-            fill_slider(ui, st, id, tr("Motif height"), *height_mm, 0.5..=20.0, " mm", |p, v| {
-                if let FillPattern::Motif { height_mm, .. } = p {
-                    *height_mm = v;
-                }
-            });
             fill_slider(
                 ui,
                 st,
                 id,
-                tr("Row offset"),
+                FillSetting {
+                    label: tr("Motif length"),
+                    range: 1.0..=30.0,
+                    suffix: " mm",
+                },
+                *length_mm,
+                |p, v| {
+                    if let FillPattern::Motif { length_mm, .. } = p {
+                        *length_mm = v;
+                    }
+                },
+            );
+            fill_slider(
+                ui,
+                st,
+                id,
+                FillSetting {
+                    label: tr("Motif height"),
+                    range: 0.5..=20.0,
+                    suffix: " mm",
+                },
+                *height_mm,
+                |p, v| {
+                    if let FillPattern::Motif { height_mm, .. } = p {
+                        *height_mm = v;
+                    }
+                },
+            );
+            fill_slider(
+                ui,
+                st,
+                id,
+                FillSetting {
+                    label: tr("Row offset"),
+                    range: 0.0..=1.0,
+                    suffix: " of a motif",
+                },
                 *stagger,
-                0.0..=1.0,
-                " of a motif",
                 |p, v| {
                     if let FillPattern::Motif { stagger, .. } = p {
                         *stagger = v;
                     }
                 },
             );
-            fill_slider(ui, st, id, tr("Gradient"), *gradient, 0.25..=4.0, " × size", |p, v| {
-                if let FillPattern::Motif { gradient, .. } = p {
-                    *gradient = v;
-                }
-            });
+            fill_slider(
+                ui,
+                st,
+                id,
+                FillSetting {
+                    label: tr("Gradient"),
+                    range: 0.25..=4.0,
+                    suffix: " × size",
+                },
+                *gradient,
+                |p, v| {
+                    if let FillPattern::Motif { gradient, .. } = p {
+                        *gradient = v;
+                    }
+                },
+            );
             let mut ball = *globe;
             if ui
                 .checkbox(&mut ball, tr("3D warp (ball)"))
                 .on_hover_text(tr("The rows bend like a ball: large in the middle, small at the edge."))
                 .changed()
             {
-                st.doc.edit("Change 3D warp", |d| {
+                st.doc.edit(tr("Change 3D warp"), |d| {
                     if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(id).map(|o| &mut o.kind)
                         && let FillPattern::Motif { globe, .. } = &mut params.pattern
                     {
@@ -1348,7 +1608,7 @@ fn fill_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &Fil
                 }
             });
             if changed {
-                st.doc.edit("Change stipple line", |d| {
+                st.doc.edit(tr("Change stipple line"), |d| {
                     if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(id).map(|o| &mut o.kind) {
                         params.pattern = FillPattern::Stipple { style: new_style };
                     }
@@ -1370,7 +1630,7 @@ fn fill_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &Fil
                     ui.label(crate::i18n::fill("{} split lines", &[&(lines.len())]))
                         .on_hover_text(tr(words::SPLIT_LINES_HELP));
                     if ui.button(tr("Remove Split Lines")).clicked() {
-                        st.doc.edit("Remove Split Lines", |d| {
+                        st.doc.edit(tr("Remove Split Lines"), |d| {
                             if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(id).map(|o| &mut o.kind) {
                                 params.pattern = FillPattern::UserSplit { lines: Vec::new() };
                             }
@@ -1391,7 +1651,7 @@ fn fill_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &Fil
                 }
             });
             if changed {
-                st.doc.edit("Change meander tiles", |d| {
+                st.doc.edit(tr("Change meander tiles"), |d| {
                     if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(id).map(|o| &mut o.kind) {
                         params.pattern = FillPattern::Meander { tile: new_tile };
                     }
@@ -1407,7 +1667,7 @@ fn fill_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &Fil
                     ui.label(crate::i18n::fill("{} guide lines", &[&(guides.len())]))
                         .on_hover_text(tr(words::GUIDE_HELP));
                     if ui.button(tr("Remove Guides")).clicked() {
-                        st.doc.edit("Remove guide lines", |d| {
+                        st.doc.edit(tr("Remove guide lines"), |d| {
                             if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(id).map(|o| &mut o.kind) {
                                 params.pattern = FillPattern::Guided { guides: Vec::new() };
                             }
@@ -1450,7 +1710,7 @@ fn fill_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &Fil
                     ui.label(crate::i18n::fill("Guide line: {} points", &[&(guide.len())]))
                         .on_hover_text(tr(words::GUIDE_HELP));
                     if ui.button(tr("Remove guide")).clicked() {
-                        st.doc.edit("Remove guide line", |d| {
+                        st.doc.edit(tr("Remove guide line"), |d| {
                             if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(id).map(|o| &mut o.kind) {
                                 params.pattern = FillPattern::Florentine { guide: Vec::new() };
                             }
@@ -1484,7 +1744,7 @@ fn split_pattern_ui(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, current:
             });
     });
     if let Some(p) = pick {
-        st.doc.edit(format!("Pattern {}", p.name), |d| {
+        st.doc.edit(crate::i18n::fill("Pattern {}", &[&p.name]), |d| {
             let Some(o) = d.object_mut(id) else { return };
             match &mut o.kind {
                 ObjectKind::Fill { params, .. } => match &mut params.pattern {
@@ -1524,7 +1784,7 @@ fn split_pattern_ui(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, current:
         );
         if resp.changed() {
             st.doc.edit_merged(
-                "Change pattern size",
+                tr("Change pattern size"),
                 MergeKey::new(format!("{}:split_scale", id.0)),
                 |d| {
                     if let Some(o) = d.object_mut(id) {
@@ -1578,8 +1838,10 @@ fn stamps_ui(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &FillPa
                         .fixed_decimals(1),
                 );
                 if resp.changed() {
-                    st.doc
-                        .edit_merged("Change stamp", MergeKey::new(format!("{}:stamp:{i}:{k}", id.0)), |d| {
+                    st.doc.edit_merged(
+                        tr("Change stamp"),
+                        MergeKey::new(format!("{}:stamp:{i}:{k}", id.0)),
+                        |d| {
                             if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(id).map(|o| &mut o.kind)
                                 && let Some(s) = params.stamps.get_mut(i)
                             {
@@ -1590,7 +1852,8 @@ fn stamps_ui(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &FillPa
                                     _ => s.center.y = middle.y + v,
                                 }
                             }
-                        });
+                        },
+                    );
                     if !resp.dragged() {
                         st.doc.end_merge();
                     }
@@ -1602,7 +1865,7 @@ fn stamps_ui(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &FillPa
         }
     }
     if let Some(i) = remove {
-        st.doc.edit("Remove stamp", |d| {
+        st.doc.edit(tr("Remove stamp"), |d| {
             if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(id).map(|o| &mut o.kind)
                 && i < params.stamps.len()
             {
@@ -1629,7 +1892,7 @@ fn stamps_ui(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &FillPa
             .object(id)
             .and_then(|o| o.control_bbox())
             .map_or(20.0, |b| (b.width().min(b.height()) * 0.6).max(5.0));
-        st.doc.edit(format!("Stamp {}", stamp.name), |d| {
+        st.doc.edit(crate::i18n::fill("Stamp {}", &[&stamp.name]), |d| {
             if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(id).map(|o| &mut o.kind) {
                 params.stamps.push(emb_model::StampPlacement {
                     stamp,
@@ -1679,7 +1942,7 @@ fn radial_center_ui(
             stop |= r.drag_stopped() || r.lost_focus();
         }
         if center.is_some() && ui.small_button(tr("Middle")).clicked() {
-            st.doc.edit("Fill center", |d| {
+            st.doc.edit(tr("Fill center"), |d| {
                 if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(id).map(|o| &mut o.kind) {
                     params.pattern = pattern(None);
                 }
@@ -1689,7 +1952,7 @@ fn radial_center_ui(
     if changed {
         let c = middle + emb_geom::Point::new(x, y);
         st.doc
-            .edit_merged("Fill center", MergeKey::new(format!("{}:radial", id.0)), |d| {
+            .edit_merged(tr("Fill center"), MergeKey::new(format!("{}:radial", id.0)), |d| {
                 if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(id).map(|o| &mut o.kind) {
                     params.pattern = pattern(Some(c));
                 }
@@ -1700,18 +1963,24 @@ fn radial_center_ui(
     }
 }
 
+/// What the slider of a fill type setting shows: its label, its range and
+/// its unit (none: whole numbers).
+struct FillSetting<'a> {
+    label: &'a str,
+    range: RangeInclusive<f64>,
+    suffix: &'a str,
+}
+
 /// A slider for a setting of the fill type. A drag is one undo step.
-#[allow(clippy::too_many_arguments)]
 fn fill_slider(
     ui: &mut egui::Ui,
     st: &mut AppState,
     id: ObjectId,
-    label: &str,
+    setting: FillSetting,
     value: f64,
-    range: RangeInclusive<f64>,
-    suffix: &str,
     set: impl FnOnce(&mut FillPattern, f64),
 ) {
+    let FillSetting { label, range, suffix } = setting;
     let mut v = value;
     let whole = suffix.is_empty();
     ui.horizontal(|ui| {
@@ -1727,7 +1996,7 @@ fn fill_slider(
         let resp = ui.add(slider);
         if resp.changed() {
             st.doc.edit_merged(
-                format!("Change {}", label.to_lowercase()),
+                crate::i18n::fill("Change {}", &[&crate::i18n::in_sentence(label)]),
                 MergeKey::new(format!("{}:fill:{label}", id.0)),
                 |d| {
                     if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(id).map(|o| &mut o.kind) {
@@ -1766,7 +2035,7 @@ fn fill_free_slider(
         );
         if resp.changed() {
             st.doc.edit_merged(
-                format!("Change {}", label.to_lowercase()),
+                crate::i18n::fill("Change {}", &[&crate::i18n::in_sentence(label)]),
                 MergeKey::new(format!("{}:col:{label}", id.0)),
                 |d| {
                     if let Some(o) = d.object_mut(id) {
@@ -1782,4 +2051,28 @@ fn fill_free_slider(
             st.doc.end_merge();
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use emb_geom::{Point, Transform};
+
+    use super::slant_change;
+
+    #[test]
+    fn slant_moves_the_top_to_the_right_about_the_point() {
+        let anchor = Point::new(0.0, 0.0);
+        let t = slant_change(Transform::IDENTITY, anchor, (0.0, 0.0), (45.0, 0.0));
+        // The top (y less) goes right; the anchor stays.
+        let top = t.apply(Point::new(0.0, -10.0));
+        assert!((top.x - 10.0).abs() < 1e-9 && (top.y + 10.0).abs() < 1e-9, "{top:?}");
+        assert!(t.apply(anchor).distance(anchor) < 1e-12);
+        // From 45° to 30° is the same as 30° from 0°.
+        let a = slant_change(Transform::IDENTITY, anchor, (45.0, 0.0), (30.0, 0.0)).apply(top);
+        let b = slant_change(Transform::IDENTITY, anchor, (0.0, 0.0), (30.0, 0.0)).apply(Point::new(0.0, -10.0));
+        assert!(a.distance(b) < 1e-9);
+        // Vertical: the right side goes down.
+        let r = slant_change(Transform::IDENTITY, anchor, (0.0, 0.0), (0.0, 45.0)).apply(Point::new(10.0, 0.0));
+        assert!((r.y - 10.0).abs() < 1e-9);
+    }
 }

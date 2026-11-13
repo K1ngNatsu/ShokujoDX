@@ -96,7 +96,7 @@ impl AppState {
             self.message = tr("Select lines, satin columns or fills to use the motif.").into();
             return 0;
         }
-        self.doc.edit(format!("Motif {}", m.name), |d| {
+        self.doc.edit(crate::i18n::fill("Motif {}", &[&m.name]), |d| {
             for id in &targets {
                 let Some(o) = d.object_mut(*id) else { continue };
                 match &mut o.kind {
@@ -161,13 +161,17 @@ impl AppState {
     pub fn create_motif(&mut self, name: &str) -> Result<PathBuf, String> {
         let name = name.trim();
         if name.is_empty() {
-            return Err("Type a name for the motif.".into());
+            return Err(tr("Type a name for the motif.").into());
         }
         if library().iter().any(|(m, _)| m.name.eq_ignore_ascii_case(name)) {
-            return Err(format!("A motif named {name} is already in the library."));
+            return Err(crate::i18n::fill(
+                "A motif named {} is already in the library.",
+                &[&name],
+            ));
         }
-        let m = Motif::from_points(name, &self.selection_points()).ok_or("Select the objects of the motif first.")?;
-        let dir = motifs_dir().ok_or("No folder for motifs.")?;
+        let m =
+            Motif::from_points(name, &self.selection_points()).ok_or(tr("Select the objects of the motif first."))?;
+        let dir = motifs_dir().ok_or(tr("No folder for motifs."))?;
         std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
         let path = dir.join(file_name(name));
         std::fs::write(&path, serde_json::to_string_pretty(&m).map_err(|e| e.to_string())?)
@@ -180,7 +184,7 @@ impl AppState {
 fn rename(path: &std::path::Path, name: &str) -> Result<PathBuf, String> {
     let name = name.trim();
     if name.is_empty() {
-        return Err("Type the new name.".into());
+        return Err(tr("Type the new name.").into());
     }
     let mut m: Motif =
         serde_json::from_str(&std::fs::read_to_string(path).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
@@ -334,13 +338,13 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
     if let Some((_, Some(path))) = &selected {
         if do_rename {
             st.message = match rename(path, &w.name) {
-                Ok(_) => format!("Renamed to {}.", w.name.trim()),
+                Ok(_) => crate::i18n::fill("Renamed to {}.", &[&w.name.trim()]),
                 Err(e) => e,
             };
         }
         if delete {
             st.message = match std::fs::remove_file(path) {
-                Ok(()) => "Motif deleted.".into(),
+                Ok(()) => tr("Motif deleted.").into(),
                 Err(e) => e.to_string(),
             };
         }

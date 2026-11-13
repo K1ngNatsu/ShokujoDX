@@ -8,7 +8,7 @@
 //!   as the hoop template; the user cuts them on their frame lines and
 //!   joins them.
 
-use emb_geom::{BBox, Point};
+use emb_geom::{BBox, Point, text};
 use emb_model::Rgb;
 use emb_model::bling::{MARK_ARM_MM, StoneTemplate};
 
@@ -70,12 +70,22 @@ fn key(t: &StoneTemplate, spec: &StoneSheetSpec) -> Page {
     let counts = t.counts();
     let total: usize = counts.iter().map(|(_, n)| n).sum();
     let size = t.bbox().map_or(String::new(), |b| {
-        format!(", {:.0} × {:.0} mm with the marks", b.width(), b.height())
+        text::fill(
+            ", {} × {} mm with the marks",
+            &[&format!("{:.0}", b.width()), &format!("{:.0}", b.height())],
+        )
     });
-    p.text(x, y, 10.0, false, format!("{total} stones{size}"));
+    p.text(x, y, 10.0, false, text::fill("{} stones{}", &[&total, &size]));
     y += 10.0;
     let cols = [x, x + 10.0, x + 70.0, x + 100.0, x + 130.0];
-    for (i, h) in ["", "Stone", "Stone size", "Hole", "Stones"].iter().enumerate() {
+    let heads = [
+        "",
+        text::tr("Stone"),
+        text::tr("Stone size"),
+        text::tr("Hole"),
+        text::tr("Stones"),
+    ];
+    for (i, h) in heads.iter().enumerate() {
         p.gray_text(cols[i], y, 8.0, *h);
     }
     for (stone, n) in &counts {
@@ -98,13 +108,17 @@ fn key(t: &StoneTemplate, spec: &StoneSheetSpec) -> Page {
         p.text(cols[4], y, 9.5, false, n.to_string());
     }
     y += 12.0;
-    p.text(x, y, 10.0, true, "How to use the template");
+    p.text(x, y, 10.0, true, text::tr("How to use the template"));
     let steps = [
-        "1. Cut the template file (SVG or DXF) from template material on the cutter. Each size of stone is a group of its own.",
-        "2. Or print the next pages at 100 % (no fit to page) to check the places of the stones.",
-        "3. Put the template on a backing board. Brush the stones into the holes, the largest size first.",
-        "4. Pick up the stones with transfer tape. Put the tape on the garment, with the marks where they must be.",
-        "5. Press with a heat press (the time and temperature that the maker of the stones gives).",
+        text::tr(
+            "1. Cut the template file (SVG or DXF) from template material on the cutter. Each size of stone is a group of its own.",
+        ),
+        text::tr("2. Or print the next pages at 100 % (no fit to page) to check the places of the stones."),
+        text::tr("3. Put the template on a backing board. Brush the stones into the holes, the largest size first."),
+        text::tr(
+            "4. Pick up the stones with transfer tape. Put the tape on the garment, with the marks where they must be.",
+        ),
+        text::tr("5. Press with a heat press (the time and temperature that the maker of the stones gives)."),
     ];
     for s in steps {
         for line in crate::page::wrap(s, 95) {
@@ -166,28 +180,28 @@ pub fn pages(t: &StoneTemplate, spec: &StoneSheetSpec) -> Vec<Page> {
             }
             let (x, y) = (MARGIN_MM, MARGIN_MM + 4.0);
             let sheet = if many {
-                format!(
+                text::fill(
                     "  ·  Sheet {} of {} (row {}, column {})",
-                    r * cols + c + 1,
-                    cols * rows,
-                    r + 1,
-                    c + 1
+                    &[&(r * cols + c + 1), &(cols * rows), &(r + 1), &(c + 1)],
                 )
             } else {
                 String::new()
             };
-            page.text(x, y, 10.0, true, format!("Rhinestone template: {}", spec.name));
+            page.text(x, y, 10.0, true, text::fill("Rhinestone template: {}", &[&spec.name]));
             page.gray_text(
                 x,
                 y + 5.0,
                 8.0,
-                format!(
-                    "Full size; holes {:.2} mm larger than the stones{sheet}",
-                    spec.clearance_mm
+                text::fill(
+                    "Full size; holes {} mm larger than the stones{}",
+                    &[&format!("{:.2}", spec.clearance_mm), &sheet],
                 ),
             );
             if r == 0 && c == 0 {
-                let note = format!("This line is {SCALE_MM:.0} mm. Print at 100 % (no fit to page).");
+                let note = text::fill(
+                    "This line is {} mm. Print at 100 % (no fit to page).",
+                    &[&format!("{:.0}", SCALE_MM)],
+                );
                 let x1 = w - MARGIN_MM;
                 let x0 = x1 - SCALE_MM;
                 page.line(Point::new(x0, y), Point::new(x1, y), 0.5, INK);

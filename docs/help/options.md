@@ -12,12 +12,12 @@ sets all options back.
 
 ## Appearance and language
 
-- **Appearance**: **Dark** or **Light** panels. **High contrast**: black
+- **Appearance**: **Dark theme** or **Light theme**. **High contrast**: black
   and white panels with strong lines, for low vision.
 - **Text size**: the size of all text and buttons. **Ctrl+Plus**,
   **Ctrl+Minus** and **Ctrl+0** change it too.
 - **Language**: English, Deutsch, Español or 日本語. The help topics are
-  in English.
+  in the same language (a topic with no translation is in English).
 - **Tools**: **All tools**, or **Simple Mode** (fewer tools, larger
   buttons).
 

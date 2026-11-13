@@ -673,7 +673,7 @@ impl AppState {
             Some(id) => id,
             None => {
                 let thread = self.current_thread_id();
-                self.doc.edit("Start Sketch", |d| {
+                self.doc.edit(tr("Start Sketch"), |d| {
                     let t = thread.unwrap_or_else(|| d.add_thread("Sketch", emb_model::Rgb(90, 90, 90)));
                     let id = d.add_object(t, ObjectKind::Sketch(Box::new(SketchObject::new(Sketch::new()))));
                     if let Some(o) = d.object_mut(id) {
@@ -714,7 +714,7 @@ impl AppState {
         self.doc.end_merge();
         let empty = self.sketch_of(e.object).is_some_and(|s| s.sketch().points.is_empty());
         if empty {
-            self.doc.edit("Remove Empty Sketch", |d| {
+            self.doc.edit(tr("Remove Empty Sketch"), |d| {
                 d.remove_object(e.object);
             });
             self.selection.clear();
@@ -888,7 +888,7 @@ impl AppState {
     /// Offset of `curves` at the distance of the panel: one undo step.
     fn offset_curves(&mut self, curves: &[CurveId]) {
         let mm = self.sketch.as_ref().map_or(2.0, |e| e.values.offset_mm);
-        let r = self.try_edit_sketch("Offset", |sk| sk.offset(curves, mm));
+        let r = self.try_edit_sketch(tr("Offset"), |sk| sk.offset(curves, mm));
         self.edit_done(r.map(|r| r.map(|made| fill("Offset: {} new curves.", &[&made.len()]))));
     }
 
@@ -918,19 +918,19 @@ impl AppState {
         let r: Option<Result<String, EditError>> = match tool {
             SketchTool::Trim => match curve {
                 Some(c) => self
-                    .try_edit_sketch("Trim", |sk| sk.trim(c, at))
+                    .try_edit_sketch(tr("Trim"), |sk| sk.trim(c, at))
                     .map(|r| r.map(|_| tr("Trimmed.").to_string())),
                 None => Some(Err(EditError::Refused(need_curve))),
             },
             SketchTool::Extend => match curve {
                 Some(c) => self
-                    .try_edit_sketch("Extend", |sk| sk.extend(c, at))
+                    .try_edit_sketch(tr("Extend"), |sk| sk.extend(c, at))
                     .map(|r| r.map(|_| tr("Extended.").to_string())),
                 None => Some(Err(EditError::Refused(need_curve))),
             },
             SketchTool::Split => match curve {
                 Some(c) => self
-                    .try_edit_sketch("Split", |sk| sk.split(c, at))
+                    .try_edit_sketch(tr("Split"), |sk| sk.split(c, at))
                     .map(|r| r.map(|_| tr("Split in two.").to_string())),
                 None => Some(Err(EditError::Refused(need_curve))),
             },
@@ -941,14 +941,14 @@ impl AppState {
                 };
                 let fillet = tool == SketchTool::Fillet;
                 let r = if fillet {
-                    self.try_edit_sketch("Fillet", |sk| sk.fillet(p, v.fillet_mm))
+                    self.try_edit_sketch(tr("Fillet"), |sk| sk.fillet(p, v.fillet_mm))
                 } else {
                     let kind = match v.chamfer_kind {
                         1 => emb_sketch::edit::ChamferKind::Two(v.chamfer_mm, v.chamfer2_mm),
                         2 => emb_sketch::edit::ChamferKind::Angle(v.chamfer_mm, v.chamfer_deg),
                         _ => emb_sketch::edit::ChamferKind::Equal(v.chamfer_mm),
                     };
-                    self.try_edit_sketch("Chamfer", |sk| sk.chamfer_with(p, kind))
+                    self.try_edit_sketch(tr("Chamfer"), |sk| sk.chamfer_with(p, kind))
                 };
                 // Type the value of the new dimension at once.
                 if let Some(Ok((_, dim))) = &r
@@ -979,15 +979,17 @@ impl AppState {
             },
             SketchTool::Mirror => match curve.filter(|c| is_line(s, *c)) {
                 Some(axis) => self
-                    .try_edit_sketch("Mirror", |sk| sk.mirror(&source, axis))
+                    .try_edit_sketch(tr("Mirror"), |sk| sk.mirror(&source, axis))
                     .map(|r| r.map(|made| fill("Mirror: {} new curves.", &[&made.len()]))),
                 None => Some(Err(EditError::Refused(tr("Click the line to mirror about.")))),
             },
             SketchTool::CircularPattern => {
                 let center = point.and_then(|p| s.point(p)).unwrap_or(at);
                 let (n, deg) = (v.count as usize, v.angle_deg);
-                self.try_edit_sketch("Circular Pattern", |sk| sk.circular_pattern(&source, center, n, deg))
-                    .map(|r| r.map(|made| fill("Pattern: {} new curves.", &[&made.len()])))
+                self.try_edit_sketch(tr("Circular Pattern"), |sk| {
+                    sk.circular_pattern(&source, center, n, deg)
+                })
+                .map(|r| r.map(|made| fill("Pattern: {} new curves.", &[&made.len()])))
             }
             t if t.is_transform() => {
                 let at = infer::snap(s, at, tol, &[]).at;
@@ -1034,11 +1036,11 @@ impl AppState {
         let Some(e) = self.sketch.as_ref() else { return };
         let (curves, points) = (e.source.clone(), e.source_points.clone());
         let label = match tool {
-            SketchTool::Stretch => "Stretch in Sketch",
-            SketchTool::Rotate => "Rotate in Sketch",
-            SketchTool::Scale => "Scale in Sketch",
-            _ if copy => "Copy in Sketch",
-            _ => "Move in Sketch",
+            SketchTool::Stretch => tr("Stretch in Sketch"),
+            SketchTool::Rotate => tr("Rotate in Sketch"),
+            SketchTool::Scale => tr("Scale in Sketch"),
+            _ if copy => tr("Copy in Sketch"),
+            _ => tr("Move in Sketch"),
         };
         let (scale, turned) = match m {
             Motion::Grow(_, k) => (k, false),
@@ -1085,7 +1087,7 @@ impl AppState {
             return;
         }
         let v = e.values.clone();
-        let r = self.try_edit_sketch("Rectangular Pattern", |sk| {
+        let r = self.try_edit_sketch(tr("Rectangular Pattern"), |sk| {
             sk.rect_pattern(&curves, v.cols as usize, v.rows as usize, v.dx_mm, v.dy_mm)
         });
         self.edit_done(r.map(|r| r.map(|made| fill("Pattern: {} new curves.", &[&made.len()]))));
@@ -1100,7 +1102,7 @@ impl AppState {
             return;
         }
         let units = self.settings.units;
-        let removed = self.edit_sketch("Relax", None, |sk| sk.relax()).unwrap_or_default();
+        let removed = self.edit_sketch(tr("Relax"), None, |sk| sk.relax()).unwrap_or_default();
         let list: Vec<String> = removed.iter().map(|c| constraint_text(units, c)).collect();
         self.message = fill("Relax removed {} constraints: {}.", &[&list.len(), &list.join(", ")]);
         if let Some(e) = &mut self.sketch {
@@ -1115,7 +1117,7 @@ impl AppState {
         match build(kind, obj.sketch(), picks) {
             Build::Done(c) => {
                 let name = c.name();
-                let r = self.edit_sketch(&format!("Constraint: {name}"), None, |sk| sk.add_constraint(c));
+                let r = self.edit_sketch(&fill("Constraint: {}", &[&tr(name)]), None, |sk| sk.add_constraint(c));
                 match r {
                     Some(Ok(_)) => self.message = fill("{} added.", &[&tr(name)]),
                     Some(Err(e)) => self.message = e.to_string(),
@@ -1146,7 +1148,7 @@ impl AppState {
             self.message = tr("Select the parts to delete first.").into();
             return;
         }
-        self.edit_sketch("Delete in Sketch", None, |sk| {
+        self.edit_sketch(tr("Delete in Sketch"), None, |sk| {
             for p in &sel {
                 match *p {
                     Pick::Constraint(c) => {
@@ -1208,7 +1210,7 @@ impl AppState {
     /// it), and opens its value box. A dimension that the sketch sets
     /// already is driven: it shows the size only.
     pub fn add_sketch_dimension(&mut self, c: Constraint, at: Option<Point>) {
-        let r = self.edit_sketch(&format!("Dimension: {}", c.name()), None, |sk| {
+        let r = self.edit_sketch(&fill("Dimension: {}", &[&tr(c.name())]), None, |sk| {
             let r = sk.add_dimension(c);
             if let (Ok((id, _)), Some(at)) = (&r, at) {
                 sk.label_at.insert(*id, at);
@@ -1362,7 +1364,7 @@ impl AppState {
                 color,
             })
             .collect();
-        let made = self.make_linked(&format!("Sketch to {}", to.name()), sketch, sources);
+        let made = self.make_linked(&fill("Sketch to {}", &[&tr(to.name())]), sketch, sources);
         if let Some(e) = &mut self.sketch {
             e.picked.clear();
         }
@@ -1441,7 +1443,7 @@ impl AppState {
                 })
                 .collect(),
         );
-        let n = self.edit_sketch("Delete Constraints", None, |sk| {
+        let n = self.edit_sketch(tr("Delete Constraints"), None, |sk| {
             let before = sk.constraints.len();
             sk.constraints.retain(|c| {
                 !c.constraint.points().iter().any(|p| points.contains(p))
@@ -1490,7 +1492,7 @@ impl AppState {
                 .iter()
                 .any(|c| o.sketch().curve(*c).is_some_and(|c| !c.construction))
         });
-        self.edit_sketch("Construction", None, |sk| {
+        self.edit_sketch(tr("Construction"), None, |sk| {
             for c in &curves {
                 sk.set_construction(*c, on);
             }
@@ -1515,7 +1517,7 @@ impl AppState {
         let on = self
             .sketch_obj()
             .is_some_and(|o| pts.iter().any(|p| !o.sketch().is_center_point(*p)));
-        self.edit_sketch("Center Point", None, |sk| {
+        self.edit_sketch(tr("Center Point"), None, |sk| {
             for p in &pts {
                 sk.set_center_point(*p, on);
             }
@@ -1534,7 +1536,7 @@ impl AppState {
                 _ => None,
             })
             .collect();
-        let r = self.edit_sketch("Automatic Dimensions", None, |sk| sk.auto_dimension(&curves));
+        let r = self.edit_sketch(tr("Automatic Dimensions"), None, |sk| sk.auto_dimension(&curves));
         let free = self.sketch_analysis().map_or(0, |a| a.free);
         if let Some((c, d)) = r {
             self.message = fill(
@@ -1563,7 +1565,7 @@ impl AppState {
         let on = self
             .sketch_obj()
             .is_some_and(|o| lines.iter().any(|l| !o.sketch().is_centerline(*l)));
-        self.edit_sketch("Centerline", None, |sk| {
+        self.edit_sketch(tr("Centerline"), None, |sk| {
             for l in &lines {
                 sk.set_centerline(*l, on);
             }
@@ -1607,7 +1609,7 @@ impl AppState {
             // A horizontal or vertical distance keeps its direction.
             _ => typed.abs() * old.value().map_or(1.0, |o| if o < 0.0 { -1.0 } else { 1.0 }),
         };
-        let r = self.edit_sketch("Dimension", None, |sk| {
+        let r = self.edit_sketch(tr("Dimension"), None, |sk| {
             sk.clear_dimension_expr(id);
             sk.set_value(id, v)
         });
@@ -1665,7 +1667,7 @@ impl AppState {
         let sketch = emb_sketch::import::from_paths(&paths, emb_sketch::import::TOL);
         let (curves, constraints) = (sketch.curves.len(), sketch.constraints.len());
         let ids: Vec<ObjectId> = vectors.iter().map(|(id, _)| *id).collect();
-        let id = self.doc.edit("Vector to Sketch", |d| {
+        let id = self.doc.edit(tr("Vector to Sketch"), |d| {
             let at = ids.iter().filter_map(|id| d.index_of(*id)).min().unwrap_or(0);
             let thread = d.object(ids[0]).map(|o| o.thread);
             for id in &ids {
@@ -1705,7 +1707,7 @@ impl AppState {
         }
         let (curves, constraints) = (obj.sketch().curves.len(), obj.sketch().constraints.len());
         let thread = self.current_thread_id();
-        let id = self.doc.edit("Import DXF", |d| {
+        let id = self.doc.edit(tr("Import DXF"), |d| {
             let t = thread.unwrap_or_else(|| d.add_thread("Sketch", emb_model::Rgb(90, 90, 90)));
             d.add_object(t, ObjectKind::Sketch(Box::new(obj)))
         });
@@ -2338,7 +2340,6 @@ fn labels_with(obj: &SketchObject, map: &ViewMap, units: crate::workspace::Units
 
 /// Draws a label: its leader and extension lines, its box and its text.
 /// `alpha` below 1 draws a ghost (the dimension that a click makes).
-#[allow(clippy::too_many_arguments)]
 fn draw_label(
     painter: &egui::Painter,
     l: &Label,
@@ -3222,7 +3223,7 @@ fn sketch_menu(ui: &mut egui::Ui, st: &mut AppState) {
         }
         if s.label_at.contains_key(id) && ui.button(tr("Reset Label Place")).clicked() {
             let id = *id;
-            st.edit_sketch("Move Dimension", None, |sk| {
+            st.edit_sketch(tr("Move Dimension"), None, |sk| {
                 sk.label_at.remove(&id);
             });
         }
@@ -3514,7 +3515,7 @@ pub fn handle_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState,
                 && let Some((id, key)) = st.sketch.as_ref().and_then(|e| e.label_drag)
             {
                 let at = to_sketch(pos);
-                st.edit_sketch("Move Dimension", Some(format!("sketch-label-{key}")), |sk| {
+                st.edit_sketch(tr("Move Dimension"), Some(format!("sketch-label-{key}")), |sk| {
                     sk.label_at.insert(id, at);
                 });
             }
@@ -3533,7 +3534,7 @@ pub fn handle_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState,
                 let key = Some(format!("sketch-drag-{}", d.key));
                 let relax = st.sketch.as_ref().is_some_and(|e| e.relax_mode);
                 if let Some(c) = d.radius {
-                    st.edit_sketch("Drag in Sketch", key, |sk| {
+                    st.edit_sketch(tr("Drag in Sketch"), key, |sk| {
                         let dims = relax_dims(sk, relax);
                         let center = match sk.curve(c).map(|c| c.geometry) {
                             Some(Geometry::Circle { center, .. }) => sk.point(center),
@@ -3550,7 +3551,7 @@ pub fn handle_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState,
                     });
                 } else {
                     let moves: Vec<(PointId, Point)> = d.points.iter().map(|(p, at)| (*p, *at + delta)).collect();
-                    st.edit_sketch("Drag in Sketch", key, |sk| {
+                    st.edit_sketch(tr("Drag in Sketch"), key, |sk| {
                         let dims = relax_dims(sk, relax);
                         sk.drag_points(&moves);
                         restore_dims(sk, &dims);
@@ -3761,7 +3762,7 @@ pub fn handle_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState,
                 let opts = st.sketch.as_ref().map(MakeOpts::of).expect("in sketch mode");
                 let start = from.point.expect("an end");
                 let end = st
-                    .edit_sketch("Sketch: Tangent Arc", None, |sk| {
+                    .edit_sketch(tr("Sketch: Tangent Arc"), None, |sk| {
                         make(SketchTool::ArcTangent, sk, &[from, to], opts)?;
                         match sk.curves.last()?.geometry {
                             Geometry::Arc { start: a, end: b, .. } => Some(if a == start { b } else { a }),
@@ -3821,7 +3822,7 @@ pub fn handle_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState,
                 let clicks = e.clicks.clone();
                 let opts = MakeOpts::of(e);
                 if clicks.len() >= clicks_needed(tool, &opts) {
-                    st.edit_sketch("Sketch", None, |sk| make(tool, sk, &clicks, opts));
+                    st.edit_sketch(tr("Sketch"), None, |sk| make(tool, sk, &clicks, opts));
                     if let Some(e) = &mut st.sketch {
                         e.clicks.clear();
                     }
@@ -3859,7 +3860,7 @@ fn finish_spline(st: &mut AppState, closed: bool) {
     if clicks.len() < 2 {
         return;
     }
-    st.edit_sketch("Sketch: Spline", None, |sk| {
+    st.edit_sketch(tr("Sketch: Spline"), None, |sk| {
         let pts: Vec<Point> = clicks.iter().map(|c| c.at).collect();
         let Ok(pieces) = sk.add_spline(&pts, closed) else {
             return;
@@ -3920,7 +3921,7 @@ fn line_click(st: &mut AppState, to: Snap, no_help: bool) {
     let Some((to, hints)) = line_end(st, &to, no_help) else {
         return;
     };
-    let ends = st.edit_sketch("Sketch: Line", None, |sk| {
+    let ends = st.edit_sketch(tr("Sketch: Line"), None, |sk| {
         let pa = infer::place(sk, &from);
         let pb = infer::place(sk, &to);
         if pa == pb {
@@ -4009,7 +4010,14 @@ fn draw_path(painter: &egui::Painter, map: &ViewMap, path: &emb_geom::Path, stro
 /// of their state, the points, the marks and dimensions, the preview of the
 /// draw tool, and the value editor of a dimension.
 pub fn draw_overlay(painter: &egui::Painter, ui: &egui::Ui, map: &ViewMap, st: &mut AppState) {
-    let Some(obj) = st.sketch_obj().cloned() else { return };
+    // The object is shared (an `Arc`), so a hold of it is not a copy of the sketch.
+    let Some(id) = st.sketch.as_ref().map(|e| e.object) else {
+        return;
+    };
+    let Some(shared) = st.doc.design().objects().iter().find(|o| o.id == id).cloned() else {
+        return;
+    };
+    let ObjectKind::Sketch(obj) = &shared.kind else { return };
     let Some(a) = st.sketch_analysis() else { return };
     let dark = ui.visuals().dark_mode;
     let bg = if dark {
@@ -4208,7 +4216,7 @@ pub fn draw_overlay(painter: &egui::Painter, ui: &egui::Ui, map: &ViewMap, st: &
     }
     // Marks and dimensions.
     let text_bg = ui.visuals().extreme_bg_color.gamma_multiply(0.9);
-    for l in labels_with(&obj, map, st.settings.units, true) {
+    for l in labels_with(obj, map, st.settings.units, true) {
         if !(e.show_marks || l.dimension || related.contains(&l.id)) {
             continue;
         }
@@ -4492,7 +4500,7 @@ pub fn draw_overlay(painter: &egui::Painter, ui: &egui::Ui, map: &ViewMap, st: &
         painter.rect_filled(r, 0.0, accent.gamma_multiply(0.08));
         painter.rect_stroke(r, 0.0, Stroke::new(1.0, accent), egui::StrokeKind::Middle);
     }
-    value_editor(ui, map, st, &obj);
+    value_editor(ui, map, st, obj);
     parameters_window(ui.ctx(), st);
 }
 
@@ -4721,7 +4729,7 @@ pub fn edit_panel(ui: &mut egui::Ui, st: &mut AppState) {
         }
     });
     if let Some(id) = remove {
-        st.edit_sketch("Remove Constraint", None, |sk| sk.remove_constraint(id));
+        st.edit_sketch(tr("Remove Constraint"), None, |sk| sk.remove_constraint(id));
     }
     if let Some(e) = &mut st.sketch {
         if let Some(id) = select {
@@ -4922,7 +4930,7 @@ pub fn detail(s: &SketchObject) -> String {
 pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, s: &SketchObject) {
     ui.label(detail(s));
     let a = s.sketch().analyze();
-    ui.weak(if a.free == 0 && a.conflicting.is_empty() {
+    ui.weak(if a.is_fully_constrained() {
         tr("Fully constrained.").to_string()
     } else {
         fill("{} free motions.", &[&a.free])
@@ -4994,7 +5002,7 @@ fn links_ui(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId) {
         );
         if ui.button(tr("Unlink the Lost Objects")).clicked() {
             st.doc
-                .edit("Unlink", |d| d.sketch_links.retain(|l| !lost.contains(&l.id)));
+                .edit(tr("Unlink"), |d| d.sketch_links.retain(|l| !lost.contains(&l.id)));
         }
     }
 }
@@ -5019,7 +5027,7 @@ pub fn made_from_sketch_ui(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId) {
             st.open_sketch(link.sketch);
         }
         if ui.button(tr("Unlink")).clicked() {
-            st.doc.edit("Unlink", |d| d.unlink_sketch(link.id));
+            st.doc.edit(tr("Unlink"), |d| d.unlink_sketch(link.id));
             st.message = tr("Unlinked: the objects stay as they are.").into();
         }
     });

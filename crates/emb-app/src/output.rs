@@ -186,14 +186,15 @@ impl OwnedCatalogs {
 
 /// Batch output: the files of the profile for each file in `paths`
 /// (project or machine files) in `folder`. A machine file gets the machine
-/// `machine`. Returns a line for each file.
+/// `machine`. Returns a line for each file (`Err` if its files are not
+/// written).
 pub fn batch_files(
     paths: &[PathBuf],
     folder: &Path,
     profile: &OutputProfile,
     c: Catalogs,
     machine: Option<&str>,
-) -> Vec<String> {
+) -> Vec<Result<String, String>> {
     let mut lines = Vec::new();
     for p in paths {
         let name = p
@@ -218,8 +219,8 @@ pub fn batch_files(
             write_files(&d, &plan, c, profile, folder, &name)
         });
         lines.push(match result {
-            Ok(files) => format!("{}: {} files", p.display(), files.len()),
-            Err(e) => format!("{}: not written: {e}", p.display()),
+            Ok(files) => Ok(crate::i18n::fill("{}: {} files", &[&p.display(), &files.len()])),
+            Err(e) => Err(crate::i18n::fill("{}: not written: {}", &[&p.display(), &e])),
         });
     }
     lines
@@ -302,7 +303,12 @@ pub fn sheet_data(design: &Design, stitches: &StitchDesign, c: Catalogs, files: 
         let thickness = fabrics.of(design).thickness_mm;
         d.to_buy = emb_model::stock::threads_to_buy(c.stock, stitches, thickness, quantity, c.spool_m)
             .iter()
-            .map(|b| format!("{}: {} spools, {}", b.thread_text(), b.spools, b.reason.label()))
+            .map(|b| {
+                crate::i18n::fill(
+                    "{}: {} spools, {}",
+                    &[&b.thread_text(), &b.spools, &tr(b.reason.label())],
+                )
+            })
             .collect();
     }
     d.date = today();
@@ -370,7 +376,7 @@ pub fn write_files(
     let needles = c.needle_plan(design, stitches);
     for ext in formats(profile, design, c.machines).into_iter().filter(|_| sews) {
         let bytes = emb_formats::write_machine_with(&ext, stitches, name, &date, machine.as_ref(), needles.as_ref())
-            .ok_or_else(|| format!(".{ext} cannot be written"))?;
+            .ok_or_else(|| crate::i18n::fill(".{} cannot be written", &[&ext]))?;
         write(folder.join(format!("{name}.{ext}")), &bytes, &mut written)?;
     }
     if profile.color_files && sews {
@@ -481,8 +487,8 @@ impl AppState {
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_else(|| self.doc.design().name.clone());
         let Some(path) = rfd::FileDialog::new()
-            .set_title("Export design picture (SVG)")
-            .add_filter("SVG picture", &["svg"])
+            .set_title(tr("Export design picture (SVG)"))
+            .add_filter(tr("SVG picture"), &["svg"])
             .set_directory(self.dialog_dir())
             .set_file_name(format!("{name}.svg"))
             .save_file()
@@ -536,7 +542,10 @@ impl AppState {
         std::fs::create_dir_all(folder).map_err(|e| format!("{}: {e}", folder.display()))?;
         let proj = folder.join(format!("{name}.{}", project::FILE_EXTENSION));
         if !self.save_to(&proj) {
-            return Err(format!("The project file {} was not saved.", proj.display()));
+            return Err(crate::i18n::fill(
+                "The project file {} was not saved.",
+                &[&proj.display()],
+            ));
         }
         let design = self.doc.design().clone();
         let plan = self.plan_view().plan.clone();
@@ -546,7 +555,7 @@ impl AppState {
         let work: crate::jobs::Work = Box::new(move || {
             let files = write_files(&design, &plan, catalogs.view(), &profile, &f, &n)?;
             Ok(crate::jobs::JobOutput {
-                message: format!("Output: {} files in {}", files.len(), f.display()),
+                message: crate::i18n::fill("Output: {} files in {}", &[&files.len(), &f.display()]),
                 files,
                 ..Default::default()
             })
@@ -565,15 +574,15 @@ impl AppState {
         let mut types = vec![project::FILE_EXTENSION];
         types.extend(emb_formats::READ_EXTENSIONS);
         let Some(paths) = rfd::FileDialog::new()
-            .set_title("Batch output: designs")
-            .add_filter("Designs and machine files", &types)
+            .set_title(tr("Batch output: designs"))
+            .add_filter(tr("Designs and machine files"), &types)
             .set_directory(self.dialog_dir())
             .pick_files()
         else {
             return;
         };
         let Some(folder) = rfd::FileDialog::new()
-            .set_title("Batch output: folder for the files")
+            .set_title(tr("Batch output: folder for the files"))
             .set_directory(self.dialog_dir())
             .pick_folder()
         else {
@@ -741,10 +750,10 @@ fn profile_ui(ui: &mut egui::Ui, st: &mut AppState) {
     ui.horizontal(|ui| {
         ui.label(tr("Barcode on the worksheet"));
         egui::ComboBox::from_id_salt("output-barcode")
-            .selected_text(p.barcode.label())
+            .selected_text(tr(p.barcode.label()))
             .show_ui(ui, |ui| {
                 for k in emb_render::barcode::BarcodeKind::ALL {
-                    ui.selectable_value(&mut p.barcode, k, k.label());
+                    ui.selectable_value(&mut p.barcode, k, tr(k.label()));
                 }
             });
     })
@@ -767,8 +776,8 @@ fn profile_ui(ui: &mut egui::Ui, st: &mut AppState) {
     });
     ui.horizontal(|ui| {
         ui.label(tr("Paper"));
-        for paper in [Paper::Letter, Paper::A4] {
-            ui.selectable_value(&mut p.paper, paper, paper.label());
+        for paper in Paper::ALL {
+            ui.selectable_value(&mut p.paper, paper, tr(paper.label()));
         }
     });
     st.set_settings(crate::workspace::Settings {
@@ -879,8 +888,8 @@ fn preview_window(ctx: &egui::Context, st: &mut AppState) {
                     {
                         let pdf = emb_render::pdf::write(&pages, &st.doc.design().name);
                         st.message = match std::fs::write(&path, pdf) {
-                            Ok(()) => format!("Saved {}", path.display()),
-                            Err(e) => format!("Not saved: {e}"),
+                            Ok(()) => crate::i18n::fill("Saved {}", &[&path.display()]),
+                            Err(e) => crate::i18n::fill("Not saved: {}", &[&e]),
                         };
                     }
                 }
@@ -906,7 +915,9 @@ pub fn notes_ui(ui: &mut egui::Ui, st: &mut AppState) {
     );
     if r.changed() {
         st.doc
-            .edit_merged("Notes", emb_model::MergeKey::new("design-notes"), |d| d.notes = notes);
+            .edit_merged(tr("Notes"), emb_model::MergeKey::new("design-notes"), |d| {
+                d.notes = notes
+            });
     }
     if r.lost_focus() {
         st.doc.end_merge();
@@ -1099,9 +1110,9 @@ mod tests {
             st.catalogs(),
             machine.as_deref(),
         );
-        assert!(lines[0].ends_with("4 files"), "{lines:?}");
-        assert!(lines[1].ends_with("4 files"), "{lines:?}");
-        assert!(lines[2].contains("not written"), "{lines:?}");
+        assert!(lines[0].as_ref().is_ok_and(|l| l.ends_with("4 files")), "{lines:?}");
+        assert!(lines[1].as_ref().is_ok_and(|l| l.ends_with("4 files")), "{lines:?}");
+        assert!(lines[2].as_ref().is_err_and(|l| l.contains("not written")), "{lines:?}");
         assert!(out.join("b.vp3").exists() && out.join("b worksheet.pdf").exists());
         std::fs::remove_dir_all(dir).ok();
         std::fs::remove_dir_all(out).ok();

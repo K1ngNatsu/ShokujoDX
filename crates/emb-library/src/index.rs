@@ -1,6 +1,7 @@
 //! The library index: an entry for each design file in the library
 //! folders, and the scan that keeps it up to date.
 
+use emb_geom::text;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
@@ -274,7 +275,7 @@ pub fn read_entry(roots: &[PathBuf], f: &ScanFile, thumbs: Option<&Path>) -> Ent
     // Some extensions (.dat, .new, .max, …) are also used for other files:
     // a machine file with no stitches is not a design.
     if format != project::FILE_EXTENSION && stitches.stitch_count() == 0 {
-        e.error = Some("No stitches: not an embroidery design".into());
+        e.error = Some(text::tr("No stitches: not an embroidery design").into());
         return e;
     }
     // The areas of the picture: the appliqué fabric and the rhinestones.

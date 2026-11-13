@@ -117,12 +117,14 @@ impl AppState {
     /// stock. One undo step.
     pub fn use_stock_threads(&mut self) -> Vec<StockChange> {
         let stock = self.settings.thread_stock.clone();
-        let mut probe = self.doc.design().clone();
-        if probe.use_stock_threads(&stock).is_empty() {
+        // No undo step if nothing changes.
+        let Ok(changes) = self.doc.try_edit(tr("Use Threads in Stock"), |d| {
+            let changes = d.use_stock_threads(&stock);
+            if changes.is_empty() { Err(()) } else { Ok(changes) }
+        }) else {
             self.message = tr("All the used threads are in stock.").into();
             return Vec::new();
-        }
-        let changes = self.doc.edit("Use Threads in Stock", |d| d.use_stock_threads(&stock));
+        };
         self.message = fill("{} threads changed to threads in stock.", &[&changes.len()]);
         changes
     }
@@ -141,7 +143,7 @@ impl AppState {
 
     fn import_stock_dialog(&mut self) {
         let Some(p) = rfd::FileDialog::new()
-            .set_title("Import thread stock")
+            .set_title(tr("Import thread stock"))
             .add_filter("CSV", &["csv"])
             .set_directory(self.dialog_dir())
             .pick_file()
@@ -479,11 +481,11 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
     }
     if export {
         let csv = st.settings.thread_stock.to_csv();
-        st.save_csv_dialog("Export thread stock", "thread stock.csv", csv);
+        st.save_csv_dialog(tr("Export thread stock"), &format!("{}.csv", tr("thread stock")), csv);
     }
     if save_buy && let Some(buy) = st.threads_to_buy() {
-        let name = format!("{} threads to buy.csv", st.doc.design().name);
-        st.save_csv_dialog("Threads to buy", &name, emb_model::stock::buy_csv(&buy));
+        let name = crate::i18n::fill("{} threads to buy.csv", &[&st.doc.design().name]);
+        st.save_csv_dialog(tr("Threads to buy"), &name, emb_model::stock::buy_csv(&buy));
     }
     if !open {
         st.show_stock = false;

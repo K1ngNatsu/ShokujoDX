@@ -259,7 +259,10 @@ impl AppState {
                 }
             }
             self.set_settings(s);
-            lines.push(format!("Favorite styles: {styles}, my stones: {stones}"));
+            lines.push(crate::i18n::fill(
+                "Favorite styles: {}, my stones: {}",
+                &[&styles, &stones],
+            ));
         }
         Ok(lines.join("; "))
     }
@@ -272,7 +275,10 @@ impl AppState {
     fn import_assets_dialog(&mut self, kind: AssetKind) {
         let Some(dir) = kind.dir() else { return };
         let Some(paths) = rfd::FileDialog::new()
-            .set_title(format!("Import {}", kind.label().to_lowercase()))
+            .set_title(crate::i18n::fill(
+                "Import {}",
+                &[&crate::i18n::in_sentence(kind.label())],
+            ))
             .add_filter(kind.label(), kind.extensions())
             .pick_files()
         else {
@@ -303,8 +309,8 @@ impl AppState {
             files.retain(|(n, _)| n != FAVORITES_FILE);
         }
         let Some(p) = rfd::FileDialog::new()
-            .set_title("Export (zip file)")
-            .add_filter("Zip file", &["zip"])
+            .set_title(tr("Export (zip file)"))
+            .add_filter(tr("Zip file"), &["zip"])
             .set_file_name(format!("{name}.zip"))
             .save_file()
         else {
@@ -323,8 +329,8 @@ impl AppState {
 
     fn import_package_dialog(&mut self) {
         let Some(p) = rfd::FileDialog::new()
-            .set_title("Import a package of assets")
-            .add_filter("Zip file", &["zip"])
+            .set_title(tr("Import a package of assets"))
+            .add_filter(tr("Zip file"), &["zip"])
             .pick_file()
         else {
             return;

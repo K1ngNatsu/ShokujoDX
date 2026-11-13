@@ -11,7 +11,7 @@
 //! its frame; the window maps to the frame. A WMF with no placeable header
 //! is read at 96 units per inch.
 
-use emb_geom::Point;
+use emb_geom::{Point, text};
 
 use crate::meta::{Bytes, MetaObject, Painter, colorref};
 use crate::svg::{SvgError, SvgImport};
@@ -110,7 +110,7 @@ pub fn import_wmf(data: &[u8], vectors: bool) -> Result<SvgImport, SvgError> {
     let start = b.pos;
     let (kind, words) = (b.u16(), b.u16());
     if !matches!(kind, Some(1 | 2)) || words != Some(9) {
-        return Err(bad("not a WMF file"));
+        return Err(bad(text::tr("not a WMF file")));
     }
     let mut pos = start + 18;
     let mut p = Painter::new(vectors);
@@ -121,7 +121,7 @@ pub fn import_wmf(data: &[u8], vectors: bool) -> Result<SvgImport, SvgError> {
         };
         let size = size as usize * 2;
         if size < 6 || pos + size > data.len() {
-            return Err(bad("a record is cut off"));
+            return Err(bad(text::tr("a record is cut off")));
         }
         let mut b = Bytes {
             data: &data[..pos + size],

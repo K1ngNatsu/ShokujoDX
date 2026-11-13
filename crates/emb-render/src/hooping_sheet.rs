@@ -2,7 +2,7 @@
 //! each hooping of a large design goes, the order, the files, and how to
 //! use the registration marks.
 
-use emb_geom::{BBox, Point};
+use emb_geom::{BBox, Point, text};
 use emb_model::Rgb;
 
 use crate::page::{Fit, Op, Page, Paper, wrap};
@@ -59,7 +59,7 @@ pub fn overview(s: &HoopingSheet, paper: Paper) -> Page {
     let mut page = Page::new(paper);
     let w = page.width_mm;
     let mut y = MARGIN_MM + 5.0;
-    page.text(MARGIN_MM, y, 16.0, true, format!("Hoopings: {}", s.name));
+    page.text(MARGIN_MM, y, 16.0, true, text::fill("Hoopings: {}", &[&s.name]));
     y += 6.0;
     page.gray_text(
         MARGIN_MM,
@@ -113,61 +113,63 @@ pub fn overview(s: &HoopingSheet, paper: Paper) -> Page {
     y = area.max.y + 8.0;
 
     // The table.
-    page.text(MARGIN_MM, y, 11.0, true, "Sew in this order");
+    page.text(MARGIN_MM, y, 11.0, true, text::tr("Sew in this order"));
     y += 6.0;
     for (k, r) in s.rows.iter().enumerate() {
         let marks = match (r.marks_first, r.marks_last) {
-            (true, true) => "marks first and last",
-            (true, false) => "marks first",
-            (false, true) => "marks last",
-            (false, false) => "no marks",
+            (true, true) => text::tr("marks first and last"),
+            (true, false) => text::tr("marks first"),
+            (false, true) => text::tr("marks last"),
+            (false, false) => text::tr("no marks"),
         };
         page.text(MARGIN_MM, y, 9.0, true, format!("{}.", k + 1));
         page.text(MARGIN_MM + 7.0, y, 9.0, false, r.files.clone());
         y += 4.5;
         let place = match r.position {
-            Some(p) => format!("hoop position {}", p + 1),
-            None => format!(
-                "center {:.1} mm right, {:.1} mm down from hooping 1",
-                r.offset.x, r.offset.y
+            Some(p) => text::fill("hoop position {}", &[&(p + 1)]),
+            None => text::fill(
+                "center {} mm right, {} mm down from hooping 1",
+                &[&format!("{:.1}", r.offset.x), &format!("{:.1}", r.offset.y)],
             ),
         };
-        page.gray_text(
-            MARGIN_MM + 7.0,
-            y,
-            8.0,
-            format!(
-                "{} stitches, {} colors · hoop {} · {place} · {marks}",
-                r.stitches,
-                r.colors,
-                if r.turned {
-                    "turned (top of the design to the right on the machine)"
-                } else {
-                    "straight"
-                },
-            ),
-        );
+        page.gray_text(MARGIN_MM + 7.0, y, 8.0, {
+            let hoop = if r.turned {
+                text::tr("turned (top of the design to the right on the machine)")
+            } else {
+                text::tr("straight")
+            };
+            text::fill(
+                "{} stitches, {} colors · hoop {} · {} · {}",
+                &[&r.stitches, &r.colors, &hoop, &place, &marks],
+            )
+        });
         y += 6.0;
     }
 
     // What to do.
     y += 2.0;
-    page.text(MARGIN_MM, y, 11.0, true, "How to sew");
+    page.text(MARGIN_MM, y, 11.0, true, text::tr("How to sew"));
     y += 5.5;
     let positions = [
-        "Hoop the fabric once, in the multi-position hoop, as the picture shows.",
-        "Put the hoop on the machine in position 1 and sew file 1.",
-        "Move the hoop to the position of the next file (the fabric stays in the hoop) and sew \
+        text::tr("Hoop the fabric once, in the multi-position hoop, as the picture shows."),
+        text::tr("Put the hoop on the machine in position 1 and sew file 1."),
+        text::tr(
+            "Move the hoop to the position of the next file (the fabric stays in the hoop) and sew \
          that file. Do the same for each file.",
+        ),
     ];
     let hoopings = [
-        "Hoop the fabric for hooping 1 at the place in the picture, and sew its file.",
-        "Take the fabric out. Hoop it again for the next hooping: its registration marks \
+        text::tr("Hoop the fabric for hooping 1 at the place in the picture, and sew its file."),
+        text::tr(
+            "Take the fabric out. Hoop it again for the next hooping: its registration marks \
          (the crosses) and its part of the design must be inside the field.",
-        "Sew the next file. It sews the registration marks first, in their own color, and \
+        ),
+        text::tr(
+            "Sew the next file. It sews the registration marks first, in their own color, and \
          the machine stops. If the new crosses are not on the old crosses, move the design \
          on the machine (or hoop again) until they are. Then sew the rest.",
-        "Do the same for each hooping. At the end, pull out the stitches of the crosses.",
+        ),
+        text::tr("Do the same for each hooping. At the end, pull out the stitches of the crosses."),
     ];
     let mut steps: Vec<&str> = if s.positions {
         positions.to_vec()
@@ -176,7 +178,7 @@ pub fn overview(s: &HoopingSheet, paper: Paper) -> Page {
     };
     if s.rows.iter().any(|r| r.turned) {
         steps.push(
-            "A turned hooping has the top of the design to the right on the machine (the machine screen shows it so). Its worksheet shows the hoop and the design.",
+            text::tr("A turned hooping has the top of the design to the right on the machine (the machine screen shows it so). Its worksheet shows the hoop and the design."),
         );
     }
     for (k, t) in steps.iter().enumerate() {
@@ -192,7 +194,7 @@ pub fn overview(s: &HoopingSheet, paper: Paper) -> Page {
     }
     if !s.warnings.is_empty() {
         y += 3.0;
-        page.text(MARGIN_MM, y, 11.0, true, "Warnings");
+        page.text(MARGIN_MM, y, 11.0, true, text::tr("Warnings"));
         y += 5.5;
         for warning in &s.warnings {
             for line in wrap(warning, 105) {

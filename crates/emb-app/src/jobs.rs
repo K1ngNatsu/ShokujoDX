@@ -118,7 +118,7 @@ impl Queue {
             .unwrap_or_default();
         for j in &mut jobs {
             if !j.is_finished() {
-                j.state = JobState::Failed("The program stopped before the job ended.".into());
+                j.state = JobState::Failed(tr("The program stopped before the job ended.").into());
             }
         }
         let next_id = jobs.iter().map(|j| j.id + 1).max().unwrap_or(1);
@@ -214,7 +214,7 @@ impl AppState {
             let id = *id;
             let result = match rx.try_recv() {
                 Ok(r) => Some(r),
-                Err(mpsc::TryRecvError::Disconnected) => Some(Err("The job stopped with an error.".into())),
+                Err(mpsc::TryRecvError::Disconnected) => Some(Err(tr("The job stopped with an error.").into())),
                 Err(mpsc::TryRecvError::Empty) => None,
             };
             if let Some(r) = result {
@@ -229,7 +229,9 @@ impl AppState {
                 j.state = JobState::Running;
             }
             let (tx, rx) = mpsc::channel();
+            let lang = crate::i18n::active();
             std::thread::spawn(move || {
+                crate::i18n::set_active(lang);
                 let _ = tx.send(work());
             });
             self.jobs.running = Some((id, rx));
@@ -250,7 +252,7 @@ impl AppState {
                     self.set_settings(s);
                 }
                 self.message = if out.message.is_empty() {
-                    format!("{label}: {} files written", out.files.len())
+                    crate::i18n::fill("{}: {} files written", &[&label, &out.files.len()])
                 } else {
                     out.message
                 };
@@ -261,7 +263,7 @@ impl AppState {
             }
             Err(e) => {
                 self.notice = Some(Notice {
-                    title: format!("{label}: not done"),
+                    title: crate::i18n::fill("{}: not done", &[&label]),
                     lines: vec![e.clone()],
                 });
                 self.jobs.jobs[k].state = JobState::Failed(e);
@@ -304,7 +306,7 @@ impl AppState {
             [one] => one
                 .file_name()
                 .map_or_else(String::new, |n| n.to_string_lossy().into_owned()),
-            many => format!("{} designs", many.len()),
+            many => crate::i18n::fill("{} designs", &[&many.len()]),
         };
         let again = Again::Batch {
             paths: paths.clone(),
@@ -315,8 +317,9 @@ impl AppState {
         let catalogs = self.owned_catalogs();
         let (f, n) = (folder.clone(), paths.len());
         let work: Work = Box::new(move || {
-            let lines = crate::output::batch_files(&paths, &f, &profile, catalogs.view(), machine.as_deref());
-            let failed = lines.iter().filter(|l| l.contains(": not written:")).count();
+            let results = crate::output::batch_files(&paths, &f, &profile, catalogs.view(), machine.as_deref());
+            let failed = results.iter().filter(|l| l.is_err()).count();
+            let lines: Vec<String> = results.into_iter().map(|l| l.unwrap_or_else(|e| e)).collect();
             let files = std::fs::read_dir(&f)
                 .map(|r| r.flatten().map(|e| e.path()).collect::<Vec<_>>())
                 .unwrap_or_default();
@@ -324,11 +327,14 @@ impl AppState {
                 return Err(lines.join("\n"));
             }
             Ok(JobOutput {
-                message: format!(
-                    "Batch output: {} of {n} designs written to {}{}",
-                    n - failed,
-                    f.display(),
-                    if failed > 0 { " (see Exports)" } else { "" }
+                message: crate::i18n::fill(
+                    "Batch output: {} of {} designs written to {}{}",
+                    &[
+                        &(n - failed),
+                        &n,
+                        &f.display(),
+                        &(if failed > 0 { tr(" (see Exports)") } else { "" }),
+                    ],
                 ),
                 files,
                 lines,
@@ -355,7 +361,7 @@ impl AppState {
         let work: Work = Box::new(move || {
             crate::library::write_catalog(&entries, &title, paper, &p)?;
             Ok(JobOutput {
-                message: format!("Wrote the catalog {} ({n} designs)", p.display()),
+                message: crate::i18n::fill("Wrote the catalog {} ({} designs)", &[&p.display(), &n]),
                 files: vec![p],
                 ..Default::default()
             })
@@ -400,8 +406,8 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
         let active = st.jobs.active();
         let ended = st.jobs.jobs.len() - active;
         ui.weak(match active {
-            0 => "No job runs.".to_string(),
-            n => format!("{n} job{} in the queue", if n == 1 { "" } else { "s" }),
+            0 => tr("No job runs.").to_string(),
+            n => crate::i18n::fill("{} job{} in the queue", &[&n, &(if n == 1 { "" } else { "s" })]),
         });
         if ui
             .add_enabled(ended > 0, egui::Button::new(tr("Clear history")).small())
@@ -443,9 +449,9 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
                 });
                 let when = j.ended.as_deref().unwrap_or(&j.queued);
                 let line = match &j.state {
-                    JobState::Waiting => format!("Queued {when}"),
-                    JobState::Running => "Running…".to_string(),
-                    JobState::Done => format!("{} files · {when}", j.files.len()),
+                    JobState::Waiting => crate::i18n::fill("Queued {}", &[&when]),
+                    JobState::Running => tr("Running…").to_string(),
+                    JobState::Done => crate::i18n::fill("{} files · {}", &[&j.files.len(), &when]),
                     JobState::Failed(e) => format!("{e} · {when}"),
                 };
                 ui.weak(line);

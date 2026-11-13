@@ -3,11 +3,33 @@ name: CI
 # Windows and Ubuntu check each push and pull request. macOS minutes cost
 # the most in a private repository, so macOS checks only a tag (v*) and a
 # run by hand (Actions > CI > Run workflow); ADR 0060.
+#
+# A commit that changes only documents that the program does not build in
+# (the spec, ADRs, plans, test notes, the top-level Markdown files) does
+# not run the checks. The help topics (docs/help) and data/ are built into
+# the program, so they are not in the list. GitHub does not apply path
+# filters to tags, so a release tag always runs the checks.
 on:
   push:
     branches: [main]
     tags: ['v*']
+    paths-ignore:
+      - 'docs/SPEC.md'
+      - 'docs/adr/**'
+      - 'docs/design/**'
+      - 'docs/testing/**'
+      - 'README.md'
+      - 'CONTRIBUTING.md'
+      - 'CLAUDE.md'
   pull_request:
+    paths-ignore:
+      - 'docs/SPEC.md'
+      - 'docs/adr/**'
+      - 'docs/design/**'
+      - 'docs/testing/**'
+      - 'README.md'
+      - 'CONTRIBUTING.md'
+      - 'CLAUDE.md'
   workflow_dispatch:
 
 env:
@@ -51,7 +73,7 @@ jobs:
       - name: Engine crates have no UI and no C dependency
         shell: bash
         run: |
-          for c in emb-geom emb-model emb-stitch emb-formats emb-render emb-letter emb-art emb-library; do
+          for c in emb-geom emb-model emb-stitch emb-formats emb-render emb-letter emb-art emb-library emb-script emb-sketch; do
             if cargo tree -p "$c" -e normal --prefix none | grep -Eq '^(egui|eframe|winit|wgpu|egui_dock|emb-app|emb-cli) '; then
               echo "$c depends on a UI crate or a higher crate"; exit 1
             fi

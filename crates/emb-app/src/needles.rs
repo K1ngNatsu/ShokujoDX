@@ -22,7 +22,7 @@ impl AppState {
     /// undo step.
     pub fn set_needle(&mut self, thread: emb_model::ThreadId, needle: Option<u8>) {
         if self.doc.design().needle_pin(thread) != needle {
-            self.doc.edit("Set Needle", |d| d.set_needle_pin(thread, needle));
+            self.doc.edit(tr("Set Needle"), |d| d.set_needle_pin(thread, needle));
         }
     }
 
@@ -271,7 +271,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         st.set_needle(t, n);
     }
     if auto_all {
-        st.doc.edit("Auto Needles", |d| d.needles.clear());
+        st.doc.edit(tr("Auto Needles"), |d| d.needles.clear());
     }
     if keep {
         st.keep_needle_threads();

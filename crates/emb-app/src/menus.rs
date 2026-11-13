@@ -126,6 +126,7 @@ pub fn edit_items(ui: &mut egui::Ui, st: &mut AppState) {
         lines,
         single_line,
         single_shape,
+        vectors,
         ..
     } = crate::ribbon::SelInfo::of(st);
     ui.menu_button(tr("Edit Objects"), |ui| {
@@ -143,6 +144,14 @@ pub fn edit_items(ui: &mut egui::Ui, st: &mut AppState) {
             .clicked()
         {
             st.join_selection();
+            ui.close();
+        }
+        if ui
+            .add_enabled(lines + vectors > 0, egui::Button::new(tr("Close Gaps…")))
+            .on_hover_text(tr("Join the ends of the selected lines where they are near"))
+            .clicked()
+        {
+            st.open_close_gaps();
             ui.close();
         }
         if ui.button(tr("Knife…")).on_hover_text(Tool::Knife.tooltip()).clicked() {

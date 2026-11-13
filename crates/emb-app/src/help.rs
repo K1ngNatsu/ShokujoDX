@@ -50,6 +50,7 @@ const FILES: &[&str] = &[
     include_str!("../../../docs/help/arranging.md"),
     include_str!("../../../docs/help/objects-and-stitches.md"),
     include_str!("../../../docs/help/stitch-types.md"),
+    include_str!("../../../docs/help/buttonholes.md"),
     include_str!("../../../docs/help/lettering.md"),
     include_str!("../../../docs/help/pictures.md"),
     include_str!("../../../docs/help/artwork.md"),
@@ -73,6 +74,10 @@ const FILES: &[&str] = &[
     include_str!("../../../docs/help/file-formats.md"),
     include_str!("../../../docs/help/glossary.md"),
 ];
+
+// The translated topics: `HELP_TRANSLATIONS`, made by `build.rs` from the
+// folders `docs/help/<code>/` (ADR 0084).
+include!(concat!(env!("OUT_DIR"), "/help_translations.rs"));
 
 /// The part of the contents that a topic is in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -139,12 +144,15 @@ pub const WINDOW_HELP: &[(&str, &str)] = &[
     ("Arrangements", "arranging"),
     ("Paste Special", "editing"),
     ("Simplify", "editing"),
+    ("Close Gaps", "editing"),
+    ("Clean Up", "editing"),
+    ("Envelope", "editing"),
     ("Corner Radius", "editing"),
     ("Hole Inside the Outline", "editing"),
     ("Save as Clipart", "library"),
     ("Motifs", "stitch-types"),
     ("Borders", "stitch-types"),
-    ("Buttonholes", "stitch-types"),
+    ("Buttonholes", "buttonholes"),
     ("Blends", "stitch-types"),
     ("ColorFills", "stitch-types"),
     ("Quilting", "quilting"),
@@ -223,9 +231,24 @@ pub fn parse_topic(text: &str) -> Option<Topic> {
     })
 }
 
-/// The id of the help topic of a ribbon tab.
+/// The id of the help topic of a ribbon tab. It is the same in each
+/// language (the label of the tab is not).
 pub fn ribbon_id(tab: RibbonTab) -> String {
-    format!("ribbon-{}", tab.label().to_lowercase())
+    let name = match tab {
+        RibbonTab::Digitize => "digitize",
+        RibbonTab::Lettering => "lettering",
+        RibbonTab::Artwork => "artwork",
+        RibbonTab::Specialty => "specialty",
+        RibbonTab::Edit => "edit",
+        RibbonTab::Arrange => "arrange",
+        RibbonTab::Color => "color",
+        RibbonTab::View => "view",
+        RibbonTab::Design => "design",
+        RibbonTab::Hooping => "hooping",
+        RibbonTab::Help => "help",
+        RibbonTab::Sketch => "sketch",
+    };
+    format!("ribbon-{name}")
 }
 
 /// What each ribbon tab is for (the first lines of its topic).
@@ -341,12 +364,34 @@ fn keyboard_topic(ctx: &egui::Context) -> Topic {
     }
 }
 
-/// All topics: the files, the ribbon tabs and the keyboard.
+/// All topics: the files (in the language of the program where a
+/// translation exists), the ribbon tabs and the keyboard.
 pub fn all_topics(ctx: &egui::Context) -> Vec<Topic> {
     let mut v: Vec<Topic> = FILES.iter().filter_map(|f| parse_topic(f)).collect();
+    translate_topics(&mut v, crate::i18n::current());
     v.extend(RibbonTab::ALL.iter().map(|t| ribbon_topic(*t, ctx)));
     v.push(keyboard_topic(ctx));
     v
+}
+
+/// The topics of `topics` that have a translation in the language `code`
+/// (ADR 0084) get its title, its body and its keywords; the English
+/// keywords stay too, so an English word still finds the topic. The id and
+/// the group stay.
+fn translate_topics(topics: &mut [Topic], code: &str) {
+    for (lang, _, text) in HELP_TRANSLATIONS {
+        if *lang != code {
+            continue;
+        }
+        let Some(t) = parse_topic(text) else { continue };
+        if let Some(en) = topics.iter_mut().find(|e| e.id == t.id) {
+            en.title = t.title;
+            en.body = t.body;
+            let mut keywords = t.keywords;
+            keywords.append(&mut en.keywords);
+            en.keywords = keywords;
+        }
+    }
 }
 
 // ---- Markdown ----
@@ -603,14 +648,48 @@ pub fn stem(word: &str) -> String {
     base
 }
 
-/// The stems of the words of a text, with the stop words left out.
+/// A character of Japanese (kana or kanji): such text has no spaces
+/// between its words.
+fn cjk(c: char) -> bool {
+    matches!(c as u32, 0x3040..=0x30FF | 0x3400..=0x4DBF | 0x4E00..=0x9FFF | 0xF900..=0xFAFF | 0xFF66..=0xFF9F)
+}
+
+/// The stems of the words of a text, with the stop words left out. A run
+/// of Japanese characters gives each pair of characters next to each other
+/// (a word of two characters or more then finds its pairs).
 pub fn tokens(text: &str) -> Vec<String> {
-    text.split(|c: char| !(c.is_alphanumeric() || c == '\''))
-        .filter(|w| !w.is_empty())
-        .filter(|w| !STOP.contains(&w.to_lowercase().as_str()))
-        .map(stem)
-        .filter(|w| !w.is_empty())
-        .collect()
+    let mut out = Vec::new();
+    for w in text.split(|c: char| !(c.is_alphanumeric() || c == '\'')) {
+        if w.is_empty() {
+            continue;
+        }
+        if !w.chars().any(cjk) {
+            if !STOP.contains(&w.to_lowercase().as_str()) {
+                out.push(stem(w));
+            }
+            continue;
+        }
+        // Runs of Japanese and of other characters ("PDF" in "PDFを開く").
+        let chars: Vec<char> = w.chars().collect();
+        let mut start = 0;
+        while start < chars.len() {
+            let japanese = cjk(chars[start]);
+            let end = (start..chars.len())
+                .find(|&i| cjk(chars[i]) != japanese)
+                .unwrap_or(chars.len());
+            let run = &chars[start..end];
+            if !japanese {
+                out.push(stem(&run.iter().collect::<String>()));
+            } else if run.len() == 1 {
+                out.push(run[0].to_string());
+            } else {
+                out.extend(run.windows(2).map(|p| p.iter().collect::<String>()));
+            }
+            start = end;
+        }
+    }
+    out.retain(|w| !w.is_empty());
+    out
 }
 
 /// A section of a topic: the text under one heading.
@@ -819,14 +898,21 @@ pub struct HelpState {
     pub results: Option<Vec<Hit>>,
     /// The topics before, for Back.
     back: Vec<String>,
+    /// The language of the topics.
+    lang: String,
 }
 
 impl HelpState {
-    /// Makes the topics and the index, once.
+    /// Makes the topics and the index, once, and again when the language
+    /// changes.
     pub fn ensure(&mut self, ctx: &egui::Context) {
-        if self.topics.is_empty() {
+        let lang = crate::i18n::current();
+        if self.topics.is_empty() || self.lang != lang {
             self.topics = all_topics(ctx);
             self.index = Index::new(&self.topics);
+            self.lang = lang.to_string();
+            // The old results are in the old language.
+            self.results = None;
         }
     }
 
@@ -1170,6 +1256,122 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// The shape of a topic: its kinds of blocks, the items of each list,
+    /// the rows and cells of each table, the links and the code.
+    fn shape(body: &str) -> Vec<String> {
+        let marks = |s: &str| -> Vec<String> {
+            spans(s)
+                .into_iter()
+                .filter_map(|sp| match sp {
+                    Span::Link(_, id) => Some(format!("link {id}")),
+                    Span::Code(c) => Some(format!("code {c}")),
+                    _ => None,
+                })
+                .collect()
+        };
+        let mut out = Vec::new();
+        for b in blocks(body) {
+            match b {
+                Block::Heading(level, h) => {
+                    out.push(format!("heading {level}"));
+                    out.extend(marks(&h));
+                }
+                Block::Para(p) => {
+                    out.push("paragraph".into());
+                    out.extend(marks(&p));
+                }
+                Block::List(numbered, items) => {
+                    out.push(format!("list {numbered} {}", items.len()));
+                    for i in &items {
+                        out.extend(marks(i));
+                    }
+                }
+                Block::Table(rows) => {
+                    out.push(format!("table {}", rows.len()));
+                    for r in &rows {
+                        out.push(format!("row {}", r.len()));
+                        for c in r {
+                            out.extend(marks(c));
+                        }
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    /// Each translated topic (ADR 0084) is a topic of the program, in the
+    /// same group, with the same blocks, links and code as the English
+    /// topic.
+    #[test]
+    fn each_translation_matches_its_topic() {
+        let english: Vec<Topic> = FILES.iter().filter_map(|f| parse_topic(f)).collect();
+        let codes: Vec<&str> = crate::i18n::languages().iter().map(|l| l.code.as_str()).collect();
+        let mut seen = HashSet::new();
+        for (code, name, text) in HELP_TRANSLATIONS {
+            assert!(codes.contains(code), "docs/help/{code}: not a language of the program");
+            let t = parse_topic(text).unwrap_or_else(|| panic!("docs/help/{code}/{name}.md does not read"));
+            assert_eq!(t.id, *name, "docs/help/{code}/{name}.md: the id is the file name");
+            assert!(seen.insert((*code, t.id.clone())), "{code}/{name}: two files");
+            let en = english
+                .iter()
+                .find(|e| e.id == t.id)
+                .unwrap_or_else(|| panic!("{code}/{name}: no English topic"));
+            assert_eq!(t.group, en.group, "{code}/{name}: the group");
+            assert!(!t.title.is_empty() && !t.keywords.is_empty(), "{code}/{name}");
+            let (a, b) = (shape(&en.body), shape(&t.body));
+            if let Some(i) = (0..a.len().max(b.len())).find(|&i| a.get(i) != b.get(i)) {
+                panic!(
+                    "{code}/{name}: block {i} is {:?} in English and {:?} here",
+                    a.get(i),
+                    b.get(i)
+                );
+            }
+        }
+    }
+
+    /// In a language with translations, the help shows them, and the search
+    /// finds their words (also in Japanese, which has no spaces).
+    #[test]
+    fn the_help_is_in_the_language_of_the_program() {
+        let ctx = crate::test_util::ready_context();
+        for (code, word) in [("de", "Startseite"), ("es", "inicio"), ("ja", "スタートページ")] {
+            if !HELP_TRANSLATIONS
+                .iter()
+                .any(|(c, n, _)| *c == code && *n == "getting-started")
+            {
+                continue;
+            }
+            crate::i18n::set_language(code);
+            let all = all_topics(&ctx);
+            let t = all.iter().find(|t| t.id == "getting-started").unwrap();
+            let en = FILES
+                .iter()
+                .filter_map(|f| parse_topic(f))
+                .find(|t| t.id == "getting-started")
+                .unwrap();
+            assert_ne!(t.title, en.title, "{code}");
+            let hits = Index::new(&all).search(word, 3);
+            assert!(
+                hits.iter().any(|h| all[h.topic].id == "getting-started"),
+                "{code}: {word}"
+            );
+            crate::i18n::set_active(None);
+        }
+        // The ribbon topics keep their ids in each language.
+        crate::i18n::set_language("de");
+        assert_eq!(ribbon_id(RibbonTab::Digitize), "ribbon-digitize");
+        crate::i18n::set_active(None);
+    }
+
+    #[test]
+    fn japanese_words_are_pairs_of_characters() {
+        assert_eq!(tokens("糸チャート"), ["糸チ", "チャ", "ャー", "ート"]);
+        assert_eq!(tokens("PDFを開く"), ["pdf", "を開", "開く"]);
+        assert_eq!(tokens("色"), ["色"]);
+        assert_eq!(tokens("the threads"), ["thread"]);
     }
 
     #[test]

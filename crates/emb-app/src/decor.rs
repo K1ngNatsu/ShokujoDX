@@ -1,11 +1,11 @@
 //! Decoration windows (P5 Milestone 7): Blends (two-color blend and multi
-//! blend layers), Buttonholes (one, or a string along a line) and Borders
-//! (decorative frames round the selection or the design).
+//! blend layers) and Borders (decorative frames round the selection or the
+//! design). The Buttonholes window is in `buttonholes`.
 
 use eframe::egui;
 use emb_geom::BBox;
-use emb_model::decor::{blend_densities, blend_profile, buttonhole, frame_objects, frames, string_positions};
-use emb_model::{BlendRecord, ButtonholeSpec, ObjectId, ObjectKind, ThreadId};
+use emb_model::decor::{blend_densities, blend_profile, frame_objects, frames};
+use emb_model::{BlendRecord, ObjectId, ObjectKind, ThreadId};
 
 use crate::app::AppState;
 use crate::i18n::tr;
@@ -19,9 +19,7 @@ pub struct DecorWindows {
     pub borders: bool,
     /// The thread of the second color of a new blend.
     pub blend_thread: Option<ThreadId>,
-    pub buttonhole: ButtonholeSpec,
-    pub buttonhole_count: usize,
-    pub buttonhole_across: bool,
+    pub buttonhole: crate::buttonholes::ButtonholeWindow,
     /// The index of the frame in the list.
     pub frame: usize,
     pub frame_margin_mm: f64,
@@ -34,9 +32,7 @@ impl Default for DecorWindows {
             buttonholes: false,
             borders: false,
             blend_thread: None,
-            buttonhole: ButtonholeSpec::default(),
-            buttonhole_count: 5,
-            buttonhole_across: true,
+            buttonhole: Default::default(),
             frame: 0,
             frame_margin_mm: 4.0,
         }
@@ -93,7 +89,7 @@ impl AppState {
             self.message = tr("Select one fill or satin column to blend.").into();
             return false;
         };
-        let ids = self.doc.edit("Color blend", |d| {
+        let ids = self.doc.edit(tr("Color blend"), |d| {
             let g = d.new_group_id();
             let i = d.index_of(o.id).unwrap_or(d.objects().len());
             let mut top = o.kind.clone();
@@ -133,7 +129,7 @@ impl AppState {
         let Some(o) = self.doc.design().object(top).cloned() else {
             return;
         };
-        let new = self.doc.edit("Add blend layer", |d| {
+        let new = self.doc.edit(tr("Add blend layer"), |d| {
             let i = d.index_of(top).map_or(d.objects().len(), |i| i + 1);
             let mut kind = o.kind.clone();
             if let Some(slot) = profile_of(&mut kind) {
@@ -253,7 +249,7 @@ fn blends_window(ctx: &egui::Context, st: &mut AppState) {
                 })
                 .inner;
             if thread != o.thread {
-                st.doc.edit("Change blend color", |d| {
+                st.doc.edit(tr("Change blend color"), |d| {
                     if let Some(obj) = d.object_mut(*id) {
                         obj.thread = thread;
                     }
@@ -263,7 +259,7 @@ fn blends_window(ctx: &egui::Context, st: &mut AppState) {
             // when it first shows a value).
             if (ra.changed() || rb.changed()) && ((a - a0).abs() > 1e-6 || (b - b0).abs() > 1e-6) {
                 st.doc.edit_merged(
-                    "Change blend density",
+                    tr("Change blend density"),
                     emb_model::MergeKey::new(format!("{}:blend", id.0)),
                     |d| {
                         if let Some(slot) = d.object_mut(*id).and_then(|o| profile_of(&mut o.kind)) {
@@ -285,14 +281,14 @@ fn blends_window(ctx: &egui::Context, st: &mut AppState) {
                 "add" => st.add_blend_layer(),
                 "remove" => {
                     let id = layers[i];
-                    st.doc.edit("Remove blend layer", |d| {
+                    st.doc.edit(tr("Remove blend layer"), |d| {
                         d.remove_object(id);
                     });
                 }
                 _ => {
                     let j = if what == "up" { i - 1 } else { i + 1 };
                     let (a, b) = (layers[i], layers[j]);
-                    st.doc.edit("Move blend layer", |d| {
+                    st.doc.edit(tr("Move blend layer"), |d| {
                         // Next to each other: moving one to the other's place swaps them.
                         if let Some(ib) = d.index_of(b) {
                             d.move_object(a, ib);
@@ -307,57 +303,6 @@ fn blends_window(ctx: &egui::Context, st: &mut AppState) {
 }
 
 impl AppState {
-    /// Adds buttonholes: a string along the selected line, or one in the
-    /// middle of the hoop. One undo step; the buttonholes are one group.
-    pub fn add_buttonholes(&mut self) -> usize {
-        let w = self.decor.clone();
-        let d = self.doc.design();
-        let line = self
-            .selection
-            .single()
-            .and_then(|id| d.object(id))
-            .and_then(|o| match &o.kind {
-                ObjectKind::Running { path, .. } => {
-                    Some((o.id, o.thread, path.flatten(0.1).into_iter().next()?.points))
-                }
-                _ => None,
-            });
-        let (positions, thread, used) = match line {
-            Some((id, t, pts)) => (
-                string_positions(&pts, w.buttonhole_count.max(1), w.buttonhole_across),
-                Some(t),
-                Some(id),
-            ),
-            None => (vec![(d.hoop.center, 90.0)], d.threads.first().map(|t| t.id), None),
-        };
-        let n = positions.len();
-        let ids = self.doc.edit("Buttonholes", |d| {
-            let t = thread.unwrap_or_else(|| d.add_thread("Thread", emb_model::Rgb(30, 30, 30)));
-            let g = d.new_group_id();
-            if let Some(id) = used {
-                d.remove_object(id);
-            }
-            let mut ids = Vec::new();
-            for (c, a) in positions {
-                for kind in buttonhole(&w.buttonhole, c, a) {
-                    let id = d.add_object(t, kind);
-                    if let Some(o) = d.object_mut(id) {
-                        o.group = Some(g);
-                        o.name = Some("Buttonhole".into());
-                    }
-                    ids.push(id);
-                }
-            }
-            ids
-        });
-        self.selection.set_all(ids);
-        self.message = crate::i18n::fill(
-            "{} buttonholes added. Cut each opening between the legs after sewing.",
-            &[&n],
-        );
-        n
-    }
-
     /// Adds the frame of the Borders window round the selection (or the
     /// whole design). It sews last. One undo step; the frame is one group.
     pub fn add_frame(&mut self) -> bool {
@@ -383,7 +328,7 @@ impl AppState {
             .map(|o| o.thread)
             .or_else(|| d.threads.first().map(|t| t.id));
         let kinds = frame_objects(&frame, &b, w.frame_margin_mm);
-        let new = self.doc.edit(format!("Border {}", frame.name), |d| {
+        let new = self.doc.edit(crate::i18n::fill("Border {}", &[&frame.name]), |d| {
             let t = thread.unwrap_or_else(|| d.add_thread("Thread", emb_model::Rgb(30, 30, 30)));
             let g = d.new_group_id();
             kinds
@@ -400,71 +345,6 @@ impl AppState {
         });
         self.selection.set_all(new);
         true
-    }
-}
-
-fn buttonholes_window(ctx: &egui::Context, st: &mut AppState) {
-    let mut open = st.decor.buttonholes;
-    let mut add = false;
-    let on_line = st
-        .selection
-        .single()
-        .and_then(|id| st.doc.design().object(id))
-        .is_some_and(|o| matches!(o.kind, ObjectKind::Running { .. }));
-    crate::dock::docked(
-        egui::Window::new(tr("Buttonholes")).id(egui::Id::new("Buttonholes")),
-        ctx,
-        egui::Id::new("Buttonholes"),
-        st.canvas_rect,
-    )
-    .open(&mut open)
-    .collapsible(false)
-    .resizable(false)
-    .default_width(320.0)
-    .show(ctx, |ui| {
-        let w = &mut st.decor;
-        let s = &mut w.buttonhole;
-        for (label, v, range) in [
-            (tr("Opening"), &mut s.length_mm, 5.0..=50.0),
-            (tr("Leg width"), &mut s.leg_mm, 0.8..=4.0),
-            (tr("Gap for the cut"), &mut s.gap_mm, 0.2..=2.0),
-            (tr("Bar tack"), &mut s.bartack_mm, 0.5..=4.0),
-            (tr("Density"), &mut s.spacing_mm, 0.2..=0.6),
-        ] {
-            ui.horizontal(|ui| {
-                ui.label(label);
-                ui.add(
-                    egui::Slider::new(v, range)
-                        .clamping(egui::SliderClamping::Edits)
-                        .suffix(" mm")
-                        .fixed_decimals(1),
-                );
-            });
-        }
-        ui.separator();
-        if on_line {
-            ui.label(tr(
-                "A string of buttonholes along the selected line (the line is used up).",
-            ));
-            ui.horizontal(|ui| {
-                ui.label(tr("Number"));
-                ui.add(egui::Slider::new(&mut w.buttonhole_count, 1..=20).clamping(egui::SliderClamping::Edits));
-            });
-            ui.checkbox(&mut w.buttonhole_across, tr("Across the line (else along it)"));
-        } else {
-            ui.weak(tr("Select a line to place a string of buttonholes along it."));
-        }
-        add = ui
-            .button(if on_line {
-                "Place buttonholes"
-            } else {
-                "Place one buttonhole"
-            })
-            .clicked();
-    });
-    st.decor.buttonholes = open;
-    if add {
-        st.add_buttonholes();
     }
 }
 
@@ -519,7 +399,7 @@ pub fn windows(ctx: &egui::Context, st: &mut AppState) {
         blends_window(ctx, st);
     }
     if st.decor.buttonholes {
-        buttonholes_window(ctx, st);
+        crate::buttonholes::window(ctx, st);
     }
     if st.decor.borders {
         borders_window(ctx, st);
@@ -593,31 +473,6 @@ mod tests {
             h.st.doc.undo();
         }
         assert_eq!(labels.len(), 3, "{labels:?}");
-    }
-
-    #[test]
-    fn a_string_of_buttonholes_along_a_line() {
-        let mut h = Harness::empty();
-        let line = h.st.doc.edit("Add", |d| {
-            let t = d.add_thread("Black", emb_model::Rgb(0, 0, 0));
-            d.add_object(
-                t,
-                ObjectKind::Running {
-                    path: Path::new()
-                        .move_to(Point::new(0.0, -40.0))
-                        .line_to(Point::new(0.0, 40.0)),
-                    params: Default::default(),
-                },
-            )
-        });
-        h.st.selection.set(line);
-        h.st.decor.buttonhole_count = 4;
-        assert_eq!(h.st.add_buttonholes(), 4);
-        let d = h.st.doc.design();
-        assert_eq!(d.objects().len(), 4 * 5, "the line is used up");
-        assert!(d.objects().iter().all(|o| o.group == d.objects()[0].group));
-        h.st.decor.buttonholes = true;
-        draw(&mut h);
     }
 
     #[test]

@@ -40,6 +40,21 @@ pub struct SubNodes {
     pub closed: bool,
 }
 
+/// A short line along a subpath: on segment `seg` from parameter `ta` to
+/// `tb`, `s` mm from the start of the subpath (see [`SubNodes::pieces`]).
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Piece {
+    pub a: Point,
+    pub b: Point,
+    pub seg: usize,
+    pub ta: f64,
+    pub tb: f64,
+    pub s: f64,
+}
+
+/// Parameters nearer than this to 0 or 1 are the end of a segment.
+const T_EPS: f64 = 1e-9;
+
 /// A node: subpath index and node index.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NodeId {
@@ -143,6 +158,63 @@ impl SubNodes {
         true
     }
 
+    /// The subpath as short lines, from its start: `line_parts` for each
+    /// line segment and `curve_parts` for each cubic.
+    pub(crate) fn pieces(&self, line_parts: usize, curve_parts: usize) -> Vec<Piece> {
+        let mut out = Vec::new();
+        let mut s = 0.0;
+        for seg in 0..self.segs.len() {
+            let n = if self.segs[seg] == Seg::Line {
+                line_parts
+            } else {
+                curve_parts
+            }
+            .max(1);
+            for j in 0..n {
+                let (ta, tb) = (j as f64 / n as f64, (j + 1) as f64 / n as f64);
+                let (a, b) = (self.point_at(seg, ta), self.point_at(seg, tb));
+                out.push(Piece { a, b, seg, ta, tb, s });
+                s += a.distance(b);
+            }
+        }
+        out
+    }
+
+    /// Puts a node at parameter `t` of segment `seg` (none at an end of the
+    /// segment). Returns the index of the node there.
+    fn split_at(&mut self, seg: usize, t: f64) -> usize {
+        if t >= 1.0 - T_EPS {
+            return seg + 1;
+        }
+        if t <= T_EPS {
+            return seg;
+        }
+        let mut np = NodePath {
+            subs: vec![std::mem::take(self)],
+        };
+        np.insert_node(SegId { sub: 0, idx: seg }, t);
+        *self = np.subs.pop().unwrap_or_default();
+        seg + 1
+    }
+
+    /// Removes the part of an open subpath after parameter `t` of segment `seg`.
+    pub(crate) fn cut_after(&mut self, seg: usize, t: f64) {
+        let keep = self.split_at(seg, t);
+        if keep >= 1 {
+            self.nodes.truncate(keep + 1);
+            self.segs.truncate(keep);
+        }
+    }
+
+    /// Removes the part of an open subpath before parameter `t` of segment `seg`.
+    pub(crate) fn cut_before(&mut self, seg: usize, t: f64) {
+        let first = self.split_at(seg, t);
+        if first + 1 < self.nodes.len() {
+            self.nodes.drain(..first);
+            self.segs.drain(..first);
+        }
+    }
+
     /// Index of the segment that ends at node `i`.
     fn seg_in(&self, i: usize) -> Option<usize> {
         match (i, self.closed) {
@@ -197,7 +269,7 @@ impl SubNodes {
         }
     }
 
-    fn point_at(&self, s: usize, t: f64) -> Point {
+    pub(crate) fn point_at(&self, s: usize, t: f64) -> Point {
         let (a, b) = self.ends(s);
         match self.segs[s] {
             Seg::Line => a.lerp(b, t),
@@ -488,6 +560,43 @@ impl NodePath {
         })
     }
 
+    /// Breaks the subpath at the node: an open subpath becomes two (the
+    /// node is the end of the first and the start of the second); a closed
+    /// subpath opens there (it starts and ends at the node). Returns `false`
+    /// for an end node of an open subpath.
+    pub fn break_at(&mut self, id: NodeId) -> bool {
+        let Some(s) = self.subs.get(id.sub) else {
+            return false;
+        };
+        let k = s.nodes.len();
+        if id.idx >= k {
+            return false;
+        }
+        if s.closed {
+            let mut open = SubNodes {
+                nodes: (0..=k).map(|j| s.nodes[(id.idx + j) % k]).collect(),
+                segs: (0..k).map(|j| s.segs[(id.idx + j) % k]).collect(),
+                closed: false,
+            };
+            open.nodes[k] = open.nodes[0];
+            self.subs[id.sub] = open;
+            return true;
+        }
+        if id.idx == 0 || id.idx + 1 >= k {
+            return false;
+        }
+        let second = SubNodes {
+            nodes: s.nodes[id.idx..].to_vec(),
+            segs: s.segs[id.idx..].to_vec(),
+            closed: false,
+        };
+        let first = &mut self.subs[id.sub];
+        first.nodes.truncate(id.idx + 1);
+        first.segs.truncate(id.idx);
+        self.subs.insert(id.sub + 1, second);
+        true
+    }
+
     /// Removes the node and joins its segments. An open subpath keeps two
     /// nodes and a closed one three; returns `false` if the node cannot go.
     pub fn delete_node(&mut self, id: NodeId) -> bool {
@@ -730,5 +839,36 @@ mod tests {
         assert!(line.delete_node(NodeId { sub: 0, idx: 0 }));
         assert_eq!(line.subs[0].nodes, vec![p(1.0, 0.0), p(2.0, 0.0)]);
         assert!(!line.delete_node(NodeId { sub: 0, idx: 0 }));
+    }
+
+    #[test]
+    fn break_at_a_node() {
+        let line =
+            Path::new()
+                .move_to(p(0.0, 0.0))
+                .line_to(p(10.0, 0.0))
+                .cubic_to(p(12.0, 0.0), p(14.0, 2.0), p(14.0, 5.0));
+        let mut np = NodePath::from_path(&line);
+        assert!(!np.break_at(NodeId { sub: 0, idx: 0 }), "an end does not break");
+        assert!(np.break_at(NodeId { sub: 0, idx: 1 }));
+        assert_eq!(np.subs.len(), 2);
+        assert_eq!(np.subs[0].nodes, vec![p(0.0, 0.0), p(10.0, 0.0)]);
+        assert_eq!(np.subs[1].nodes, vec![p(10.0, 0.0), p(14.0, 5.0)]);
+        assert!(matches!(np.subs[1].segs[0], Seg::Cubic(..)));
+        // A closed square opens at its third corner.
+        let mut sq = NodePath::from_path(&Path::polygon(&[
+            p(0.0, 0.0),
+            p(10.0, 0.0),
+            p(10.0, 10.0),
+            p(0.0, 10.0),
+        ]));
+        assert!(sq.break_at(NodeId { sub: 0, idx: 2 }));
+        let s = &sq.subs[0];
+        assert!(!s.closed);
+        assert_eq!(
+            s.nodes,
+            vec![p(10.0, 10.0), p(0.0, 10.0), p(0.0, 0.0), p(10.0, 0.0), p(10.0, 10.0)]
+        );
+        assert_eq!(s.segs.len(), 4);
     }
 }

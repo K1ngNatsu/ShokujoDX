@@ -2,7 +2,7 @@
 id: editing
 title: Changing objects
 group: design
-keywords: edit, copy, cut, paste, paste special, paste after, duplicate, delete, clipart, select, by color, by type, split, join, break apart, knife, split at needle, hole, remove holes, fill holes, corner radius, hole from outline, frame, simplify, nodes, continue line, redwork, branching, close shape, reverse, swap sides, machine functions, stop, trim, tie-in, tie-off, lock stitch
+keywords: edit, copy, cut, paste, paste special, paste after, duplicate, delete, clipart, select, by color, by type, split, join, break apart, knife, split at needle, hole, remove holes, fill holes, corner radius, hole from outline, frame, simplify, nodes, smart fill, trim segment, envelope, slant, skew, copy properties, repeat, break at node, smart drawing, close gaps, gaps, overshoot, clean up, zig-zag, loops, spikes, svg, continue line, redwork, branching, close shape, reverse, swap sides, machine functions, stop, trim, tie-in, tie-off, lock stitch
 ---
 # Changing objects
 
@@ -46,10 +46,26 @@ See [The design library and clipart](library).
 - **Knife**: cut the selected objects along a line. Click two points.
 - **Break Apart**: one object for each separate part of an object.
 - **Join**: one object from the selected objects of one kind and color:
-  lines and columns whose ends touch, fills that touch. It puts back
-  together what Break apart or the knife separated.
+  lines and columns whose ends touch, fills that touch. Two columns that
+  meet at a corner (one stops and the other starts over it) become one
+  column that turns at a mitre corner. It puts back together what Break
+  apart or the knife separated.
 - **Split at Needle**: cut the object under the stitch cursor in two,
   where the cursor is.
+- **Close Gaps…**: join the ends of the selected lines where they are
+  near, so lines that you drew one at a time (Freehand, Line) become one
+  line or a closed shape. Set the **Gap**: ends nearer than this join, the
+  nearest ends first, at the point halfway between them. The window starts
+  with a gap that joins each end that has another end within 10 mm. With **Cut
+  overshoots**, two lines that go across each other near their ends are
+  cut where they cross. A line closes when its two ends are near. Lines
+  join only with lines of the same color. The canvas shows the result
+  while you change the gap; **OK** keeps it. To sew a closed shape as a
+  fill, use **Convert**.
+- **Trim Segment**: click a part of a line between two crossings, or an
+  end past the last crossing: that part goes. The crossings are with
+  other lines, the outlines of other objects and the line itself. Use it
+  for the overshoots of lines drawn by hand.
 
 ## Shape
 
@@ -70,6 +86,23 @@ See [The design library and clipart](library).
   sharper than this stays a corner), and **Curves** or **Straight lines**
   between the corners. The window shows the number of nodes before and
   after. Simplify never adds nodes.
+- **Clean Up…**: removes small faults from the selected lines, fills and
+  vector objects, as from an SVG file or a trace. Set the **Detail size**:
+  **Remove small loops and spikes** (where a line crosses itself, or goes
+  out and comes back), **Smooth zig-zags** (corners stay sharp) and
+  **Remove tiny parts**. The parts of a fill outline that go over each
+  other become one area. The canvas shows the result; **OK** keeps it.
+  Satin columns, appliqué and lettering do not change.
+- **Envelope…**: bends the selected lines, fills, satin columns, appliqué
+  and vector objects into a shape (arch, bulge, pennant, perspective and
+  more), with an **Amount**. The canvas shows the result; **OK** keeps it.
+  Lettering has its own envelope (Lettering art).
+- **Copy Properties**: select the objects, click Copy Properties, then
+  click the object to copy from. The selected objects get its color, and
+  its stitch settings where they are of the same kind (fill to fill, line
+  to line, and so on). One undo step.
+- **Repeat**: does the last ribbon command again (also **Space**, and the
+  right-click menu).
 
 ## Lines and columns
 
@@ -108,5 +141,7 @@ the objects, then click:
 
 Object Properties > **Machine Functions** shows the same settings for one
 object, with **Trim after: Automatic** (trim when the next object is far,
-else a travel stitch) and **Sew slowly** (only U01 files keep it). The
+else a travel stitch), **Hidden travel** (as Automatic, but a far object
+of the same color gets travel stitches where objects that sew later cover
+all of the way) and **Sew slowly** (only U01 files keep it). The
 stitch list shows each function; see [Checking a design](checking).

@@ -99,9 +99,27 @@ pub fn set_language(code: &str) {
     set_active(lang);
 }
 
-/// Sets the language of this thread (tests use their own languages).
+/// Sets the language of this thread (tests use their own languages). The
+/// engine crates take their texts from the same language (ADR 0083).
 pub fn set_active(lang: Option<&'static Language>) {
+    emb_geom::text::set_translator(|english| active().and_then(|l| l.get(english)));
     ACTIVE.with(|a| a.set(lang));
+}
+
+/// A translated word (a name or a label) for the middle of a sentence:
+/// lower case, but German nouns keep their capital letter.
+pub fn in_sentence(word: &str) -> String {
+    if current() == "de" {
+        word.to_string()
+    } else {
+        word.to_lowercase()
+    }
+}
+
+/// The language of this thread (`None`: English). A thread that makes
+/// texts for the screen takes the language of the program with it.
+pub fn active() -> Option<&'static Language> {
+    ACTIVE.with(Cell::get)
 }
 
 /// The code of the language of this thread.
@@ -123,28 +141,7 @@ pub fn tr(english: &str) -> &str {
 /// shows nothing: for an English plural "s" in the middle of a text
 /// ("{} piece{} to {}").
 pub fn fill(template: &'static str, values: &[&dyn std::fmt::Display]) -> String {
-    let t = tr(template);
-    let mut out = String::with_capacity(t.len() + 16);
-    let mut rest = t;
-    let mut i = 0;
-    loop {
-        let next = [
-            rest.find("{}").map(|a| (a, 2, true)),
-            rest.find("{_}").map(|a| (a, 3, false)),
-        ]
-        .into_iter()
-        .flatten()
-        .min_by_key(|(a, ..)| *a);
-        let Some((at, len, show)) = next else { break };
-        out.push_str(&rest[..at]);
-        if show && let Some(v) = values.get(i) {
-            out.push_str(&v.to_string());
-        }
-        i += 1;
-        rest = &rest[at + len..];
-    }
-    out.push_str(rest);
-    out
+    emb_geom::text::place(tr(template), values)
 }
 
 /// The number of values that a text takes: its `{}` and `{_}`.
@@ -251,24 +248,70 @@ pub(crate) mod tests {
 
     /// All texts of the program: the literals in `tr("…")` and `fill("…"`
     /// calls of the source files, and the panel titles of the ribbon.
+    /// The `.rs` files of `dir` and of its module folders, not `tests.rs`
+    /// files (only tests) and not `skip`.
+    fn rs_files(dir: &std::path::Path, skip: &str) -> Vec<std::path::PathBuf> {
+        let mut files = Vec::new();
+        let mut dirs = vec![dir.to_path_buf()];
+        while let Some(d) = dirs.pop() {
+            for p in std::fs::read_dir(&d).unwrap().filter_map(|e| e.ok().map(|e| e.path())) {
+                if p.is_dir() {
+                    dirs.push(p);
+                } else if p.extension().is_some_and(|x| x == "rs")
+                    && p.file_name().is_some_and(|n| n != skip && n != "tests.rs")
+                {
+                    files.push(p);
+                }
+            }
+        }
+        files.sort();
+        files
+    }
+
+    /// The code of a source file, without its tests (a `mod tests;` line is
+    /// not the tests).
+    fn code_of(f: &std::path::Path) -> String {
+        // (A checkout on Windows can have CRLF line ends.)
+        let s = std::fs::read_to_string(f).unwrap().replace("\r\n", "\n");
+        s.split("#[cfg(test)]\nmod tests {").next().unwrap_or(&s).to_string()
+    }
+
+    /// The string literals after each of `markers` in `s`.
+    fn literals_after(s: &str, markers: &[&str], out: &mut BTreeSet<String>) {
+        for marker in markers {
+            let mut rest = s;
+            while let Some(at) = rest.find(marker) {
+                let before = rest[..at].chars().last();
+                rest = &rest[at + marker.len()..];
+                // `tr(` and not `ptr(` or `attr(`.
+                if before.is_some_and(|c| c.is_alphanumeric() || c == '_') {
+                    continue;
+                }
+                // The literal can be on the next line (rustfmt).
+                let Some(lit) = rest.trim_start().strip_prefix('"') else {
+                    continue;
+                };
+                rest = lit;
+                if let Some((text, used)) = literal(rest) {
+                    if !text.is_empty() {
+                        out.insert(text);
+                    }
+                    rest = &rest[used..];
+                }
+            }
+        }
+    }
+
+    /// All texts of the program: the literals in `tr("…")` and `fill("…"`
+    /// calls of the source files, and the panel titles of the ribbon.
     pub(crate) fn source_texts() -> BTreeSet<String> {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
         let mut out = BTreeSet::new();
-        let mut files: Vec<_> = std::fs::read_dir(&dir)
-            .unwrap()
-            .filter_map(|e| e.ok().map(|e| e.path()))
-            .filter(|p| p.extension().is_some_and(|x| x == "rs"))
-            // This file has no texts to show, only the code of the scan.
-            .filter(|p| p.file_name().is_some_and(|n| n != "i18n.rs"))
-            .collect();
-        files.sort();
-        for f in files {
-            // (A checkout on Windows can have CRLF line ends.)
-            let s = std::fs::read_to_string(&f).unwrap().replace("\r\n", "\n");
-            // Not the tests of a file.
-            let s = s.split("#[cfg(test)]\nmod tests").next().unwrap_or(&s);
+        // This file has no texts to show, only the code of the scan.
+        for f in rs_files(&dir, "i18n.rs") {
+            let s = code_of(&f);
             // Help texts in constants (the program shows them with `tr(X_HELP)`).
-            let mut rest = s;
+            let mut rest = s.as_str();
             while let Some(at) = rest.find("_HELP: &str =") {
                 rest = rest[at + "_HELP: &str =".len()..].trim_start();
                 if let Some(lit) = rest.strip_prefix('"')
@@ -278,27 +321,34 @@ pub(crate) mod tests {
                     rest = &lit[used..];
                 }
             }
-            for marker in ["tr(", "fill(", "title:"] {
-                let mut rest = s;
-                while let Some(at) = rest.find(marker) {
-                    let before = rest[..at].chars().last();
-                    rest = &rest[at + marker.len()..];
-                    // `tr(` and not `ptr(` or `attr(`.
-                    if before.is_some_and(|c| c.is_alphanumeric() || c == '_') {
-                        continue;
-                    }
-                    // The literal can be on the next line (rustfmt).
-                    let Some(lit) = rest.trim_start().strip_prefix('"') else {
-                        continue;
-                    };
-                    rest = lit;
-                    if let Some((text, used)) = literal(rest) {
-                        if !text.is_empty() {
-                            out.insert(text);
-                        }
-                        rest = &rest[used..];
-                    }
-                }
+            literals_after(&s, &["tr(", "fill(", "title:"], &mut out);
+        }
+        out
+    }
+
+    /// The engine crates, whose messages the program shows (ADR 0083).
+    pub(crate) const ENGINE_CRATES: [&str; 10] = [
+        "emb-geom",
+        "emb-model",
+        "emb-stitch",
+        "emb-formats",
+        "emb-render",
+        "emb-letter",
+        "emb-art",
+        "emb-library",
+        "emb-script",
+        "emb-sketch",
+    ];
+
+    /// The messages of the engine crates: the literals in `text::tr("…")`
+    /// and `text::fill("…"` (ADR 0083).
+    pub(crate) fn engine_source_texts() -> BTreeSet<String> {
+        let crates = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let mut out = BTreeSet::new();
+        for c in ENGINE_CRATES {
+            // The module of the hook has its doc examples only.
+            for f in rs_files(&crates.join(c).join("src"), "text.rs") {
+                literals_after(&code_of(&f), &["text::tr(", "text::fill("], &mut out);
             }
         }
         out
@@ -308,6 +358,7 @@ pub(crate) mod tests {
     /// program shows with `tr(x.name())`.
     pub(crate) fn engine_texts() -> BTreeSet<String> {
         let mut out: Vec<&'static str> = Vec::new();
+        out.extend(emb_model::ObjectKind::TYPE_NAMES);
         out.extend(emb_model::FillPattern::all().iter().map(|p| p.name()));
         out.extend(emb_model::ColumnPattern::ALL.iter().map(|p| p.name()));
         out.extend(emb_model::MeanderTile::ALL.iter().map(|t| t.name()));
@@ -315,18 +366,44 @@ pub(crate) mod tests {
         out.extend(crate::color_fills::SETTS.iter().map(|(name, _, _)| *name));
         out.extend(emb_model::lace::TEMPLATES.iter().map(|(name, _)| *name));
         out.extend(emb_model::ShapeOp::ALL.iter().map(|p| p.name()));
+        out.extend(crate::manipulate::ScaleFrom::ALL.iter().map(|(_, name)| *name));
         out.extend(emb_model::ConvertTo::ALL.iter().map(|p| p.name()));
         out.extend(emb_model::BorderPlace::ALL.iter().map(|p| p.name()));
         out.extend(emb_model::ProductKind::ALL.iter().map(|p| p.name()));
+        out.extend(
+            emb_model::ProductKind::ALL
+                .iter()
+                .flat_map(|p| p.placements().iter().map(|pl| pl.name)),
+        );
+        out.extend(emb_library::SortKey::ALL.iter().map(|k| k.label()));
+        out.extend(
+            emb_model::chart::harmonies(emb_model::Rgb(200, 40, 40))
+                .into_iter()
+                .map(|(n, _)| n),
+        );
+        out.extend(emb_library::GroupKey::ALL.iter().map(|k| k.label()));
         out.extend(emb_model::TraceStitch::all().iter().map(|p| p.name()));
         out.extend(emb_art::click::ClickStitch::ALL.iter().map(|p| p.name()));
         out.extend(emb_art::smart::SmartStitch::ALL.iter().map(|p| p.name()));
         out.extend(emb_model::quote::LineKind::ALL.iter().map(|k| k.label()));
+        out.extend(emb_model::order::ROW_LABELS);
         out.extend(emb_model::stock::BuyReason::ALL.iter().map(|k| k.label()));
         out.extend(emb_sketch::Constraint::NAMES);
         out.extend(emb_sketch::edit::MESSAGES);
         out.extend(emb_sketch::ExprError::MESSAGES);
         out.extend(emb_model::sketch::RegionTo::ALL.map(|r| r.name()));
+        out.extend(emb_model::cross::Part::all().into_iter().map(|p| p.name()));
+        out.extend(emb_model::EnvelopeShape::ALL.iter().map(|s| s.name()));
+        out.extend(emb_model::MonogramStyle::ALL.iter().map(|s| s.name()));
+        out.extend(emb_model::BorderShape::ALL.iter().map(|s| s.name()));
+        out.extend(emb_model::BorderStitch::ALL.iter().map(|s| s.name()));
+        out.extend(emb_model::OrnamentShape::ALL.iter().map(|s| s.name()));
+        out.extend(emb_model::OrnamentPlace::ALL.iter().map(|s| s.name()));
+        out.extend(emb_art::photo::PhotoStyle::ALL.iter().map(|s| s.name()));
+        out.extend(emb_render::barcode::BarcodeKind::ALL.iter().map(|k| k.label()));
+        out.extend(emb_render::page::Paper::ALL.iter().map(|p| p.label()));
+        out.extend(emb_model::ButtonholeShape::ALL.iter().map(|s| s.name()));
+        out.extend(emb_model::ButtonholeShape::ALL.iter().map(|s| s.help()));
         // Names in constants of the app (shown with `tr(name)`).
         out.extend(crate::hoops::BOX_PLACES.iter().map(|(_, name)| *name));
         out.extend(crate::kiosk::THREADS.iter().map(|(name, _)| *name));
@@ -355,7 +432,47 @@ pub(crate) mod tests {
     pub(crate) fn all_texts() -> BTreeSet<String> {
         let mut t = source_texts();
         t.extend(engine_texts());
+        t.extend(engine_source_texts());
         t
+    }
+
+    /// Names of the engine that the program does not translate: brands, and
+    /// names that it does not show.
+    const NAMES_NOT_SHOWN: [&str; 5] = [
+        "Bernina",
+        "Brother, Baby Lock",
+        "Husqvarna Viking, Pfaff",
+        "Janome",
+        "Remove overlaps",
+    ];
+
+    #[test]
+    fn each_engine_name_is_in_the_template() {
+        // The literals of each `fn name(self)` and `fn label(self)` of the
+        // engine crates must be in the template, so that `tr(x.name())`
+        // shows a translation (add the list to `engine_texts`).
+        let crates = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let texts = all_texts();
+        let mut missing = Vec::new();
+        for c in ENGINE_CRATES {
+            for f in rs_files(&crates.join(c).join("src"), "text.rs") {
+                let s = code_of(&f);
+                for head in ["fn name(self) -> &'static str {", "fn label(self) -> &'static str {"] {
+                    for (at, _) in s.match_indices(head) {
+                        let body = &s[at..];
+                        let body = &body[..body.find("\n    }\n").unwrap_or(body.len())];
+                        let mut names = BTreeSet::new();
+                        literals_after(body, &["=> "], &mut names);
+                        for n in names {
+                            if !texts.contains(&n) && !NAMES_NOT_SHOWN.contains(&n.as_str()) {
+                                missing.push(format!("{}: {n}", f.display()));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert!(missing.is_empty(), "{missing:#?}");
     }
 
     #[test]
@@ -410,6 +527,69 @@ pub(crate) mod tests {
             missing.len(),
             &missing[..missing.len().min(10)]
         );
+    }
+
+    /// The history keeps the label in the language of the edit, so the
+    /// Undo menu and the Undo message show it in that language.
+    #[test]
+    fn undo_labels_are_in_the_language() {
+        use emb_model::{HoopCatalog, MachineCatalog};
+        let mut st = crate::app::AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        set_active(Some(test_language(&[
+            ("Add Sample Objects", "Beispielobjekte hinzufügen"),
+            ("Undo: {}", "Rückgängig: {}"),
+        ])));
+        st.add_sample_objects();
+        assert_eq!(st.doc.undo_label(), Some("Beispielobjekte hinzufügen"));
+        st.undo();
+        assert_eq!(st.message, "Rückgängig: Beispielobjekte hinzufügen");
+        set_active(None);
+    }
+
+    /// The engine crates take the language of the thread (ADR 0083): the
+    /// errors, the warnings and the labels of the printed sheets.
+    #[test]
+    fn engine_messages_are_in_the_language() {
+        use emb_render::page::Op;
+        let engine = || {
+            let mut sheet = emb_render::sheet::SheetData {
+                name: "Test".into(),
+                stitches: 10,
+                ..Default::default()
+            };
+            sheet.date = "today".into();
+            let texts: Vec<String> = emb_render::sheet::production(&sheet, emb_render::page::Paper::A4)[0]
+                .ops
+                .iter()
+                .filter_map(|o| match o {
+                    Op::Text { text, .. } => Some(text.clone()),
+                    _ => None,
+                })
+                .collect();
+            (
+                emb_stitch::StitchError::Empty.to_string(),
+                emb_model::ShapeError::TooFew.to_string(),
+                emb_formats::read_machine("xyz", &[]).unwrap_err(),
+                texts,
+            )
+        };
+        let (stitch, shape, format, sheet) = engine();
+        assert_eq!(stitch, "the object has no stitchable geometry");
+        assert!(sheet.iter().any(|t| t == "Stitches"));
+        set_language("de");
+        let (stitch_de, shape_de, format_de, sheet_de) = engine();
+        assert_eq!(stitch_de, tr("the object has no stitchable geometry"));
+        assert_ne!(stitch_de, stitch);
+        assert_ne!(shape_de, shape);
+        assert_eq!(format_de, "unbekanntes Maschinenformat .xyz");
+        assert_ne!(format_de, format);
+        assert!(sheet_de.iter().any(|t| t == "Stiche"), "{sheet_de:?}");
+        assert!(
+            sheet_de.iter().any(|t| t.starts_with("Produktions-Arbeitsblatt")),
+            "{sheet_de:?}"
+        );
+        set_active(None);
+        assert_eq!(engine().0, stitch, "English again");
     }
 
     #[test]

@@ -23,7 +23,51 @@ fn main() {
     for p in ["../../.git/HEAD", "../../.git/refs/heads", "../../.git/index"] {
         println!("cargo:rerun-if-changed={p}");
     }
+    help_translations();
     windows_resources();
+}
+
+/// The translated help topics (ADR 0084): each folder `docs/help/<code>/`
+/// with its Markdown files, built into the program as the list
+/// `HELP_TRANSLATIONS` (language code, file name, text). A language can
+/// have some of the topics: the others show in English.
+fn help_translations() {
+    let help = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/help");
+    println!("cargo:rerun-if-changed={}", help.display());
+    let mut langs: Vec<_> = std::fs::read_dir(&help)
+        .map(|d| {
+            d.filter_map(|e| e.ok().map(|e| e.path()))
+                .filter(|p| p.is_dir())
+                .collect()
+        })
+        .unwrap_or_default();
+    langs.sort();
+    let mut out = String::from("/// Made by build.rs: (language, file name, text) of each translated help topic.\n");
+    out.push_str("pub const HELP_TRANSLATIONS: &[(&str, &str, &str)] = &[\n");
+    for dir in langs {
+        println!("cargo:rerun-if-changed={}", dir.display());
+        let code = dir.file_name().unwrap_or_default().to_string_lossy().into_owned();
+        let mut files: Vec<_> = std::fs::read_dir(&dir)
+            .map(|d| {
+                d.filter_map(|e| e.ok().map(|e| e.path()))
+                    .filter(|p| p.extension().is_some_and(|x| x == "md"))
+                    .collect()
+            })
+            .unwrap_or_default();
+        files.sort();
+        for f in files {
+            println!("cargo:rerun-if-changed={}", f.display());
+            let name = f.file_stem().unwrap_or_default().to_string_lossy().into_owned();
+            // An absolute path (`include_str!` reads it from `OUT_DIR`).
+            let path = f.display().to_string();
+            out.push_str(&format!("    ({code:?}, {name:?}, include_str!({path:?})),\n"));
+        }
+    }
+    out.push_str("];\n");
+    let dest = std::path::Path::new(&std::env::var("OUT_DIR").unwrap_or_default()).join("help_translations.rs");
+    if let Err(e) = std::fs::write(&dest, out) {
+        println!("cargo:warning=The help translations are not built in: {e}");
+    }
 }
 
 /// The icon of the Windows program and the data that Explorer shows in

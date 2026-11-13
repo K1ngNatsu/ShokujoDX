@@ -3,6 +3,7 @@
 //! import: fills and running lines, or vector objects (ADR 0024, 0027).
 
 use crate::svg::{SvgError, SvgImport};
+use emb_geom::text;
 
 /// The file extensions of vector artwork that the app can import.
 pub const ARTWORK_EXTENSIONS: [&str; 5] = ["svg", "pdf", "ai", "emf", "wmf"];
@@ -16,7 +17,7 @@ pub fn import_artwork(ext: &str, data: &[u8], vectors: bool) -> Result<SvgImport
         "pdf" | "ai" => crate::pdf::import_pdf(data, vectors),
         "emf" => crate::emf::import_emf(data, vectors),
         "wmf" => crate::wmf::import_wmf(data, vectors),
-        other => Err(SvgError::Parse(format!("cannot import .{other} artwork"))),
+        other => Err(SvgError::Parse(text::fill("cannot import .{} artwork", &[&other]))),
     }
 }
 

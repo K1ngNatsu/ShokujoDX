@@ -424,14 +424,13 @@ impl AppState {
     pub fn add_offsets(&mut self) {
         let ids = self.sel();
         let spec = self.artwork.spec;
-        let mut probe = self.doc.design().clone();
-        if let Err(e) = probe.add_offsets(&ids, &spec) {
-            self.message = e.to_string();
-            return;
-        }
-        let new = self
-            .doc
-            .edit("Offsets", |d| d.add_offsets(&ids, &spec).unwrap_or_default());
+        let new = match self.doc.try_edit(tr("Offsets"), |d| d.add_offsets(&ids, &spec)) {
+            Ok(new) => new,
+            Err(e) => {
+                self.message = e.to_string();
+                return;
+            }
+        };
         self.message = crate::i18n::fill("{} outlines added.", &[&(new.len())]);
         self.selection.set_all(new);
     }
@@ -443,7 +442,7 @@ impl AppState {
             self.message = tr("Select objects first.").into();
             return;
         }
-        let new = self.doc.edit("Arrange copies", |d| d.arrange(&ids, a));
+        let new = self.doc.edit(tr("Arrange copies"), |d| d.arrange(&ids, a));
         let mut all = ids;
         all.extend(&new);
         self.message = crate::i18n::fill("{} copies added.", &[&(new.len())]);
@@ -454,16 +453,36 @@ impl AppState {
     pub fn remove_overlaps(&mut self) {
         let ids = self.sel();
         let overlap = self.shaping.overlap_mm;
-        let mut probe = self.doc.design().clone();
         let linked = self.shaping.linked;
-        if let Err(e) = probe.remove_overlaps(&ids, overlap, linked) {
-            self.message = e.to_string();
-            return;
-        }
-        let n = self.doc.edit("Remove Overlaps", |d| {
-            d.remove_overlaps(&ids, overlap, linked).map_or(0, |v| v.len())
-        });
-        self.message = crate::i18n::fill("Overlaps removed: {} pieces left under the selection.", &[&n]);
+        let new = match self
+            .doc
+            .try_edit(tr("Remove Overlaps"), |d| d.remove_overlaps(&ids, overlap, linked))
+        {
+            Ok(new) => new,
+            Err(e) => {
+                self.message = e.to_string();
+                return;
+            }
+        };
+        // Lettering in the result got a knockout (ADR 0093).
+        let d = self.doc.design();
+        let letters = new
+            .iter()
+            .filter(|id| {
+                matches!(
+                    d.object(**id).map(|o| &o.kind),
+                    Some(emb_model::ObjectKind::Lettering(_))
+                )
+            })
+            .count();
+        self.message = if letters == 0 {
+            crate::i18n::fill("Overlaps removed: {} pieces left under the selection.", &[&new.len()])
+        } else {
+            crate::i18n::fill(
+                "Overlaps removed: {} pieces left under the selection. {} lettering objects sew round the objects in front.",
+                &[&(new.len() - letters), &letters],
+            )
+        };
     }
 
     /// The border trace of the selection, with its settings.
@@ -508,14 +527,13 @@ impl AppState {
     /// Adds a border trace round the selection. One undo step.
     pub fn add_border_trace(&mut self, spec: TraceSpec) {
         let ids = self.sel();
-        let mut probe = self.doc.design().clone();
-        if let Err(e) = probe.add_border_trace(&ids, spec) {
+        if let Err(e) = self
+            .doc
+            .try_edit(tr("Border Trace"), |d| d.add_border_trace(&ids, spec))
+        {
             self.message = e.to_string();
             return;
         }
-        self.doc.edit("Border Trace", |d| {
-            let _ = d.add_border_trace(&ids, spec);
-        });
         self.message = tr("Border trace added. Change it in this window while its objects are selected.").into();
     }
 
@@ -528,14 +546,14 @@ impl AppState {
             return;
         }
         self.doc
-            .edit_merged("Change border trace", MergeKey::new(format!("trace-{id}")), |d| {
-                let _ = d.update_border_trace(id, spec);
+            .edit_merged(tr("Change border trace"), MergeKey::new(format!("trace-{id}")), |d| {
+                *d = probe
             });
     }
 
     /// Removes border trace `id`; the cut objects come back.
     pub fn remove_border_trace(&mut self, id: u32) {
-        self.doc.edit("Remove border trace", |d| d.remove_border_trace(id));
+        self.doc.edit(tr("Remove border trace"), |d| d.remove_border_trace(id));
     }
 
     /// Returns `true` (with a message) if one of `ids` is linked (a border
@@ -579,7 +597,7 @@ impl AppState {
             self.message = tr("The selection has no links.").into();
             return;
         }
-        self.doc.edit("Unlink", |d| {
+        self.doc.edit(tr("Unlink"), |d| {
             d.shape_links.retain(|l| !links.contains(&l.id));
             d.border_traces.retain(|t| !traces.contains(&t.id));
             d.sketch_links.retain(|l| !sketch_links.contains(&l.id));

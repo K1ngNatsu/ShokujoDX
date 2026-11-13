@@ -67,6 +67,10 @@ pub enum TrimMode {
     Always,
     /// Never trim after the object (but at a color change); a long gap is a jump.
     Never,
+    /// As `Auto`, but a long gap to the next object of the same color gets
+    /// travel stitches if objects that sew later cover all of the way
+    /// (hidden travel, ADR 0082); else a trim.
+    Hidden,
 }
 
 /// The machine functions of an object.
@@ -200,6 +204,7 @@ impl ObjectKind {
 
     pub fn type_name(&self) -> &'static str {
         match self {
+            // (Each name is in `TYPE_NAMES`.)
             ObjectKind::Running { .. } => "Running",
             ObjectKind::Satin { .. } => "Satin",
             ObjectKind::Fill { .. } => "Fill",
@@ -212,6 +217,21 @@ impl ObjectKind {
             ObjectKind::Sketch(_) => "Sketch",
         }
     }
+
+    /// The names of [`ObjectKind::type_name`]: English, because the program
+    /// compares them; it translates them where it shows them.
+    pub const TYPE_NAMES: [&'static str; 10] = [
+        "Running",
+        "Satin",
+        "Fill",
+        "Stitches",
+        "Appliqué",
+        "Lettering",
+        "Vector",
+        "Cross stitch",
+        "Rhinestones",
+        "Sketch",
+    ];
 
     /// Returns `false` for objects that sew nothing (vectors, rhinestones).
     pub fn sews(&self) -> bool {

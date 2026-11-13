@@ -42,7 +42,9 @@ had no name.
    engine crates stay English (the engine has no UI dependency, rule 5);
    the app translates the names that it shows. The help topics in
    `docs/help` stay English for now: they are documents, and a language
-   can add its own topic files later.
+   can add its own topic files later. (Changed by ADR 0083: the messages
+   of the engine are translated through `emb_geom::text`; and by ADR 0084:
+   the help topics have translations in `docs/help/<code>/`.)
 5. **Accessibility.** `a11y.rs` gives screen reader names to buttons that
    the program paints (each ribbon button, with its on or off state), to
    the icon buttons (their tooltip) and to the canvas ("Design canvas: n

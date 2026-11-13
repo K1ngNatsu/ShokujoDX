@@ -53,20 +53,38 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
     let mut slots: Vec<Slot> = Vec::new();
     let mut hovered_now = None;
     let blocks = design.color_blocks();
+    // The blocks of each thread (numbers from 1), for the merge hint.
+    let mut thread_blocks: std::collections::HashMap<emb_model::ThreadId, Vec<usize>> = Default::default();
+    for (bi, (t, _)) in blocks.iter().enumerate() {
+        thread_blocks.entry(*t).or_default().push(bi + 1);
+    }
+    let index: std::collections::HashMap<ObjectId, usize> =
+        design.objects().iter().enumerate().map(|(i, o)| (o.id, i)).collect();
     let scroll = egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
         ui.spacing_mut().item_spacing.y = 2.0;
+        let width = ui.available_width();
         for (bi, (thread_id, ids)) in blocks.iter().enumerate() {
             let first = ids[0];
             let collapsed = st.seq_collapsed.contains(&first);
-            // Other blocks with the same thread: a hint that a merge is possible.
-            let same_thread: Vec<usize> = blocks
-                .iter()
-                .enumerate()
-                .filter(|(j, (t, _))| *j != bi && t == thread_id)
-                .map(|(j, _)| j + 1)
-                .collect();
-
-            let header = block_header(ui, st, &design, bi, *thread_id, ids, collapsed, &same_thread);
+            // A header or a row out of view takes its space only: a large
+            // design has thousands of rows.
+            let (_, header) = ui.allocate_space(Vec2::new(width, HEADER_H));
+            if ui.is_rect_visible(header) {
+                // Other blocks with the same thread: a hint that a merge is possible.
+                let same_thread: Vec<usize> = thread_blocks[thread_id]
+                    .iter()
+                    .copied()
+                    .filter(|b| *b != bi + 1)
+                    .collect();
+                let block = Block {
+                    index: bi,
+                    thread: *thread_id,
+                    ids,
+                    collapsed,
+                    same_thread: &same_thread,
+                };
+                block_header(ui, st, &design, header, block);
+            }
             slots.push(Slot {
                 y_mid: header.center().y,
                 line_y: header.top() - 1.0,
@@ -74,15 +92,16 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
             });
             if !collapsed {
                 for id in ids {
-                    let Some(index) = design.index_of(*id) else { continue };
-                    let obj = &design.objects()[index];
-                    let row = object_row(ui, st, &design, obj, index);
-                    if row.1 {
+                    let (_, row) = ui.allocate_space(Vec2::new(width, ROW_H));
+                    if ui.is_rect_visible(row)
+                        && let Some(&i) = index.get(id)
+                        && object_row(ui, st, &design, row, &design.objects()[i], i)
+                    {
                         hovered_now = Some(*id);
                     }
                     slots.push(Slot {
-                        y_mid: row.0.center().y,
-                        line_y: row.0.top() - 1.0,
+                        y_mid: row.center().y,
+                        line_y: row.top() - 1.0,
                         before: Some(*id),
                     });
                 }
@@ -120,7 +139,7 @@ fn toolbar(ui: &mut egui::Ui, st: &mut AppState, design: &Design) {
                      overlapping object is in the way, so what is on top stays on top."))
                 .clicked()
         {
-            st.resequence("Optimize color changes", Design::optimize_color_changes);
+            st.resequence(tr("Optimize color changes"), Design::optimize_color_changes);
         }
         if design.objects().len() > 1
             && ui
@@ -150,10 +169,10 @@ fn toolbar(ui: &mut egui::Ui, st: &mut AppState, design: &Design) {
                 .named(tr(tip));
             if r.clicked() {
                 match i {
-                    0 => st.sequence_selected("Move to Start", |d, ids| d.move_objects_to_start(ids)),
-                    1 => st.sequence_selected("Move Back One", |d, ids| d.step_objects(ids, Step::Backward)),
-                    2 => st.sequence_selected("Move Forward One", |d, ids| d.step_objects(ids, Step::Forward)),
-                    _ => st.sequence_selected("Move to End", |d, ids| d.move_objects_to_end(ids)),
+                    0 => st.sequence_selected(tr("Move to Start"), |d, ids| d.move_objects_to_start(ids)),
+                    1 => st.sequence_selected(tr("Move Back One"), |d, ids| d.step_objects(ids, Step::Backward)),
+                    2 => st.sequence_selected(tr("Move Forward One"), |d, ids| d.step_objects(ids, Step::Forward)),
+                    _ => st.sequence_selected(tr("Move to End"), |d, ids| d.move_objects_to_end(ids)),
                 }
             }
         }
@@ -163,7 +182,7 @@ fn toolbar(ui: &mut egui::Ui, st: &mut AppState, design: &Design) {
             .clicked()
         {
             let ids = st.selection.ids().to_vec();
-            st.resequence("Sequence by Click Order", |d| d.sequence_in_order(&ids));
+            st.resequence(tr("Sequence by Click Order"), |d| d.sequence_in_order(&ids));
         }
     });
 }
@@ -199,19 +218,26 @@ fn start_drag(st: &mut AppState, design: &Design, ids: &[ObjectId], resp: &egui:
     egui::DragAndDrop::set_payload(&resp.ctx, DragPayload(moving));
 }
 
-#[allow(clippy::too_many_arguments)]
-fn block_header(
-    ui: &mut egui::Ui,
-    st: &mut AppState,
-    design: &Design,
-    block_index: usize,
-    thread_id: emb_model::ThreadId,
-    ids: &[ObjectId],
+/// A color block of the Sequence panel: its place, its thread, its objects,
+/// whether it is collapsed, and the other blocks (numbers from 1) with the
+/// same thread.
+struct Block<'a> {
+    index: usize,
+    thread: emb_model::ThreadId,
+    ids: &'a [ObjectId],
     collapsed: bool,
-    same_thread: &[usize],
-) -> Rect {
-    let width = ui.available_width();
-    let (rect, resp) = ui.allocate_exact_size(Vec2::new(width, HEADER_H), Sense::click_and_drag());
+    same_thread: &'a [usize],
+}
+
+fn block_header(ui: &mut egui::Ui, st: &mut AppState, design: &Design, rect: Rect, block: Block) {
+    let Block {
+        index: block_index,
+        thread: thread_id,
+        ids,
+        collapsed,
+        same_thread,
+    } = block;
+    let resp = ui.interact(rect, ui.id().with(("seq_block", ids[0])), Sense::click_and_drag());
     let arrow_rect = Rect::from_min_size(rect.min, Vec2::new(22.0, HEADER_H));
     let arrow = ui.interact(arrow_rect, resp.id.with("arrow"), Sense::click());
 
@@ -257,7 +283,7 @@ fn block_header(
         FontId::proportional(13.0),
         text_color,
     );
-    let mut right = format!("{} obj", ids.len());
+    let mut right = crate::i18n::fill("{} obj", &[&ids.len()]);
     if !same_thread.is_empty() {
         right = format!("↻ {right}");
     }
@@ -297,13 +323,18 @@ fn block_header(
     if resp.hovered() && !resp.dragged() {
         ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
     }
-    rect
 }
 
-/// Draws one object row. Returns its rect and whether the pointer is over it.
-fn object_row(ui: &mut egui::Ui, st: &mut AppState, design: &Design, obj: &DesignObject, index: usize) -> (Rect, bool) {
-    let width = ui.available_width();
-    let (rect, resp) = ui.allocate_exact_size(Vec2::new(width, ROW_H), Sense::click_and_drag());
+/// Draws one object row in `rect`. Returns whether the pointer is over it.
+fn object_row(
+    ui: &mut egui::Ui,
+    st: &mut AppState,
+    design: &Design,
+    rect: Rect,
+    obj: &DesignObject,
+    index: usize,
+) -> bool {
+    let resp = ui.interact(rect, ui.id().with(("seq_row", obj.id)), Sense::click_and_drag());
     let selected = st.selection.contains(obj.id);
     let v = ui.visuals();
     let p = ui.painter();
@@ -334,7 +365,7 @@ fn object_row(ui: &mut egui::Ui, st: &mut AppState, design: &Design, obj: &Desig
         format!(
             "#{}  {}",
             index + 1,
-            obj.name.clone().unwrap_or_else(|| obj.type_name().to_string())
+            obj.name.clone().unwrap_or_else(|| tr(obj.type_name()).to_string())
         ),
         FontId::proportional(13.0),
         text_color,
@@ -365,7 +396,7 @@ fn object_row(ui: &mut egui::Ui, st: &mut AppState, design: &Design, obj: &Desig
         st.selection.set(obj.id);
     }
     resp.context_menu(|ui| crate::commands::object_menu(ui, st));
-    (rect, resp.hovered())
+    resp.hovered()
 }
 
 /// A short description of the stitch settings and machine functions, for
@@ -377,20 +408,30 @@ fn detail(obj: &DesignObject) -> String {
 }
 
 fn stitch_detail(obj: &DesignObject) -> String {
+    use crate::i18n::fill;
+    let mm1 = |v: f64| format!("{v:.1}");
     match &obj.kind {
         ObjectKind::Running { params, .. } => match (&params.border, &params.motif) {
-            (Some(b), _) => format!("{} line · {:.1} mm wide", b.column.pattern.name(), b.width_mm),
-            (None, Some(_)) => "Motif run".into(),
-            (None, None) if params.cut => format!("Cut line · {:.1} mm", params.stitch_length_mm),
+            (Some(b), _) => fill(
+                "{} line · {} mm wide",
+                &[&tr(b.column.pattern.name()), &mm1(b.width_mm)],
+            ),
+            (None, Some(_)) => tr("Motif run").into(),
+            (None, None) if params.cut => fill("Cut line · {} mm", &[&mm1(params.stitch_length_mm)]),
             (None, None) => {
-                let kind = if params.repeats >= 3 { "Bean stitch" } else { "Running" };
-                format!("{kind} · {:.1} mm", params.stitch_length_mm)
+                let kind = if params.repeats >= 3 {
+                    tr("Bean stitch")
+                } else {
+                    tr("Running")
+                };
+                fill("{} · {} mm", &[&kind, &mm1(params.stitch_length_mm)])
             }
         },
-        ObjectKind::Satin { params, .. } => {
-            format!("{} column · {:.2} mm spacing", params.pattern.name(), params.spacing_mm)
-        }
-        ObjectKind::Lettering(l) => format!("Lettering · {}", crate::lettering::summary(l)),
+        ObjectKind::Satin { params, .. } => fill(
+            "{} column · {} mm spacing",
+            &[&tr(params.pattern.name()), &format!("{:.2}", params.spacing_mm)],
+        ),
+        ObjectKind::Lettering(l) => fill("Lettering · {}", &[&crate::lettering::summary(l)]),
         ObjectKind::CrossStitch(x) => crate::cross::detail(x),
         ObjectKind::Bling(b) => crate::bling::detail(b),
         ObjectKind::Sketch(s) => crate::sketch::detail(s),
@@ -398,7 +439,10 @@ fn stitch_detail(obj: &DesignObject) -> String {
             let h = if holes.is_empty() {
                 String::new()
             } else {
-                format!(" · {} hole{}", holes.len(), if holes.len() == 1 { "" } else { "s" })
+                fill(
+                    " · {} hole{}",
+                    &[&holes.len(), &(if holes.len() == 1 { "" } else { "s" })],
+                )
             };
             // The curved fills have no row angle.
             use emb_model::FillPattern as F;
@@ -407,27 +451,34 @@ fn stitch_detail(obj: &DesignObject) -> String {
                 F::Contour | F::Offset | F::Spiral | F::IslandCoil | F::Radial { .. } | F::Maze | F::Stipple { .. }
             );
             if curved {
-                format!("{}{h}", params.pattern.name())
+                format!("{}{h}", tr(params.pattern.name()))
             } else {
-                format!("{} · {:.0}°{h}", params.pattern.name(), params.angle_deg)
+                format!("{} · {:.0}°{h}", tr(params.pattern.name()), params.angle_deg)
             }
         }
         ObjectKind::Stitches { path, .. } => {
             let n: usize = emb_stitch::stitch_subpaths(path).iter().map(Vec::len).sum();
-            format!("Stitches · {n} points")
+            fill("Stitches · {} points", &[&n])
         }
         ObjectKind::Vector { path, .. } => {
             let n = path.subpaths().len();
-            format!("Artwork · {n} path{} · no stitches", if n == 1 { "" } else { "s" })
+            fill(
+                "Artwork · {} path{} · no stitches",
+                &[&n, &(if n == 1 { "" } else { "s" })],
+            )
         }
         ObjectKind::Applique { pieces, params } => {
             let n = pieces.len();
             let stops = usize::from(params.placement || params.tack_down != emb_model::TackDown::None)
                 + usize::from(params.trim_stop && params.cover);
-            format!(
-                "Appliqué · {n} piece{} · {stops} stop{}",
-                if n == 1 { "" } else { "s" },
-                if stops == 1 { "" } else { "s" }
+            fill(
+                "Appliqué · {} piece{} · {} stop{}",
+                &[
+                    &n,
+                    &(if n == 1 { "" } else { "s" }),
+                    &stops,
+                    &(if stops == 1 { "" } else { "s" }),
+                ],
             )
         }
     }
@@ -507,9 +558,9 @@ fn handle_drop(ui: &mut egui::Ui, st: &mut AppState, area: Rect, slots: &[Slot])
         pos + Vec2::new(14.0, 10.0),
         Align2::LEFT_TOP,
         if n == 1 {
-            "Move 1 object".to_string()
+            tr("Move 1 object").to_string()
         } else {
-            format!("Move {n} objects")
+            crate::i18n::fill("Move {} objects", &[&n])
         },
         FontId::proportional(12.0),
         accent,
@@ -519,7 +570,7 @@ fn handle_drop(ui: &mut egui::Ui, st: &mut AppState, area: Rect, slots: &[Slot])
         egui::DragAndDrop::clear_payload(&ctx);
         let ids = payload.0.clone();
         let before = slot.before;
-        st.resequence("Change sew order", |d| d.move_objects_before(&ids, before));
+        st.resequence(tr("Change sew order"), |d| d.move_objects_before(&ids, before));
     }
 }
 
@@ -728,5 +779,47 @@ mod tests {
             });
         }
         assert_eq!(st.selection.ids(), &[ids[1], ids[3]]);
+    }
+
+    /// Only the rows in view are drawn, and a drop below them still goes
+    /// to the end of the order.
+    #[test]
+    fn a_long_list_draws_the_rows_in_view_only() {
+        let mut st = state();
+        let ids = st.doc.edit("Many", |d| {
+            let t = d.threads[0].id;
+            (0..400)
+                .map(|i| {
+                    let x = f64::from(i % 20) * 3.0;
+                    let r = emb_geom::BBox::new(emb_geom::Point::new(x, 0.0), emb_geom::Point::new(x + 2.0, 2.0));
+                    d.add_object(
+                        t,
+                        ObjectKind::Fill {
+                            outer: emb_geom::Path::rect(r),
+                            holes: Vec::new(),
+                            params: Default::default(),
+                        },
+                    )
+                })
+                .collect::<Vec<_>>()
+        });
+        let ctx = egui::Context::default();
+        let input = RawInput {
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(420.0, 900.0))),
+            ..Default::default()
+        };
+        let mut out = ctx.run_ui(input, |ui| {
+            egui::CentralPanel::default().show(ui, |ui| show(ui, &mut st));
+        });
+        out.textures_delta.clear();
+        let texts = out
+            .shapes
+            .iter()
+            .filter(|c| matches!(c.shape, egui::epaint::Shape::Text(_)))
+            .count();
+        assert!(texts < 150, "{texts} texts for 400 rows: rows out of view are drawn");
+        // The rows out of view still take their space.
+        let rect = out.shapes.iter().map(|c| c.clip_rect).fold(Rect::NOTHING, Rect::union);
+        assert!(rect.height() <= 900.0 && ids.len() as f32 * ROW_H > 900.0);
     }
 }

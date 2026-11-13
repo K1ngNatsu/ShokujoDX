@@ -41,7 +41,7 @@ use std::collections::HashMap;
 
 use emb_geom::region::{self, Join, Region};
 use emb_geom::{BBox, Path, Point, Transform, math};
-use emb_model::{CurrentProperties, ObjectKind, Rgb, Underlay, VectorStyle};
+use emb_model::{CurrentProperties, Functions, ObjectKind, Rgb, TrimMode, Underlay, VectorStyle};
 use image::{Rgba, RgbaImage, imageops::FilterType};
 
 use crate::autotrace::{self, Area, TraceSettings};
@@ -340,6 +340,16 @@ pub struct SmartObject {
     pub kind: ObjectKind,
 }
 
+/// The machine functions of the objects that [`digitize`] makes: travel
+/// hidden under the colors that sew later, in place of a trim, where it can
+/// (ADR 0082).
+pub fn functions() -> Functions {
+    Functions {
+        trim: TrimMode::Hidden,
+        ..Functions::default()
+    }
+}
+
 /// The embroidery for the picture `r` (pixels to mm by `to_mm`): the colors
 /// in `order` (palette indexes; colors not in it are left out), each as its
 /// choice says.
@@ -351,8 +361,26 @@ pub fn digitize(
     spec: &SmartSpec,
     current: &CurrentProperties,
 ) -> Vec<SmartObject> {
+    digitize_until(r, to_mm, choices, order, spec, current, &|| false).unwrap_or_default()
+}
+
+/// As [`digitize`], with stop points after the trace and before each area:
+/// when `stop` gives `true`, the work stops and the result is `None` (a
+/// background job whose result is not wanted any more, ADR 0081).
+pub fn digitize_until(
+    r: &Reduced,
+    to_mm: &Transform,
+    choices: &[ColorChoice],
+    order: &[u16],
+    spec: &SmartSpec,
+    current: &CurrentProperties,
+    stop: &dyn Fn() -> bool,
+) -> Option<Vec<SmartObject>> {
     let merged = merge_colors(r, choices);
     let (map, traced) = autotrace::trace_map(&merged, &spec.trace);
+    if stop() {
+        return None;
+    }
     let mm_per_px = to_mm.apply_vector(Point::new(1.0, 0.0)).distance(Point::ZERO);
     let areas: Vec<Area> = traced.iter().map(|a| a.transformed(to_mm)).collect();
     let rank: HashMap<u16, usize> = order.iter().enumerate().map(|(i, &c)| (c, i)).collect();
@@ -395,6 +423,9 @@ pub fn digitize(
             .filter_map(|(i, a)| Some((i, a.outer.control_bbox()?.center())))
             .collect();
         while !todo.is_empty() {
+            if stop() {
+                return None;
+            }
             let k = pen.map_or(0, |p| {
                 (0..todo.len())
                     .min_by(|&i, &j| todo[i].1.distance(p).total_cmp(&todo[j].1.distance(p)))
@@ -445,7 +476,7 @@ pub fn digitize(
         }
     }
     out.extend(lines);
-    out
+    Some(out)
 }
 
 /// A run along the middle of an area: a triple (bean) run if the area is
@@ -862,6 +893,40 @@ mod tests {
         match k {
             ObjectKind::Fill { holes, .. } => holes.len(),
             _ => usize::MAX,
+        }
+    }
+
+    #[test]
+    fn digitize_stops_at_its_stop_points() {
+        let r = reduce(
+            &picture(),
+            &ReduceSpec {
+                colors: 3,
+                ..ReduceSpec::default()
+            },
+        );
+        let order: Vec<u16> = (0..r.palette.len() as u16).collect();
+        let choices = vec![ColorChoice::default(); r.palette.len()];
+        let (t, spec, current) = (
+            Transform::scale(0.25, 0.25),
+            SmartSpec::default(),
+            CurrentProperties::default(),
+        );
+        let asked = std::cell::Cell::new(0);
+        let all = digitize_until(&r, &t, &choices, &order, &spec, &current, &|| {
+            asked.set(asked.get() + 1);
+            false
+        })
+        .unwrap();
+        assert_eq!(all.len(), digitize(&r, &t, &choices, &order, &spec, &current).len());
+        assert!(asked.get() >= 2, "after the trace and before each area");
+        for n in 1..=2 {
+            asked.set(0);
+            let stopped = digitize_until(&r, &t, &choices, &order, &spec, &current, &|| {
+                asked.set(asked.get() + 1);
+                asked.get() >= n
+            });
+            assert!(stopped.is_none());
         }
     }
 

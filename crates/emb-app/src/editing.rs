@@ -274,20 +274,20 @@ impl AppState {
     /// Reverses the direction of the selected objects.
     pub fn reverse_selection(&mut self) {
         let ids = self.selected();
-        let n = self.doc.edit("Reverse Direction", |d| d.reverse_objects(&ids));
+        let n = self.doc.edit(tr("Reverse Direction"), |d| d.reverse_objects(&ids));
         self.message = match n {
-            0 => "Select lines, columns, vectors or stone runs.".into(),
-            n => format!("Reversed the direction of {n} object(s)."),
+            0 => tr("Select lines, columns, vectors or stone runs.").into(),
+            n => crate::i18n::fill("Reversed the direction of {} object(s).", &[&n]),
         };
     }
 
     /// Swaps the sides of the selected satin columns.
     pub fn swap_sides(&mut self) {
         let ids = self.selected();
-        let n = self.doc.edit("Swap Sides", |d| d.swap_column_sides(&ids));
+        let n = self.doc.edit(tr("Swap Sides"), |d| d.swap_column_sides(&ids));
         self.message = match n {
-            0 => "Select satin columns.".into(),
-            n => format!("Swapped the sides of {n} column(s)."),
+            0 => tr("Select satin columns.").into(),
+            n => crate::i18n::fill("Swapped the sides of {} column(s).", &[&n]),
         };
     }
 
@@ -301,18 +301,18 @@ impl AppState {
         };
         let n = self.doc.edit(label, |d| d.close_shapes(&ids, curve));
         self.message = match n {
-            0 => "Select open lines, vectors or stone runs.".into(),
-            n => format!("Closed {n} object(s)."),
+            0 => tr("Select open lines, vectors or stone runs.").into(),
+            n => crate::i18n::fill("Closed {} object(s).", &[&n]),
         };
     }
 
     /// Changes the selected stone runs and fills to single stones.
     pub fn make_single_stones(&mut self) {
         let ids = self.selected();
-        let n = self.doc.edit("To Single Stones", |d| d.to_single_stones(&ids));
+        let n = self.doc.edit(tr("To Single Stones"), |d| d.to_single_stones(&ids));
         self.message = match n {
-            0 => "Select stone runs or stone fills.".into(),
-            n => format!("{n} object(s) are single stones now. Reshape moves each stone."),
+            0 => tr("Select stone runs or stone fills.").into(),
+            n => crate::i18n::fill("{} object(s) are single stones now. Reshape moves each stone.", &[&n]),
         };
     }
 }

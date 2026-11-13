@@ -30,7 +30,7 @@ impl AppState {
         }
         let order = (!o.is_empty()).then_some(o);
         self.doc
-            .edit_merged("Order Details", emb_model::MergeKey::new("design-order"), |d| {
+            .edit_merged(tr("Order Details"), emb_model::MergeKey::new("design-order"), |d| {
                 d.order = order
             });
     }
@@ -84,7 +84,7 @@ impl AppState {
         };
         let name = format!("{} quote.pdf", self.doc.design().name);
         let Some(p) = rfd::FileDialog::new()
-            .set_title("Quote sheet")
+            .set_title(tr("Quote sheet"))
             .add_filter("PDF", &["pdf"])
             .set_directory(self.dialog_dir())
             .set_file_name(name)

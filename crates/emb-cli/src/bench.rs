@@ -477,7 +477,10 @@ pub fn run(p: &BenchPicture) -> Metrics {
     colors.sort_unstable();
     colors.dedup();
     for o in objs {
-        d.add_object(threads[o.color as usize], o.kind);
+        let id = d.add_object(threads[o.color as usize], o.kind);
+        if let Some(o) = d.object_mut(id) {
+            o.functions = smart::functions();
+        }
     }
     let plan = emb_stitch::build_plan(&d, &Default::default(), &mut Default::default());
     lap("plan", &mut times);

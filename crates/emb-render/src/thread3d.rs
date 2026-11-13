@@ -184,15 +184,6 @@ impl ShadeTable {
     }
 }
 
-/// A brightness factor and a highlight as an RGB color with alpha, for a
-/// mesh vertex: `color` lit with `shade`.
-pub fn vertex_color(color: [u8; 3], (factor, shine): (f32, f32)) -> [u8; 3] {
-    color.map(|v| {
-        let v = f32::from(v) * factor;
-        (v + (255.0 - v).max(0.0) * shine).round().clamp(0.0, 255.0) as u8
-    })
-}
-
 /// The look of a thread plied of two strands: light and dark bands across
 /// the thread that turn along it. `along_mm` is the distance from the start
 /// of the stitch. Returns a brightness factor near 1.

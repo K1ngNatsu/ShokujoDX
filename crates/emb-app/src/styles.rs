@@ -84,32 +84,32 @@ pub fn change_text(from: &Fabric, to: &Fabric) -> String {
     if (s - 1.0).abs() > 1e-6 {
         let pct = ((1.0 - s).abs() * 100.0).round();
         v.push(if s < 1.0 {
-            format!("{pct} % denser")
+            crate::i18n::fill("{} % denser", &[&pct])
         } else {
-            format!("{pct} % lighter")
+            crate::i18n::fill("{} % lighter", &[&pct])
         });
     }
     let l = to.stitch_length_factor / from.stitch_length_factor;
     if (l - 1.0).abs() > 1e-6 {
         let pct = ((l - 1.0).abs() * 100.0).round();
         v.push(if l > 1.0 {
-            format!("fill stitches {pct} % longer")
+            crate::i18n::fill("fill stitches {} % longer", &[&pct])
         } else {
-            format!("fill stitches {pct} % shorter")
+            crate::i18n::fill("fill stitches {} % shorter", &[&pct])
         });
     }
     let p = to.pull_mm - from.pull_mm;
     if p.abs() > 1e-6 {
-        v.push(format!("pull compensation {p:+.2} mm"));
+        v.push(crate::i18n::fill("pull compensation {} mm", &[&format!("{p:+.2}")]));
     }
     if to.underlay != from.underlay {
-        v.push(format!(
+        v.push(crate::i18n::fill(
             "{} underlay",
-            words::underlay_weight(to.underlay).to_lowercase()
+            &[&crate::i18n::in_sentence(words::underlay_weight(to.underlay))],
         ));
     }
     if v.is_empty() {
-        "no change to the stitch settings".into()
+        tr("no change to the stitch settings").into()
     } else {
         v.join(", ")
     }
@@ -135,38 +135,44 @@ impl AppState {
         let name = id
             .and_then(|i| fabrics.get(i))
             .map_or("no fabric".to_string(), |f| f.name.clone());
-        let changed = self
-            .doc
-            .edit(format!("Fabric: {name}"), |d| d.set_fabric(&fabrics, id, objects));
+        let changed = self.doc.edit(crate::i18n::fill("Fabric: {}", &[&name]), |d| {
+            d.set_fabric(&fabrics, id, objects)
+        });
         self.message = match changed.len() {
-            0 => format!("Fabric: {name}. New objects get the fabric settings."),
-            n => format!("Fabric: {name}. {n} objects changed."),
+            0 => crate::i18n::fill("Fabric: {}. New objects get the fabric settings.", &[&name]),
+            n => crate::i18n::fill("Fabric: {}. {} objects changed.", &[&name, &n]),
         };
     }
 
     /// Copies the settings of the selected objects to the current properties.
     pub fn make_properties_current(&mut self) {
         let ids = self.selection.in_sew_order(self.doc.design());
-        let mut test = self.doc.design().clone();
-        if test.make_current(&ids) == 0 {
+        let r = self
+            .doc
+            .try_edit(tr("Make properties current"), |d| match d.make_current(&ids) {
+                0 => Err(()),
+                n => Ok(n),
+            });
+        if r.is_err() {
             self.message = tr("The current properties are the same already").into();
             return;
         }
-        self.doc.edit("Make properties current", |d| d.make_current(&ids));
         self.message = tr("New objects get the settings of the selection").into();
     }
 
     /// Gives the selected objects the current properties.
     pub fn apply_current_properties(&mut self) {
         let ids = self.selection.in_sew_order(self.doc.design());
-        let mut test = self.doc.design().clone();
-        if test.apply_current(&ids).is_empty() {
+        let Ok(n) = self
+            .doc
+            .try_edit(tr("Apply current properties"), |d| match d.apply_current(&ids).len() {
+                0 => Err(()),
+                n => Ok(n),
+            })
+        else {
             self.message = tr("The selection has the current properties already").into();
             return;
-        }
-        let n = self
-            .doc
-            .edit("Apply current properties", |d| d.apply_current(&ids).len());
+        };
         self.message = crate::i18n::fill("Current properties applied to {} objects", &[&n]);
     }
 
@@ -184,11 +190,12 @@ impl AppState {
             return;
         };
         self.message = crate::i18n::fill("Style \"{}\" for {}", &[&name, &(style.types())]);
-        self.doc
-            .edit(format!("New style {name}"), |d| match d.style_index(&style.name) {
+        self.doc.edit(crate::i18n::fill("New style {}", &[&name]), |d| {
+            match d.style_index(&style.name) {
                 Some(i) => d.styles[i] = style,
                 None => d.styles.push(style),
-            });
+            }
+        });
     }
 
     /// Gives the selected objects the settings of style `i`.
@@ -197,17 +204,18 @@ impl AppState {
         let Some(name) = self.doc.design().styles.get(i).map(|s| s.name.clone()) else {
             return;
         };
-        let mut test = self.doc.design().clone();
-        if test.apply_style(i, &ids).is_empty() {
+        let Ok(n) = self.doc.try_edit(crate::i18n::fill("Apply style {}", &[&name]), |d| {
+            match d.apply_style(i, &ids).len() {
+                0 => Err(()),
+                n => Ok(n),
+            }
+        }) else {
             self.message = crate::i18n::fill(
                 "The selection has the settings of \"{}\" already, or no object of its types",
                 &[&name],
             );
             return;
-        }
-        let n = self
-            .doc
-            .edit(format!("Apply style {name}"), |d| d.apply_style(i, &ids).len());
+        };
         self.message = crate::i18n::fill("Style \"{}\" applied to {} objects", &[&name, &n]);
     }
 
@@ -224,7 +232,8 @@ impl AppState {
             return;
         }
         let name = style.name.clone();
-        self.doc.edit(format!("Update style {name}"), |d| d.styles[i] = style);
+        self.doc
+            .edit(crate::i18n::fill("Update style {}", &[&name]), |d| d.styles[i] = style);
         self.message = crate::i18n::fill(
             "Style \"{}\" updated. Objects keep their settings until you apply it.",
             &[&name],
@@ -235,7 +244,8 @@ impl AppState {
         let Some(name) = self.doc.design().styles.get(i).map(|s| s.name.clone()) else {
             return;
         };
-        self.doc.edit(format!("Delete style {name}"), |d| d.styles.remove(i));
+        self.doc
+            .edit(crate::i18n::fill("Delete style {}", &[&name]), |d| d.styles.remove(i));
     }
 
     pub fn rename_style(&mut self, i: usize, name: &str) {
@@ -248,12 +258,12 @@ impl AppState {
             self.message = crate::i18n::fill("A style \"{}\" exists already", &[&name]);
             return;
         }
-        self.doc.edit("Rename style", |d| d.styles[i].name = name);
+        self.doc.edit(tr("Rename style"), |d| d.styles[i].name = name);
     }
 
     /// Writes the design as a template `name` in `dir`.
     pub fn save_template(&mut self, dir: &Path, name: &str, objects: bool) -> Result<PathBuf, String> {
-        let name = valid_name(name).ok_or("Type a name without / \\ : * ? \" < > |")?;
+        let name = valid_name(name).ok_or(tr("Type a name without / \\ : * ? \" < > |"))?;
         std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
         let path = dir.join(format!("{name}.{}", template::FILE_EXTENSION));
         let t = template::from_design(self.doc.design(), name, objects);
@@ -386,34 +396,41 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
         ));
         let c = st.doc.design().current.clone();
         let u = st.settings.units;
+        let lower = crate::i18n::in_sentence;
         current_line(
             ui,
-            "Running",
-            format!(
+            tr("Running"),
+            crate::i18n::fill(
                 "stitch length {} ({})",
-                u.fmt(c.running.stitch_length_mm),
-                words::length(c.running.stitch_length_mm)
+                &[
+                    &u.fmt(c.running.stitch_length_mm),
+                    &words::length(c.running.stitch_length_mm),
+                ],
             ),
         );
         current_line(
             ui,
-            "Satin",
-            format!(
+            tr("Satin"),
+            crate::i18n::fill(
                 "density {} ({}), underlay {}",
-                u.fmt(c.satin.spacing_mm),
-                words::density(c.satin.spacing_mm),
-                words::underlay(&c.satin.underlay).to_lowercase()
+                &[
+                    &u.fmt(c.satin.spacing_mm),
+                    &words::density(c.satin.spacing_mm),
+                    &lower(words::underlay(&c.satin.underlay)),
+                ],
             ),
         );
         current_line(
             ui,
-            "Fill",
-            format!(
+            tr("Fill"),
+            crate::i18n::fill(
                 "density {} ({}), stitch length {}, underlay {}",
-                u.fmt(c.fill.spacing_mm),
-                words::density(c.fill.spacing_mm),
-                u.fmt(c.fill.stitch_length_mm),
-                words::underlay(&c.fill.underlay).to_lowercase()
+                &[
+                    &u.fmt(c.fill.spacing_mm),
+                    &words::density(c.fill.spacing_mm),
+                    &u.fmt(c.fill.stitch_length_mm),
+                    &lower(words::underlay(&c.fill.underlay)),
+                ],
             ),
         );
         ui.horizontal_wrapped(|ui| {
@@ -542,26 +559,34 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
 /// The settings of a style, for a tooltip.
 fn style_text(s: &Style, u: crate::workspace::Units) -> String {
     let mut v = Vec::new();
+    let lower = crate::i18n::in_sentence;
     if let Some(r) = &s.running {
-        v.push(format!("Running: stitch length {}", u.fmt(r.stitch_length_mm)));
+        v.push(crate::i18n::fill(
+            "Running: stitch length {}",
+            &[&u.fmt(r.stitch_length_mm)],
+        ));
     }
     if let Some(p) = &s.satin {
-        v.push(format!(
+        v.push(crate::i18n::fill(
             "Satin: density {} ({}), pull compensation {}, underlay {}",
-            u.fmt(p.spacing_mm),
-            words::density(p.spacing_mm),
-            u.fmt(p.pull_compensation_mm),
-            words::underlay(&p.underlay).to_lowercase()
+            &[
+                &u.fmt(p.spacing_mm),
+                &words::density(p.spacing_mm),
+                &u.fmt(p.pull_compensation_mm),
+                &lower(words::underlay(&p.underlay)),
+            ],
         ));
     }
     if let Some(p) = &s.fill {
-        v.push(format!(
-            "Fill: density {} ({}), stitch length {}, angle {:.0}°, underlay {}",
-            u.fmt(p.spacing_mm),
-            words::density(p.spacing_mm),
-            u.fmt(p.stitch_length_mm),
-            p.angle_deg,
-            words::underlay(&p.underlay).to_lowercase()
+        v.push(crate::i18n::fill(
+            "Fill: density {} ({}), stitch length {}, angle {}°, underlay {}",
+            &[
+                &u.fmt(p.spacing_mm),
+                &words::density(p.spacing_mm),
+                &u.fmt(p.stitch_length_mm),
+                &format!("{:.0}", p.angle_deg),
+                &lower(words::underlay(&p.underlay)),
+            ],
         ));
     }
     v.join("\n")
@@ -695,7 +720,7 @@ fn fabric_window(ctx: &egui::Context, st: &mut AppState) {
         ui.add_space(4.0);
         ui.checkbox(
             &mut dlg.objects,
-            format!("Change the satin and fill objects of the design ({n_objects})"),
+            crate::i18n::fill("Change the satin and fill objects of the design ({})", &[&n_objects]),
         )
         .on_hover_text(tr(
             "Each object keeps its own settings, changed by the difference between the fabrics. \

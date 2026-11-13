@@ -21,7 +21,7 @@ use std::collections::BTreeMap;
 use emb_geom::region::{self, Join};
 use serde::{Deserialize, Serialize};
 
-use crate::shaping::{ShapeError, area_of, even_odd, takes_part};
+use crate::shaping::{ShapeError, area_of, takes_part};
 use crate::{
     BorderPlace, ColumnPattern, Design, DesignObject, LineBorder, ObjectId, ObjectKind, RunningParams, ThreadId,
 };
@@ -259,10 +259,7 @@ impl Design {
     fn traced_area(&self, ids: &[ObjectId]) -> Vec<region::Region> {
         ids.iter()
             .filter_map(|id| self.object(*id))
-            .filter_map(|o| match &o.kind {
-                ObjectKind::Lettering(_) => Some(even_odd(&crate::vector::area_outline(&o.kind))),
-                k => area_of(k),
-            })
+            .filter_map(|o| crate::shaping::cut_area_of(&o.kind))
             .fold(Vec::new(), |acc, a| region::union(&acc, &a))
     }
 

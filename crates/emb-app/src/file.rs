@@ -90,10 +90,10 @@ impl AppState {
                     let mut all = vec![project::FILE_EXTENSION];
                     all.extend(emb_formats::READ_EXTENSIONS);
                     rfd::FileDialog::new()
-                        .set_title("Open design")
-                        .add_filter("Designs and machine files", &all)
-                        .add_filter("Embroidery project", &[project::FILE_EXTENSION])
-                        .add_filter("Machine files", &emb_formats::READ_EXTENSIONS)
+                        .set_title(tr("Open design"))
+                        .add_filter(tr("Designs and machine files"), &all)
+                        .add_filter(tr("Embroidery project"), &[project::FILE_EXTENSION])
+                        .add_filter(tr("Machine files"), &emb_formats::READ_EXTENSIONS)
                         .set_directory(self.dialog_dir())
                         .pick_file()
                 });
@@ -292,7 +292,7 @@ impl AppState {
                 d.pin_block_needles(&needles);
                 return Some(d);
             }
-            Ok(_) => "The file has no stitches.".to_string(),
+            Ok(_) => tr("The file has no stitches.").to_string(),
             Err(e) => e,
         };
         self.notice = Some(Notice {
@@ -322,8 +322,8 @@ impl AppState {
     /// Asks for a machine file and adds its stitch objects to the design.
     pub fn insert_machine_file_dialog(&mut self) {
         let Some(p) = rfd::FileDialog::new()
-            .set_title("Insert machine file")
-            .add_filter("Machine files", &emb_formats::READ_EXTENSIONS)
+            .set_title(tr("Insert machine file"))
+            .add_filter(tr("Machine files"), &emb_formats::READ_EXTENSIONS)
             .set_directory(self.dialog_dir())
             .pick_file()
         else {
@@ -341,7 +341,7 @@ impl AppState {
             return;
         };
         let c = self.doc.design().hoop.center;
-        let ids = self.doc.edit("Insert machine file", |d| {
+        let ids = self.doc.edit(tr("Insert machine file"), |d| {
             let mut ids = Vec::new();
             for o in src.objects() {
                 let Some(t) = src.thread(o.thread) else { continue };
@@ -373,8 +373,8 @@ impl AppState {
     pub fn save_as(&mut self) -> bool {
         let name = format!("{}.{}", self.doc.design().name, project::FILE_EXTENSION);
         let Some(mut p) = rfd::FileDialog::new()
-            .set_title("Save design as")
-            .add_filter("Embroidery project", &[project::FILE_EXTENSION])
+            .set_title(tr("Save design as"))
+            .add_filter(tr("Embroidery project"), &[project::FILE_EXTENSION])
             .set_directory(self.dialog_dir())
             .set_file_name(name)
             .save_file()
@@ -392,7 +392,7 @@ impl AppState {
         if let Some(stem) = path.file_stem().map(|s| s.to_string_lossy().into_owned())
             && stem != self.doc.design().name
         {
-            self.doc.edit("Rename design", |d| d.name = stem);
+            self.doc.edit(tr("Rename design"), |d| d.name = stem);
         }
         match project::save(self.doc.design(), path) {
             Ok(()) => {
@@ -417,15 +417,15 @@ impl AppState {
     pub fn import_artwork_dialog(&mut self, mode: ArtworkImport) {
         let Some(p) = rfd::FileDialog::new()
             .set_title(match mode {
-                ArtworkImport::Objects => "Import Artwork",
-                ArtworkImport::Lines => "Import artwork as lines",
-                ArtworkImport::Vectors => "Import artwork as vectors",
+                ArtworkImport::Objects => tr("Import Artwork"),
+                ArtworkImport::Lines => tr("Import artwork as lines"),
+                ArtworkImport::Vectors => tr("Import artwork as vectors"),
             })
             .add_filter(
-                "Vector artwork (SVG, PDF, AI, EMF, WMF)",
+                tr("Vector artwork (SVG, PDF, AI, EMF, WMF)"),
                 &emb_formats::artwork::ARTWORK_EXTENSIONS,
             )
-            .add_filter("DXF drawing (opens as a sketch)", &["dxf"])
+            .add_filter(tr("DXF drawing (opens as a sketch)"), &["dxf"])
             .set_directory(self.dialog_dir())
             .pick_file()
         else {
@@ -474,7 +474,7 @@ impl AppState {
         if imported.objects.is_empty() {
             self.notice = Some(Notice {
                 title: "Nothing to import".into(),
-                lines: std::iter::once("The file has no filled or stroked shapes.".to_string())
+                lines: std::iter::once(tr("The file has no filled or stroked shapes.").to_string())
                     .chain(imported.warnings)
                     .collect(),
             });
@@ -483,7 +483,7 @@ impl AppState {
         let target = self.doc.design().hoop.center;
         let shift = imported.bbox().map(|b| target - b.center()).unwrap_or(Point::ZERO);
         let t = Transform::translate(shift.x, shift.y);
-        let ids: Vec<ObjectId> = self.doc.edit("Import Artwork", |d| {
+        let ids: Vec<ObjectId> = self.doc.edit(tr("Import Artwork"), |d| {
             let mut ids = Vec::with_capacity(imported.objects.len());
             for o in &imported.objects {
                 let thread = thread_for_color(d, o.color);
@@ -508,13 +508,15 @@ impl AppState {
             && let Some(h) = self.hoops.get(id)
             && !h.fits(b.width(), b.height(), 0.0)
         {
-            lines.push(format!(
-                "The artwork is {:.0} × {:.0} mm, larger than the hoop ({} × {} mm). \
+            lines.push(crate::i18n::fill(
+                "The artwork is {} × {} mm, larger than the hoop ({} × {} mm). \
                  Use the handles or Object Properties to resize it.",
-                b.width(),
-                b.height(),
-                h.width_mm,
-                h.height_mm
+                &[
+                    &format!("{:.0}", b.width()),
+                    &format!("{:.0}", b.height()),
+                    &h.width_mm,
+                    &h.height_mm,
+                ],
             ));
         }
         if !lines.is_empty() {

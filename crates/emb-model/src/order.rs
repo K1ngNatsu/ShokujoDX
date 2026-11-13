@@ -96,8 +96,8 @@ impl OrderInfo {
     }
 
     /// The rows of the order for a sheet: a name and a value, only the
-    /// values that are set. The names are English (the sheets are in
-    /// English).
+    /// values that are set. The names are English, from [`ROW_LABELS`]
+    /// (the sheets translate them, ADR 0083).
     pub fn rows(&self) -> Vec<(&'static str, String)> {
         let mut rows = Vec::new();
         let mut add = |k: &'static str, v: String| {
@@ -105,7 +105,7 @@ impl OrderInfo {
                 rows.push((k, v.trim().to_string()));
             }
         };
-        add("Order", self.number.clone());
+        add("Order number", self.number.clone());
         add("Customer", self.customer.clone());
         add("Garment", self.garment_text());
         let quantity = if self.sizes.is_empty() {
@@ -157,9 +157,27 @@ impl OrderInfo {
     }
 }
 
+/// The names of the rows of [`OrderInfo::rows`].
+pub const ROW_LABELS: [&str; 6] = ["Order number", "Customer", "Garment", "Quantity", "Placement", "Due"];
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_rows_have_the_row_labels() {
+        let o = OrderInfo {
+            number: "1".into(),
+            customer: "c".into(),
+            garment: "g".into(),
+            quantity: 2,
+            placement: "p".into(),
+            due: "d".into(),
+            ..OrderInfo::default()
+        };
+        let labels: Vec<&str> = o.rows().iter().map(|r| r.0).collect();
+        assert_eq!(labels, ROW_LABELS);
+    }
 
     fn order() -> OrderInfo {
         OrderInfo {
@@ -206,7 +224,7 @@ mod tests {
     fn rows_for_the_sheets() {
         let rows = order().rows();
         let get = |k: &str| rows.iter().find(|(n, _)| *n == k).map(|(_, v)| v.clone());
-        assert_eq!(get("Order").as_deref(), Some("A-1042"));
+        assert_eq!(get("Order number").as_deref(), Some("A-1042"));
         assert_eq!(get("Garment").as_deref(), Some("Polo shirt, Navy"));
         assert_eq!(get("Quantity").as_deref(), Some("30 (S 10, M 20)"));
         assert_eq!(get("Due").as_deref(), Some("2026-11-02"));

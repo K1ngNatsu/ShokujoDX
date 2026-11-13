@@ -15,20 +15,32 @@ use crate::i18n::tr;
 use crate::stitch_types::column_params;
 use crate::words;
 
+/// What the slider of an effect shows: the key of its undo step, its
+/// label and tooltip, its range and its unit.
+struct Effect<'a> {
+    key: &'a str,
+    label: &'a str,
+    help: &'a str,
+    range: RangeInclusive<f64>,
+    suffix: &'a str,
+}
+
 /// A slider for an effect. A drag is one undo step.
-#[allow(clippy::too_many_arguments)]
 fn slider(
     ui: &mut egui::Ui,
     st: &mut AppState,
     id: ObjectId,
-    key: &str,
-    label: &str,
-    help: &str,
+    effect: Effect,
     value: f64,
-    range: RangeInclusive<f64>,
-    suffix: &str,
     set: impl FnOnce(&mut ObjectKind, f64),
 ) {
+    let Effect {
+        key,
+        label,
+        help,
+        range,
+        suffix,
+    } = effect;
     let mut v = value;
     ui.horizontal(|ui| {
         ui.label(label).on_hover_text(help);
@@ -40,7 +52,7 @@ fn slider(
         );
         if resp.changed() {
             st.doc.edit_merged(
-                format!("Change {}", label.to_lowercase()),
+                crate::i18n::fill("Change {}", &[&crate::i18n::in_sentence(label)]),
                 MergeKey::new(format!("{}:fx:{key}", id.0)),
                 |d| {
                     if let Some(o) = d.object_mut(id) {
@@ -146,7 +158,7 @@ fn accordion_ui(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, current: &Op
             });
     });
     if let Some(a) = pick {
-        st.doc.edit("Change accordion spacing", |d| {
+        st.doc.edit(tr("Change accordion spacing"), |d| {
             if let Some(slot) = d.object_mut(id).and_then(|o| accordion_of(&mut o.kind)) {
                 *slot = a;
             }
@@ -205,7 +217,7 @@ fn accordion_ui(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, current: &Op
         if changed {
             points.sort_by(|a, b| a.0.total_cmp(&b.0));
             st.doc.edit_merged(
-                "Change accordion profile",
+                tr("Change accordion profile"),
                 MergeKey::new(format!("{}:fx:acc", id.0)),
                 |d| {
                     if let Some(slot) = d.object_mut(id).and_then(|o| accordion_of(&mut o.kind)) {
@@ -225,12 +237,14 @@ fn hand_ui(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, value: f64) {
         ui,
         st,
         id,
-        "hand",
-        tr("Hand stitch"),
-        tr(words::HAND_HELP),
+        Effect {
+            key: "hand",
+            label: tr("Hand stitch"),
+            help: tr(words::HAND_HELP),
+            range: 0.0..=1.5,
+            suffix: " mm",
+        },
         value,
-        0.0..=1.5,
-        " mm",
         |k, v| match k {
             ObjectKind::Running { params, .. } => params.hand_mm = v,
             ObjectKind::Fill { params, .. } => params.hand_mm = v,
@@ -272,7 +286,7 @@ pub fn corner_ui(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, b: &LineBor
         }
     });
     if changed {
-        st.doc.edit("Change corners", |d| {
+        st.doc.edit(tr("Change corners"), |d| {
             if let Some(r) = d.object_mut(id).and_then(|o| run_params(&mut o.kind))
                 && let Some(b) = r.border.as_mut()
             {
@@ -311,12 +325,14 @@ pub fn column_effects(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, p: &Sa
                 ui,
                 st,
                 id,
-                "frac",
-                tr("Spacing measured at"),
-                tr(words::FRACTIONAL_HELP),
+                Effect {
+                    key: "frac",
+                    label: tr("Spacing measured at"),
+                    help: tr(words::FRACTIONAL_HELP),
+                    range: 0.0..=1.0,
+                    suffix: " of the width",
+                },
                 p.spacing_at,
-                0.0..=1.0,
-                " of the width",
                 set(|c, v| c.spacing_at = v),
             );
             check(
@@ -337,12 +353,14 @@ pub fn column_effects(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, p: &Sa
                 ui,
                 st,
                 id,
-                "jagged",
-                tr("Jagged edge"),
-                tr(words::JAGGED_HELP),
+                Effect {
+                    key: "jagged",
+                    label: tr("Jagged edge"),
+                    help: tr(words::JAGGED_HELP),
+                    range: 0.0..=5.0,
+                    suffix: " mm",
+                },
                 p.jagged_mm,
-                0.0..=5.0,
-                " mm",
                 set(|c, v| c.jagged_mm = v),
             );
             hand_ui(ui, st, id, p.hand_mm);
@@ -350,12 +368,14 @@ pub fn column_effects(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, p: &Sa
                 ui,
                 st,
                 id,
-                "pct",
-                tr("Pull compensation"),
-                tr(words::PULL_PERCENT_HELP),
+                Effect {
+                    key: "pct",
+                    label: tr("Pull compensation"),
+                    help: tr(words::PULL_PERCENT_HELP),
+                    range: 0.0..=30.0,
+                    suffix: " % of the width",
+                },
                 p.pull_percent,
-                0.0..=30.0,
-                " % of the width",
                 set(|c, v| c.pull_percent = v),
             );
             check(
@@ -376,12 +396,14 @@ pub fn column_effects(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, p: &Sa
                     ui,
                     st,
                     id,
-                    "pullb",
-                    tr("Rail B pull"),
-                    tr(words::PULL_SIDES_HELP),
+                    Effect {
+                        key: "pullb",
+                        label: tr("Rail B pull"),
+                        help: tr(words::PULL_SIDES_HELP),
+                        range: 0.0..=1.0,
+                        suffix: " mm",
+                    },
                     b,
-                    0.0..=1.0,
-                    " mm",
                     set(|c, v| c.pull_b_mm = Some(v)),
                 );
             }
@@ -411,12 +433,14 @@ pub fn fill_effects(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, p: &Fill
                 ui,
                 st,
                 id,
-                "jagged",
-                tr("Jagged edge"),
-                tr(words::JAGGED_HELP),
+                Effect {
+                    key: "jagged",
+                    label: tr("Jagged edge"),
+                    help: tr(words::JAGGED_HELP),
+                    range: 0.0..=5.0,
+                    suffix: " mm",
+                },
                 p.jagged_mm,
-                0.0..=5.0,
-                " mm",
                 |k, v| {
                     if let Some(f) = fill_params(k) {
                         f.jagged_mm = v;

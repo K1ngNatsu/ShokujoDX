@@ -55,7 +55,7 @@ impl AppState {
             return;
         }
         let n = ids.len();
-        self.doc.edit("Convert to appliqué", |d| {
+        self.doc.edit(tr("Convert to appliqué"), |d| {
             for id in ids {
                 if d.is_linked(id) {
                     let _ = d.convert_linked(id, None, &to_applique);
@@ -70,6 +70,58 @@ impl AppState {
             "{} objects are appliqué now. Set the fabric color in Object Properties.",
             &[&n],
         );
+    }
+
+    /// Makes one appliqué object of the selection (`Design::applique_from`,
+    /// ADR 0087): the areas become one fabric, and a selected border that
+    /// covers an edge is the cover of that edge.
+    pub fn applique_from_selection(&mut self) {
+        let ids = self.selection.in_sew_order(self.doc.design());
+        let params = self.doc.design().current.applique.clone();
+        match self
+            .doc
+            .try_edit(tr("Appliqué from Selection"), |d| d.applique_from(&ids, &params))
+        {
+            Ok(id) => {
+                self.selection.set(id);
+                let (own_cover, open) = match self.doc.design().object(id).map(|o| &o.kind) {
+                    Some(ObjectKind::Applique { pieces, params }) => {
+                        (params.cover, pieces.iter().any(|pc| !pc.open_edges.is_empty()))
+                    }
+                    _ => (true, false),
+                };
+                self.message = match (own_cover, open) {
+                    (false, _) => tr("Appliqué made. The selected border is its cover, and sews after it."),
+                    (true, true) => {
+                        tr("Appliqué made. The selected border covers some edges; the other edges get a cover.")
+                    }
+                    _ => tr("Appliqué made. Back to Original puts the objects back."),
+                }
+                .into();
+            }
+            Err(e) => self.message = e.to_string(),
+        }
+    }
+
+    /// Puts back the objects that the selected appliqué replaced.
+    pub fn applique_back_to_original(&mut self) {
+        let d = self.doc.design();
+        let Some(id) = self
+            .selection
+            .in_sew_order(d)
+            .into_iter()
+            .find(|id| d.applique_origin(*id).is_some())
+        else {
+            self.message = tr("Select an appliqué object made with Appliqué from Selection.").into();
+            return;
+        };
+        let at = d.index_of(id).unwrap_or(0);
+        let n = d.applique_origin(id).map_or(0, |o| o.originals.len());
+        self.doc.edit(tr("Back to Original"), |d| d.back_to_original(id));
+        let d = self.doc.design();
+        let back: Vec<ObjectId> = d.objects().iter().skip(at).take(n).map(|o| o.id).collect();
+        self.selection.set_all(back);
+        self.message = crate::i18n::fill("{} objects are back in place of the appliqué.", &[&n]);
     }
 
     /// Joins the selected appliqué objects into one, at the place of the
@@ -98,7 +150,7 @@ impl AppState {
         }
         let others: Vec<ObjectId> = objs[1..].iter().map(|o| o.id).collect();
         let n = pieces.len();
-        self.doc.edit("Combine Appliqué", |d| {
+        self.doc.edit(tr("Combine Appliqué"), |d| {
             if let Some(ObjectKind::Applique { pieces: p, .. }) = d.object_mut(first).map(|o| &mut o.kind) {
                 *p = pieces;
             }
@@ -108,9 +160,15 @@ impl AppState {
         });
         self.selection.set(first);
         self.message = if colors {
-            format!("{n} pieces in one appliqué object. It sews in the thread of the first object.")
+            crate::i18n::fill(
+                "{} pieces in one appliqué object. It sews in the thread of the first object.",
+                &[&n],
+            )
         } else {
-            format!("{n} pieces in one appliqué object: each step sews for all pieces, with one stop.")
+            crate::i18n::fill(
+                "{} pieces in one appliqué object: each step sews for all pieces, with one stop.",
+                &[&n],
+            )
         };
     }
 }
@@ -281,13 +339,16 @@ pub fn properties(
     }
 
     if p != *params || new_pieces != pieces {
-        st.doc
-            .edit_merged("Change appliqué", MergeKey::new(format!("{}:applique", id.0)), |d| {
+        st.doc.edit_merged(
+            tr("Change appliqué"),
+            MergeKey::new(format!("{}:applique", id.0)),
+            |d| {
                 if let Some(ObjectKind::Applique { pieces, params }) = d.object_mut(id).map(|o| &mut o.kind) {
                     *params = p;
                     *pieces = new_pieces;
                 }
-            });
+            },
+        );
         if !drag {
             st.doc.end_merge();
         }
@@ -410,7 +471,7 @@ impl AppState {
     pub fn write_cutter_file(&self, path: &std::path::Path) -> Result<usize, String> {
         let pieces = self.cutter_pieces();
         if pieces.is_empty() {
-            return Err("The design has no appliqué objects.".into());
+            return Err(tr("The design has no appliqué objects.").into());
         }
         let ext = path
             .extension()
@@ -428,9 +489,9 @@ impl AppState {
     pub fn cutter_file_dialog(&mut self) {
         let name = format!("{} cut.svg", self.doc.design().name);
         let Some(p) = rfd::FileDialog::new()
-            .set_title("Appliqué cutter file")
-            .add_filter("SVG (cutting machines)", &["svg"])
-            .add_filter("DXF (cutter and laser programs)", &["dxf"])
+            .set_title(tr("Appliqué cutter file"))
+            .add_filter(tr("SVG (cutting machines)"), &["svg"])
+            .add_filter(tr("DXF (cutter and laser programs)"), &["dxf"])
             .set_directory(self.dialog_dir())
             .set_file_name(name)
             .save_file()
@@ -473,6 +534,53 @@ mod tests {
                 },
             )
         })
+    }
+
+    #[test]
+    fn applique_from_selection_and_back_to_original() {
+        let mut h = Harness::empty();
+        let a = fill(&mut h, 0.0);
+        let border = h.st.doc.edit("Add", |d| {
+            let t = d.add_thread("navy", Rgb(0, 0, 90));
+            d.add_object(
+                t,
+                ObjectKind::Running {
+                    path: Path::rect(BBox::new(Point::new(0.0, 0.0), Point::new(20.0, 20.0))),
+                    params: emb_model::RunningParams {
+                        border: Some(emb_model::LineBorder {
+                            width_mm: 3.0,
+                            column: Default::default(),
+                            corner: Default::default(),
+                        }),
+                        ..Default::default()
+                    },
+                },
+            )
+        });
+        h.st.select_all();
+        let s = crate::ribbon::SelInfo::of(&h.st);
+        assert!(h.st.can(crate::ribbon::Cmd::AppliqueFromSelection, &s));
+        assert!(!h.st.can(crate::ribbon::Cmd::BackToOriginal, &s));
+        let steps = h.st.doc.undo_len();
+        h.st.applique_from_selection();
+        assert_eq!(h.st.doc.undo_len(), steps + 1, "one undo step");
+        let d = h.st.doc.design();
+        let id = d.objects()[0].id;
+        assert!(matches!(&d.objects()[0].kind, ObjectKind::Applique { params, .. } if !params.cover));
+        assert_eq!(d.objects()[1].id, border);
+        assert!(h.st.selection.contains(id));
+        let s = crate::ribbon::SelInfo::of(&h.st);
+        assert!(h.st.can(crate::ribbon::Cmd::BackToOriginal, &s));
+        h.st.applique_back_to_original();
+        let d = h.st.doc.design();
+        let ids: Vec<ObjectId> = d.objects().iter().map(|o| o.id).collect();
+        assert_eq!(ids, vec![a, border]);
+        assert!(h.st.selection.contains(a));
+        h.st.doc.undo();
+        assert!(
+            h.st.doc.design().applique_origin(id).is_some(),
+            "undo brings the appliqué back"
+        );
     }
 
     #[test]

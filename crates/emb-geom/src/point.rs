@@ -64,15 +64,33 @@ impl Point {
         self.x.is_finite() && self.y.is_finite()
     }
 
+    /// Where the segments `a`-`b` and `c`-`d` cross: the parameter on each
+    /// (0 to 1), or `None` if they do not cross or are parallel.
+    pub fn crossing(a: Point, b: Point, c: Point, d: Point) -> Option<(f64, f64)> {
+        let (r, s) = (b - a, d - c);
+        let den = r.cross(s);
+        if den.abs() < 1e-12 {
+            return None;
+        }
+        let u = (c - a).cross(s) / den;
+        let v = (c - a).cross(r) / den;
+        ((0.0..=1.0).contains(&u) && (0.0..=1.0).contains(&v)).then_some((u, v))
+    }
+
     /// Distance from this point to the segment `a`-`b`.
     pub fn distance_to_segment(self, a: Point, b: Point) -> f64 {
+        self.distance(self.nearest_on_segment(a, b))
+    }
+
+    /// The point of the segment `a`-`b` nearest to this point.
+    pub fn nearest_on_segment(self, a: Point, b: Point) -> Point {
         let ab = b - a;
         let len_sq = ab.length_sq();
         if len_sq == 0.0 {
-            return self.distance(a);
+            return a;
         }
         let t = ((self - a).dot(ab) / len_sq).clamp(0.0, 1.0);
-        self.distance(a + ab * t)
+        a + ab * t
     }
 }
 

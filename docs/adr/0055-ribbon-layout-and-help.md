@@ -19,7 +19,7 @@ the translation files.
 
 ## Decision
 
-1. **The ribbon** (`emb-app/src/ribbon.rs`), by the work that each tab is
+1. **The ribbon** (`emb-app/src/ribbon/tabs.rs`), by the work that each tab is
    for:
    - Specialty: Cross stitch (with Picture to cross stitch and Chart),
      Rhinestones, Cutwork, **Quilting** (from Artwork) and **Puff and

@@ -6,7 +6,7 @@
 //! owner decision, 2026-10-25); users import other charts. See
 //! `docs/design/p3-plan.md` and `docs/design/p11-plan.md`.
 
-use emb_geom::math;
+use emb_geom::{math, text};
 
 use crate::{ModelError, Rgb};
 
@@ -68,13 +68,13 @@ impl ThreadChart {
     /// of the name has a digit, it is the thread code.
     pub fn parse_gpl(text: &str, default_name: &str) -> Result<ThreadChart, ModelError> {
         let bad = |line: usize, message: &str| ModelError::Invalid {
-            what: "thread chart",
-            message: format!("line {line}: {message}"),
+            what: text::tr("thread chart"),
+            message: text::fill("line {}: {}", &[&line, &message]),
         };
         let mut lines = text.lines().enumerate();
         match lines.next() {
             Some((_, l)) if l.trim_start_matches('\u{feff}').trim() == "GIMP Palette" => {}
-            _ => return Err(bad(1, "the first line must be \"GIMP Palette\"")),
+            _ => return Err(bad(1, text::tr("the first line must be \"GIMP Palette\""))),
         }
         let mut chart = ThreadChart {
             name: default_name.to_string(),
@@ -115,7 +115,7 @@ impl ThreadChart {
             });
         }
         if chart.threads.is_empty() {
-            return Err(bad(1, "the chart has no colors"));
+            return Err(bad(1, text::tr("the chart has no colors")));
         }
         Ok(chart)
     }
@@ -143,16 +143,16 @@ impl ThreadChart {
                 (None, 0) => {}
                 (None, _) => {
                     return Err(ModelError::Invalid {
-                        what: "thread chart",
-                        message: format!("line {}: expected code,name,#rrggbb", i + 1),
+                        what: text::tr("thread chart"),
+                        message: text::fill("line {}: expected code,name,#rrggbb", &[&(i + 1)]),
                     });
                 }
             }
         }
         if chart.threads.is_empty() {
             return Err(ModelError::Invalid {
-                what: "thread chart",
-                message: "the chart has no colors".into(),
+                what: text::tr("thread chart"),
+                message: text::tr("the chart has no colors").into(),
             });
         }
         Ok(chart)

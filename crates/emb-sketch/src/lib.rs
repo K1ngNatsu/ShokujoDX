@@ -29,7 +29,7 @@ pub mod regions;
 pub mod shape;
 pub mod solve;
 
-use emb_geom::{Path, Point, math};
+use emb_geom::{Path, Point, math, text};
 use serde::{Deserialize, Serialize};
 
 pub use edit::EditError;
@@ -460,13 +460,13 @@ pub struct SketchConstraint {
 /// Why a sketch refuses a change.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum SketchError {
-    #[error("the sketch has no such point or curve")]
+    #[error("{}", text::tr("the sketch has no such point or curve"))]
     Missing,
     #[error("{0}")]
     WrongCurves(&'static str),
-    #[error("a dimension must be a number in its range")]
+    #[error("{}", text::tr("a dimension must be a number in its range"))]
     BadValue,
-    #[error("a radius must be more than 0")]
+    #[error("{}", text::tr("a radius must be more than 0"))]
     BadRadius,
 }
 
@@ -622,7 +622,9 @@ impl Sketch {
 
     /// Adds an arc counterclockwise from `start` to `end` round `center`,
     /// with three new points. The radius is the distance to `start`; `end`
-    /// goes on the circle.
+    /// goes on the circle. (The tests make arcs with it; the program makes
+    /// them with `add_arc_between`.)
+    #[cfg(test)]
     pub fn add_arc(&mut self, center: Point, start: Point, end: Point) -> Result<CurveId, SketchError> {
         let r = center.distance(start);
         if !(r.is_finite() && r > 1e-9 && r <= MAX_MM) {

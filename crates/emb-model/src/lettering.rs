@@ -16,7 +16,8 @@
 //! whole text after that; the sew order and the connections of the letters
 //! are settings of the object (ADR 0018).
 
-use emb_geom::{BBox, Point, Transform};
+use emb_geom::region::Region;
+use emb_geom::{BBox, Point, Transform, text};
 use serde::{Deserialize, Serialize};
 
 use crate::{Baseline, Envelope, FillParams, ObjectKind, SatinParams, Underlay};
@@ -284,6 +285,10 @@ pub struct Lettering {
     pub satin: SatinParams,
     #[serde(default = "letter_fill")]
     pub fill: FillParams,
+    /// Satin columns that meet at a corner sew as one column that turns (a
+    /// mitre corner, `crate::mitre`), not as a stop and a start.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub mitre_corners: bool,
     /// The recommended height range of the font (min, max) in mm, from the
     /// last layout. The design checks warn outside it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -294,8 +299,53 @@ pub struct Lettering {
     /// Changes to single letters, in index order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub edits: Vec<LetterEdit>,
+    /// The area that objects in front cut out of the stitches (ADR 0093).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub knockout: Option<Knockout>,
     #[serde(default)]
     pub letters: Vec<Letter>,
+}
+
+/// A knockout of a lettering (ADR 0093): the objects that sew after the
+/// lettering and cover it cut its stitches. The letters stay as they are;
+/// only their stitches change.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Knockout {
+    /// How far the letters stay under the objects in front, in mm.
+    #[serde(default)]
+    pub overlap_mm: f64,
+    /// The cut area in design coordinates, from the last edit
+    /// (`Design::settle_knockouts`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub area: Vec<CutArea>,
+}
+
+impl Knockout {
+    /// The cut area as regions.
+    pub fn regions(&self) -> Vec<Region> {
+        self.area.iter().map(CutArea::region).collect()
+    }
+}
+
+/// One part of a cut area: an outer ring and its holes.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CutArea {
+    pub outer: Vec<Point>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub holes: Vec<Vec<Point>>,
+}
+
+impl CutArea {
+    pub fn region(&self) -> Region {
+        Region::new(self.outer.clone(), self.holes.clone())
+    }
+
+    pub fn from_region(r: &Region) -> CutArea {
+        CutArea {
+            outer: r.outer.clone(),
+            holes: r.holes.clone(),
+        }
+    }
 }
 
 fn one() -> f64 {
@@ -340,9 +390,11 @@ impl Lettering {
             stitch: LetterStitch::default(),
             satin: letter_satin(),
             fill: letter_fill(),
+            mitre_corners: false,
             range_mm: None,
             placement: Transform::translate(at.x, at.y),
             edits: Vec::new(),
+            knockout: None,
             letters: Vec::new(),
         }
     }
@@ -372,12 +424,6 @@ impl Lettering {
     /// Removes all changes by hand from the character at `index`.
     pub fn reset_letter(&mut self, index: usize) {
         self.edits.retain(|e| e.index != index);
-    }
-
-    /// The transform from the letter frame of letter `letter` to the
-    /// design, with the edit of the letter (not the envelope).
-    pub fn letter_to_design(&self, letter: usize) -> Option<Transform> {
-        Some(self.letter_to_lettering(letter)?.then(self.placement))
     }
 
     /// A point of the letter frame of letter `letter` in the design, with
@@ -607,18 +653,20 @@ impl Lettering {
     /// recommended range of the font.
     pub fn size_warning(&self) -> Option<String> {
         let (lo, hi) = self.range_mm?;
-        let what = if self.height_mm < lo - 1e-6 {
-            "smaller"
+        let template = if self.height_mm < lo - 1e-6 {
+            text::tr("Lettering {} mm is smaller than the size range of {} ({}–{} mm)")
         } else if self.height_mm > hi + 1e-6 {
-            "larger"
+            text::tr("Lettering {} mm is larger than the size range of {} ({}–{} mm)")
         } else {
             return None;
         };
-        Some(format!(
-            "Lettering {:.1} mm is {what} than the size range of {} ({lo:.0}–{hi:.0} mm)",
-            self.height_mm,
-            self.font.label()
-        ))
+        let values: [&dyn std::fmt::Display; 4] = [
+            &format!("{:.1}", self.height_mm),
+            &self.font.label(),
+            &format!("{lo:.0}"),
+            &format!("{hi:.0}"),
+        ];
+        Some(text::place(template, &values))
     }
 
     /// The lines of the text.

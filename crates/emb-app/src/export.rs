@@ -167,12 +167,14 @@ impl AppState {
                         .find(|(_, rec)| !h.contains(rec.pos, 0.0));
                     if let Some((i, rec)) = first_out {
                         r.errors.push(Issue {
-                            text: format!(
-                                "Record {} at ({:.1}, {:.1}) mm from the hoop center is outside the {} field.",
-                                i + 1,
-                                rec.pos.x,
-                                rec.pos.y,
-                                h.name
+                            text: crate::i18n::fill(
+                                "Record {} at ({}, {}) mm from the hoop center is outside the {} field.",
+                                &[
+                                    &(i + 1),
+                                    &format!("{:.1}", rec.pos.x),
+                                    &format!("{:.1}", rec.pos.y),
+                                    &h.name,
+                                ],
                             ),
                             at: Some(self.plan_to_canvas(rec.pos)),
                         });
@@ -181,7 +183,7 @@ impl AppState {
                         && !self.hoop_fits_machine(id)
                     {
                         r.warnings.push(Issue {
-                            text: format!("The hoop \"{}\" is not in the list for {}.", h.name, m.name),
+                            text: crate::i18n::fill("The hoop \"{}\" is not in the list for {}.", &[&h.name, &m.name]),
                             at: None,
                         });
                     }
@@ -196,7 +198,10 @@ impl AppState {
                         .any(|hp| hp.fits(w, h, 0.0) || hp.fits(h, w, 0.0));
                     if !fits {
                         r.warnings.push(Issue {
-                            text: format!("{w:.0} × {h:.0} mm is larger than every hoop of {}.", m.name),
+                            text: crate::i18n::fill(
+                                "{} × {} mm is larger than every hoop of {}.",
+                                &[&format!("{w:.0}"), &format!("{h:.0}"), &m.name],
+                            ),
                             at: None,
                         });
                     }
@@ -209,9 +214,9 @@ impl AppState {
             && !l.hoopings.is_empty()
         {
             r.warnings.push(Issue {
-                text: format!(
+                text: crate::i18n::fill(
                     "The design has {} hoopings: Hooping > Output Hoopings writes a file for each.",
-                    l.hoopings.len()
+                    &[&l.hoopings.len()],
                 ),
                 at: None,
             });
@@ -219,9 +224,11 @@ impl AppState {
             && self.hoops.get(id).is_some_and(|h| !h.positions.is_empty())
         {
             r.warnings.push(Issue {
-                text: "A multi-position hoop sews one position at a time: use Hooping > Auto Layout and \
-                       Output hoopings."
-                    .into(),
+                text: tr(
+                    "A multi-position hoop sews one position at a time: use Hooping > Auto Layout and \
+                     Output hoopings.",
+                )
+                .into(),
                 at: None,
             });
         }
@@ -238,7 +245,7 @@ impl AppState {
         for (msg, places) in reasons {
             let n = places.len().max(1);
             r.warnings.push(Issue {
-                text: format!("{n} object(s) skipped: {msg}."),
+                text: crate::i18n::fill("{} object(s) skipped: {}.", &[&n, &crate::i18n::tr(&msg)]),
                 at: places.first().copied(),
             });
         }
@@ -267,7 +274,7 @@ impl AppState {
             machine.as_ref(),
             needles.as_ref(),
         )
-        .ok_or_else(|| format!("{} cannot be written", format.label()))?;
+        .ok_or_else(|| crate::i18n::fill("{} cannot be written", &[&format.label()]))?;
         std::fs::write(path, bytes).map_err(|e| format!("{}: {e}", path.display()))?;
 
         // The native file next to the export (spec). If the design has no
@@ -275,9 +282,9 @@ impl AppState {
         let native = path.with_extension(project::FILE_EXTENSION);
         if self.file_path.is_none() || self.file_path.as_deref() == Some(native.as_path()) {
             if !self.save_to(&native) {
-                return Err(format!(
+                return Err(crate::i18n::fill(
                     "Exported, but the project file {} was not saved.",
-                    native.display()
+                    &[&native.display()],
                 ));
             }
         } else {
@@ -341,7 +348,7 @@ pub fn dialog(ctx: &egui::Context, st: &mut AppState) {
                 ui.end_row();
                 ui.label(tr("Hoop"));
                 ui.label(match &d.hoop.selection {
-                    HoopSelection::OpenField => "Open field".to_string(),
+                    HoopSelection::OpenField => tr("Open field").to_string(),
                     HoopSelection::Preset { id } => {
                         st.hoops.get(id).map(|h| h.name.clone()).unwrap_or_else(|| id.clone())
                     }
@@ -451,7 +458,7 @@ pub fn dialog(ctx: &egui::Context, st: &mut AppState) {
     if export {
         let name = format!("{}.{}", st.doc.design().name, dlg.format.ext());
         let picked = rfd::FileDialog::new()
-            .set_title("Export machine file")
+            .set_title(tr("Export machine file"))
             .add_filter(dlg.format.label(), &[dlg.format.ext()])
             .set_directory(st.export_dialog_dir())
             .set_file_name(name)

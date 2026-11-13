@@ -108,15 +108,15 @@ impl AppState {
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_else(|| name.to_string());
         let backdrop = Backdrop::new(file, bytes, pixels, target.center(), width);
-        self.doc.edit("Load backdrop", |d| d.backdrop = Some(backdrop));
+        self.doc.edit(tr("Load backdrop"), |d| d.backdrop = Some(backdrop));
         self.message = tr("Backdrop loaded and locked. Unlock it in the Backdrop panel to move it.").into();
     }
 
     /// Asks for a picture file and loads it as the backdrop.
     pub fn import_bitmap_dialog(&mut self) {
         let Some(p) = rfd::FileDialog::new()
-            .set_title("Load backdrop picture")
-            .add_filter("Pictures (PNG, JPEG, BMP, TIFF, GIF)", &FILE_TYPES)
+            .set_title(tr("Load backdrop picture"))
+            .add_filter(tr("Pictures (PNG, JPEG, BMP, TIFF, GIF)"), &FILE_TYPES)
             .set_directory(self.dialog_dir())
             .pick_file()
         else {
@@ -319,7 +319,7 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
                     st.edit_backdrop_outside();
                 }
                 if ui.button(tr("Remove")).clicked() {
-                    st.doc.edit("Remove backdrop", |d| d.backdrop = None);
+                    st.doc.edit(tr("Remove backdrop"), |d| d.backdrop = None);
                 }
             });
         });

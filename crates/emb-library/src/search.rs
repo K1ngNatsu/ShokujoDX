@@ -14,6 +14,7 @@
 //!   name), inside the safety margin, straight or turned 90°.
 //! - `error:yes` (or `error:no`): files that cannot be read.
 
+use emb_geom::text;
 use std::cmp::Ordering;
 
 use emb_model::{HoopCatalog, HoopPreset};
@@ -107,7 +108,7 @@ impl Query {
                 "fits" | "hoop" => {
                     q.filters.push(match find_hoop(hoops, &value) {
                         Some(h) => Filter::Fits(Box::new(h.clone())),
-                        None => Filter::Nothing(format!("no hoop {value:?}")),
+                        None => Filter::Nothing(text::fill("no hoop {}", &[&format!("{:?}", value)])),
                     });
                     None
                 }
@@ -125,7 +126,10 @@ impl Query {
                 Some(Ok(t)) => q.filters.push(Filter::Text(t, texts())),
                 Some(Err(f)) => q.filters.push(match range(&value) {
                     Some((min, max)) => Filter::Range { field: f, min, max },
-                    None => Filter::Nothing(format!("{key}: needs a number, not {value:?}")),
+                    None => Filter::Nothing(text::fill(
+                        "{}: needs a number, not {}",
+                        &[&key, &format!("{:?}", value)],
+                    )),
                 }),
                 None => {}
             }
@@ -393,7 +397,7 @@ pub fn group(index: &Index, items: &[usize], key: GroupKey, hoops: &[HoopPreset]
     // (order, label) for each item.
     let label = |e: &Entry| -> (usize, String) {
         if e.error.is_some() {
-            return (usize::MAX, "Files that cannot be read".into());
+            return (usize::MAX, text::tr("Files that cannot be read").into());
         }
         match key {
             GroupKey::Folder => {
@@ -414,14 +418,14 @@ pub fn group(index: &Index, items: &[usize], key: GroupKey, hoops: &[HoopPreset]
             GroupKey::Colors => (
                 e.colors,
                 if e.colors == 1 {
-                    "1 color".into()
+                    text::tr("1 color").into()
                 } else {
-                    format!("{} colors", e.colors)
+                    text::fill("{} colors", &[&e.colors])
                 },
             ),
             GroupKey::Hoop => match by_area.iter().position(|h| fits(h, e.width_mm, e.height_mm)) {
                 Some(k) => (k, by_area[k].name.clone()),
-                None => (usize::MAX - 1, "Larger than the hoops".into()),
+                None => (usize::MAX - 1, text::tr("Larger than the hoops").into()),
             },
             GroupKey::None => unreachable!(),
         }

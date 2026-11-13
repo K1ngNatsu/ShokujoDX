@@ -292,15 +292,18 @@ impl AppState {
     /// Saves the selected objects as the clipart item `name` (with its
     /// threads; the center of the objects goes to the origin).
     pub fn save_clipart(&mut self, name: &str, keywords: &str) -> Result<PathBuf, String> {
-        let dir = self.clipart.dir.clone().ok_or("There is no clipart folder.")?;
-        let name = crate::styles::valid_name(name).ok_or("Type a name without / \\ : * ? \" < > |")?;
+        let dir = self.clipart.dir.clone().ok_or(tr("There is no clipart folder."))?;
+        let name = crate::styles::valid_name(name).ok_or(tr("Type a name without / \\ : * ? \" < > |"))?;
         let ids = self.selected();
         if ids.is_empty() {
-            return Err("Select the objects to keep as clipart.".into());
+            return Err(tr("Select the objects to keep as clipart.").into());
         }
         let path = dir.join(format!("{name}.{}", project::FILE_EXTENSION));
         if path.exists() {
-            return Err(format!("A clipart item \"{name}\" is there already. Use another name."));
+            return Err(crate::i18n::fill(
+                "A clipart item \"{}\" is there already. Use another name.",
+                &[&name],
+            ));
         }
         let src = self.doc.design();
         let objects: Vec<DesignObject> = ids
@@ -342,7 +345,7 @@ impl AppState {
                 .unwrap_or(Transform::IDENTITY);
             inv.apply(self.view.center)
         });
-        let ids = self.doc.edit("Insert clipart", |d| {
+        let ids = self.doc.edit(tr("Insert clipart"), |d| {
             let ids = d.paste_objects(&objects, &item.threads);
             d.center_objects_at(&ids, target);
             ids

@@ -16,6 +16,7 @@
 //! The streams use a Huffman and back-reference compression. A bad stream
 //! stops the read; the stitches up to that point stay.
 
+use emb_geom::text;
 use emb_model::StitchDesign;
 
 use crate::common::{Bytes, Low, Pattern, signed8, table_thread, to_design};
@@ -23,7 +24,7 @@ use crate::tables::HUS_THREADS;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum HusError {
-    #[error("file is shorter than the HUS header")]
+    #[error("{}", text::tr("file is shorter than the HUS header"))]
     TooShort,
 }
 

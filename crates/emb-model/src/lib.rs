@@ -12,11 +12,15 @@
 //! - [`project`]: the native project file format.
 #![forbid(unsafe_code)]
 
+use emb_geom::text;
+
 pub mod applique;
+pub mod applique_from;
 pub mod arrange;
 pub mod backdrop;
 pub mod baseline;
 pub mod bling;
+pub mod buttonhole;
 pub mod chart;
 pub mod colorway;
 pub mod cross;
@@ -32,10 +36,12 @@ pub mod hoop;
 pub mod hooping;
 pub mod import;
 pub mod keyboard;
+pub mod knockout;
 pub mod lace;
 pub mod lettering;
 pub mod link;
 pub mod machine;
+pub mod mitre;
 pub mod monogram;
 pub mod motif;
 pub mod needles;
@@ -63,15 +69,19 @@ pub mod trace;
 pub mod vector;
 
 pub use applique::{AppliqueParams, AppliquePiece, DEFAULT_FABRIC_COLOR, TackDown, outline_edges};
+pub use applique_from::{AppliqueError, AppliqueOrigin};
 pub use arrange::{Arrangement, BorderPlace, OffsetMake, OffsetSpec};
 pub use backdrop::Backdrop;
 pub use baseline::Baseline;
 pub use bling::{Bling, BlingFill, BlingLayout, Stone};
+pub use buttonhole::{ButtonholeRecord, ButtonholeShape, ButtonholeSpec};
 pub use chart::{ChartThread, Lab, ThreadChart};
 pub use colorway::{Colorway, ThreadLook};
 pub use cross::{CrossOrder, CrossParams, CrossStitch};
-pub use decor::{BlendRecord, ButtonholeSpec, Frame, FrameShape, FrameStitch};
-pub use design::{Anchor, Design, Guide, HoopPlacement, HoopSelection, Rotation, StartEnd};
+pub use decor::{BlendRecord, Frame, FrameShape, FrameStitch};
+pub use design::{
+    Anchor, ConstructionMark, Design, Guide, GuideStyle, HoopPlacement, HoopSelection, MarkShape, Rotation, StartEnd,
+};
 pub use envelope::{Envelope, EnvelopeShape};
 pub use fabric::{Fabric, FabricCatalog, FabricChange, UnderlayWeight};
 pub use history::{Document, MergeKey};
@@ -80,7 +90,8 @@ pub use hooping::{Hooping, HoopingLayout, HoopingOut};
 pub use import::design_from_stitches;
 pub use keyboard::{KeyDesign, KeyObject, KeyboardCollection};
 pub use lettering::{
-    FontKind, FontRef, Justify, Letter, LetterConnection, LetterEdit, LetterOrder, LetterShape, LetterStitch, Lettering,
+    CutArea, FontKind, FontRef, Justify, Knockout, Letter, LetterConnection, LetterEdit, LetterOrder, LetterShape,
+    LetterStitch, Lettering,
 };
 pub use link::{LinkOp, ShapeLink};
 pub use machine::{MachineCatalog, MachineProfile, SewTimes};
@@ -112,19 +123,19 @@ pub use vector::{ConvertTo, VectorStyle};
 /// Errors from loading data files and project files.
 #[derive(Debug, thiserror::Error)]
 pub enum ModelError {
-    #[error("cannot parse {what}: {source}")]
+    #[error("{}", text::fill("cannot parse {}: {}", &[.what, .source]))]
     Toml {
         what: &'static str,
         #[source]
         source: toml::de::Error,
     },
-    #[error("cannot parse project file: {0}")]
+    #[error("{}", text::fill("cannot parse project file: {}", &[.0]))]
     Json(#[from] serde_json::Error),
-    #[error("invalid {what}: {message}")]
+    #[error("{}", text::fill("invalid {}: {}", &[.what, .message]))]
     Invalid { what: &'static str, message: String },
-    #[error("unsupported project file: {0}")]
+    #[error("{}", text::fill("unsupported project file: {}", &[.0]))]
     UnsupportedProject(String),
-    #[error("cannot read {path}: {source}")]
+    #[error("{}", text::fill("cannot read {}: {}", &[.path, .source]))]
     Io {
         path: String,
         #[source]

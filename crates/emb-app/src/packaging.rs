@@ -264,3 +264,44 @@ fn the_workflows_use_current_actions() {
         }
     }
 }
+
+/// CI skips only documents that the program does not build in, and checks
+/// all ten engine crates for UI and C dependencies (rules 5 and 9).
+#[test]
+fn the_ci_skips_only_documents_and_checks_each_engine_crate() {
+    let ci = read(".github/workflows/ci.yml");
+    let ignored: Vec<&str> = ci
+        .lines()
+        .map(str::trim)
+        .filter_map(|l| l.strip_prefix("- '").and_then(|l| l.strip_suffix('\'')))
+        .collect();
+    assert!(!ignored.is_empty());
+    for p in &ignored {
+        assert!(p.ends_with(".md") || p.ends_with("/**"), "{p}");
+        for built in ["docs/help", "data", "crates", "packaging", "Cargo"] {
+            assert!(!p.starts_with(built), "CI must not skip {p}: the program builds it in");
+        }
+    }
+    let engine = [
+        "emb-geom",
+        "emb-model",
+        "emb-stitch",
+        "emb-formats",
+        "emb-render",
+        "emb-letter",
+        "emb-art",
+        "emb-library",
+        "emb-script",
+        "emb-sketch",
+    ];
+    let line = ci
+        .lines()
+        .find(|l| l.contains("for c in emb-geom"))
+        .expect("the engine check");
+    for c in engine {
+        assert!(
+            line.split_whitespace().any(|w| w.trim_end_matches(';') == c),
+            "{c} is not in the engine check"
+        );
+    }
+}

@@ -30,6 +30,10 @@ pub struct Design {
     /// Guide lines for snapping, in view coordinates (after the design rotation).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub guides: Vec<Guide>,
+    /// Construction lines and points (ADR 0089), in view coordinates. They
+    /// do not sew.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub marks: Vec<ConstructionMark>,
     /// The background (fabric) color of the current colorway. `None`: the
     /// normal canvas color.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -62,6 +66,13 @@ pub struct Design {
     /// The multi blends of the design (see `decor`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub blends: Vec<crate::BlendRecord>,
+    /// The buttonholes that the Buttonholes window can change (see `buttonhole`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub buttonholes: Vec<crate::ButtonholeRecord>,
+    /// The objects that each appliqué made from a selection replaced (see
+    /// `applique_from`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub applique_origins: Vec<crate::AppliqueOrigin>,
     /// The border traces of the design (see `trace`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub border_traces: Vec<crate::BorderTrace>,
@@ -96,6 +107,10 @@ pub struct Design {
     /// garment, sizes, placement, due date. `None`: no order.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub order: Option<crate::order::OrderInfo>,
+    /// For each lettering with a knockout, the revisions of the objects
+    /// that cut it at the last `settle_knockouts` (ADR 0093). Not saved.
+    #[serde(skip)]
+    pub(crate) knockout_seen: crate::knockout::Seen,
 }
 
 /// A guide line across the canvas. `vertical` guides are at `x = pos`,
@@ -104,6 +119,82 @@ pub struct Design {
 pub struct Guide {
     pub vertical: bool,
     pub pos: f64,
+    #[serde(default, skip_serializing_if = "GuideStyle::is_default")]
+    pub style: GuideStyle,
+}
+
+impl Guide {
+    pub fn new(vertical: bool, pos: f64) -> Guide {
+        Guide {
+            vertical,
+            pos,
+            style: GuideStyle::default(),
+        }
+    }
+}
+
+/// How a guide or a construction mark shows, and whether it can move.
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct GuideStyle {
+    /// The color of the line (`None`: the guide color of the Options).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<Rgb>,
+    /// A solid line (else dashed).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub solid: bool,
+    /// A locked mark does not move with a drag (the menu and the edit
+    /// window still change it).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub locked: bool,
+}
+
+impl GuideStyle {
+    pub fn is_default(&self) -> bool {
+        *self == GuideStyle::default()
+    }
+}
+
+/// The shape of a construction mark, in view coordinates.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum MarkShape {
+    /// A line across the canvas through `through`, at `angle_deg`
+    /// (counterclockwise from the right, on the screen).
+    Line { through: Point, angle_deg: f64 },
+    /// A point.
+    Point { at: Point },
+}
+
+/// A construction line or point (ADR 0089): a help for drawing that does
+/// not sew. Points snap to it as to the guides.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct ConstructionMark {
+    pub shape: MarkShape,
+    #[serde(default, skip_serializing_if = "GuideStyle::is_default")]
+    pub style: GuideStyle,
+}
+
+impl ConstructionMark {
+    pub fn new(shape: MarkShape) -> ConstructionMark {
+        ConstructionMark {
+            shape,
+            style: GuideStyle::default(),
+        }
+    }
+}
+
+impl MarkShape {
+    /// The point and the unit direction of a line (on the screen, Y down).
+    pub fn line(&self) -> Option<(Point, Point)> {
+        match *self {
+            MarkShape::Line { through, angle_deg } => {
+                let r = emb_geom::math::to_radians(angle_deg);
+                Some((through, Point::new(emb_geom::math::cos(r), -emb_geom::math::sin(r))))
+            }
+            MarkShape::Point { .. } => None,
+        }
+    }
 }
 
 /// Which hoop the design uses and where the hoop center is.
@@ -245,6 +336,7 @@ impl Design {
             rotation: Rotation::Deg0,
             backdrop: None,
             guides: Vec::new(),
+            marks: Vec::new(),
             background: None,
             colorways: Vec::new(),
             colorway: 0,
@@ -255,6 +347,8 @@ impl Design {
             monograms: Vec::new(),
             team_names: None,
             blends: Vec::new(),
+            buttonholes: Vec::new(),
+            applique_origins: Vec::new(),
             border_traces: Vec::new(),
             shape_links: Vec::new(),
             sketch_links: Vec::new(),
@@ -265,6 +359,7 @@ impl Design {
             template_marks: None,
             needles: Vec::new(),
             order: None,
+            knockout_seen: Default::default(),
         }
     }
 
@@ -325,9 +420,11 @@ impl Design {
     }
 
     /// Removes object `id`. Its sketch links end: the links of a sketch,
-    /// and a link with no objects left.
+    /// and a link with no objects left. The record of an appliqué made from
+    /// a selection goes too.
     pub fn remove_object(&mut self, id: ObjectId) -> Option<Arc<DesignObject>> {
         let i = self.index_of(id)?;
+        self.applique_origins.retain(|o| o.applique != id);
         if !self.sketch_links.is_empty() {
             self.sketch_links.retain_mut(|l| {
                 l.objects.retain(|o| *o != id);
@@ -473,6 +570,7 @@ impl Design {
             && self.rotation == o.rotation
             && self.backdrop == o.backdrop
             && self.guides == o.guides
+            && self.marks == o.marks
             && self.background == o.background
             && self.colorways == o.colorways
             && self.colorway == o.colorway
@@ -483,6 +581,8 @@ impl Design {
             && self.monograms == o.monograms
             && self.team_names == o.team_names
             && self.blends == o.blends
+            && self.buttonholes == o.buttonholes
+            && self.applique_origins == o.applique_origins
             && self.border_traces == o.border_traces
             && self.shape_links == o.shape_links
             && self.sketch_links == o.sketch_links

@@ -12,7 +12,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::f64::consts::{PI, TAU};
 
-use emb_geom::{Point, math};
+use emb_geom::{Point, math, text};
 
 use crate::shape::{EPS, Shape, carrier_crossings, crossings};
 use crate::{Constraint, ConstraintId, CurveId, Geometry, MAX_MM, PointId, Sketch};
@@ -20,7 +20,7 @@ use crate::{Constraint, ConstraintId, CurveId, Geometry, MAX_MM, PointId, Sketch
 /// Why an edit is refused.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum EditError {
-    #[error("the sketch has no such point or curve")]
+    #[error("{}", text::tr("the sketch has no such point or curve"))]
     Missing,
     #[error("{0}")]
     Refused(&'static str),

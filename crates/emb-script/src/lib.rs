@@ -19,7 +19,7 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use emb_geom::Transform;
+use emb_geom::{Transform, text};
 use emb_model::arrange::{OffsetMake, OffsetSpec};
 use emb_model::{BorderPlace, Design, MachineProfile, ObjectId, ObjectKind, Rgb, ShapeOp, ShapeOptions, ThreadId};
 use rhai::{Array, Dynamic, Engine, EvalAltResult, Map, Scope};
@@ -198,7 +198,7 @@ pub struct ScriptError {
 impl std::fmt::Display for ScriptError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.line {
-            Some(l) => write!(f, "line {l}: {}", self.message),
+            Some(l) => f.write_str(&text::fill("line {}: {}", &[&l, &self.message])),
             None => f.write_str(&self.message),
         }
     }
@@ -226,7 +226,7 @@ fn ids_of(a: &Array) -> Res<Vec<ObjectId>> {
     a.iter()
         .map(|v| {
             v.as_int()
-                .map_err(|_| -> Box<EvalAltResult> { "a list of objects has only object numbers".into() })
+                .map_err(|_| -> Box<EvalAltResult> { text::tr("a list of objects has only object numbers").into() })
                 .and_then(oid)
         })
         .collect()
@@ -316,8 +316,9 @@ fn set_settings_of(k: &mut ObjectKind, new: Dynamic) -> Res<()> {
     use rhai::serde::from_dynamic;
     let new = coerce(new, &settings_of(k)?);
     let kind = kind_name(k);
-    let bad =
-        |e: Box<EvalAltResult>| -> Box<EvalAltResult> { format!("these settings do not fit a {kind}: {e}").into() };
+    let bad = |e: Box<EvalAltResult>| -> Box<EvalAltResult> {
+        text::fill("these settings do not fit a {}: {}", &[&kind, &e]).into()
+    };
     match k {
         ObjectKind::Running { params, .. } => *params = from_dynamic(&new).map_err(bad)?,
         ObjectKind::Satin { params, .. } => *params = from_dynamic(&new).map_err(bad)?,
@@ -328,7 +329,7 @@ fn set_settings_of(k: &mut ObjectKind, new: Dynamic) -> Res<()> {
         ObjectKind::CrossStitch(x) => **x = from_dynamic(&new).map_err(bad)?,
         ObjectKind::Bling(b) => **b = from_dynamic(&new).map_err(bad)?,
         ObjectKind::Sketch(s) => **s = from_dynamic(&new).map_err(bad)?,
-        ObjectKind::Stitches { .. } => return Err("stitch objects have no settings".into()),
+        ObjectKind::Stitches { .. } => return Err(text::tr("stitch objects have no settings").into()),
     }
     Ok(())
 }
@@ -399,7 +400,7 @@ fn register(engine: &mut Engine, ctx: &Shared) {
             .design
             .object(id)
             .cloned()
-            .ok_or_else(|| format!("there is no object {}", id.0).into())
+            .ok_or_else(|| text::fill("there is no object {}", &[&id.0]).into())
     };
     let c = ctx.clone();
     engine.register_fn("kind", move |id: i64| -> Res<String> {
@@ -414,7 +415,7 @@ fn register(engine: &mut Engine, ctx: &Shared) {
     engine.register_fn("set_name", move |id: i64, s: &str| -> Res<()> {
         let id = oid(id)?;
         let mut x = c.borrow_mut();
-        let o = x.design.object_mut(id).ok_or("there is no such object")?;
+        let o = x.design.object_mut(id).ok_or(text::tr("there is no such object"))?;
         o.name = (!s.trim().is_empty()).then(|| s.to_string());
         x.changed = true;
         Ok(())
@@ -428,15 +429,20 @@ fn register(engine: &mut Engine, ctx: &Shared) {
         let (id, t) = (oid(id)?, tid(t)?);
         let mut x = c.borrow_mut();
         if x.design.thread(t).is_none() {
-            return Err(format!("there is no thread {}", t.0).into());
+            return Err(text::fill("there is no thread {}", &[&t.0]).into());
         }
-        x.design.object_mut(id).ok_or("there is no such object")?.thread = t;
+        x.design
+            .object_mut(id)
+            .ok_or(text::tr("there is no such object"))?
+            .thread = t;
         x.changed = true;
         Ok(())
     });
     let c = ctx.clone();
     engine.register_fn("size", move |id: i64| -> Res<Map> {
-        let b = object(&c, id)?.control_bbox().ok_or("the object has no size")?;
+        let b = object(&c, id)?
+            .control_bbox()
+            .ok_or(text::tr("the object has no size"))?;
         let mut m = Map::new();
         m.insert("x".into(), Dynamic::from_float(b.min.x));
         m.insert("y".into(), Dynamic::from_float(b.min.y));
@@ -452,7 +458,7 @@ fn register(engine: &mut Engine, ctx: &Shared) {
     engine.register_fn("set_settings", move |id: i64, m: Map| -> Res<()> {
         let id = oid(id)?;
         let mut x = c.borrow_mut();
-        let o = x.design.object_mut(id).ok_or("there is no such object")?;
+        let o = x.design.object_mut(id).ok_or(text::tr("there is no such object"))?;
         set_settings_of(&mut o.kind, Dynamic::from_map(m))?;
         x.changed = true;
         Ok(())
@@ -461,7 +467,7 @@ fn register(engine: &mut Engine, ctx: &Shared) {
     engine.register_fn("remove", move |id: i64| -> Res<()> {
         let id = oid(id)?;
         let mut x = c.borrow_mut();
-        x.design.remove_object(id).ok_or("there is no such object")?;
+        x.design.remove_object(id).ok_or(text::tr("there is no such object"))?;
         x.selection.retain(|s| *s != id);
         x.changed = true;
         Ok(())
@@ -473,7 +479,7 @@ fn register(engine: &mut Engine, ctx: &Shared) {
             .design
             .index_of(id)
             .map(|i| i as i64)
-            .ok_or_else(|| "there is no such object".into())
+            .ok_or_else(|| text::tr("there is no such object").into())
     });
     let c = ctx.clone();
     engine.register_fn("move_to", move |id: i64, index: i64| -> Res<()> {
@@ -482,7 +488,7 @@ fn register(engine: &mut Engine, ctx: &Shared) {
         let n = x.design.objects().len();
         let at = usize::try_from(index).unwrap_or(0).min(n.saturating_sub(1));
         if !x.design.move_object(id, at) && x.design.object(id).is_none() {
-            return Err("there is no such object".into());
+            return Err(text::tr("there is no such object").into());
         }
         x.changed = true;
         Ok(())
@@ -492,7 +498,10 @@ fn register(engine: &mut Engine, ctx: &Shared) {
     let c = ctx.clone();
     engine.register_fn("move_objects", move |a: Array, dx: Dynamic, dy: Dynamic| -> Res<()> {
         let num = |v: &Dynamic| v.as_float().or_else(|_| v.as_int().map(|i| i as f64));
-        let (dx, dy) = (num(&dx).map_err(|_| "a number")?, num(&dy).map_err(|_| "a number")?);
+        let (dx, dy) = (
+            num(&dx).map_err(|_| text::tr("a number"))?,
+            num(&dy).map_err(|_| text::tr("a number"))?,
+        );
         let ids = ids_of(&a)?;
         let mut x = c.borrow_mut();
         if x.design.transform_objects(&ids, &Transform::translate(dx, dy)) {
@@ -512,7 +521,7 @@ fn register(engine: &mut Engine, ctx: &Shared) {
     });
     with_number!(engine, "scale_objects", ctx, |c, a: Array, f| {
         if !(f.is_finite() && f > 0.0 && f <= 100.0) {
-            return Err("the scale must be more than 0 and at most 100".into());
+            return Err(text::tr("the scale must be more than 0 and at most 100").into());
         }
         let ids = ids_of(&a)?;
         let mut x = c.borrow_mut();
@@ -552,7 +561,7 @@ fn register(engine: &mut Engine, ctx: &Shared) {
     let look = |c: &Shared, t: i64, f: &dyn Fn(&mut emb_model::ThreadLook)| -> Res<()> {
         let t = tid(t)?;
         let mut x = c.borrow_mut();
-        let mut l = emb_model::ThreadLook::of(x.design.thread(t).ok_or("there is no such thread")?);
+        let mut l = emb_model::ThreadLook::of(x.design.thread(t).ok_or(text::tr("there is no such thread"))?);
         f(&mut l);
         let cw = x.design.colorway;
         x.design.set_colorway_look(cw, t, l);
@@ -586,7 +595,7 @@ fn register(engine: &mut Engine, ctx: &Shared) {
     };
     with_number!(engine, "add_outline", ctx, |c, a: Array, d| {
         if !(d.is_finite() && d.abs() <= 100.0) {
-            return Err("the distance must be from -100 to 100 mm".into());
+            return Err(text::tr("the distance must be from -100 to 100 mm").into());
         }
         offsets(
             c,
@@ -600,7 +609,7 @@ fn register(engine: &mut Engine, ctx: &Shared) {
     });
     with_number!(engine, "add_border", ctx, |c, a: Array, w| {
         if !(w.is_finite() && w > 0.0 && w <= 20.0) {
-            return Err("the border width must be more than 0 and at most 20 mm".into());
+            return Err(text::tr("the border width must be more than 0 and at most 20 mm").into());
         }
         offsets(
             c,
@@ -621,7 +630,7 @@ fn register(engine: &mut Engine, ctx: &Shared) {
         let op = ShapeOp::ALL
             .into_iter()
             .find(|o| key(o.name()) == key(op))
-            .ok_or_else(|| format!("no shaping {op:?}: use weld, intersect, exclude, front_minus_back, back_minus_front, flatten, divide or combine"))?;
+            .ok_or_else(|| text::fill("no shaping {}: use weld, intersect, exclude, front_minus_back, back_minus_front, flatten, divide or combine", &[&format!("{:?}", op)]))?;
         let ids = ids_of(&a)?;
         let mut x = c.borrow_mut();
         let new = x
@@ -681,11 +690,13 @@ fn engine(ctx: &Shared, limits: &Limits) -> Engine {
 /// The error of a script, with its line.
 fn script_error(e: &EvalAltResult, limits: &Limits, messages: Vec<String>) -> ScriptError {
     let message = match e {
-        EvalAltResult::ErrorTerminated(..) => format!(
+        EvalAltResult::ErrorTerminated(..) => text::fill(
             "the script ran longer than {} seconds and was stopped",
-            limits.time.as_secs()
+            &[&limits.time.as_secs()],
         ),
-        EvalAltResult::ErrorTooManyOperations(..) => "the script did too many operations and was stopped".into(),
+        EvalAltResult::ErrorTooManyOperations(..) => {
+            text::tr("the script did too many operations and was stopped").into()
+        }
         EvalAltResult::ErrorRuntime(v, _) => v.to_string(),
         other => other.to_string(),
     };
@@ -757,7 +768,7 @@ pub fn run(
     drop(eng);
     let ctx = Rc::try_unwrap(ctx)
         .map_err(|_| ScriptError {
-            message: "the script state is still in use".into(),
+            message: text::tr("the script state is still in use").into(),
             line: None,
             messages: Vec::new(),
         })?
@@ -767,10 +778,9 @@ pub fn run(
     }
     if ctx.design.objects().len() > limits.max_objects {
         return Err(ScriptError {
-            message: format!(
+            message: text::fill(
                 "the design would have {} objects, more than {}",
-                ctx.design.objects().len(),
-                limits.max_objects
+                &[&(ctx.design.objects().len()), &limits.max_objects],
             ),
             line: None,
             messages: ctx.messages,

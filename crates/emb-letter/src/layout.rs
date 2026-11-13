@@ -97,6 +97,9 @@ pub fn layout_with_box(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> (Ve
                     for q in &mut parts {
                         q.transform(&Transform::scale(scale, scale));
                     }
+                    if l.mitre_corners {
+                        emb_model::mitre::join_parts(&mut parts);
+                    }
                     parts
                 }
             };

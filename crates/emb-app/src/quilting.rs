@@ -110,10 +110,10 @@ impl AppState {
         let thread = ids.iter().filter_map(|id| d.object(*id)).map(|o| o.thread).next()?;
         let at = ids.iter().filter_map(|id| d.index_of(*id)).max().map_or(0, |i| i + 1);
         let params = quilt_line(self.quilting.triple);
-        let id = self.doc.edit("Echo quilting", |d| {
+        let id = self.doc.edit(tr("Echo quilting"), |d| {
             let id = d.insert_object(at, thread, ObjectKind::Running { path, params });
             if let Some(o) = d.object_mut(id) {
-                o.name = Some("Echo quilting".into());
+                o.name = Some(tr("Echo quilting").into());
             }
             id
         });
@@ -147,10 +147,10 @@ impl AppState {
             ..FillParams::default().with_pattern(pattern)
         };
         let kind = fill_of(&area, params);
-        let id = self.doc.edit("Background quilting", |d| {
+        let id = self.doc.edit(tr("Background quilting"), |d| {
             let id = d.insert_object(at, thread, kind);
             if let Some(o) = d.object_mut(id) {
-                o.name = Some("Background quilting".into());
+                o.name = Some(tr("Background quilting").into());
             }
             id
         });
@@ -251,7 +251,7 @@ impl AppState {
                 .filter(|l| l.hoopings.len() > 1)
         });
         let n = layout.as_ref().map_or(1, |l| l.hoopings.len());
-        let new = self.doc.edit("Quilt block", |d| {
+        let new = self.doc.edit(tr("Quilt block"), |d| {
             let new = apply(d);
             d.hooping = layout;
             new

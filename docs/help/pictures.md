@@ -110,7 +110,8 @@ Remove the parts that must not sew:
   (JPEG blocks, the grain of a scan) and keeps the edges sharp.
 - **Clean edges**.
 - **Colors from the thread chart**: the colors are threads of the chart
-  of the Threads panel.
+  of the Threads panel. If you select another chart or change the thread
+  stock, the wizard uses the new colors.
 
 ### Colors
 
@@ -160,12 +161,18 @@ design. **Group the objects** and **Hide the backdrop picture** are
 options. Undo takes all the objects back.
 
 While the wizard makes a preview, the preview shows **Working…** and the
-last picture. You can change more settings; the wizard then uses the
-newest settings.
+last picture. You can change more settings: the wizard stops the old
+preview and makes one with the newest settings. If a preview takes too
+long, click **Stop**. Change a setting to make the preview again.
+
+**Cut out subject**, the marks and **Remove the edge color** also work in
+the background. The picture shows **Working…** until the change is done,
+and the other tools of the Background step wait.
 
 ## Tips
 
-- A photo has many small areas, and each needs a trim. Use **Cut out
+- A photo has many small areas, and each needs a trim, if no later color
+  covers the way to the next area (hidden travel). Use **Cut out
   subject**, less detail and larger specks, or **Photo stitch**. See
   [Questions and problems](troubleshooting).
 - Picture to design makes a start. Check the sew order and the objects

@@ -4,7 +4,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use emb_geom::Transform;
+use emb_geom::{Transform, text};
 use emb_model::{FontRef, LetterStitch, ObjectKind};
 use serde::{Deserialize, Serialize};
 
@@ -31,11 +31,11 @@ pub fn default_chars() -> Vec<char> {
 
 #[derive(Debug, thiserror::Error)]
 pub enum EmbFontError {
-    #[error("not an embroidery font: {0}")]
+    #[error("{}", text::fill("not an embroidery font: {}", &[.0]))]
     Parse(#[from] serde_json::Error),
-    #[error("embroidery font version {0} is newer than this program reads ({VERSION})")]
+    #[error("{}", text::fill("embroidery font version {} is newer than this program reads ({})", &[.0, &VERSION]))]
     Version(u32),
-    #[error("not an embroidery font file")]
+    #[error("{}", text::tr("not an embroidery font file"))]
     Format,
 }
 

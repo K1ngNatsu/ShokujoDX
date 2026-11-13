@@ -16,6 +16,8 @@ pub enum Paper {
 }
 
 impl Paper {
+    pub const ALL: [Paper; 2] = [Paper::Letter, Paper::A4];
+
     /// Width and height in mm (portrait).
     pub fn size_mm(self) -> (f64, f64) {
         match self {

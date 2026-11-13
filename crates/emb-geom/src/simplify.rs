@@ -68,7 +68,7 @@ pub fn simplified(path: &Path, s: &Simplify) -> Path {
 }
 
 /// The turn at `b` from the direction `a`→`b` to `b`→`c`, in degrees.
-fn turn_deg(a: Point, b: Point, c: Point) -> f64 {
+pub(crate) fn turn_deg(a: Point, b: Point, c: Point) -> f64 {
     let (u, v) = (b - a, c - b);
     math::to_degrees(math::atan2(u.cross(v), u.dot(v))).abs()
 }
@@ -228,7 +228,15 @@ fn fit_part(seq: &[Point], t1: Point, t2: Point, tol: f64, path: &mut Path) -> O
     let (a, b) = (seq[0], seq[n - 1]);
     if n == 2 {
         let d = a.distance(b) / 3.0;
-        push_cubic(path, [a, a + t1 * d, b + t2 * d, b]);
+        let (c1, c2) = (a + t1 * d, b + t2 * d);
+        // A curve stays within 3/4 of the distance of its handles from the
+        // line. If the tangents turn too far from the line, the curve goes
+        // straight.
+        if 0.75 * c1.distance_to_segment(a, b).max(c2.distance_to_segment(a, b)) <= tol {
+            push_cubic(path, [a, c1, c2, b]);
+        } else {
+            push_cubic(path, [a, a.lerp(b, 1.0 / 3.0), a.lerp(b, 2.0 / 3.0), b]);
+        }
         return None;
     }
     let mut u = chord_params(seq);
@@ -296,25 +304,40 @@ fn bezier(seq: &[Point], u: &[f64], t1: Point, t2: Point) -> [Point; 4] {
     let det = c00 * c11 - c01 * c01;
     let seg = a.distance(b);
     let eps = 1e-6 * seg;
+    // A handle longer than the points are long makes a curve that goes far
+    // out between the points (a spike): use the safe handles then.
+    let arc: f64 = seq.windows(2).map(|w| w[0].distance(w[1])).sum();
     let (mut al, mut ar) = if det.abs() > 1e-12 {
         ((x0 * c11 - x1 * c01) / det, (c00 * x1 - c01 * x0) / det)
     } else {
         (0.0, 0.0)
     };
-    if al < eps || ar < eps {
+    if !(al.is_finite() && ar.is_finite()) || al < eps || ar < eps || al > arc || ar > arc {
         al = seg / 3.0;
         ar = seg / 3.0;
     }
     [a, a + t1 * al, b + t2 * ar, b]
 }
 
-/// The largest distance from the points to the curve, and where.
+/// The largest distance from the points to the curve, and where. The
+/// curve between two points must also stay near the line between them, so
+/// a loop or a spike between the points does not pass.
 fn max_error(seq: &[Point], b: &[Point; 4], u: &[f64]) -> (f64, usize) {
-    let mut best = (0.0, seq.len() / 2);
-    for i in 1..seq.len() - 1 {
+    let n = seq.len();
+    let mut best = (0.0, n / 2);
+    for i in 1..n - 1 {
         let d = eval(b, u[i]).distance(seq[i]);
         if d > best.0 {
             best = (d, i);
+        }
+    }
+    for i in 0..n - 1 {
+        for f in [0.25, 0.5, 0.75] {
+            let t = u[i] + (u[i + 1] - u[i]) * f;
+            let d = eval(b, t).distance_to_segment(seq[i], seq[i + 1]);
+            if d > best.0 {
+                best = (d, (i + 1).min(n - 2).max(1));
+            }
         }
     }
     best
@@ -470,5 +493,40 @@ mod tests {
             .collect();
         assert_eq!(ends.last(), seq.last());
         assert!(ends.windows(2).all(|w| w[1].x > w[0].x));
+    }
+
+    #[test]
+    fn a_rough_coastline_gets_no_spikes() {
+        // Owner report (2026-11-13): Simplify of a map gave long spikes.
+        // A rough outline of 2000 points, like a coastline.
+        let mut seed: u64 = 12345;
+        let mut rnd = || {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            (seed >> 33) as f64 / (1u64 << 31) as f64 - 0.5
+        };
+        for _ in 0..4 {
+            let n = 2000;
+            let mut r = 40.0;
+            let pts: Vec<Point> = (0..n)
+                .map(|i| {
+                    r = (r + rnd() * 1.5).clamp(20.0, 60.0);
+                    let a = f64::from(i) / f64::from(n) * std::f64::consts::TAU;
+                    Point::new(r * math::cos(a) + rnd() * 0.6, r * math::sin(a) + rnd() * 0.6)
+                })
+                .collect();
+            let path = Path::polygon(&pts);
+            for tol in [0.05, 0.1, 0.5] {
+                let s = simplified(
+                    &path,
+                    &Simplify {
+                        tolerance_mm: tol,
+                        ..Simplify::QUICK
+                    },
+                );
+                let d = deviation(&s, &path);
+                assert!(d < 2.0 * tol, "tolerance {tol}: the curve goes {d} mm out");
+                assert!(node_count(&s) < node_count(&path));
+            }
+        }
     }
 }

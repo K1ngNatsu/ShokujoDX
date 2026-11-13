@@ -17,7 +17,7 @@
 //! (even-odd) and stroked with its own pen and brush. One device unit is
 //! 0.01 mm, so the file has the real size.
 
-use emb_geom::Point;
+use emb_geom::{Point, text};
 
 use crate::meta::{Bytes, MetaObject, Painter, colorref, stock};
 use crate::svg::{SvgError, SvgImport};
@@ -138,13 +138,13 @@ pub fn import_emf(data: &[u8], vectors: bool) -> Result<SvgImport, SvgError> {
     let bad = |m: &str| SvgError::Parse(format!("EMF: {m}"));
     let mut head = Bytes { data, pos: 0 };
     if head.u32() != Some(EMR_HEADER) {
-        return Err(bad("not an EMF file"));
+        return Err(bad(text::tr("not an EMF file")));
     }
     // Header: type, size, bounds (16), frame (16), signature at byte 40,
     // ... device size in pixels at byte 72, in mm at byte 80.
     let at = |pos: usize| Bytes { data, pos };
     if at(40).u32() != Some(SIGNATURE) {
-        return Err(bad("not an EMF file"));
+        return Err(bad(text::tr("not an EMF file")));
     }
     let (dev_px, dev_mm) = {
         let mut b = at(72);
@@ -174,7 +174,7 @@ pub fn import_emf(data: &[u8], vectors: bool) -> Result<SvgImport, SvgError> {
         };
         let size = size as usize;
         if size < 8 || pos + size > data.len() {
-            return Err(bad("a record is cut off"));
+            return Err(bad(text::tr("a record is cut off")));
         }
         let mut b = Bytes {
             data: &data[..pos + size],

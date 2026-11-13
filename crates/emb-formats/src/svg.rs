@@ -16,7 +16,7 @@
 //! SVG user units are CSS pixels (96 per inch); `usvg` resolves physical
 //! units such as `mm`. The result is in mm with the SVG origin at (0, 0).
 
-use emb_geom::{BBox, Path, Point, region};
+use emb_geom::{BBox, Path, Point, region, text};
 use emb_model::{FillParams, ObjectKind, Rgb, RunningParams, VectorStyle};
 
 /// mm per CSS pixel.
@@ -26,7 +26,7 @@ pub(crate) const FALLBACK: Rgb = Rgb(128, 128, 128);
 
 #[derive(Debug, thiserror::Error)]
 pub enum SvgError {
-    #[error("cannot read SVG: {0}")]
+    #[error("{}", text::fill("cannot read SVG: {}", &[.0]))]
     Parse(String),
 }
 

@@ -33,8 +33,8 @@ In the list, set for each thread:
 ## Only threads in stock
 
 **Only threads in stock** (in the Thread Stock window and in the Threads
-panel) makes the stock the thread chart: the chart list, **Match Design
-to Chart**, the picture tools and **Picture to Design** then use only the
+panel) makes the stock the thread chart: the chart list, **Match to Chart**,
+the picture tools and **Picture to Design** then use only the
 threads that you have. Turn it off to go back to the chart that showed
 before.
 

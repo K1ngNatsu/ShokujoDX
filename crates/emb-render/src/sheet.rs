@@ -12,7 +12,7 @@
 //!   picture, the numbers of the design, the lines of the price, the total,
 //!   and lines to sign.
 
-use emb_geom::{BBox, Point};
+use emb_geom::{BBox, Point, text};
 use emb_model::Rgb;
 
 use crate::Segment;
@@ -95,15 +95,21 @@ impl HoopLayout {
 
     /// The shape of the hoop as the operator puts it on the machine.
     pub fn hoop_text(&self) -> String {
-        let shape = match self.width_mm - self.height_mm {
-            d if d > 0.5 => "Landscape",
-            d if d < -0.5 => "Portrait",
-            _ => "Square",
-        };
-        format!(
-            "{shape}: {:.0} mm from left to right, {:.0} mm from the back to the front",
-            self.width_mm, self.height_mm
-        )
+        let (w, h) = (format!("{:.0}", self.width_mm), format!("{:.0}", self.height_mm));
+        match self.width_mm - self.height_mm {
+            d if d > 0.5 => text::fill(
+                "Landscape: {} mm from left to right, {} mm from the back to the front",
+                &[&w, &h],
+            ),
+            d if d < -0.5 => text::fill(
+                "Portrait: {} mm from left to right, {} mm from the back to the front",
+                &[&w, &h],
+            ),
+            _ => text::fill(
+                "Square: {} mm from left to right, {} mm from the back to the front",
+                &[&w, &h],
+            ),
+        }
     }
 
     /// Where the top of the design points, and where its center is.
@@ -119,36 +125,45 @@ impl HoopLayout {
             (self.rotation_deg as i32, a)
         };
         let turn = match turn_deg {
-            90 => "Turned 90° clockwise: the top of the design is at the right side of the hoop",
-            180 => "Upside down: the top of the design is at the bottom of the hoop",
-            270 => "Turned 90° counterclockwise: the top of the design is at the left side of the hoop",
-            _ => "Upright: the top of the design is at the top of the hoop",
+            90 => text::tr("Turned 90° clockwise: the top of the design is at the right side of the hoop"),
+            180 => text::tr("Upside down: the top of the design is at the bottom of the hoop"),
+            270 => text::tr("Turned 90° counterclockwise: the top of the design is at the left side of the hoop"),
+            _ => text::tr("Upright: the top of the design is at the top of the hoop"),
         };
         let c = self.design.center();
+        // `plus` and `minus` are texts with the distance in place of `{}`.
         let side = |v: f64, plus: &str, minus: &str| {
             if v.abs() < 0.5 {
                 None
             } else {
-                Some(format!("{:.0} mm {}", v.abs(), if v > 0.0 { plus } else { minus }))
+                Some(text::place(
+                    if v > 0.0 { plus } else { minus },
+                    &[&format!("{:.0}", v.abs())],
+                ))
             }
         };
-        let off: Vec<String> = [side(c.x, "right", "left"), side(c.y, "down", "up")]
-            .into_iter()
-            .flatten()
-            .collect();
-        let center = if off.is_empty() {
-            "The design is at the hoop center.".to_string()
-        } else {
-            format!("The design center is {} from the hoop center.", off.join(" and "))
+        let off: Vec<String> = [
+            side(c.x, text::tr("{} mm right"), text::tr("{} mm left")),
+            side(c.y, text::tr("{} mm down"), text::tr("{} mm up")),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        let center = match off.as_slice() {
+            [] => text::tr("The design is at the hoop center.").to_string(),
+            [one] => text::fill("The design center is {} from the hoop center.", &[one]),
+            [x, y, ..] => text::fill("The design center is {} and {} from the hoop center.", &[x, y]),
         };
+        let deg = format!("{:.1}", a.abs());
         let slant = if a.abs() < 0.05 {
             String::new()
-        } else {
-            format!(
-                " The design is on a slant: turned {:.1}° {} in the hoop.",
-                a.abs(),
-                if a > 0.0 { "counterclockwise" } else { "clockwise" }
+        } else if a > 0.0 {
+            text::fill(
+                " The design is on a slant: turned {}° counterclockwise in the hoop.",
+                &[&deg],
             )
+        } else {
+            text::fill(" The design is on a slant: turned {}° clockwise in the hoop.", &[&deg])
         };
         format!("{turn}. {center}{slant}")
     }
@@ -173,7 +188,7 @@ const HOOP_DIAGRAM_MM: f64 = 46.0;
 fn hoop_diagram(p: &mut Page, l: &HoopLayout, x: f64, y: f64) -> f64 {
     let s = HOOP_DIAGRAM_MM / l.width_mm.max(l.height_mm).max(1.0);
     let (w, h) = (l.width_mm * s, l.height_mm * s);
-    let label = "Back of machine";
+    let label = text::tr("Back of machine");
     let lw = crate::page::text_width_mm(label, 8.0);
     p.gray_text(x + (w - lw) / 2.0, y + 3.0, 8.0, label);
     let top = y + 5.0;
@@ -281,19 +296,20 @@ impl SheetData {
     /// The design notes, and the notes of the order after them.
     pub fn notes_text(&self) -> String {
         match self.order.as_ref().map(|o| o.notes.trim()).filter(|n| !n.is_empty()) {
-            Some(n) if self.notes.trim().is_empty() => format!("Order: {n}"),
-            Some(n) => format!(
-                "{}
-Order: {n}",
-                self.notes.trim_end()
-            ),
+            Some(n) if self.notes.trim().is_empty() => text::fill("Order: {}", &[&n]),
+            Some(n) => format!("{}\n{}", self.notes.trim_end(), text::fill("Order: {}", &[&n])),
             None => self.notes.clone(),
         }
     }
 
-    /// The rows of the order (none with no order).
-    fn order_rows(&self) -> Vec<(&'static str, String)> {
-        self.order.as_ref().map(|o| o.rows()).unwrap_or_default()
+    /// The rows of the order (none with no order), with their labels in
+    /// the language of the sheet; not the row `skip` (an English label).
+    fn order_rows(&self, skip: Option<&str>) -> Vec<(&'static str, String)> {
+        let rows = self.order.as_ref().map(|o| o.rows()).unwrap_or_default();
+        rows.into_iter()
+            .filter(|(k, _)| Some(*k) != skip)
+            .map(|(k, v)| (text::tr(k), v))
+            .collect()
     }
 
     /// The numbers, colors and stitches of a stitch list. The caller adds
@@ -302,7 +318,7 @@ Order: {n}",
         use emb_model::StitchKind;
         let thread = |i: usize| s.threads.get(i);
         let color_at = |i: usize| SheetColor {
-            name: thread(i).map_or(format!("Thread {}", i + 1), |t| t.name.clone()),
+            name: thread(i).map_or_else(|| text::fill("Thread {}", &[&(i + 1)]), |t| t.name.clone()),
             brand: thread(i).and_then(|t| t.brand.clone()),
             code: thread(i).and_then(|t| t.code.clone()),
             color: thread(i).map_or(crate::FALLBACK_COLOR, |t| t.color),
@@ -376,11 +392,9 @@ Order: {n}",
             .iter()
             .filter_map(|&b| {
                 let c = self.colors.get(b)?;
-                Some(format!(
+                Some(text::fill(
                     "Color {}: the machine stops. Put {} on needle {}.",
-                    b + 1,
-                    c.thread_text(),
-                    c.needle?
+                    &[&(b + 1), &c.thread_text(), &(c.needle?)],
                 ))
             })
             .collect();
@@ -416,29 +430,29 @@ pub fn process_steps(design: &emb_model::Design, name: &str) -> Vec<String> {
     let marks = design.sewn_mark_centers().is_some();
     let mut s = vec![if design.objects().iter().any(|o| o.kind.sews()) {
         if marks {
-            "Sew the embroidery (the machine file). The last color sews four crosses: the template marks.".to_string()
+            text::tr("Sew the embroidery (the machine file). The last color sews four crosses: the template marks.")
+                .to_string()
         } else {
-            "Sew the embroidery (the machine file).".to_string()
+            text::tr("Sew the embroidery (the machine file).").to_string()
         }
     } else {
-        "The design has no embroidery: only rhinestones.".to_string()
+        text::tr("The design has no embroidery: only rhinestones.").to_string()
     }];
-    s.push(format!(
-        "Cut the template ({name} template.svg) from template material. Brush the {} stones into it, the largest size first.",
-        stones.len()
-    ));
+    s.push(text::fill("Cut the template ({} template.svg) from template material. Brush the {} stones into it, the largest size first.", &[&name, &stones.len()]));
     if marks {
         s.push(
-            "Pick up the stones with transfer tape. Mark the four crosses of the template on the tape with a pen."
-                .into(),
+            text::tr(
+                "Pick up the stones with transfer tape. Mark the four crosses of the template on the tape with a pen.",
+            )
+            .into(),
         );
-        s.push("Put the tape on the fabric with its crosses on the sewn crosses.".into());
+        s.push(text::tr("Put the tape on the fabric with its crosses on the sewn crosses.").into());
     } else {
-        s.push("Pick up the stones with transfer tape. Put the tape on the fabric where the picture shows the stones (no sewn marks: add them with Specialty > Template marks).".into());
+        s.push(text::tr("Pick up the stones with transfer tape. Put the tape on the fabric where the picture shows the stones (no sewn marks: add them with Specialty > Template marks).").into());
     }
-    s.push("Press with a heat press (the time and temperature that the maker of the stones gives).".into());
+    s.push(text::tr("Press with a heat press (the time and temperature that the maker of the stones gives).").into());
     if marks {
-        s.push("Pull out the threads of the template marks.".into());
+        s.push(text::tr("Pull out the threads of the template marks.").into());
     }
     s
 }
@@ -601,9 +615,9 @@ fn picture(p: &mut Page, d: &SheetData, area: BBox) -> f64 {
         });
     }
     let shown = if (scale - 1.0).abs() < 0.005 {
-        "shown at real size".to_string()
+        text::tr("shown at real size").to_string()
     } else {
-        format!("shown at {:.0} %", scale * 100.0)
+        text::fill("shown at {} %", &[&format!("{:.0}", scale * 100.0)])
     };
     p.gray_text(
         area.min.x,
@@ -636,7 +650,7 @@ fn notes(p: &mut Page, notes: &str, y: f64, chars: usize) -> f64 {
     if notes.trim().is_empty() {
         return y;
     }
-    p.text(MARGIN, y, 10.0, true, "Notes");
+    p.text(MARGIN, y, 10.0, true, text::tr("Notes"));
     let mut y = y + 5.5;
     for line in wrap(notes, chars) {
         p.text(MARGIN, y, 9.5, false, line);
@@ -665,7 +679,7 @@ fn needle_list(p: &mut Page, d: &SheetData, y: f64) -> f64 {
     if d.needles.is_empty() {
         return y;
     }
-    p.text(MARGIN, y, 10.0, true, "Needles at the start");
+    p.text(MARGIN, y, 10.0, true, text::tr("Needles at the start"));
     let mut y = y + 5.5;
     let col_w = (p.width_mm - 2.0 * MARGIN) / 2.0;
     for (i, n) in d.needles.iter().enumerate() {
@@ -679,23 +693,29 @@ fn needle_list(p: &mut Page, d: &SheetData, y: f64) -> f64 {
         });
         let mut t: String = n.thread.chars().take(46).collect();
         if n.put_on {
-            t.push_str(" (put on)");
+            t.push_str(text::tr(" (put on)"));
         }
         p.text(x + 17.0, yy, 9.5, false, t);
     }
     y += 5.5 * d.needles.len().div_ceil(2) as f64 + 1.0;
-    p.text(MARGIN, y, 9.0, false, format!("Needle sequence: {}", d.needle_sequence));
+    p.text(
+        MARGIN,
+        y,
+        9.0,
+        false,
+        text::fill("Needle sequence: {}", &[&d.needle_sequence]),
+    );
     y += 4.8;
     p.gray_text(
         MARGIN,
         y,
         8.5,
-        "Type this sequence on the machine for DST, TAP and EXP files. TBF and U01 files have the needles.",
+        text::tr("Type this sequence on the machine for DST, TAP and EXP files. TBF and U01 files have the needles."),
     );
     y += 4.8;
     if !d.thread_changes.is_empty() {
         y += 1.0;
-        p.text(MARGIN, y, 10.0, true, "Thread changes (*)");
+        p.text(MARGIN, y, 10.0, true, text::tr("Thread changes (*)"));
         y += 5.5;
         for s in &d.thread_changes {
             p.text(MARGIN, y, 9.5, false, s.chars().take(110).collect::<String>());
@@ -710,7 +730,7 @@ fn stop_list(p: &mut Page, stops: &[String], y: f64) -> f64 {
     if stops.is_empty() {
         return y;
     }
-    p.text(MARGIN, y, 10.0, true, "Stops");
+    p.text(MARGIN, y, 10.0, true, text::tr("Stops"));
     let mut y = y + 5.5;
     for (i, s) in stops.iter().enumerate() {
         for (k, line) in wrap(&format!("{}. {s}", i + 1), 100).into_iter().enumerate() {
@@ -726,7 +746,7 @@ fn buy_list(p: &mut Page, lines: &[String], y: f64) -> f64 {
     if lines.is_empty() {
         return y;
     }
-    p.text(MARGIN, y, 10.0, true, "Threads to buy");
+    p.text(MARGIN, y, 10.0, true, text::tr("Threads to buy"));
     let mut y = y + 5.5;
     for l in lines {
         for (k, line) in wrap(l, 100).into_iter().enumerate() {
@@ -742,7 +762,7 @@ fn step_list(p: &mut Page, steps: &[String], y: f64) -> f64 {
     if steps.is_empty() {
         return y;
     }
-    p.text(MARGIN, y, 10.0, true, "Order of work");
+    p.text(MARGIN, y, 10.0, true, text::tr("Order of work"));
     let mut y = y + 5.5;
     for (i, s) in steps.iter().enumerate() {
         for (k, line) in wrap(&format!("{}. {s}", i + 1), 100).into_iter().enumerate() {
@@ -764,7 +784,7 @@ fn stone_list(p: &mut Page, counts: &[(String, Rgb, usize)], y: f64) -> f64 {
         y,
         10.0,
         true,
-        format!("Rhinestones ({total}, not sewn: use the template)"),
+        text::fill("Rhinestones ({}, not sewn: use the template)", &[&total]),
     );
     let mut y = y + 5.5;
     for (label, color, n) in counts {
@@ -785,45 +805,52 @@ pub fn production(d: &SheetData, paper: Paper) -> Vec<Page> {
     let mut pages = Vec::new();
     let mut p = Page::new(paper);
     let w = p.width_mm;
-    let top = header(&mut p, d, "Production worksheet");
+    let top = header(&mut p, d, text::tr("Production worksheet"));
     if let Some((kind, text)) = &d.barcode {
         crate::barcode::draw(&mut p, *kind, text, w - MARGIN, MARGIN, 9.0, 70.0);
     }
     let pic = BBox::new(Point::new(MARGIN, top), Point::new(MARGIN + 100.0, top + 110.0));
     picture(&mut p, d, pic);
 
-    let mut info: Vec<(&str, String)> = d.order_rows();
+    let mut info: Vec<(&str, String)> = d.order_rows(None);
     info.extend([
         (
-            "Size",
+            text::tr("Size"),
             d.size
                 .map(|(a, b)| format!("{a:.1} × {b:.1} mm"))
                 .unwrap_or_else(|| "—".into()),
         ),
-        ("Stitches", d.stitches.to_string()),
-        ("Colors", d.colors.len().to_string()),
-        ("Color changes", d.colors.len().saturating_sub(1).to_string()),
-        ("Trims", d.trims.to_string()),
+        (text::tr("Stitches"), d.stitches.to_string()),
+        (text::tr("Colors"), d.colors.len().to_string()),
+        (text::tr("Color changes"), d.colors.len().saturating_sub(1).to_string()),
+        (text::tr("Trims"), d.trims.to_string()),
     ]);
     if d.stops > 0 {
-        info.push(("Stops", d.stops.to_string()));
+        info.push((text::tr("Stops"), d.stops.to_string()));
     }
     info.push((
-        "Sew time",
+        text::tr("Sew time"),
         d.minutes
-            .map(|m| format!("about {}", time_text(m)))
+            .map(|m| text::fill("about {}", &[&(time_text(m))]))
             .unwrap_or_else(|| "—".into()),
     ));
-    info.push(("Machine", d.machine.clone().unwrap_or_else(|| "—".into())));
-    info.push(("Hoop", d.hoop.clone().unwrap_or_else(|| "Open field".into())));
+    info.push((text::tr("Machine"), d.machine.clone().unwrap_or_else(|| "—".into())));
+    info.push((
+        text::tr("Hoop"),
+        d.hoop.clone().unwrap_or_else(|| text::tr("Open field").into()),
+    ));
     if let Some(l) = &d.hoop_layout {
-        info.push(("Hooping", l.hoop_text()));
-        info.push(("Orientation", l.design_text()));
+        info.push((text::tr("Hooping"), l.hoop_text()));
+        info.push((text::tr("Orientation"), l.design_text()));
     }
     if let Some(c) = &d.colorway {
-        info.push(("Colorway", c.clone()));
+        info.push((text::tr("Colorway"), c.clone()));
     }
-    for (k, v) in [("Fabric", &d.fabric), ("Backing", &d.backing), ("Topping", &d.topping)] {
+    for (k, v) in [
+        (text::tr("Fabric"), &d.fabric),
+        (text::tr("Backing"), &d.backing),
+        (text::tr("Topping"), &d.topping),
+    ] {
         if let Some(v) = v.as_ref().filter(|v| !v.trim().is_empty()) {
             info.push((k, v.clone()));
         }
@@ -831,7 +858,7 @@ pub fn production(d: &SheetData, paper: Paper) -> Vec<Page> {
     let x = MARGIN + 107.0;
     let mut y = rows(&mut p, x, top + 4.0, &info);
     if !d.files.is_empty() {
-        p.gray_text(x, y, 9.0, "Files");
+        p.gray_text(x, y, 9.0, text::tr("Files"));
         y += 5.0;
         for f in &d.files {
             p.text(x, y, 8.5, false, f.clone());
@@ -856,14 +883,18 @@ pub fn production(d: &SheetData, paper: Paper) -> Vec<Page> {
     let (name_chars, brand_chars) = if with_needles { (28, 18) } else { (34, 20) };
     let needle_x = MARGIN + 9.0;
     let table_head = |p: &mut Page, y: f64| {
-        for (x, t) in col
-            .iter()
-            .zip(["#", "Color", "Thread", "Brand and code", "Stitches", "Top thread"])
-        {
+        for (x, t) in col.iter().zip([
+            "#",
+            text::tr("Color"),
+            text::tr("Thread"),
+            text::tr("Brand and code"),
+            text::tr("Stitches"),
+            text::tr("Top thread"),
+        ]) {
             p.text(*x, y, 9.0, true, t);
         }
         if with_needles {
-            p.text(needle_x, y, 9.0, true, "Needle");
+            p.text(needle_x, y, 9.0, true, text::tr("Needle"));
         }
         p.line(Point::new(MARGIN, y + 1.8), Point::new(w - MARGIN, y + 1.8), 0.2, RULE);
         y + 7.0
@@ -874,7 +905,7 @@ pub fn production(d: &SheetData, paper: Paper) -> Vec<Page> {
     for (i, c) in d.colors.iter().enumerate() {
         if y > bottom {
             pages.push(std::mem::replace(&mut p, Page::new(paper)));
-            let t = header(&mut p, d, "Production worksheet (continued)");
+            let t = header(&mut p, d, text::tr("Production worksheet (continued)"));
             y = table_head(&mut p, t + 4.0);
         }
         p.text(col[0], y, 9.5, false, (i + 1).to_string());
@@ -913,10 +944,9 @@ pub fn production(d: &SheetData, paper: Paper) -> Vec<Page> {
     }
     if !d.colors.is_empty() {
         let len = emb_model::thread_use::length_text;
-        let text = format!(
+        let text = text::fill(
             "Thread (an estimate): top thread {}, bobbin thread {}",
-            len(d.top_mm),
-            len(d.bobbin_mm)
+            &[&(len(d.top_mm)), &(len(d.bobbin_mm))],
         );
         p.text(col[2], y, 9.0, false, text);
         y += 6.0;
@@ -947,7 +977,7 @@ pub fn production(d: &SheetData, paper: Paper) -> Vec<Page> {
         };
     if stops_h + stones_h + notes_h > 0.0 && y + stops_h + stones_h + notes_h > p.height_mm - MARGIN {
         pages.push(std::mem::replace(&mut p, Page::new(paper)));
-        y = header(&mut p, d, "Production worksheet (continued)") + 4.0;
+        y = header(&mut p, d, text::tr("Production worksheet (continued)")) + 4.0;
     }
     let y = needle_list(&mut p, d, y);
     let y = stop_list(&mut p, &d.stop_notes, y);
@@ -960,7 +990,12 @@ pub fn production(d: &SheetData, paper: Paper) -> Vec<Page> {
     if n > 1 {
         for (i, pg) in pages.iter_mut().enumerate() {
             let h = pg.height_mm;
-            pg.gray_text(MARGIN, h - MARGIN + 6.0, 8.0, format!("Page {} of {n}", i + 1));
+            pg.gray_text(
+                MARGIN,
+                h - MARGIN + 6.0,
+                8.0,
+                text::fill("Page {} of {}", &[&(i + 1), &n]),
+            );
         }
     }
     pages
@@ -970,10 +1005,10 @@ pub fn production(d: &SheetData, paper: Paper) -> Vec<Page> {
 pub fn approval(d: &SheetData, paper: Paper) -> Page {
     let mut p = Page::new(paper);
     let w = p.width_mm;
-    let top = header(&mut p, d, "Design approval");
+    let top = header(&mut p, d, text::tr("Design approval"));
     let pic = BBox::new(Point::new(MARGIN, top), Point::new(w - MARGIN, top + 140.0));
     let mut y = picture(&mut p, d, pic) + 10.0;
-    p.text(MARGIN, y, 10.0, true, "Colors");
+    p.text(MARGIN, y, 10.0, true, text::tr("Colors"));
     y += 6.0;
     let col_w = (w - 2.0 * MARGIN) / 2.0;
     for (i, c) in d.colors.iter().enumerate() {
@@ -992,13 +1027,13 @@ pub fn approval(d: &SheetData, paper: Paper) -> Page {
     }
     y += 6.0 * d.colors.len().div_ceil(2) as f64 + 6.0;
     if let Some(f) = &d.fabric {
-        p.text(MARGIN, y, 10.0, true, "Fabric");
+        p.text(MARGIN, y, 10.0, true, text::tr("Fabric"));
         p.text(MARGIN + 22.0, y, 10.0, false, f.clone());
         y += 9.0;
     }
-    let mut order = d.order_rows();
+    let mut order = d.order_rows(None);
     if let Some(price) = &d.price {
-        order.push(("Price", price.clone()));
+        order.push((text::tr("Price"), price.clone()));
     }
     if !order.is_empty() {
         y = rows(&mut p, MARGIN, y, &order) + 3.0;
@@ -1015,8 +1050,8 @@ pub fn approval(d: &SheetData, paper: Paper) -> Page {
         0.3,
         BLACK,
     );
-    p.gray_text(MARGIN, sy + 4.5, 9.0, "Approved by");
-    p.gray_text(w - MARGIN - 60.0, sy + 4.5, 9.0, "Date");
+    p.gray_text(MARGIN, sy + 4.5, 9.0, text::tr("Approved by"));
+    p.gray_text(w - MARGIN - 60.0, sy + 4.5, 9.0, text::tr("Date"));
     p
 }
 
@@ -1027,7 +1062,7 @@ pub fn quote_sheet(d: &SheetData, q: &emb_model::quote::Quote, currency: &str, p
     use emb_model::quote::money_text;
     let mut p = Page::new(paper);
     let w = p.width_mm;
-    let top = header(&mut p, d, "Quote");
+    let top = header(&mut p, d, text::tr("Quote"));
     let pic = BBox::new(Point::new(MARGIN, top), Point::new(w - MARGIN, top + 90.0));
     let mut y = picture(&mut p, d, pic) + 10.0;
     let threads = d.colors.len();
@@ -1035,10 +1070,13 @@ pub fn quote_sheet(d: &SheetData, q: &emb_model::quote::Quote, currency: &str, p
         MARGIN,
         y,
         9.5,
-        format!("{} stitches · {threads} colors · {}", d.stitches, size_text(d.size)),
+        text::fill(
+            "{} stitches · {} colors · {}",
+            &[&d.stitches, &threads, &(size_text(d.size))],
+        ),
     );
     y += 8.0;
-    let order: Vec<(&str, String)> = d.order_rows().into_iter().filter(|(k, _)| *k != "Quantity").collect();
+    let order: Vec<(&str, String)> = d.order_rows(Some("Quantity"));
     if !order.is_empty() {
         y = rows(&mut p, MARGIN, y, &order) + 2.0;
     }
@@ -1049,15 +1087,15 @@ pub fn quote_sheet(d: &SheetData, q: &emb_model::quote::Quote, currency: &str, p
         let tw = text_width_mm(&t, 10.0);
         p.text(x - tw, y, 10.0, bold, t);
     };
-    p.text(MARGIN, y, 10.0, true, "Price");
-    right(&mut p, x_qty, y, true, "Quantity".into());
-    right(&mut p, x_each, y, true, "Each".into());
-    right(&mut p, x_amount, y, true, "Amount".into());
+    p.text(MARGIN, y, 10.0, true, text::tr("Price"));
+    right(&mut p, x_qty, y, true, text::tr("Quantity").into());
+    right(&mut p, x_each, y, true, text::tr("Each").into());
+    right(&mut p, x_amount, y, true, text::tr("Total").into());
     y += 2.0;
     p.line(Point::new(MARGIN, y), Point::new(w - MARGIN, y), 0.2, RULE);
     y += 6.0;
     for l in &q.lines {
-        p.text(MARGIN, y, 10.0, false, l.kind.label());
+        p.text(MARGIN, y, 10.0, false, text::tr(l.kind.label()));
         if l.kind.per_piece() {
             right(&mut p, x_qty, y, false, l.quantity.to_string());
             right(&mut p, x_each, y, false, money_text(currency, l.each));
@@ -1066,13 +1104,13 @@ pub fn quote_sheet(d: &SheetData, q: &emb_model::quote::Quote, currency: &str, p
         y += 6.0;
     }
     if q.lines.is_empty() {
-        p.gray_text(MARGIN, y, 10.0, "No prices are set.");
+        p.gray_text(MARGIN, y, 10.0, text::tr("No prices are set."));
         y += 6.0;
     }
     y -= 4.0;
     p.line(Point::new(MARGIN, y), Point::new(w - MARGIN, y), 0.3, BLACK);
     y += 7.0;
-    p.text(MARGIN, y, 12.0, true, "Total");
+    p.text(MARGIN, y, 12.0, true, text::tr("Total"));
     let total = money_text(currency, q.total);
     p.text(x_amount - text_width_mm(&total, 12.0), y, 12.0, true, total);
     y += 6.0;
@@ -1080,10 +1118,9 @@ pub fn quote_sheet(d: &SheetData, q: &emb_model::quote::Quote, currency: &str, p
         MARGIN,
         y,
         9.5,
-        format!(
+        text::fill(
             "{} pieces · {} for each piece",
-            q.quantity,
-            money_text(currency, q.each)
+            &[&q.quantity, &(money_text(currency, q.each))],
         ),
     );
     y += 10.0;
@@ -1098,8 +1135,8 @@ pub fn quote_sheet(d: &SheetData, q: &emb_model::quote::Quote, currency: &str, p
         0.3,
         BLACK,
     );
-    p.gray_text(MARGIN, sy + 4.5, 9.0, "Accepted by");
-    p.gray_text(w - MARGIN - 60.0, sy + 4.5, 9.0, "Date");
+    p.gray_text(MARGIN, sy + 4.5, 9.0, text::tr("Accepted by"));
+    p.gray_text(w - MARGIN - 60.0, sy + 4.5, 9.0, text::tr("Date"));
     p
 }
 

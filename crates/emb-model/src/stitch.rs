@@ -29,13 +29,6 @@ pub enum StitchKind {
     Fast,
 }
 
-impl StitchKind {
-    /// `true` for a speed change (`Slow`, `Fast`): no move, no needle.
-    pub fn is_speed(self) -> bool {
-        matches!(self, StitchKind::Slow | StitchKind::Fast)
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct StitchRecord {
     pub pos: Point,

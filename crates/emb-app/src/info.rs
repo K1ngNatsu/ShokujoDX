@@ -323,7 +323,7 @@ impl AppState {
             info.issues.push(Issue {
                 severity: Severity::Warning,
                 object: w.object,
-                text: crate::i18n::fill("No stitches: {}", &[&w.message]),
+                text: crate::i18n::fill("No stitches: {}", &[&crate::i18n::tr(&w.message)]),
                 at,
             });
         }
@@ -536,7 +536,16 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
                     ui.weak(tr("Thread on fabric"));
                     ui.weak(tr("Top thread")).on_hover_text(tr(THREAD_USE_HELP));
                     ui.end_row();
+                    // A row out of view takes its height only (a design can
+                    // have hundreds of color blocks).
+                    let row_h = ui.text_style_height(&egui::TextStyle::Body).max(14.0);
                     for (i, c) in info.colors.iter().enumerate() {
+                        let probe = egui::Rect::from_min_size(ui.cursor().min, egui::vec2(ui.available_width(), row_h));
+                        if !ui.is_rect_visible(probe) {
+                            ui.allocate_space(egui::vec2(14.0, row_h));
+                            ui.end_row();
+                            continue;
+                        }
                         let (rect, _) = ui.allocate_exact_size(egui::Vec2::splat(14.0), egui::Sense::hover());
                         ui.painter().rect_filled(rect, 2.0, color32(c.color));
                         ui.label(format!("{}. {}", i + 1, c.name));
@@ -567,14 +576,31 @@ pub fn warnings_list(ui: &mut egui::Ui, st: &mut AppState, info: &DesignInfo) {
     ui.strong(crate::i18n::fill("Warnings ({})", &[&(info.issues.len())]));
     ui.weak(tr("Click a warning to select the object."));
     let mut picked = None;
+    let d = st.doc.design();
+    let index: std::collections::HashMap<emb_model::ObjectId, usize> =
+        d.objects().iter().enumerate().map(|(i, o)| (o.id, i)).collect();
+    // The rows are one line high (long texts are cut, with all of the text
+    // on hover), so a row out of view takes the height of the first row only.
+    let mut row_h = None;
     for (i, issue) in info.issues.iter().enumerate() {
+        if let Some(h) = row_h {
+            let probe = egui::Rect::from_min_size(ui.cursor().min, egui::vec2(ui.available_width(), h));
+            if !ui.is_rect_visible(probe) {
+                ui.allocate_space(egui::vec2(ui.available_width(), h));
+                continue;
+            }
+        }
         let (mark, color) = match issue.severity {
             Severity::Error => ("⛔", Color32::from_rgb(220, 60, 50)),
             Severity::Warning => ("⚠", Color32::from_rgb(230, 150, 20)),
         };
-        let name = issue.object.and_then(|id| st.doc.design().object(id)).map(|o| {
-            let n = st.doc.design().index_of(o.id).map_or(0, |i| i + 1);
-            format!("#{n} {}", o.name.clone().unwrap_or_else(|| o.type_name().to_string()))
+        let name = issue.object.and_then(|id| index.get(&id)).map(|&n| {
+            let o = &d.objects()[n];
+            format!(
+                "#{} {}",
+                n + 1,
+                o.name.clone().unwrap_or_else(|| tr(o.type_name()).to_string())
+            )
         });
         let text = match name {
             Some(n) => format!("{n}: {}", issue.text),
@@ -582,8 +608,10 @@ pub fn warnings_list(ui: &mut egui::Ui, st: &mut AppState, info: &DesignInfo) {
         };
         let r = ui.horizontal(|ui| {
             ui.label(RichText::new(mark).color(color));
-            ui.add(egui::Button::new(text).frame(false))
+            ui.add(egui::Button::new(text.as_str()).frame(false).truncate())
+                .on_hover_text(text)
         });
+        row_h.get_or_insert(r.response.rect.height());
         if r.inner.clicked() {
             picked = Some(i);
         }

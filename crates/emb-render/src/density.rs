@@ -120,6 +120,7 @@ impl DensityMap {
     }
 
     /// The layers of the cell at `p` (0 outside the map).
+    #[cfg(test)]
     pub fn layers_at(&self, p: Point) -> f64 {
         let c = ((p.x - self.origin.x) / self.cell_mm).floor();
         let r = ((p.y - self.origin.y) / self.cell_mm).floor();

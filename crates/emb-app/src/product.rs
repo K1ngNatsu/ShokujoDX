@@ -58,7 +58,7 @@ impl AppState {
         if let Some(p) = kind.placements().first() {
             v.put_design_at(self.doc.design(), p.at);
         }
-        self.doc.edit("Product", |d| d.product = Some(v));
+        self.doc.edit(tr("Product"), |d| d.product = Some(v));
         self.fit_product = true;
     }
 
@@ -106,15 +106,15 @@ impl AppState {
         let mut v = ProductView::new(kind, WHITE);
         v.origin = c - size * 0.5;
         v.picture = Some(picture);
-        self.doc.edit("Product picture", |d| d.product = Some(v));
+        self.doc.edit(tr("Product picture"), |d| d.product = Some(v));
         self.fit_product = true;
         Ok(())
     }
 
     pub fn product_picture_dialog(&mut self) {
         let Some(p) = rfd::FileDialog::new()
-            .set_title("Picture of your product")
-            .add_filter("Pictures (PNG, JPEG, BMP, TIFF, GIF)", &crate::backdrop::FILE_TYPES)
+            .set_title(tr("Picture of your product"))
+            .add_filter(tr("Pictures (PNG, JPEG, BMP, TIFF, GIF)"), &crate::backdrop::FILE_TYPES)
             .set_directory(self.dialog_dir())
             .pick_file()
         else {
@@ -168,7 +168,7 @@ impl AppState {
     pub fn save_decoration(&mut self, path: &Path) -> Result<(), String> {
         let pic = self
             .decoration_picture()
-            .ok_or("Choose a product first (Design > Product).")?;
+            .ok_or(tr("Choose a product first (Design > Product)."))?;
         std::fs::write(path, pic.png()).map_err(|e| format!("{}: {e}", path.display()))
     }
 
@@ -178,7 +178,7 @@ impl AppState {
             return;
         }
         let Some(p) = rfd::FileDialog::new()
-            .set_title("Save picture on product (PNG)")
+            .set_title(tr("Save picture on product (PNG)"))
             .add_filter("PNG", &["png"])
             .set_directory(self.dialog_dir())
             .set_file_name(format!("{} on product.png", self.doc.design().name))
@@ -287,7 +287,7 @@ fn contents(ui: &mut egui::Ui, st: &mut AppState) {
     ));
     let current = st.doc.design().product.clone();
     let name = match &current {
-        Some(v) if v.picture.is_some() => "My picture".to_string(),
+        Some(v) if v.picture.is_some() => tr("My picture").to_string(),
         Some(v) => v.kind.name().to_string(),
         None => "None".to_string(),
     };
@@ -319,7 +319,7 @@ fn contents(ui: &mut egui::Ui, st: &mut AppState) {
     match pick {
         Some(Some(k)) => st.set_product(k),
         Some(None) => {
-            st.doc.edit("No product", |d| d.product = None);
+            st.doc.edit(tr("No product"), |d| d.product = None);
         }
         None => {}
     }
@@ -346,9 +346,12 @@ fn contents(ui: &mut egui::Ui, st: &mut AppState) {
         let mut put = None;
         ui.horizontal_wrapped(|ui| {
             for (i, p) in v.kind.placements().iter().enumerate() {
-                let tip = format!("Usual largest design here: {:.0} × {:.0} mm", p.max.0, p.max.1);
+                let tip = crate::i18n::fill(
+                    "Usual largest design here: {} × {} mm",
+                    &[&format!("{:.0}", p.max.0), &format!("{:.0}", p.max.1)],
+                );
                 if ui
-                    .selectable_label(on == Some(p.name), p.name)
+                    .selectable_label(on == Some(p.name), tr(p.name))
                     .on_hover_text(tip)
                     .clicked()
                 {
@@ -364,11 +367,15 @@ fn contents(ui: &mut egui::Ui, st: &mut AppState) {
         {
             ui.colored_label(
                 ui.visuals().warn_fg_color,
-                format!(
-                    "The design ({w:.0} × {h:.0} mm) is larger than the usual size for {} ({:.0} × {:.0} mm).",
-                    p.name.to_lowercase(),
-                    p.max.0,
-                    p.max.1
+                crate::i18n::fill(
+                    "The design ({} × {} mm) is larger than the usual size for {} ({} × {} mm).",
+                    &[
+                        &format!("{w:.0}"),
+                        &format!("{h:.0}"),
+                        &tr(p.name).to_lowercase(),
+                        &format!("{:.0}", p.max.0),
+                        &format!("{:.0}", p.max.1),
+                    ],
                 ),
             );
         }

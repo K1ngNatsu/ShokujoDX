@@ -196,14 +196,19 @@ pub fn unzip(bytes: &[u8]) -> Result<Vec<(String, Vec<u8>)>, String> {
                     .read_to_end(&mut d)
                     .map_err(|e| format!("{name}: {e}"))?;
                 if d.len() > MAX_UNZIPPED {
-                    return Err(format!("{name}: the file is too large"));
+                    return Err(crate::i18n::fill("{}: the file is too large", &[&name]));
                 }
                 d
             }
-            m => return Err(format!("{name}: compression method {m} is not supported")),
+            m => {
+                return Err(crate::i18n::fill(
+                    "{}: compression method {} is not supported",
+                    &[&name, &m],
+                ));
+            }
         };
         if crc32fast::hash(&data) != crc {
-            return Err(format!("{name}: the data is damaged"));
+            return Err(crate::i18n::fill("{}: the data is damaged", &[&name]));
         }
         out.push((name, data));
     }
@@ -310,7 +315,7 @@ impl AppState {
         let Ok(pixels) = emb_art::picture_size(&bytes) else {
             return;
         };
-        self.doc.edit("Backdrop changed in another program", |d| {
+        self.doc.edit(tr("Backdrop changed in another program"), |d| {
             if let Some(b) = d.backdrop.as_mut() {
                 b.data = std::sync::Arc::new(bytes);
                 b.pixels = pixels;
@@ -343,7 +348,7 @@ impl AppState {
         let needles = self.catalogs().needle_plan(&d, &plan.stitches);
         let machine_file =
             emb_formats::write_machine_with(&ext, &plan.stitches, &name, &date, machine.as_ref(), needles.as_ref())
-                .ok_or_else(|| format!("The program cannot write .{ext} files."))?;
+                .ok_or_else(|| crate::i18n::fill("The program cannot write .{} files.", &[&ext]))?;
         let project = emb_model::project::to_string(&d).into_bytes();
         let segments = emb_render::segments(&plan.stitches);
         let look = self.settings.look.picture_look(d.fabric.as_deref());
@@ -389,19 +394,23 @@ impl AppState {
             return;
         }
         let names: Vec<&str> = files.iter().map(|(n, _)| n.as_str()).collect();
-        let body = format!(
-            "The embroidery design \"{stem}\" is in the attached file {} ({}).",
-            path.file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_default(),
-            names.join(", ")
+        let body = crate::i18n::fill(
+            "The embroidery design \"{}\" is in the attached file {} ({}).",
+            &[
+                &stem,
+                &path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default(),
+                &names.join(", "),
+            ],
         );
         let opened = open_with_system(Path::new(&mailto(&stem, &body))).is_ok();
         let _ = show_in_folder(&path);
         self.message = if opened {
-            format!("Attach {} to the message (the folder shows it).", path.display())
+            crate::i18n::fill("Attach {} to the message (the folder shows it).", &[&path.display()])
         } else {
-            format!("Wrote {}. Attach it to an email.", path.display())
+            crate::i18n::fill("Wrote {}. Attach it to an email.", &[&path.display()])
         };
     }
 }

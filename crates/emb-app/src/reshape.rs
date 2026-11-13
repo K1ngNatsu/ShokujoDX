@@ -241,6 +241,34 @@ impl AppState {
         self.reshape.node = new.map(|n| (k, n));
     }
 
+    /// Breaks the line at the selected node (ADR 0092): an open line
+    /// becomes two parts, a closed line opens there. Lines and vector lines
+    /// only. Returns `false` if nothing changed.
+    pub fn break_at_node(&mut self) -> bool {
+        let (Some(id), Some((k, n))) = (self.selection.single(), self.reshape.node) else {
+            return false;
+        };
+        let line = self
+            .doc
+            .design()
+            .object(id)
+            .is_some_and(|o| matches!(o.kind, ObjectKind::Running { .. } | ObjectKind::Vector { .. }));
+        let Some(path) = self.path_of(id, k).filter(|_| line) else {
+            self.message = tr("Break at Node works on lines and vector lines.").into();
+            return false;
+        };
+        if !NodePath::from_path(&path).clone().break_at(n) {
+            self.message = tr("An end does not break: select a node inside the line.").into();
+            return false;
+        }
+        self.edit_path("Break at Node", None, id, &path, k, |np| {
+            np.break_at(n);
+        });
+        self.reshape.node = None;
+        self.message = tr("The line is in two parts. Break Apart makes two objects.").into();
+        true
+    }
+
     /// Removes the selected node. Returns `false` if there is none or it cannot go.
     pub fn delete_node(&mut self) -> bool {
         let (Some(id), Some((k, n))) = (self.selection.single(), self.reshape.node) else {
@@ -255,7 +283,7 @@ impl AppState {
             }
             np.subs.remove(n.sub);
             let path = np.to_path();
-            self.doc.edit("Delete stone", |d| {
+            self.doc.edit(tr("Delete stone"), |d| {
                 if let Some(ObjectKind::Bling(b)) = d.object_mut(id).map(|o| &mut o.kind)
                     && let emb_model::BlingLayout::Stones { points } = &mut b.layout
                 {
@@ -280,7 +308,7 @@ impl AppState {
     /// Deletes a stitch angle line (rung) of the selected satin.
     pub fn delete_rung(&mut self, i: usize) {
         let Some(id) = self.selection.single() else { return };
-        self.doc.edit("Delete stitch angle", |d| {
+        self.doc.edit(tr("Delete stitch angle"), |d| {
             if let Some(emb_model::ObjectKind::Satin { geometry, .. }) = d.object_mut(id).map(|o| &mut o.kind)
                 && i < geometry.rungs.len()
             {
@@ -292,7 +320,7 @@ impl AppState {
     /// Clears the start and end points that the user set.
     pub fn reset_start_end(&mut self) {
         let Some(id) = self.selection.single() else { return };
-        self.doc.edit("Reset start and end", |d| {
+        self.doc.edit(tr("Reset start and end"), |d| {
             if let Some(o) = d.object_mut(id) {
                 o.start = None;
                 o.end = None;
@@ -380,7 +408,7 @@ pub fn handle_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState,
                 }),
             },
             Some(DragOp::ReshapeRung { id, rung, b_end, key }) => {
-                st.doc.edit_merged("Move stitch angle", key, |d| {
+                st.doc.edit_merged(tr("Move stitch angle"), key, |d| {
                     if let Some(emb_model::ObjectKind::Satin { geometry, .. }) = d.object_mut(id).map(|o| &mut o.kind)
                         && let Some(r) = geometry.rungs.get_mut(rung)
                     {
@@ -394,8 +422,8 @@ pub fn handle_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState,
             }
             Some(DragOp::ReshapeMarker { id, which, key }) => {
                 let label = match which {
-                    Marker::Start => "Move start point",
-                    Marker::End => "Move end point",
+                    Marker::Start => tr("Move start point"),
+                    Marker::End => tr("Move end point"),
                 };
                 st.doc.edit_merged(label, key, |d| {
                     if let Some(o) = d.object_mut(id) {
@@ -452,7 +480,10 @@ pub fn handle_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState,
             st.reshape.node = None;
         }
     }
-    response.context_menu(|ui| menu(ui, st));
+    // A guide menu (from a ruler marker) takes the right click.
+    if st.guide_menu.is_none() {
+        response.context_menu(|ui| menu(ui, st));
+    }
 }
 
 /// What the right click was on, kept while the menu is open.
@@ -495,6 +526,19 @@ fn menu(ui: &mut egui::Ui, st: &mut AppState) {
                 .clicked()
             {
                 st.delete_node();
+                ui.close();
+            }
+            let line = st
+                .selection
+                .single()
+                .and_then(|id| st.doc.design().object(id))
+                .is_some_and(|o| matches!(o.kind, ObjectKind::Running { .. } | ObjectKind::Vector { .. }));
+            if ui
+                .add_enabled(line, egui::Button::new(tr("Break at Node")).shortcut_text("B"))
+                .on_hover_text(tr("Cut the line in two at this node; a closed line opens here."))
+                .clicked()
+            {
+                st.break_at_node();
                 ui.close();
             }
             ui.separator();

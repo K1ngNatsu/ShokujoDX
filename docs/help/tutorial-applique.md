@@ -2,7 +2,7 @@
 id: tutorial-applique
 title: "Tutorial: an appliqué"
 group: tutorials
-keywords: tutorial, appliqué, applique, fabric piece, placement, tack-down, cover, satin, stop, cut, cutter file, layers, combine, partial
+keywords: tutorial, appliqué, applique, fabric piece, placement, tack-down, cover, satin, stop, cut, cutter file, layers, combine, partial, from selection, back to original, border as cover
 ---
 # Tutorial: an appliqué
 
@@ -69,6 +69,13 @@ DXF. Cut the piece before you sew; then the tack-down needs no cut.
 - **Combine Appliqué** joins the selected appliqué objects: all
   placement lines first, then all tack-downs, then all covers, with one
   stop for each step.
+- **Appliqué from Selection** makes one appliqué object of the selected
+  fills and shapes: overlapping shapes become one piece. A selected satin
+  border on an edge is the cover of that edge and sews after the
+  appliqué, so a fill with a border becomes fabric with the same border.
+  A closed satin border alone becomes fabric inside it.
+- **Back to Original** puts back the objects that the selected appliqué
+  replaced (also after you move it), and removes the appliqué.
 - An appliqué object can have more pieces, on up to four **Layers**: a
   piece on layer 2 goes on the fabric of layer 1.
 - **Edges with cover**: clear an edge where another object covers the

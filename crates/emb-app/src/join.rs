@@ -8,8 +8,10 @@
 //!   part (a part whose ends then touch is closed).
 //! - Fills become one fill: the union of their areas, so parts cut by the
 //!   knife are one area again.
-//! - Satin columns whose ends touch become one column; columns that do not
-//!   touch another column stay apart.
+//! - Satin columns whose ends touch become one column. Columns that meet at
+//!   a corner (one stops where the other starts over it) become one column
+//!   with a mitre corner (`emb_model::mitre`, ADR 0086). The other columns
+//!   stay apart.
 //! - Stitch objects become one object, with a jump between the parts.
 //!
 //! Appliqué and lettering are not joined. Each join is one undo step.
@@ -167,7 +169,8 @@ fn chain_columns(a: &SatinGeometry, b: &SatinGeometry) -> Option<SatinGeometry> 
     None
 }
 
-/// Columns whose ends touch become one column. The others stay as they are.
+/// Columns whose ends touch become one column, then columns that meet at a
+/// corner become one column with a mitre corner. The others stay as they are.
 fn join_columns(kinds: &[&ObjectKind]) -> Vec<ObjectKind> {
     let mut cols: Vec<(SatinGeometry, emb_model::SatinParams)> = kinds
         .iter()
@@ -188,9 +191,12 @@ fn join_columns(kinds: &[&ObjectKind]) -> Vec<ObjectKind> {
         }
         break;
     }
-    cols.into_iter()
+    let mut kinds: Vec<ObjectKind> = cols
+        .into_iter()
         .map(|(geometry, params)| ObjectKind::Satin { geometry, params })
-        .collect()
+        .collect();
+    emb_model::mitre::join_parts(&mut kinds);
+    kinds
 }
 
 fn join_stitches(kinds: &[&ObjectKind]) -> ObjectKind {
@@ -284,7 +290,7 @@ impl AppState {
             return;
         }
         let joined: usize = plan.iter().map(|(ids, new)| ids.len() - new.len()).sum();
-        let selected = self.doc.edit("Join", |d| {
+        let selected = self.doc.edit(tr("Join"), |d| {
             let mut selected = Vec::new();
             for (ids, new) in plan {
                 for id in &ids[1..] {
@@ -402,6 +408,37 @@ mod tests {
         assert!(touch(a[0], p(0.0, -2.0)) || touch(a[0], p(40.0, -2.0)), "{a:?}");
         let len: f64 = geometry.rail_a.flatten(0.05).iter().map(|l| l.length()).sum();
         assert!((len - 40.0).abs() < 1e-6, "{len}");
+    }
+
+    #[test]
+    fn columns_that_meet_at_a_corner_join_with_a_mitre() {
+        let mut h = Harness::empty();
+        let col = |a: &[Point]| ObjectKind::Satin {
+            geometry: SatinGeometry::from_centerline(&crate::actions::path_of(a, false), 4.0),
+            params: SatinParams::default(),
+        };
+        // An "L": the stem to the bottom edge of the foot, the foot from the
+        // left edge of the stem (a lap).
+        add(
+            &mut h,
+            vec![col(&[p(0.0, 0.0), p(0.0, 22.0)]), col(&[p(-2.0, 20.0), p(20.0, 20.0)])],
+        );
+        h.st.select_all();
+        h.st.join_selection();
+        let d = h.st.doc.design();
+        assert_eq!(d.objects().len(), 1);
+        let ObjectKind::Satin { geometry, .. } = &d.objects()[0].kind else {
+            panic!()
+        };
+        // One rail goes through the outer corner of the "L".
+        let corner = p(-2.0, 22.0);
+        let near = |r: &Path| {
+            r.flatten(0.05)
+                .iter()
+                .flat_map(|l| l.points.clone())
+                .any(|q| q.distance(corner) < 1e-6)
+        };
+        assert!(near(&geometry.rail_a) || near(&geometry.rail_b));
     }
 
     #[test]

@@ -20,7 +20,18 @@
 //! Rounded rectangle, Ellipse, Star, Ring): drag from corner to corner. Ctrl
 //! makes equal sides; Alt draws from the center.
 //!
-//! Points snap to the grid and guides when snap is on. A finished object is
+//! Drawing help of the point tools (ADR 0088):
+//! - A left drag places a curve point and pulls out its handle: the curve
+//!   goes through the point in the direction of the drag.
+//! - Shift keeps the line from the last point at a step of 15°.
+//! - The length and the angle from the last point show at the pointer.
+//!   Type a length (for example `25`, `1 in` or `12+3`), or a length and an
+//!   angle (`25<45`), and push Enter: the next point goes that far, toward
+//!   the pointer or at that angle.
+//!
+//! Points snap to the grid and guides when snap is on, and to the nodes,
+//! midpoints, centers and edges of other objects with the object snap; then
+//! they also line up with the points already placed. A finished object is
 //! one undo step. The tool stays active, so you can draw the next object.
 
 use eframe::egui::{self, Color32, CursorIcon, Modifiers, Pos2, Rect, Shape, Stroke, Vec2};
@@ -33,7 +44,7 @@ use emb_model::{
 use crate::app::AppState;
 use crate::i18n::tr;
 use crate::manipulate::ViewMap;
-use crate::workspace::Defaults;
+use crate::workspace::{Defaults, SnapHit, SnapKind};
 
 /// Snap distance to close a shape on its first point, in screen points.
 const CLOSE_SNAP: f32 = 8.0;
@@ -45,6 +56,10 @@ const FREEHAND_STEP: f32 = 3.0;
 const FREEHAND_TOL_MM: f64 = 0.3;
 /// Inner radius of a star, as a fraction of the outer radius.
 const STAR_INNER: f64 = 0.45;
+/// Shift keeps the line from the last point at a multiple of this angle, in degrees.
+const ANGLE_STEP_DEG: f64 = 15.0;
+/// A drag shorter than this places a corner (no handle), in screen points.
+const HANDLE_MIN: f32 = 4.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Tool {
@@ -97,12 +112,22 @@ pub enum Tool {
     Stone,
     StoneRun,
     StoneFill,
+    /// A construction line through two points (ADR 0089). It does not sew.
+    ConstructionLine,
+    /// A construction point (ADR 0089). It does not sew.
+    ConstructionPoint,
+    /// Click inside an area that lines enclose: a fill of it (ADR 0092).
+    SmartFill,
+    /// Click a part of a line between crossings: it goes (ADR 0092).
+    TrimSegment,
+    /// A stroke by hand that becomes a clean line or shape (ADR 0092).
+    SmartDraw,
 }
 
 impl Tool {
     /// All tools. The ribbon test checks that each one has a button.
     #[cfg(test)]
-    pub const ALL: [Tool; 40] = [
+    pub const ALL: [Tool; 45] = [
         Tool::Select,
         Tool::Reshape,
         Tool::Lasso,
@@ -143,6 +168,11 @@ impl Tool {
         Tool::Stone,
         Tool::StoneRun,
         Tool::StoneFill,
+        Tool::ConstructionLine,
+        Tool::ConstructionPoint,
+        Tool::SmartFill,
+        Tool::TrimSegment,
+        Tool::SmartDraw,
     ];
 
     pub fn label(self) -> &'static str {
@@ -175,6 +205,11 @@ impl Tool {
             Tool::DirectionLine => tr("Direction Line"),
             Tool::MirrorLine => tr("Mirror Line"),
             Tool::RefPoints => tr("Ref Points"),
+            Tool::ConstructionLine => tr("Construction Line"),
+            Tool::ConstructionPoint => tr("Construction Point"),
+            Tool::SmartFill => tr("Smart Fill"),
+            Tool::TrimSegment => tr("Trim Segment"),
+            Tool::SmartDraw => tr("Smart Drawing"),
             Tool::Measure => tr("Measure"),
             Tool::Zoom => tr("Zoom"),
             Tool::CropRect => tr("Crop Box"),
@@ -246,6 +281,25 @@ impl Tool {
                 "Move, turn and scale the selection by two points: click two points on it, \
                  then where they go.",
             ),
+            Tool::ConstructionLine => tr(
+                "A dashed help line across the canvas through two points, at any angle. Points snap to it \
+                 and to where it crosses other lines. It does not sew.",
+            ),
+            Tool::ConstructionPoint => {
+                tr("A help point on the canvas. Points snap to it. It does not sew. Click where it goes.")
+            }
+            Tool::SmartFill => tr(
+                "Click inside an area that lines or the outlines of objects close all round: it becomes a fill. \
+                 The lines can cross; small gaps close.",
+            ),
+            Tool::TrimSegment => tr(
+                "Click a part of a line between two crossings (or the end past the last crossing): that part \
+                 goes. Good for the overshoots of lines drawn by hand.",
+            ),
+            Tool::SmartDraw => tr(
+                "Draw by hand: a stroke near a straight line, a rectangle, a triangle, a circle or an ellipse \
+                 becomes that clean shape. Other strokes stay as drawn.",
+            ),
             Tool::Measure => tr("Measure a distance and an angle. Drag."),
             Tool::Zoom => tr("Drag a box to zoom to it. Click: zoom in. Shift+click: zoom out."),
             Tool::CropRect => tr("Crop the backdrop picture to a box: click two corners."),
@@ -314,12 +368,18 @@ impl Tool {
             (Tool::Stone, ..) => tr("Click where a stone goes."),
             (Tool::Backstitch, 0, _) => tr("Click a cell corner or a cell center where the line starts."),
             (Tool::Backstitch, ..) => tr("Click the next point. Right click or Esc: end the line."),
+            (Tool::ConstructionLine, 0, _) => tr("Click the first point of the construction line."),
+            (Tool::ConstructionLine, ..) => tr("Click the second point. Shift: steps of 15°."),
+            (Tool::ConstructionPoint, ..) => tr("Click where the construction point goes."),
             (Tool::RefPoints, 0, _) => tr("Click the first reference point on the selection."),
             (Tool::RefPoints, 1, _) => tr("Click the second reference point on the selection."),
             (Tool::RefPoints, 2, _) => tr("Click where the first point goes."),
             (Tool::RefPoints, ..) => tr("Click where the second point goes."),
             (t, ..) if t.is_box() => tr("Drag from corner to corner. Ctrl: equal sides. Alt: from center."),
             (Tool::Freehand | Tool::FreeShape | Tool::Lasso, ..) => tr("Drag to draw."),
+            (Tool::SmartDraw, ..) => tr("Drag to draw a line or a shape."),
+            (Tool::SmartFill, ..) => tr("Click inside an area that lines close all round."),
+            (Tool::TrimSegment, ..) => tr("Click the part of a line that must go."),
             (Tool::Measure, ..) => tr("Drag to measure."),
             (Tool::Lettering, ..) => tr("Click where the baseline of the first line starts."),
             (Tool::Zoom, ..) => tr("Drag a box, or click to zoom in (Shift: out)."),
@@ -351,6 +411,8 @@ impl Tool {
                 | Tool::DirectionLine
                 | Tool::MirrorLine
                 | Tool::RefPoints
+                | Tool::ConstructionLine
+                | Tool::ConstructionPoint
                 | Tool::PolySelect
                 | Tool::LineSelect
                 | Tool::CropRect
@@ -376,7 +438,7 @@ impl Tool {
     }
 
     pub fn is_freehand(self) -> bool {
-        matches!(self, Tool::Freehand | Tool::FreeShape | Tool::Lasso)
+        matches!(self, Tool::Freehand | Tool::FreeShape | Tool::Lasso | Tool::SmartDraw)
     }
 
     /// The outline of the current part is closed (clicking the first point closes it).
@@ -393,12 +455,31 @@ impl Tool {
         ) || (self == Tool::Turning && stages == 0)
     }
 
+    /// Tools whose points can be curve points (a right click, or a drag that
+    /// pulls out a handle).
+    fn takes_curves(self, stages: usize) -> bool {
+        matches!(
+            self,
+            Tool::Line
+                | Tool::StoneRun
+                | Tool::StoneFill
+                | Tool::Shape
+                | Tool::ComplexFill
+                | Tool::Applique
+                | Tool::Column
+                | Tool::ColumnB
+                | Tool::ColumnC
+        ) || (self == Tool::Turning && stages == 0)
+    }
+
     /// Tools that finish by themselves after this many points.
     fn fixed_points(self) -> Option<usize> {
         match self {
             Tool::ClickStitch => Some(1),
             Tool::Knife | Tool::StitchAngle | Tool::MirrorLine | Tool::CropRect | Tool::CropEllipse => Some(2),
             Tool::RefPoints => Some(4),
+            Tool::ConstructionLine => Some(2),
+            Tool::ConstructionPoint => Some(1),
             _ => None,
         }
     }
@@ -488,6 +569,34 @@ pub struct DrawState {
     pub freehand: Vec<Point>,
     /// Line tool: add the new points to the end of this object ("continue digitizing").
     pub continue_from: Option<ObjectId>,
+    /// The length (and angle) that the user types for the next point.
+    pub typed: String,
+    /// The curve points with a dragged handle, and their tangents.
+    pub tangents: Vec<(Point, Point)>,
+    /// The curve point whose handle the user drags out now.
+    pub handle_from: Option<Point>,
+    /// Where the next point goes with the pointer where it is now.
+    pub target: Option<Point>,
+}
+
+/// The tangent of the curve point `p`, if the user dragged out its handle.
+fn tangent_at(tangents: &[(Point, Point)], p: Point) -> Option<Point> {
+    tangents.iter().rev().find(|(q, _)| *q == p).map(|(_, t)| *t)
+}
+
+/// A typed length (in the units, see `workspace::parse_length`), with an
+/// angle in degrees after `<`.
+pub fn parse_length_angle(text: &str, units: crate::workspace::Units) -> Option<(f64, Option<f64>)> {
+    let (l, a) = match text.split_once('<') {
+        Some((l, a)) => (l, Some(a)),
+        None => (text, None),
+    };
+    let len = crate::workspace::parse_length(l.trim(), units)?;
+    let angle = match a {
+        Some(a) => Some(crate::workspace::parse_number(a)?),
+        None => None,
+    };
+    (len > 0.0).then_some((len, angle))
 }
 
 /// The thread for new objects: the current one, else the first, else a new one.
@@ -504,21 +613,32 @@ pub fn thread_for_new(d: &mut Design, current: Option<ThreadId>) -> ThreadId {
 /// Makes the object from the points with the default settings, or `None` if there are too few.
 #[cfg(test)]
 pub fn build(tool: Tool, points: &[(Point, bool)]) -> Option<ObjectKind> {
-    build_with(tool, points, &[], &CurrentProperties::default(), &Defaults::default())
+    build_with(
+        tool,
+        points,
+        &[],
+        &[],
+        &CurrentProperties::default(),
+        &Defaults::default(),
+    )
 }
 
-/// Makes the object from the points of the current part and the finished parts.
+/// Makes the object from the points of the current part and the finished
+/// parts. `tangents` are the curve points with a dragged handle.
 pub fn build_with(
     tool: Tool,
     points: &[(Point, bool)],
     stages: &[Vec<(Point, bool)>],
+    tangents: &[(Point, Point)],
     p: &CurrentProperties,
     d: &Defaults,
 ) -> Option<ObjectKind> {
     let corners = |pts: &[(Point, bool)]| -> Vec<(Point, bool)> { pts.iter().map(|(p, _)| (*p, false)).collect() };
+    let through =
+        |pts: &[(Point, bool)], closed: bool| Path::through_points_with(pts, closed, |q| tangent_at(tangents, q));
     match tool {
         Tool::Line if points.len() >= 2 => Some(ObjectKind::Running {
-            path: Path::through_points(points, false),
+            path: through(points, false),
             params: p.running.clone(),
         }),
         Tool::Manual if points.len() >= 2 => Some(ObjectKind::Running {
@@ -533,7 +653,7 @@ pub fn build_with(
             ..emb_model::Bling::new(
                 d.stone.clone(),
                 emb_model::BlingLayout::Run {
-                    path: Path::through_points(points, false),
+                    path: through(points, false),
                 },
             )
         }))),
@@ -542,14 +662,14 @@ pub fn build_with(
             ..emb_model::Bling::new(
                 d.stone.clone(),
                 emb_model::BlingLayout::Fill {
-                    outer: Path::through_points(points, true),
+                    outer: through(points, true),
                     holes: Vec::new(),
                     fill: d.stone_fill,
                 },
             )
         }))),
         Tool::Shape if points.len() >= 3 => Some(ObjectKind::Fill {
-            outer: Path::through_points(points, true),
+            outer: through(points, true),
             holes: vec![],
             params: p.fill.clone(),
         }),
@@ -560,11 +680,11 @@ pub fn build_with(
             }
             let (outer, holes) = parts.split_first()?;
             (outer.len() >= 3).then(|| ObjectKind::Fill {
-                outer: Path::through_points(outer, true),
+                outer: through(outer, true),
                 holes: holes
                     .iter()
                     .filter(|h| h.len() >= 3)
-                    .map(|h| Path::through_points(h, true))
+                    .map(|h| through(h, true))
                     .collect(),
                 params: p.fill.clone(),
             })
@@ -577,11 +697,11 @@ pub fn build_with(
             let (outer, holes) = parts.split_first()?;
             (outer.len() >= 3).then(|| ObjectKind::Applique {
                 pieces: vec![AppliquePiece::new(
-                    Path::through_points(outer, true),
+                    through(outer, true),
                     holes
                         .iter()
                         .filter(|h| h.len() >= 3)
-                        .map(|h| Path::through_points(h, true))
+                        .map(|h| through(h, true))
                         .collect(),
                 )],
                 params: p.applique.clone(),
@@ -593,8 +713,8 @@ pub fn build_with(
             let b: Vec<(Point, bool)> = (0..pairs).map(|i| points[2 * i + 1]).collect();
             Some(ObjectKind::Satin {
                 geometry: SatinGeometry {
-                    rail_a: Path::through_points(&a, false),
-                    rail_b: Path::through_points(&b, false),
+                    rail_a: through(&a, false),
+                    rail_b: through(&b, false),
                     rungs: (0..pairs).map(|i| (a[i].0, b[i].0)).collect(),
                 },
                 params: p.satin.clone(),
@@ -605,15 +725,15 @@ pub fn build_with(
             let b = stages.get(1).map(Vec::as_slice).unwrap_or(points);
             (a.len() >= 2 && b.len() >= 2).then(|| ObjectKind::Satin {
                 geometry: SatinGeometry {
-                    rail_a: Path::through_points(a, false),
-                    rail_b: Path::through_points(b, false),
+                    rail_a: through(a, false),
+                    rail_b: through(b, false),
                     rungs: vec![],
                 },
                 params: p.satin.clone(),
             })
         }
         Tool::ColumnC if points.len() >= 2 => Some(ObjectKind::Satin {
-            geometry: SatinGeometry::from_centerline(&Path::through_points(points, false), d.column_width_mm),
+            geometry: SatinGeometry::from_centerline(&through(points, false), d.column_width_mm),
             params: p.satin.clone(),
         }),
         Tool::Turning => {
@@ -622,7 +742,7 @@ pub fn build_with(
             if outline.len() < 3 {
                 return None;
             }
-            let geometry = SatinGeometry::from_outline(&Path::through_points(outline, true), &lines)?;
+            let geometry = SatinGeometry::from_outline(&through(outline, true), &lines)?;
             Some(ObjectKind::Satin {
                 geometry,
                 params: SatinParams {
@@ -769,8 +889,7 @@ impl AppState {
         self.selection.set(id);
         self.draw.continue_from = Some(id);
         self.message =
-            "Click points to continue the line from its end (or from its start: click near the start first). Enter: finish."
-                .into();
+            tr("Click points to continue the line from its end (or from its start: click near the start first). Enter: finish.").into();
     }
 
     /// Ends one part of a tool with parts, or finishes. Returns `true` if something happened.
@@ -801,6 +920,8 @@ impl AppState {
             }
             Tool::ClickStitch => return self.finish_action(|st, p| st.click_stitch(p[0])),
             Tool::RefPoints => return self.finish_action(|st, p| st.transform_by_points(p[0], p[1], p[2], p[3])),
+            Tool::ConstructionLine => return self.finish_action(|st, p| st.add_construction_line(p[0], p[1])),
+            Tool::ConstructionPoint => return self.finish_action(|st, p| st.add_construction_point(p[0])),
             Tool::AddHole => return self.finish_action(|st, p| st.add_hole(p)),
             Tool::PolySelect => return self.finish_action(|st, p| st.select_inside(p)),
             Tool::LineSelect => return self.finish_action(|st, p| st.select_crossing(p)),
@@ -822,6 +943,7 @@ impl AppState {
             self.tool,
             &self.draw.points,
             &stages,
+            &self.draw.tangents,
             &self.doc.design().current,
             &self.settings.defaults,
         ) else {
@@ -873,8 +995,9 @@ impl AppState {
             // The new points, last one first, then the old start.
             let mut pts: Vec<(Point, bool)> = self.draw.points.iter().rev().copied().collect();
             pts.push((start, false));
-            let extra = Path::through_points(&pts, false);
-            self.doc.edit("Continue Line", |d| {
+            // The line goes the other way, so the handles turn round.
+            let extra = Path::through_points_with(&pts, false, |q| tangent_at(&self.draw.tangents, q).map(|t| -t));
+            self.doc.edit(tr("Continue Line"), |d| {
                 if let Some(ObjectKind::Running { path, .. }) = d.object_mut(id).map(|o| &mut o.kind) {
                     let mut cmds = extra.cmds;
                     cmds.extend(path.cmds.drain(..).skip(1));
@@ -884,8 +1007,8 @@ impl AppState {
         } else {
             let mut pts = vec![(end, false)];
             pts.extend(self.draw.points.iter().copied());
-            let extra = Path::through_points(&pts, false);
-            self.doc.edit("Continue Line", |d| {
+            let extra = Path::through_points_with(&pts, false, |q| tangent_at(&self.draw.tangents, q));
+            self.doc.edit(tr("Continue Line"), |d| {
                 if let Some(ObjectKind::Running { path, .. }) = d.object_mut(id).map(|o| &mut o.kind) {
                     path.cmds.extend(extra.cmds.into_iter().skip(1));
                 }
@@ -898,7 +1021,7 @@ impl AppState {
     }
 
     pub(crate) fn add_drawn(&mut self, kind: ObjectKind) {
-        let label = format!("Draw {}", kind.type_name().to_lowercase());
+        let label = crate::i18n::fill("Draw {}", &[&crate::i18n::in_sentence(tr(kind.type_name()))]);
         let current = self.current_thread;
         let as_vector = self.draw_vectors;
         let id = self.doc.edit(label, |d| {
@@ -928,6 +1051,7 @@ impl AppState {
         if self.tool == Tool::Reshape {
             return match key {
                 egui::Key::Delete | egui::Key::Backspace => self.delete_node(),
+                egui::Key::B => self.break_at_node(),
                 egui::Key::Escape if self.reshape.node.is_some() => {
                     self.reshape.node = None;
                     true
@@ -939,15 +1063,38 @@ impl AppState {
                 _ => false,
             };
         }
+        // A typed length takes Enter, Backspace and Esc first.
+        if !self.draw.typed.is_empty() {
+            match key {
+                egui::Key::Enter => {
+                    if self.place_typed() {
+                        self.draw.typed.clear();
+                        if self.tool.fixed_points() == Some(self.draw.points.len()) {
+                            self.finish_drawing();
+                        }
+                    } else {
+                        self.message =
+                            tr("Type a length, for example 25 or 1 in, or a length and an angle, for example 25<45.")
+                                .into();
+                    }
+                }
+                egui::Key::Backspace => {
+                    self.draw.typed.pop();
+                }
+                egui::Key::Escape => self.draw.typed.clear(),
+                _ => return false,
+            }
+            return true;
+        }
         match key {
             egui::Key::Enter => {
                 self.finish_drawing();
                 true
             }
             egui::Key::Backspace => {
-                if self.draw.points.pop().is_none()
-                    && let Some(last) = self.draw.stages.pop()
-                {
+                if let Some((p, _)) = self.draw.points.pop() {
+                    self.draw.tangents.retain(|(q, _)| *q != p);
+                } else if let Some(last) = self.draw.stages.pop() {
                     // Back into the last finished part.
                     self.draw.points = last;
                 }
@@ -973,6 +1120,102 @@ impl AppState {
     }
 }
 
+impl AppState {
+    /// The point that the pointer at `pos` places with a point tool. With
+    /// Shift, the line from the last point keeps a step of
+    /// [`ANGLE_STEP_DEG`] (on the screen); else the point snaps (see
+    /// [`AppState::snap_hit`]).
+    pub fn draw_target(&self, map: &ViewMap, pos: Pos2, shift: bool) -> SnapHit {
+        let raw = map.to_design(pos);
+        if shift && let Some(&(last, _)) = self.draw.points.last() {
+            let rot = self.doc.design().rotation_transform();
+            let (a, b) = (rot.apply(last), rot.apply(raw));
+            let d = b - a;
+            let step = math::to_radians(ANGLE_STEP_DEG);
+            let angle = (math::atan2(d.y, d.x) / step).round() * step;
+            let dir = Point::new(math::cos(angle), math::sin(angle));
+            let v = a + dir * d.dot(dir).max(0.0);
+            return SnapHit {
+                at: rot.inverse().map_or(raw, |i| i.apply(v)),
+                kind: None,
+                align: [None; 2],
+            };
+        }
+        let drawn: Vec<Point> = self.draw.points.iter().map(|(p, _)| *p).collect();
+        self.snap_hit(map, raw, &drawn)
+    }
+
+    /// Places the next point at the typed length from the last point: at
+    /// the typed angle (counterclockwise from the right, on the screen), or
+    /// toward the pointer. `false` if the text is not a length.
+    pub fn place_typed(&mut self) -> bool {
+        let Some(&(last, _)) = self.draw.points.last() else {
+            return false;
+        };
+        let Some((len, angle)) = parse_length_angle(&self.draw.typed, self.settings.units) else {
+            return false;
+        };
+        let rot = self.doc.design().rotation_transform();
+        let a = rot.apply(last);
+        let dir = match angle {
+            Some(deg) => {
+                let r = math::to_radians(deg);
+                Point::new(math::cos(r), -math::sin(r))
+            }
+            None => self
+                .draw
+                .target
+                .and_then(|t| (rot.apply(t) - a).normalized())
+                .unwrap_or(Point::new(1.0, 0.0)),
+        };
+        let p = rot.inverse().map_or(last, |i| i.apply(a + dir * len));
+        self.draw.points.push((p, false));
+        true
+    }
+
+    /// The length and the angle from the last placed point to `p`, as text.
+    fn length_angle_text(&self, p: Point) -> Option<String> {
+        let &(last, _) = self.draw.points.last()?;
+        let rot = self.doc.design().rotation_transform();
+        let d = rot.apply(p) - rot.apply(last);
+        let angle = math::to_degrees(math::atan2(-d.y, d.x));
+        Some(format!("{}  {:.1}°", self.settings.units.fmt(d.length()), angle))
+    }
+}
+
+/// While a point tool has points, typed text that starts with a number is
+/// the length of the next point (see [`AppState::place_typed`]); the keys
+/// of that text do not run shortcuts. Enter, Backspace and Esc stay for
+/// [`AppState::draw_key`].
+pub fn take_typed(ctx: &egui::Context, st: &mut AppState) {
+    if !st.tool.uses_points() || st.draw.points.is_empty() {
+        return;
+    }
+    let starts = |t: &str| t.starts_with(|c: char| c.is_ascii_digit() || c == '.' || c == '<');
+    let typed = ctx.input_mut(|i| {
+        let active =
+            !st.draw.typed.is_empty() || i.events.iter().any(|e| matches!(e, egui::Event::Text(t) if starts(t)));
+        if !active {
+            return None;
+        }
+        let mut text = String::new();
+        i.events.retain(|e| match e {
+            egui::Event::Text(t) => {
+                text.push_str(t);
+                false
+            }
+            egui::Event::Key { key, modifiers, .. } => {
+                matches!(key, egui::Key::Enter | egui::Key::Backspace | egui::Key::Escape) || modifiers.command
+            }
+            _ => true,
+        });
+        Some(text)
+    });
+    if let Some(t) = typed {
+        st.draw.typed.push_str(&t);
+    }
+}
+
 /// Handles canvas input for a draw or edit tool.
 pub fn handle_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState, map: &ViewMap) {
     ui.ctx().set_cursor_icon(CursorIcon::Crosshair);
@@ -981,6 +1224,7 @@ pub fn handle_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState,
         Tool::Measure => return crate::workspace::measure_input(response, st, map),
         Tool::Zoom => return crate::workspace::zoom_input(ui, response, st),
         Tool::Lettering => return crate::lettering::tool_input(response, st, map),
+        Tool::SmartFill | Tool::TrimSegment => return crate::drawing_aids::tool_input(response, st, map),
         Tool::CrossStitch | Tool::CrossErase | Tool::Backstitch => {
             return crate::cross::tool_input(ui, response, st, map);
         }
@@ -988,6 +1232,27 @@ pub fn handle_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState,
         _ => {}
     }
     if st.tool.uses_points() {
+        st.draw.target = response.hover_pos().map(|p| st.draw_target(map, p, mods.shift).at);
+        // A left drag: a curve point, with the handle where the drag ends.
+        let curves = st.tool.takes_curves(st.draw.stages.len());
+        if curves
+            && response.drag_started_by(egui::PointerButton::Primary)
+            && let Some(origin) = ui.input(|i| i.pointer.press_origin())
+        {
+            st.draw.handle_from = Some(st.draw_target(map, origin, mods.shift).at);
+        }
+        if response.drag_stopped_by(egui::PointerButton::Primary)
+            && let Some(p) = st.draw.handle_from.take()
+            && let Some(end) = ui.input(|i| i.pointer.latest_pos())
+        {
+            if map.to_screen(p).distance(end) >= HANDLE_MIN {
+                st.draw.tangents.push((p, (map.to_design(end) - p) * 3.0));
+                st.draw.points.push((p, true));
+            } else {
+                st.draw.points.push((p, false));
+            }
+            return;
+        }
         let left = response.clicked();
         let right = response.secondary_clicked();
         if (left || right)
@@ -1001,7 +1266,7 @@ pub fn handle_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState,
                 st.finish_drawing();
                 return;
             }
-            let p = st.snap(map, map.to_design(pos));
+            let p = st.draw_target(map, pos, mods.shift).at;
             // Ignore a second click on the same place (for example a double click).
             if st.draw.points.last().is_none_or(|(q, _)| q.distance(p) > 1e-6) {
                 st.draw.points.push((p, right));
@@ -1054,13 +1319,31 @@ fn finish_freehand(st: &mut AppState, pts: &[Point]) {
         Tool::Lasso if pts.len() >= 3 => st.select_inside(pts),
         Tool::Freehand if pts.len() >= 2 => {
             let p = freehand_points(pts, false);
-            if let Some(kind) = build_with(Tool::Line, &p, &[], &st.doc.design().current, &st.settings.defaults) {
+            if let Some(kind) = build_with(
+                Tool::Line,
+                &p,
+                &[],
+                &[],
+                &st.doc.design().current,
+                &st.settings.defaults,
+            ) {
                 st.add_drawn(kind);
             }
         }
+        Tool::SmartDraw if pts.len() >= 2 => {
+            let smoothed = freehand_points(pts, false);
+            st.smart_drawing(pts, smoothed);
+        }
         Tool::FreeShape if pts.len() >= 3 => {
             let p = freehand_points(pts, true);
-            if let Some(kind) = build_with(Tool::Shape, &p, &[], &st.doc.design().current, &st.settings.defaults) {
+            if let Some(kind) = build_with(
+                Tool::Shape,
+                &p,
+                &[],
+                &[],
+                &st.doc.design().current,
+                &st.settings.defaults,
+            ) {
                 st.add_drawn(kind);
             }
         }
@@ -1126,8 +1409,16 @@ pub fn draw_preview(painter: &egui::Painter, ui: &egui::Ui, st: &AppState, map: 
         }
         // The object as it would be with the pointer as the next corner.
         let mut pts = st.draw.points.clone();
-        if let Some(h) = hover {
-            pts.push((st.snap(map, map.to_design(h)), false));
+        let mut tangents = st.draw.tangents.clone();
+        let target = hover.map(|h| st.draw_target(map, h, mods.shift));
+        match (st.draw.handle_from, hover) {
+            // A curve point whose handle is dragged out now.
+            (Some(p), Some(h)) => {
+                let t = (map.to_design(h) - p) * 3.0;
+                tangents.push((p, t));
+                pts.push((p, true));
+            }
+            _ => pts.extend(target.map(|t| (t.at, false))),
         }
         let object_tool = st.tool.makes_running() || st.tool.makes_satin() || matches!(st.tool, Tool::Shape);
         let built = if object_tool && st.draw.continue_from.is_none() {
@@ -1135,6 +1426,7 @@ pub fn draw_preview(painter: &egui::Painter, ui: &egui::Ui, st: &AppState, map: 
                 st.tool,
                 &pts,
                 &st.draw.stages,
+                &tangents,
                 &st.doc.design().current,
                 &st.settings.defaults,
             )
@@ -1201,6 +1493,30 @@ pub fn draw_preview(painter: &egui::Painter, ui: &egui::Ui, st: &AppState, map: 
                 painter.rect_stroke(r, 0.0, Stroke::new(1.5, color), egui::StrokeKind::Inside);
             }
         }
+        // The handles of the curve points.
+        for &(p, t) in &tangents {
+            let (a, b) = (map.to_screen(p - t * (1.0 / 3.0)), map.to_screen(p + t * (1.0 / 3.0)));
+            painter.line_segment([a, b], Stroke::new(1.0, color.gamma_multiply(0.7)));
+            painter.circle_filled(a, 2.5, color);
+            painter.circle_filled(b, 2.5, color);
+        }
+        // What the pointer snaps to, and the length and angle from the last point.
+        if st.draw.handle_from.is_none()
+            && let (Some(t), Some(h)) = (target, hover)
+        {
+            draw_snap_marks(painter, map, &t, color);
+            let text = match st.draw.typed.is_empty() {
+                true => st.length_angle_text(t.at),
+                false => Some(crate::i18n::fill("{}|  Enter: place the point", &[&st.draw.typed])),
+            };
+            if let Some(text) = text {
+                let galley = painter.layout_no_wrap(text, egui::FontId::proportional(12.0), color);
+                let pos = h + Vec2::new(14.0, 14.0);
+                let bg = ui.visuals().extreme_bg_color.gamma_multiply(0.85);
+                painter.rect_filled(Rect::from_min_size(pos, galley.size()).expand(3.0), 3.0, bg);
+                painter.galley(pos, galley, color);
+            }
+        }
         // Close hint on the first point of a closed outline.
         if st.tool.closes(st.draw.stages.len())
             && st.draw.points.len() >= 3
@@ -1229,6 +1545,61 @@ pub fn draw_preview(painter: &egui::Painter, ui: &egui::Ui, st: &AppState, map: 
             color,
         );
     }
+}
+
+/// The mark of what a point snaps to (a node, a midpoint, a center or an
+/// edge of another object), with its name, and dashed lines to the drawn
+/// points that it lines up with.
+fn draw_snap_marks(painter: &egui::Painter, map: &ViewMap, hit: &SnapHit, color: Color32) {
+    let s = map.to_screen(hit.at);
+    let stroke = Stroke::new(1.5, color);
+    for q in hit.align.iter().flatten() {
+        painter.extend(Shape::dashed_line(
+            &[map.to_screen(*q), s],
+            Stroke::new(1.0, color.gamma_multiply(0.7)),
+            4.0,
+            3.0,
+        ));
+    }
+    let Some(kind) = hit.kind else { return };
+    match kind {
+        SnapKind::Node => {
+            let r = Rect::from_center_size(s, Vec2::splat(10.0));
+            painter.rect_stroke(r, 0.0, stroke, egui::StrokeKind::Middle);
+        }
+        SnapKind::Midpoint => {
+            let pts = vec![
+                s + Vec2::new(0.0, -6.0),
+                s + Vec2::new(5.5, 4.0),
+                s + Vec2::new(-5.5, 4.0),
+            ];
+            painter.add(Shape::closed_line(pts, stroke));
+        }
+        SnapKind::Center => {
+            painter.circle_stroke(s, 5.0, stroke);
+            painter.line_segment([s - Vec2::X * 3.0, s + Vec2::X * 3.0], stroke);
+            painter.line_segment([s - Vec2::Y * 3.0, s + Vec2::Y * 3.0], stroke);
+        }
+        SnapKind::Edge => {
+            painter.line_segment([s + Vec2::new(-4.0, -4.0), s + Vec2::new(4.0, 4.0)], stroke);
+            painter.line_segment([s + Vec2::new(-4.0, 4.0), s + Vec2::new(4.0, -4.0)], stroke);
+        }
+        SnapKind::Mark => {
+            painter.circle_stroke(s, 6.0, stroke);
+        }
+        SnapKind::Intersection => {
+            painter.circle_stroke(s, 6.0, stroke);
+            painter.line_segment([s + Vec2::new(-4.0, -4.0), s + Vec2::new(4.0, 4.0)], stroke);
+            painter.line_segment([s + Vec2::new(-4.0, 4.0), s + Vec2::new(4.0, -4.0)], stroke);
+        }
+    }
+    painter.text(
+        s + Vec2::new(9.0, -9.0),
+        egui::Align2::LEFT_BOTTOM,
+        kind.label(),
+        egui::FontId::proportional(11.0),
+        color,
+    );
 }
 
 #[cfg(test)]
@@ -1318,6 +1689,130 @@ mod tests {
     fn at(h: &Harness, x: f64, y: f64) -> Pos2 {
         let c = h.st.doc.design().hoop.center;
         h.screen(c + Point::new(x, y))
+    }
+
+    /// A placed point relative to the hoop center.
+    fn placed(h: &Harness, i: usize) -> Point {
+        h.st.draw.points[i].0 - h.st.doc.design().hoop.center
+    }
+
+    fn near(a: Point, b: Point, tol: f64) -> bool {
+        a.distance(b) <= tol
+    }
+
+    #[test]
+    fn shift_keeps_the_line_at_steps_of_15_degrees() {
+        let mut h = Harness::empty();
+        h.st.set_tool(Tool::Line);
+        h.click(PointerButton::Primary, at(&h, 0.0, 0.0));
+        let pos = at(&h, 20.0, 2.0);
+        let shift = Modifiers::SHIFT;
+        let ev = |pressed| egui::Event::PointerButton {
+            pos,
+            button: PointerButton::Primary,
+            pressed,
+            modifiers: shift,
+        };
+        h.frame(vec![
+            egui::Event::ModifiersChanged(shift),
+            egui::Event::PointerMoved(pos),
+        ]);
+        h.frame(vec![ev(true)]);
+        h.frame(vec![ev(false)]);
+        h.frame(vec![egui::Event::ModifiersChanged(Modifiers::NONE)]);
+        // 5.7° goes to 0°: the point is on the line across, at the projected length.
+        let p = placed(&h, 1);
+        assert!(p.y.abs() < 1e-6 && (p.x - 20.0).abs() < 0.2, "{p:?}");
+        // With no Shift, the point stays where the click is.
+        h.click(PointerButton::Primary, at(&h, 30.0, 13.0));
+        assert!(near(placed(&h, 2), Point::new(30.0, 13.0), 0.2));
+    }
+
+    #[test]
+    fn a_typed_length_places_the_next_point() {
+        let mut h = Harness::empty();
+        h.st.set_tool(Tool::Line);
+        h.click(PointerButton::Primary, at(&h, 0.0, 0.0));
+        // The pointer shows the direction; the typed text the length.
+        h.frame(vec![egui::Event::PointerMoved(at(&h, 10.0, 0.0))]);
+        h.frame(vec![egui::Event::Text("25".into())]);
+        assert_eq!(h.st.draw.typed, "25");
+        h.key(Key::Enter);
+        assert!(h.st.draw.typed.is_empty());
+        assert!(near(placed(&h, 1), Point::new(25.0, 0.0), 1e-6), "{:?}", placed(&h, 1));
+        // A length and an angle: 90° is up on the screen. The H of "in"
+        // does not mirror anything.
+        h.frame(vec![egui::Event::Text("1".into())]);
+        h.frame(vec![egui::Event::Text(" in<90".into())]);
+        h.key(Key::H);
+        assert_eq!(h.st.draw.typed, "1 in<90");
+        h.key(Key::Enter);
+        assert!(
+            near(placed(&h, 2), Point::new(25.0, -25.4), 1e-6),
+            "{:?}",
+            placed(&h, 2)
+        );
+        // Backspace and Esc work on the text first, then on the points.
+        h.frame(vec![egui::Event::Text("12".into())]);
+        h.key(Key::Backspace);
+        assert_eq!(h.st.draw.typed, "1");
+        h.key(Key::Escape);
+        assert!(h.st.draw.typed.is_empty());
+        assert_eq!(h.st.draw.points.len(), 3, "Esc on the text keeps the points");
+        // Text that is not a length stays, with a message.
+        h.frame(vec![egui::Event::Text("5x".into())]);
+        h.key(Key::Enter);
+        assert_eq!(h.st.draw.points.len(), 3);
+        assert!(h.st.message.contains("25<45"), "{}", h.st.message);
+        h.key(Key::Escape);
+        h.key(Key::Enter);
+        assert_eq!(h.st.doc.design().objects().len(), 1, "Enter with no text finishes");
+        // With no point placed, a number is not a length.
+        h.frame(vec![egui::Event::Text("7".into())]);
+        assert!(h.st.draw.typed.is_empty());
+    }
+
+    #[test]
+    fn a_drag_pulls_out_a_curve_handle() {
+        let mut h = Harness::empty();
+        h.st.set_tool(Tool::Line);
+        h.click(PointerButton::Primary, at(&h, 0.0, 0.0));
+        h.drag(
+            PointerButton::Primary,
+            at(&h, 20.0, 0.0),
+            at(&h, 26.0, 0.0),
+            Modifiers::NONE,
+        );
+        assert_eq!(h.st.draw.points.len(), 2);
+        assert!(h.st.draw.points[1].1, "a dragged point is a curve point");
+        assert!(near(placed(&h, 1), Point::new(20.0, 0.0), 0.2));
+        h.click(PointerButton::Primary, at(&h, 40.0, 10.0));
+        // Backspace removes a point and its handle; put it back.
+        h.key(Key::Backspace);
+        h.click(PointerButton::Primary, at(&h, 40.0, 10.0));
+        h.key(Key::Enter);
+        let d = h.st.doc.design();
+        let ObjectKind::Running { path, .. } = &d.objects()[0].kind else {
+            panic!()
+        };
+        let c = d.hoop.center;
+        // The curve leaves the point toward the end of the drag.
+        let leave = path.cmds.iter().find_map(|cmd| match *cmd {
+            emb_geom::PathCmd::CubicTo(c1, _, _) if near(c1 - c, Point::new(26.0, 0.0), 0.3) => Some(c1),
+            _ => None,
+        });
+        assert!(leave.is_some(), "{:?}", path.cmds);
+        // A short drag is a corner.
+        h.st.set_tool(Tool::Line);
+        h.click(PointerButton::Primary, at(&h, 0.0, 30.0));
+        let from = at(&h, 10.0, 30.0);
+        h.drag(
+            PointerButton::Primary,
+            from,
+            from + Vec2::new(2.0, 0.0),
+            Modifiers::NONE,
+        );
+        assert!(!h.st.draw.points[1].1);
     }
 
     #[test]

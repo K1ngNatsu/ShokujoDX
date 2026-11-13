@@ -1,7 +1,7 @@
 //! Team names (P4 Milestone 6, ADR 0020): the design of each row of a
 //! team names list, and all rows in one design.
 
-use emb_geom::{BBox, Point, Transform};
+use emb_geom::{BBox, Point, Transform, text};
 use emb_model::{Design, FontRef, ObjectKind, TeamNames, TeamRow, ThreadId};
 
 use crate::layout::relayout;
@@ -21,7 +21,7 @@ pub fn row_design(
     for (i, col) in tn.columns.iter().enumerate() {
         let value = row.values.get(i).map(|v| v.trim()).unwrap_or("");
         let Some(ObjectKind::Lettering(l)) = out.object(col.object).map(|o| o.kind.clone()) else {
-            return Err(format!("The column \"{}\" has no lettering object.", col.title));
+            return Err(text::fill("The column \"{}\" has no lettering object.", &[&col.title]));
         };
         if value.is_empty() {
             out.remove_object(col.object);
@@ -103,6 +103,7 @@ pub fn layout_design(
     let mut out = d.clone();
     out.team_names = None;
     out.monograms.clear();
+    out.buttonholes.clear();
     let ids: Vec<_> = out.objects().iter().map(|o| o.id).collect();
     for id in ids {
         out.remove_object(id);

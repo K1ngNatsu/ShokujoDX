@@ -1,25 +1,21 @@
-//! Decoration (P5 Milestone 7): color blends and multi blends, buttonholes,
-//! and decorative borders (frames).
+//! Decoration (P5 Milestone 7): color blends and multi blends, and
+//! decorative borders (frames).
 //!
 //! - A blend is fill or satin layers with the same shape, one for each
 //!   color. The density of each layer changes from one side to the other
 //!   (accordion spacing), so the colors mix. A two-color blend has one
 //!   layer from dense to open and one from open to dense. A multi blend
 //!   keeps its layers in one group; `BlendRecord` marks the group.
-//! - A buttonhole is a running box (it holds the fabric), two narrow satin
-//!   legs with a gap for the cut between them, and a bar tack across each
-//!   end. A buttonhole string is buttonholes spaced evenly along a line.
+//! - Buttonholes are in [`crate::buttonhole`].
 //! - A frame is a decorative border round a box: a shape (rectangle,
 //!   rounded rectangle, oval, circle) and a stitch (satin, runs, a column
 //!   type, a motif). The built-in frames are our own designs.
 
-use emb_geom::{BBox, Path, Point, Transform};
+use emb_geom::{BBox, Path};
 use serde::{Deserialize, Serialize};
 
 use crate::motif::{Motif, MotifRun};
-use crate::object::{
-    Accordion, ColumnPattern, LineBorder, ObjectKind, RunningParams, SatinGeometry, SatinParams, Underlay,
-};
+use crate::object::{Accordion, ColumnPattern, LineBorder, ObjectKind, RunningParams};
 
 /// A multi blend: the fill or satin objects of `group` are its layers.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -55,112 +51,6 @@ pub fn blend_densities(a: Option<&Accordion>) -> (f64, f64) {
         Some(a) => (100.0 / a.factor(0.0), 100.0 / a.factor(1.0)),
         None => (100.0, 100.0),
     }
-}
-
-/// The settings of a buttonhole, in mm.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ButtonholeSpec {
-    /// The length of the opening (the cut), between the bar tacks.
-    pub length_mm: f64,
-    /// The width of each satin leg.
-    pub leg_mm: f64,
-    /// The gap between the legs, where the opening is cut.
-    pub gap_mm: f64,
-    /// The length of each bar tack along the buttonhole.
-    pub bartack_mm: f64,
-    /// Satin spacing of the legs and bar tacks.
-    pub spacing_mm: f64,
-}
-
-impl Default for ButtonholeSpec {
-    fn default() -> Self {
-        ButtonholeSpec {
-            length_mm: 18.0,
-            leg_mm: 1.8,
-            gap_mm: 0.6,
-            bartack_mm: 1.5,
-            spacing_mm: 0.3,
-        }
-    }
-}
-
-/// A straight centerline from `a` to `b`.
-fn segment(a: Point, b: Point) -> Path {
-    Path::new().move_to(a).line_to(b)
-}
-
-/// The objects of one buttonhole with its middle at `center`, its length
-/// along `angle_deg` (0°: along +X), in sew order: a running box, the
-/// first leg, a bar tack, the second leg, a bar tack.
-pub fn buttonhole(spec: &ButtonholeSpec, center: Point, angle_deg: f64) -> Vec<ObjectKind> {
-    let half_len = spec.length_mm.max(1.0) / 2.0;
-    let leg = spec.leg_mm.max(0.5);
-    let off = spec.gap_mm.max(0.0) / 2.0 + leg / 2.0;
-    let width = 2.0 * leg + spec.gap_mm.max(0.0);
-    let t = Transform::rotate_deg(angle_deg).then(Transform::translate(center.x, center.y));
-    let at = |x: f64, y: f64| t.apply(Point::new(x, y));
-    let satin = |center: Path, w: f64| ObjectKind::Satin {
-        geometry: SatinGeometry::from_centerline(&center, w),
-        params: SatinParams {
-            spacing_mm: spec.spacing_mm,
-            pull_compensation_mm: 0.0,
-            short_stitches: false,
-            underlay: Underlay::None,
-            ..SatinParams::default()
-        },
-    };
-    let bar = spec.bartack_mm.max(0.5);
-    let end = half_len + bar / 2.0;
-    let edge = width / 2.0;
-    vec![
-        // A running box round the buttonhole holds the fabric.
-        ObjectKind::Running {
-            path: Path::polygon(&[
-                at(-end - bar / 2.0, -edge),
-                at(end + bar / 2.0, -edge),
-                at(end + bar / 2.0, edge),
-                at(-end - bar / 2.0, edge),
-            ]),
-            params: RunningParams {
-                stitch_length_mm: 1.5,
-                ..RunningParams::default()
-            },
-        },
-        satin(segment(at(-half_len, -off), at(half_len, -off)), leg),
-        satin(segment(at(end, -edge), at(end, edge)), bar),
-        satin(segment(at(half_len, off), at(-half_len, off)), leg),
-        satin(segment(at(-end, edge), at(-end, -edge)), bar),
-    ]
-}
-
-/// The middles and the angles of `count` buttonholes spaced evenly along
-/// `line` (the first and the last at its ends). With `across`, each
-/// buttonhole is across the line; else along it.
-pub fn string_positions(line: &[Point], count: usize, across: bool) -> Vec<(Point, f64)> {
-    let mut at = vec![0.0];
-    for w in line.windows(2) {
-        at.push(at[at.len() - 1] + w[0].distance(w[1]));
-    }
-    let total = at[at.len() - 1];
-    if line.len() < 2 || count == 0 || total <= 0.0 {
-        return Vec::new();
-    }
-    (0..count)
-        .map(|k| {
-            let s = if count == 1 {
-                total / 2.0
-            } else {
-                total * k as f64 / (count - 1) as f64
-            };
-            let i = at.partition_point(|&l| l <= s).clamp(1, line.len() - 1);
-            let seg = at[i] - at[i - 1];
-            let f = if seg > 0.0 { (s - at[i - 1]) / seg } else { 0.0 };
-            let p = line[i - 1].lerp(line[i], f);
-            let d = line[i] - line[i - 1];
-            let a = emb_geom::math::to_degrees(emb_geom::math::atan2(d.y, d.x));
-            (p, if across { a + 90.0 } else { a })
-        })
-        .collect()
 }
 
 /// The shape of a frame.
@@ -306,6 +196,7 @@ pub fn frame_objects(frame: &Frame, b: &BBox, margin: f64) -> Vec<ObjectKind> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use emb_geom::Point;
 
     #[test]
     fn blend_profiles_round_trip_densities() {
@@ -318,46 +209,6 @@ mod tests {
         assert!((100.0 / a.factor(0.5) - 60.0).abs() < 1e-9);
         assert_eq!(blend_densities(None), (100.0, 100.0));
         assert_eq!(blend_profile(100.0, 0.0).factor(1.0), 100.0 / MIN_DENSITY_PCT);
-    }
-
-    #[test]
-    fn a_buttonhole_has_a_box_two_legs_and_two_bar_tacks() {
-        let spec = ButtonholeSpec::default();
-        let objs = buttonhole(&spec, Point::new(10.0, 10.0), 90.0);
-        assert_eq!(objs.len(), 5);
-        assert!(matches!(objs[0], ObjectKind::Running { .. }));
-        let b = objs
-            .iter()
-            .filter_map(|k| k.control_bbox())
-            .reduce(BBox::union)
-            .unwrap();
-        // Turned 90°: the length is along Y. Opening 18 mm + two bar tacks.
-        assert!((b.height() - (18.0 + 2.0 * 1.5)).abs() < 0.01, "{b:?}");
-        assert!((b.width() - (2.0 * 1.8 + 0.6)).abs() < 0.01, "{b:?}");
-        assert!((b.center().distance(Point::new(10.0, 10.0))) < 1e-9);
-        // The legs leave the gap free for the cut.
-        let ObjectKind::Satin { geometry, .. } = &objs[1] else {
-            panic!()
-        };
-        let xs: Vec<f64> = geometry
-            .rail_a
-            .points()
-            .chain(geometry.rail_b.points())
-            .map(|p| p.x)
-            .collect();
-        assert!(xs.iter().all(|x| (x - 10.0).abs() >= 0.3 - 1e-9));
-    }
-
-    #[test]
-    fn a_string_spaces_buttonholes_evenly() {
-        let line = [Point::new(0.0, 0.0), Point::new(0.0, 100.0)];
-        let p = string_positions(&line, 5, true);
-        assert_eq!(p.len(), 5);
-        assert_eq!(p[0].0, Point::new(0.0, 0.0));
-        assert_eq!(p[4].0, Point::new(0.0, 100.0));
-        assert!((p[1].0.y - 25.0).abs() < 1e-9);
-        assert!((p[0].1 - 180.0).abs() < 1e-9, "across a line going down: {}", p[0].1);
-        assert_eq!(string_positions(&line, 1, false)[0].0, Point::new(0.0, 50.0));
     }
 
     #[test]

@@ -2,7 +2,7 @@
 id: digitizing
 title: Drawing objects
 group: design
-keywords: draw, digitize, line, manual, freehand, shape, fill, complex fill, free shape, column, satin, column pairs, column c, rectangle, round rect, ellipse, star, ring, turning, curve, corner, right click, property bar, reshape, node, handle, start point, end point, angle, direction line, stitch direction, hole, knife, borders, buttonholes, blends
+keywords: draw, digitize, line, manual, freehand, shape, fill, complex fill, free shape, column, satin, column pairs, column c, rectangle, round rect, ellipse, star, ring, turning, curve, corner, right click, property bar, reshape, node, handle, start point, end point, angle, typed length, shift, 15 degrees, snap, midpoint, center, edge, line up, drag handle, direction line, stitch direction, hole, knife, borders, buttonholes, blends
 ---
 # Drawing objects
 
@@ -24,6 +24,24 @@ after an object, so you can draw more. Push **Esc** to stop.
 - Snap to the grid, the guides or other objects (View tab) works while
   you draw.
 
+## Drawing help
+
+- **Drag** to make a curve point with a handle: push the mouse button
+  where the point goes, and move to where the curve goes. A short drag
+  makes a corner.
+- Hold **Shift** to keep the line from the last point at a step of 15°.
+- The length and the angle from the last point show at the pointer. The
+  angle goes counterclockwise from the right: 0° is to the right, 90° is
+  up.
+- Type a length and push **Enter**: the next point goes that far, toward
+  the pointer. Type a length and an angle, for example `25<45`, for a
+  point at that angle. You can type units and calculations, for example
+  `1 in` or `12+3`. **Backspace** and **Esc** change the text first.
+- With **Snap objects** on, the points snap to the nodes, the midpoints,
+  the centers and the edges of other objects (a mark with its name
+  shows). They also line up with the points that you placed (a dashed
+  line shows).
+
 ## Lines
 
 - **Line**: a running stitch line. Left click: corner; right click: curve
@@ -31,6 +49,10 @@ after an object, so you can draw more. Push **Esc** to stop.
 - **Manual**: each click is one needle point. Use it for a few exact
   stitches, for example a tie-down.
 - **Freehand**: drag to draw. The program smooths the line.
+- **Smart Drawing**: drag to draw. A stroke near a straight line, a
+  rectangle, a triangle, a circle or an ellipse becomes that clean shape
+  (a level line or rectangle if it is near level). Other strokes stay
+  as drawn. **Ctrl+Z** gives back the stroke.
 
 The property bar of a line has the run type (**Run**, **Backstitch**,
 **Stem stitch**, **Sculpture run**, **Manual**), **Triple** (each stitch
@@ -48,6 +70,9 @@ types](stitch-types).
 - **Free Shape**: drag round the area. The program smooths the outline.
 - **Turning**: a fill whose stitches turn. Click the outline, Enter; then
   click stitch angle lines across the shape (two clicks each); Enter.
+- **Smart Fill**: click inside an area that lines or the outlines of
+  other objects close all round. The area becomes a fill, with holes for
+  the shapes inside it. The lines can cross; gaps up to 0.3 mm close.
 
 ## Columns
 
@@ -101,7 +126,8 @@ a cover satin. See [Tutorial: an appliqué](tutorial-applique).
 3. Drag a handle to change a curve. **Alt** while you drag makes a
    corner. Double-click a node to change it between corner and curve.
 4. Double-click the outline to add a node. **Delete** removes the
-   selected node.
+   selected node. **B** (or right-click > **Break at Node**) cuts a line
+   in two at the selected node; a closed line opens there.
 5. The green point is where the object starts to sew; the red point is
    where it ends. Drag them to move them.
 

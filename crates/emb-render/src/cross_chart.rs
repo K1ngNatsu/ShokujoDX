@@ -9,7 +9,7 @@
 //!   center, and the backstitch lines. A large chart goes on more pages;
 //!   each page says which columns and rows it has.
 
-use emb_geom::{BBox, Point};
+use emb_geom::{BBox, Point, text};
 use emb_model::cross::{Cell, Corner, CrossStitch, Line, Part};
 use emb_model::{Design, ObjectKind, Rgb};
 
@@ -443,30 +443,47 @@ pub fn chart(colors: &[ChartColor], spec: &ChartSpec) -> Vec<Page> {
             f64::from(e.rows) * cell / 25.4
         )
     };
-    first.text(x, y, 9.0, true, "Size");
+    first.text(x, y, 9.0, true, text::tr("Size"));
     y += 5.0;
     first.text(
         x,
         y,
         9.0,
         false,
-        format!("Machine ({:.2} mm cells): {}", spec.cell_mm, size(spec.cell_mm)),
+        text::fill(
+            "Machine ({} mm cells): {}",
+            &[&format!("{:.2}", spec.cell_mm), &(size(spec.cell_mm))],
+        ),
     );
     for n in AIDA_COUNTS {
         y += 4.5;
-        first.text(x, y, 9.0, false, format!("Aida {n}: {}", size(25.4 / f64::from(n))));
+        first.text(
+            x,
+            y,
+            9.0,
+            false,
+            text::fill("Aida {}: {}", &[&n, &(size(25.4 / f64::from(n)))]),
+        );
     }
     y += 9.0;
     // The key.
-    first.text(x, y, 9.0, true, "Key");
+    first.text(x, y, 9.0, true, text::tr("Key"));
     let cols_x = [x, x + 9.0, x + 17.0, x + 95.0, x + 115.0, x + 135.0];
     y += 5.0;
-    for (i, h) in ["", "", "Thread", "Full", "Partial", "Lines"].iter().enumerate() {
+    let heads = [
+        "",
+        "",
+        text::tr("Thread"),
+        text::tr("Full"),
+        text::tr("Partial"),
+        text::tr("Lines"),
+    ];
+    for (i, h) in heads.iter().enumerate() {
         first.gray_text(cols_x[i], y, 8.0, *h);
     }
     for (k, (c, n)) in colors.iter().zip(&all).enumerate() {
         if y > ph - MARGIN_MM - 60.0 {
-            first.gray_text(x, y + 5.0, 8.0, "More colors: see the chart pages.");
+            first.gray_text(x, y + 5.0, 8.0, text::tr("More colors: see the chart pages."));
             break;
         }
         y += 5.5;

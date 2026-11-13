@@ -24,7 +24,7 @@
 //!   Python `round` rounds half to even. This changes a value only when a
 //!   coordinate is exactly on 0.05 mm.
 
-use emb_geom::Point;
+use emb_geom::{Point, text};
 use emb_model::{StitchDesign, StitchKind, StitchRecord};
 
 pub const UNITS_PER_MM: f64 = 10.0;
@@ -67,7 +67,7 @@ impl TrimCode {
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum DstError {
-    #[error("file is shorter than the 512-byte DST header")]
+    #[error("{}", text::tr("file is shorter than the 512-byte DST header"))]
     TooShort,
 }
 

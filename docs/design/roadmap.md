@@ -160,15 +160,19 @@ the rules of the spec, the translations, the licenses and the help.
   the edge color removed, takes 33 s in the stitch plan: the fills have
   very long outlines. The background job keeps the window responsive, but
   a job cannot be stopped (P12 plan, "Not in this phase"). No real picture
-  of the bench or of the owner comes near this.
+  of the bench or of the owner comes near this. *Done on 2026-10-29 (ADR
+  0081): the jobs have stop points and the wizard has a Stop button.*
 - Remove the edge color (0.5 s on a large picture) and cut out the subject
-  (0.2 s) still run on the window thread.
+  (0.2 s) still run on the window thread. *Done on 2026-10-29 (ADR 0081):
+  they run on a thread.*
 - The wizard keeps the thread chart colors from when "Colors from the
   thread chart" was ticked; after a change of the chart in the Threads
-  panel, tick it again.
+  panel, tick it again. *Done on 2026-10-29: the wizard follows the chart
+  (`Wizard::follow_chart`).*
 - A photo gives a trim for nearly each object (the owner's four photos: 61
   to 271 objects), because its areas of one color are apart. Travel
-  between them under later colors is not done.
+  between them under later colors is not done. *Done on 2026-10-29 (ADR
+  0082): hidden travel, 19 to 42 % fewer trims on these photos.*
 - The bench counts the band of overlap and pull compensation round each
   area as "outside" (1.5 to 15 %); it is on purpose.
 - The limits of line art (2 mm wide, a run under 1 mm, a triple run from
@@ -285,6 +289,7 @@ documents and the open exit tests.
   errors) and the lines of notices that have values in them stay in
   English (ADR 0042).
 - `ribbon.rs` has 4 400 lines: most of it is the table of the commands.
+  *Done on 2026-10-29: `ribbon/` is a folder module of six files.*
 - The installer, the macOS and the Linux packages have not run: the
   repository has no GitHub remote yet (ADR 0043).
 

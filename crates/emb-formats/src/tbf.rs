@@ -27,6 +27,7 @@
 //!   writes past the header fields (or stops with an error) when there are
 //!   more.
 
+use emb_geom::text;
 use emb_model::{Rgb, StitchDesign};
 
 use crate::common::{Bytes, Low, Pattern, color_thread, encode_with, signed8, to_design};
@@ -41,7 +42,7 @@ const MAX_THREADS: usize = (0x376 - 0x20E) / 5;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum TbfError {
-    #[error("file is shorter than the 1536-byte TBF header")]
+    #[error("{}", text::tr("file is shorter than the 1536-byte TBF header"))]
     TooShort,
 }
 

@@ -33,13 +33,17 @@ the design. More underlay helps the fill keep its shape.
 Each trim takes time. Keep the objects of one color together in the sew
 order (**Arrange > Fewer Color Changes**). **Arrange > Shortest Order**
 puts the objects of each color nearest first. **Closest Join** lets short
-gaps get travel stitches, not trims. Design info warns about objects
-with many trims: try another start or end point.
+gaps get travel stitches, not trims. **Trim after: Hidden travel**
+(Machine Functions) sews travel stitches under the colors that sew later,
+in place of a trim. Design info warns about objects with many trims: try
+another start or end point.
 
 ## Picture to design makes too many objects
 
 A photo has many small areas of each color, and each area that is apart
-from the others needs a trim. In the wizard:
+from the others needs a trim. The wizard gives its objects **Hidden
+travel**: where the colors that sew later cover the way, the needle goes
+there with travel stitches and no trim. In the wizard:
 
 - **Background:** use **Cut out subject**, so only the subject sews.
   **Remove the edge color** works well only on a plain background.

@@ -493,7 +493,7 @@ mod tests {
         let (mut h, id) = anna();
         h.st.reshape.letter = Some((id, 0));
         let l = lettering(&h, id);
-        let pivot = l.letter_to_design(0).unwrap().apply(l.letters[0].center);
+        let pivot = l.letter_point(0, l.letters[0].center).unwrap();
         // Turn: the handle above the letter to the right of the middle.
         let t = turn_handle(&l, 0).unwrap();
         let to = Point::new(pivot.x + pivot.distance(t), pivot.y);

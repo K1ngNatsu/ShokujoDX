@@ -132,7 +132,7 @@ impl AppState {
             layout.marks = o.marks;
         }
         let n = layout.hoopings.len();
-        self.doc.edit("Auto Layout", |d| d.hooping = Some(layout));
+        self.doc.edit(tr("Auto Layout"), |d| d.hooping = Some(layout));
         self.hoopings_ui.mode = true;
         self.hoopings_ui.selected = None;
         self.message = crate::i18n::fill(
@@ -236,7 +236,7 @@ impl AppState {
 
     /// Removes the layout.
     pub fn clear_hoopings(&mut self) {
-        self.doc.edit("Remove Hoopings", |d| d.hooping = None);
+        self.doc.edit(tr("Remove Hoopings"), |d| d.hooping = None);
         self.hoopings_ui.selected = None;
         self.hoopings_ui.drawing = None;
     }
@@ -286,11 +286,11 @@ impl AppState {
     pub fn output_hoopings(&mut self, folder: &Path, name: &str) -> Result<Vec<PathBuf>, String> {
         let views = self.hooping_views();
         if views.is_empty() {
-            return Err("The design has no hoopings. Use Auto layout first.".into());
+            return Err(tr("The design has no hoopings. Use Auto layout first.").into());
         }
         let hoop = self
             .layout_hoop()
-            .ok_or("The hoop of the layout is not in the hoop list.")?;
+            .ok_or(tr("The hoop of the layout is not in the hoop list."))?;
         let profile = self.settings.output.clone();
         let mut written = Vec::new();
         let mut rows = Vec::new();
@@ -356,7 +356,7 @@ impl AppState {
     /// Asks for a folder, then writes the hoopings there.
     pub fn output_hoopings_dialog(&mut self) {
         let Some(folder) = rfd::FileDialog::new()
-            .set_title("Output hoopings: choose a folder")
+            .set_title(tr("Output hoopings: choose a folder"))
             .set_directory(self.dialog_dir())
             .pick_folder()
         else {
@@ -625,7 +625,11 @@ pub fn options(ui: &mut egui::Ui, st: &mut AppState) {
             .width(200.0)
             .show_ui(ui, |ui| {
                 for h in &st.hoops.hoops {
-                    ui.selectable_value(&mut l.hoop, h.id.clone(), format!("{} ({} × {} mm)", h.name, h.width_mm, h.height_mm));
+                    ui.selectable_value(
+                        &mut l.hoop,
+                        h.id.clone(),
+                        crate::i18n::fill("{} ({} × {} mm)", &[&h.name, &h.width_mm, &h.height_mm]),
+                    );
                 }
             });
         ui.label(tr("Margin"));

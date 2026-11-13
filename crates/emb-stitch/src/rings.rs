@@ -178,7 +178,6 @@ fn extended(row: &[Point], ext: f64) -> Vec<Point> {
 }
 
 /// Sews a guided fill. With no usable guide, the rows are straight tatami.
-#[allow(clippy::too_many_arguments)]
 pub fn guided(
     shape: &Shape,
     guides: &[Vec<Point>],

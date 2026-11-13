@@ -192,6 +192,16 @@ fn buttonholes() {
 }
 
 #[test]
+fn buttonhole_shapes() {
+    golden("buttonhole-shapes");
+}
+
+#[test]
+fn mitre_corners() {
+    golden("mitre-corners");
+}
+
+#[test]
 fn borders() {
     golden("borders");
 }

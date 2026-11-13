@@ -45,7 +45,7 @@ Then the exit test of the phase: the exit tests of each milestone pass.
 
 | Item | Reason |
 | --- | --- |
-| Stopping a job that runs | The engine functions have no stop point. With the faster Auto (Milestone 1) and fewer small areas (Milestone 2), one job is short. Revisit if the bench shows long jobs. |
+| Stopping a job that runs | Done after the phase (2026-10-29, ADR 0081): the stitch plan and the objects have stop points; the wizard stops an old job and has a Stop button. |
 | A learned model (neural network) for the cut-out or the colors | Large model files and a new kind of dependency. The graph cut of ADR 0031 does the job. |
 
 ## Progress

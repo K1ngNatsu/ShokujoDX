@@ -429,7 +429,7 @@ impl AppState {
         }
         let ids = self.selection.in_sew_order(self.doc.design());
         let name = style.name.clone();
-        let n = self.doc.edit(format!("Apply style {name}"), |d| {
+        let n = self.doc.edit(crate::i18n::fill("Apply style {}", &[&name]), |d| {
             let k = match d.style_index(&name) {
                 Some(k) => {
                     d.styles[k] = style;
@@ -582,7 +582,7 @@ pub fn color_wheel(ui: &mut egui::Ui, st: &mut AppState) {
             let (r, _) = ui.allocate_exact_size(Vec2::splat(16.0), Sense::hover());
             ui.painter().rect_filled(r, 2.0, color32(color));
             if ui
-                .add(egui::Button::new(format!("{kind}: {text}")).frame(false))
+                .add(egui::Button::new(format!("{}: {text}", tr(kind))).frame(false))
                 .clicked()
             {
                 use_k = Some((k, ui.input(|i| i.modifiers.command)));

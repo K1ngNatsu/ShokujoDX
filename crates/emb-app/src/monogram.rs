@@ -7,6 +7,7 @@
 //! next to the settings file (`.monogram`, JSON).
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use eframe::egui::{self, Color32, Pos2, Rect, Stroke, Vec2};
 use emb_geom::{BBox, Point};
@@ -29,6 +30,21 @@ pub struct MonogramWindow {
     pub replace: Option<u32>,
     /// The name for Save as template.
     pub template_name: String,
+    /// The templates, read when the window opens and after Save as template.
+    pub templates: Option<Arc<Vec<MonogramTemplate>>>,
+    /// The preview: the initials and the spec that made it, and its objects.
+    pub preview: Option<Arc<Preview>>,
+}
+
+/// The objects of the preview, made again only when the monogram changes.
+#[derive(Debug)]
+pub struct Preview {
+    pub initials: String,
+    pub spec: MonogramSpec,
+    /// The initials (a lettering object), the ornaments and the borders.
+    pub letters: ObjectKind,
+    pub ornaments: Vec<ObjectKind>,
+    pub borders: Vec<ObjectKind>,
 }
 
 impl Default for MonogramWindow {
@@ -39,6 +55,8 @@ impl Default for MonogramWindow {
             spec: MonogramSpec::new(default_font()),
             replace: None,
             template_name: String::new(),
+            templates: None,
+            preview: None,
         }
     }
 }
@@ -116,9 +134,9 @@ impl AppState {
             return;
         };
         let label = if replace.is_some() {
-            "Change monogram"
+            tr("Change monogram")
         } else {
-            "Add monogram"
+            tr("Add monogram")
         };
         let group = replace.map(|r| r.group);
         let ids = self.doc.edit(label, |d| {
@@ -134,9 +152,9 @@ impl AppState {
     pub fn save_monogram_template(&mut self) -> Result<PathBuf, String> {
         let name = self.monogram_window.template_name.trim().to_string();
         if name.is_empty() {
-            return Err("Type a name for the template.".into());
+            return Err(tr("Type a name for the template.").into());
         }
-        let dir = templates_dir().ok_or("No folder for templates.")?;
+        let dir = templates_dir().ok_or(tr("No folder for templates."))?;
         std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
         let file: String = name
             .chars()
@@ -154,6 +172,7 @@ impl AppState {
             spec: self.monogram_window.spec.clone(),
         };
         std::fs::write(&path, t.to_json()).map_err(|e| e.to_string())?;
+        self.monogram_window.templates = None;
         Ok(path)
     }
 }
@@ -179,17 +198,17 @@ fn combo<T: Copy + PartialEq>(
     ui.horizontal(|ui| {
         ui.label(label);
         egui::ComboBox::from_id_salt(salt)
-            .selected_text(name(*v))
+            .selected_text(tr(name(*v)))
             .show_ui(ui, |ui| {
                 for x in all {
-                    ui.selectable_value(v, *x, name(*x));
+                    ui.selectable_value(v, *x, tr(name(*x)));
                 }
             });
     });
 }
 
 /// Draws the objects, each in its color, fitted into `rect`.
-fn draw_preview(painter: &egui::Painter, rect: Rect, objs: &[(Rgb, &ObjectKind)]) {
+pub(crate) fn draw_preview(painter: &egui::Painter, rect: Rect, objs: &[(Rgb, &ObjectKind)]) {
     let Some(bb) = objs.iter().filter_map(|(_, k)| k.control_bbox()).reduce(BBox::union) else {
         return;
     };
@@ -226,8 +245,15 @@ fn draw_preview(painter: &egui::Painter, rect: Rect, objs: &[(Rgb, &ObjectKind)]
 /// The Monogram window.
 pub fn window(ctx: &egui::Context, st: &mut AppState) {
     if !st.monogram_window.open {
+        st.monogram_window.templates = None;
+        st.monogram_window.preview = None;
         return;
     }
+    let templates = st
+        .monogram_window
+        .templates
+        .get_or_insert_with(|| Arc::new(templates()))
+        .clone();
     let mut open = true;
     let (mut place, mut save) = (false, false);
     let mut w = st.monogram_window.clone();
@@ -258,7 +284,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         });
         ui.label(tr("Templates"));
         ui.horizontal_wrapped(|ui| {
-            for t in templates() {
+            for t in templates.iter() {
                 if ui
                     .button(&t.name)
                     .on_hover_text(tr("Use the style, border, ornaments and colors of this template."))
@@ -368,10 +394,26 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         let (rect, _) = ui.allocate_exact_size(egui::vec2(400.0, 180.0), egui::Sense::hover());
         ui.painter().rect_filled(rect, 4.0, ui.visuals().extreme_bg_color);
         st.monogram_window = w.clone();
-        match st.monogram_objects(Point::ZERO) {
+        let kept = w
+            .preview
+            .clone()
+            .filter(|p| p.initials == w.initials && p.spec == w.spec);
+        // A missing font can come with the font scan, so only a preview with
+        // objects is kept.
+        let preview = kept.or_else(|| {
+            let m = st.monogram_objects(Point::ZERO)?;
+            Some(Arc::new(Preview {
+                initials: w.initials.clone(),
+                spec: w.spec.clone(),
+                letters: ObjectKind::Lettering(Box::new(m.letters)),
+                ornaments: m.ornaments,
+                borders: m.borders,
+            }))
+        });
+        w.preview = preview.clone();
+        match preview.as_deref() {
             Some(m) => {
-                let letters = ObjectKind::Lettering(Box::new(m.letters));
-                let mut objs: Vec<(Rgb, &ObjectKind)> = vec![(w.spec.letter_color, &letters)];
+                let mut objs: Vec<(Rgb, &ObjectKind)> = vec![(w.spec.letter_color, &m.letters)];
                 objs.extend(m.ornaments.iter().map(|k| (w.spec.ornament_color, k)));
                 objs.extend(m.borders.iter().map(|k| (w.spec.border_color, k)));
                 draw_preview(ui.painter(), rect, &objs);
@@ -380,7 +422,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                 ui.painter().text(
                     rect.center(),
                     egui::Align2::CENTER_CENTER,
-                    "Type initials, or choose a font that has them.",
+                    tr("Type initials, or choose a font that has them."),
                     egui::FontId::proportional(13.0),
                     ui.visuals().weak_text_color(),
                 );
@@ -389,9 +431,9 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         ui.separator();
         ui.horizontal(|ui| {
             let text = if w.replace.is_some() {
-                "Change the monogram"
+                tr("Change the monogram")
             } else {
-                "Add to the design"
+                tr("Add to the design")
             };
             place = ui
                 .add_enabled(!w.initials.trim().is_empty(), egui::Button::new(text))
@@ -417,7 +459,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
     }
     if save {
         st.message = match st.save_monogram_template() {
-            Ok(p) => format!("Saved template {}", p.display()),
+            Ok(p) => crate::i18n::fill("Saved template {}", &[&p.display()]),
             Err(e) => e,
         };
     }
@@ -512,5 +554,31 @@ mod tests {
             out.textures_delta.clear();
         }
         assert!(st.monogram_window.open);
+    }
+
+    #[test]
+    fn the_preview_is_made_again_only_after_a_change() {
+        let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        st.open_monogram();
+        let ctx = egui::Context::default();
+        let frame = |st: &mut AppState| {
+            let mut out = ctx.run_ui(egui::RawInput::default(), |ui| window(ui.ctx(), st));
+            out.textures_delta.clear();
+        };
+        frame(&mut st);
+        let (t, p) = (
+            st.monogram_window.templates.clone().expect("the templates"),
+            st.monogram_window.preview.clone().expect("the preview"),
+        );
+        frame(&mut st);
+        assert!(Arc::ptr_eq(&t, st.monogram_window.templates.as_ref().unwrap()));
+        assert!(Arc::ptr_eq(&p, st.monogram_window.preview.as_ref().unwrap()));
+        st.monogram_window.initials = "XY".into();
+        frame(&mut st);
+        let q = st.monogram_window.preview.clone().unwrap();
+        assert!(!Arc::ptr_eq(&p, &q) && q.initials == "XY");
+        st.monogram_window.open = false;
+        frame(&mut st);
+        assert!(st.monogram_window.templates.is_none() && st.monogram_window.preview.is_none());
     }
 }

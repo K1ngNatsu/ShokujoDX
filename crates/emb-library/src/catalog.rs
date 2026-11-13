@@ -1,7 +1,7 @@
 //! The design catalog: pages with a picture of each design and its
 //! numbers, 4 × 5 designs on a page.
 
-use emb_geom::{BBox, Point};
+use emb_geom::{BBox, Point, text};
 use emb_model::{Rgb, StitchDesign};
 use emb_render::page::{Op, Page, Paper, fit_segments, text_width_mm};
 
@@ -35,7 +35,7 @@ pub fn pages(title: &str, items: &[Item], paper: Paper) -> Vec<Page> {
     }
     if out.is_empty() {
         let mut p = page(title, &[], paper, 1, 1);
-        p.gray_text(MARGIN, MARGIN + HEADER + 6.0, 10.0, "No designs.");
+        p.gray_text(MARGIN, MARGIN + HEADER + 6.0, 10.0, text::tr("No designs."));
         out.push(p);
     }
     out
@@ -51,7 +51,7 @@ fn page(title: &str, items: &[Item], paper: Paper, number: usize, of: usize) -> 
         true,
         fit_text(title, 13.0, w - 2.0 * MARGIN - 30.0),
     );
-    let pages = format!("Page {number} of {of}");
+    let pages = text::fill("Page {} of {}", &[&number, &of]);
     p.gray_text(w - MARGIN - text_width_mm(&pages, 8.0), MARGIN + 5.0, 8.0, pages);
     let (cw, ch) = (
         (w - 2.0 * MARGIN) / COLUMNS as f64,

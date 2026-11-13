@@ -189,16 +189,7 @@ fn satin_area(outer: &Path, holes: &[Path], current: &CurrentProperties) -> Opti
 }
 
 /// A turning satin column from a closed shape with no holes: stitch angle
-/// lines square to its spine. `None` if the shape has no area or the
-/// column would not sew well.
-pub fn satin_from_shape(outline: &Path) -> Option<SatinGeometry> {
-    let ring = outline.flatten(FLATTEN_TOL_MM).into_iter().next()?.points;
-    if ring.len() < 3 || region::ring_signed_area(&ring).abs() < MIN_AREA_MM2 {
-        return None;
-    }
-    turning_column(outline, &ring)
-}
-
+/// lines square to its spine. `None` if the column would not sew well.
 fn turning_column(outline: &Path, ring: &[Point]) -> Option<SatinGeometry> {
     let rings = [ring.to_vec()];
     let guide = spine::spine(ring)?;
@@ -572,7 +563,6 @@ mod tests {
         for (a, b) in &geometry.rungs {
             assert!((a.x - b.x).abs() < 1.0 && (a.y - b.y).abs() > 5.0, "{a:?} {b:?}");
         }
-        assert!(satin_from_shape(&Path::new().move_to(p(0.0, 0.0)).line_to(p(1.0, 0.0)).close()).is_none());
     }
 
     /// A C shape: a ring sector round (50, 50), radii 20 and 30, open on the right.

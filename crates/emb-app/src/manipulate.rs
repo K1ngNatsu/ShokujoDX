@@ -5,7 +5,11 @@
 //! - Drag on empty canvas to box-select objects that are fully inside.
 //!   Ctrl or Shift adds to the selection.
 //! - Drag a corner handle to scale in proportion; Shift scales freely.
-//!   Drag a side handle to scale in one direction. Alt scales about the center.
+//!   Drag a side handle to scale in one direction. The point of the box
+//!   that stays is the Scale from point of Object Properties (the center
+//!   unless the user changes it, owner request 2026-11-13; a point on the
+//!   side of the handle uses the opposite side). Alt scales from the
+//!   opposite side.
 //! - Drag the round handle above the box to rotate; Shift snaps to 15°.
 //!
 //! The math is in design coordinates, so it also works when the design has
@@ -20,6 +24,7 @@ use emb_model::{Design, DesignObject, MergeKey, ObjectId};
 
 use crate::app::AppState;
 use crate::canvas::{self, CanvasView};
+use crate::i18n::tr;
 
 /// Half size of a scale handle, in screen points.
 const HANDLE: f32 = 4.0;
@@ -28,6 +33,49 @@ const ROTATE_OFFSET: f32 = 24.0;
 /// Smallest size that scaling can make, in mm.
 const MIN_SIZE_MM: f64 = 0.5;
 const ROTATE_SNAP_DEG: f64 = 15.0;
+
+/// The point of the selection box that scaling keeps in place, in screen
+/// directions: -1, 0 or 1 on each axis (0, 0 is the center; -1, -1 is the
+/// top left).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+pub struct ScaleFrom {
+    pub x: i8,
+    pub y: i8,
+}
+
+impl ScaleFrom {
+    /// The nine points, row by row from the top left, with their names.
+    pub const ALL: [(ScaleFrom, &'static str); 9] = [
+        (ScaleFrom { x: -1, y: -1 }, "Top left"),
+        (ScaleFrom { x: 0, y: -1 }, "Top"),
+        (ScaleFrom { x: 1, y: -1 }, "Top right"),
+        (ScaleFrom { x: -1, y: 0 }, "Left"),
+        (ScaleFrom { x: 0, y: 0 }, "Center"),
+        (ScaleFrom { x: 1, y: 0 }, "Right"),
+        (ScaleFrom { x: -1, y: 1 }, "Bottom left"),
+        (ScaleFrom { x: 0, y: 1 }, "Bottom"),
+        (ScaleFrom { x: 1, y: 1 }, "Bottom right"),
+    ];
+
+    /// The same point in design directions (the design rotation turns the
+    /// screen directions).
+    pub fn in_design(self, d: &Design) -> (i8, i8) {
+        let inv = d.rotation_transform().inverse().unwrap_or(Transform::IDENTITY);
+        let v = inv.apply(Point::new(f64::from(self.x), f64::from(self.y))) - inv.apply(Point::ZERO);
+        let r = |a: f64| a.round().clamp(-1.0, 1.0) as i8;
+        (r(v.x), r(v.y))
+    }
+
+    /// The point of box `b` (design coordinates).
+    pub fn point(self, d: &Design, b: BBox) -> Point {
+        let (x, y) = self.in_design(d);
+        let c = b.center();
+        Point::new(
+            c.x + f64::from(x) * b.width() / 2.0,
+            c.y + f64::from(y) * b.height() / 2.0,
+        )
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Handle {
@@ -83,10 +131,12 @@ pub enum DragOp {
         original: emb_geom::Path,
         key: MergeKey,
     },
-    /// Moves a guide (index in `Design::guides`).
+    /// Moves a guide (index in `Design::guides`). `marker`: the drag
+    /// started on the marker of the guide on its ruler.
     Guide {
         index: usize,
         key: MergeKey,
+        marker: bool,
     },
     /// Reshape tool: moves one end of a satin stitch angle line (rung).
     ReshapeRung {
@@ -294,16 +344,22 @@ fn apply(st: &mut AppState, label: &str, key: &MergeKey, originals: &[DesignObje
     });
 }
 
-/// Scale factors for a handle drag. `p` is the pointer in design coordinates.
-fn scale_factors(bbox: BBox, fx: i8, fy: i8, p: Point, mods: Modifiers) -> (Point, f64, f64) {
+/// The side of the box that stays for a drag of handle `fx`, `fy`: the
+/// point `from` (design directions), but the opposite side on an axis where
+/// `from` is on the side of the handle, or with Alt.
+fn scale_anchor(fx: i8, fy: i8, from: (i8, i8), alt: bool) -> (i8, i8) {
+    let pick = |f: i8, a: i8| if f != 0 && (alt || a == f) { -f } else { a };
+    (pick(fx, from.0), pick(fy, from.1))
+}
+
+/// Scale factors for a handle drag. `p` is the pointer in design
+/// coordinates; `from` is the Scale from point in design directions.
+fn scale_factors(bbox: BBox, fx: i8, fy: i8, p: Point, mods: Modifiers, from: (i8, i8)) -> (Point, f64, f64) {
     let c = bbox.center();
     let (hw, hh) = (bbox.width() / 2.0, bbox.height() / 2.0);
     let handle = Point::new(c.x + f64::from(fx) * hw, c.y + f64::from(fy) * hh);
-    let anchor = if mods.alt {
-        c
-    } else {
-        Point::new(c.x - f64::from(fx) * hw, c.y - f64::from(fy) * hh)
-    };
+    let (ax, ay) = scale_anchor(fx, fy, from, mods.alt);
+    let anchor = Point::new(c.x + f64::from(ax) * hw, c.y + f64::from(ay) * hh);
     let factor = |p: f64, h: f64, a: f64, size: f64| {
         let span = h - a;
         if span.abs() < 1e-12 {
@@ -334,6 +390,11 @@ fn scale_factors(bbox: BBox, fx: i8, fy: i8, p: Point, mods: Modifiers) -> (Poin
     (anchor, sx, sy)
 }
 
+/// Alt is down (the drawing of the drag shows the point that it uses).
+fn map_alt(painter: &egui::Painter) -> bool {
+    painter.ctx().input(|i| i.modifiers.alt)
+}
+
 /// Updates the drag for pointer `pos` (screen).
 pub fn update_drag(st: &mut AppState, map: &ViewMap, pos: Pos2, mods: Modifiers) {
     let Some(mut op) = st.drag.take() else { return };
@@ -358,7 +419,8 @@ pub fn update_drag(st: &mut AppState, map: &ViewMap, pos: Pos2, mods: Modifiers)
             fy,
             key,
         } => {
-            let (anchor, sx, sy) = scale_factors(*bbox, *fx, *fy, p, mods);
+            let from = st.settings.scale_from.in_design(st.doc.design());
+            let (anchor, sx, sy) = scale_factors(*bbox, *fx, *fy, p, mods, from);
             apply(st, "Scale", key, originals, &scale_about(anchor, sx, sy));
         }
         DragOp::Rotate {
@@ -386,7 +448,7 @@ pub fn update_drag(st: &mut AppState, map: &ViewMap, pos: Pos2, mods: Modifiers)
         | DragOp::Guide { .. } => {}
         DragOp::Backdrop { start, origin, key } => {
             let to = *origin + (p - *start);
-            st.doc.edit_merged("Move backdrop", key.clone(), |d| {
+            st.doc.edit_merged(tr("Move backdrop"), key.clone(), |d| {
                 if let Some(b) = d.backdrop.as_mut() {
                     b.origin = to;
                 }
@@ -572,6 +634,20 @@ pub fn draw_overlay(painter: &egui::Painter, map: &ViewMap, st: &AppState, accen
             painter.rect_stroke(r, 1.0, Stroke::new(1.5, accent), egui::StrokeKind::Inside);
         }
     }
+    // The point that scaling keeps in place (during a drag: the one that
+    // the drag uses).
+    let d = st.doc.design();
+    let from = st.settings.scale_from.in_design(d);
+    let (ax, ay) = match &st.drag {
+        Some(DragOp::Scale { fx, fy, .. }) => scale_anchor(*fx, *fy, from, map_alt(painter)),
+        _ => from,
+    };
+    let (c, hw, hh) = (b.center(), b.width() / 2.0, b.height() / 2.0);
+    let a = map.to_screen(Point::new(c.x + f64::from(ax) * hw, c.y + f64::from(ay) * hh));
+    let stroke = Stroke::new(1.5, accent);
+    painter.circle_stroke(a, 3.5, stroke);
+    painter.line_segment([a - Vec2::new(6.0, 0.0), a + Vec2::new(6.0, 0.0)], stroke);
+    painter.line_segment([a - Vec2::new(0.0, 6.0), a + Vec2::new(0.0, 6.0)], stroke);
 
     // Live values while dragging, and the size at rest.
     let text = match &st.drag {
@@ -608,29 +684,67 @@ mod tests {
         BBox::new(Point::ZERO, Point::new(10.0, 20.0))
     }
 
+    const CENTER: (i8, i8) = (0, 0);
+
     #[test]
-    fn side_handle_scales_one_axis_from_opposite_side() {
-        let (anchor, sx, sy) = scale_factors(bb(), 1, 0, Point::new(20.0, 5.0), Modifiers::NONE);
-        assert_eq!(anchor, Point::new(0.0, 10.0));
+    fn handles_scale_from_the_center_by_default() {
+        // Owner request (2026-11-13): the design stays where it is.
+        let (anchor, sx, sy) = scale_factors(bb(), 1, 0, Point::new(15.0, 5.0), Modifiers::NONE, CENTER);
+        assert_eq!(anchor, Point::new(5.0, 10.0));
+        assert_eq!((sx, sy), (2.0, 1.0));
+        let (anchor, sx, sy) = scale_factors(bb(), 1, 1, Point::new(15.0, 30.0), Modifiers::NONE, CENTER);
+        assert_eq!(anchor, Point::new(5.0, 10.0));
+        assert!((sx - 2.0).abs() < 1e-12 && (sy - 2.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn side_handle_with_alt_scales_one_axis_from_opposite_side() {
+        let (anchor, sx, sy) = scale_factors(bb(), 1, 0, Point::new(20.0, 5.0), Modifiers::ALT, CENTER);
+        assert_eq!(anchor.x, 0.0);
         assert_eq!((sx, sy), (2.0, 1.0));
     }
 
     #[test]
+    fn a_corner_point_stays_and_a_point_on_the_handle_side_uses_the_other_side() {
+        // From the top left: the bottom right handle scales away from it.
+        let (anchor, sx, _) = scale_factors(bb(), 1, 1, Point::new(20.0, 40.0), Modifiers::NONE, (-1, -1));
+        assert_eq!(anchor, Point::new(0.0, 0.0));
+        assert!((sx - 2.0).abs() < 1e-12);
+        // The top left handle itself scales from the bottom right.
+        let (anchor, ..) = scale_factors(bb(), -1, -1, Point::new(-10.0, -20.0), Modifiers::NONE, (-1, -1));
+        assert_eq!(anchor, Point::new(10.0, 20.0));
+    }
+
+    #[test]
     fn corner_is_proportional_unless_shift() {
-        let (_, sx, sy) = scale_factors(bb(), 1, 1, Point::new(20.0, 40.0), Modifiers::NONE);
+        let (_, sx, sy) = scale_factors(bb(), 1, 1, Point::new(20.0, 40.0), Modifiers::ALT, CENTER);
         assert!((sx - 2.0).abs() < 1e-12 && (sy - 2.0).abs() < 1e-12);
-        let (_, sx, sy) = scale_factors(bb(), 1, 1, Point::new(20.0, 30.0), Modifiers::SHIFT);
+        let (_, sx, sy) = scale_factors(
+            bb(),
+            1,
+            1,
+            Point::new(20.0, 30.0),
+            Modifiers::SHIFT | Modifiers::ALT,
+            CENTER,
+        );
         assert_eq!((sx, sy), (2.0, 1.5));
     }
 
     #[test]
-    fn alt_scales_about_center_and_size_has_a_minimum() {
-        let (anchor, sx, _) = scale_factors(bb(), 1, 0, Point::new(15.0, 0.0), Modifiers::ALT);
-        assert_eq!(anchor, Point::new(5.0, 10.0));
-        assert_eq!(sx, 2.0);
+    fn the_size_has_a_minimum() {
         // Dragging past the anchor does not flip or collapse the shape.
-        let (_, sx, _) = scale_factors(bb(), 1, 0, Point::new(-50.0, 0.0), Modifiers::NONE);
+        let (_, sx, _) = scale_factors(bb(), 1, 0, Point::new(-50.0, 0.0), Modifiers::ALT, CENTER);
         assert!((sx * 10.0 - MIN_SIZE_MM).abs() < 1e-12);
+    }
+
+    #[test]
+    fn the_scale_from_point_turns_with_the_design() {
+        let mut d = Design::new("Test");
+        assert_eq!(ScaleFrom { x: -1, y: -1 }.in_design(&d), (-1, -1));
+        d.rotation = emb_model::Rotation::Deg90;
+        let (x, y) = ScaleFrom { x: -1, y: -1 }.in_design(&d);
+        // Back through the turn: the screen top left is another corner of the design.
+        assert!(x != 0 && y != 0 && (x, y) != (-1, -1));
     }
 
     // ---- Headless canvas tests with real pointer events ----
@@ -780,7 +894,8 @@ mod tests {
             .into_iter()
             .find(|(k, _)| *k == Handle::Scale { fx: 1, fy: 0 })
             .unwrap();
-        let grow_px = (b.width() * h.st.view.scale()) as f32;
+        // From the center (the default): half the width each side.
+        let grow_px = (b.width() * h.st.view.scale()) as f32 / 2.0;
         h.drag(
             PointerButton::Primary,
             right,
@@ -795,6 +910,19 @@ mod tests {
             b.width()
         );
         assert!((nb.height() - b.height()).abs() < 1e-9);
+        assert!((nb.center().x - b.center().x).abs() < 0.05, "the center stays");
+        // From the left side: the left side stays.
+        h.st.undo();
+        h.st.settings.scale_from = ScaleFrom { x: -1, y: 0 };
+        h.frame(vec![]);
+        h.drag(
+            PointerButton::Primary,
+            right,
+            right + Vec2::new(2.0 * grow_px, 0.0),
+            Modifiers::NONE,
+        );
+        let nb = h.st.doc.design().bbox_of(&[star]).unwrap();
+        assert!((nb.width() - 2.0 * b.width()).abs() < 0.05);
         assert!((nb.min.x - b.min.x).abs() < 1e-9, "left side stays");
     }
 
@@ -817,9 +945,10 @@ mod tests {
             .into_iter()
             .find(|(k, _)| *k == Handle::Scale { fx: 1, fy: 1 })
             .unwrap();
+        // From the center: half the size more on each side.
         let grow = Vec2::new(
-            (b.width() * h.st.view.scale()) as f32,
-            (b.height() * h.st.view.scale()) as f32,
+            (b.width() * h.st.view.scale()) as f32 / 2.0,
+            (b.height() * h.st.view.scale()) as f32 / 2.0,
         );
         h.drag(PointerButton::Primary, corner, corner + grow, Modifiers::NONE);
         let emb_model::ObjectKind::Lettering(l) = &h.st.doc.design().object(id).unwrap().kind else {

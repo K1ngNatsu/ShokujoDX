@@ -56,7 +56,7 @@ impl AppState {
             return 0;
         }
         let (brand, pen) = (self.cutwork_brand(), self.cutwork.penetration_mm);
-        let new = self.doc.edit("Cutwork", |d| d.make_cutwork(&ids, brand, pen));
+        let new = self.doc.edit(tr("Cutwork"), |d| d.make_cutwork(&ids, brand, pen));
         self.message = crate::i18n::fill("Cut lines for {} needles.", &[&new.len()]);
         let n = new.len();
         self.selection.set_all(new);

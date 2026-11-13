@@ -75,6 +75,7 @@ impl Document {
     }
 
     /// Sets the maximum number of undo steps. The oldest steps are removed first.
+    #[cfg(test)]
     pub fn set_limit(&mut self, limit: usize) {
         self.limit = limit.max(1);
         self.trim();
@@ -85,6 +86,7 @@ impl Document {
         self.merge_key = None;
         self.push_snapshot(label.into());
         let r = f(&mut self.design);
+        self.design.settle_knockouts();
         self.design.settle_hoop();
         r
     }
@@ -98,6 +100,7 @@ impl Document {
     ) -> Result<R, E> {
         let mut work = self.design.clone();
         let r = f(&mut work)?;
+        work.settle_knockouts();
         work.settle_hoop();
         self.merge_key = None;
         self.push_snapshot(label.into());
@@ -117,6 +120,7 @@ impl Document {
             self.state = self.new_state();
         }
         let r = f(&mut self.design);
+        self.design.settle_knockouts();
         self.design.settle_hoop();
         r
     }
@@ -124,6 +128,12 @@ impl Document {
     /// Stops merging. The next `edit_merged` call makes a new undo step.
     pub fn end_merge(&mut self) {
         self.merge_key = None;
+    }
+
+    /// `true` while the edits with `key` make one undo step: the last undo
+    /// step is theirs.
+    pub fn is_merging(&self, key: &MergeKey) -> bool {
+        self.merge_key.as_ref() == Some(key)
     }
 
     /// Stops merging only if the current merge has `key`. A panel uses this,

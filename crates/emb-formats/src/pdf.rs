@@ -9,7 +9,7 @@
 //! PDF units are points (1/72 inch) with y up; the result is in mm with
 //! y down and the top-left of the page at (0, 0).
 
-use emb_geom::{Path, Point};
+use emb_geom::{Path, Point, text};
 use emb_model::Rgb;
 use lopdf::{Dictionary, Document, Object, content::Content};
 
@@ -149,7 +149,7 @@ impl Reader<'_> {
 
     /// Runs the operators of a content stream with `resources`.
     fn run(&mut self, data: &[u8], resources: Option<&Dictionary>, g0: GState, depth: usize) -> Result<(), SvgError> {
-        let content = Content::decode(data).map_err(|e| SvgError::Parse(format!("PDF content: {e}")))?;
+        let content = Content::decode(data).map_err(|e| SvgError::Parse(text::fill("PDF content: {}", &[&e])))?;
         let mut g = g0;
         let mut stack: Vec<GState> = Vec::new();
         for op in &content.operations {
@@ -359,20 +359,20 @@ pub fn import_pdf(data: &[u8], vectors: bool) -> Result<SvgImport, SvgError> {
     if !data.starts_with(b"%PDF") {
         if data.starts_with(b"%!PS") {
             return Err(SvgError::Parse(
-                "this is a PostScript file (an old AI or EPS file): save it as PDF or SVG first".into(),
+                text::tr("this is a PostScript file (an old AI or EPS file): save it as PDF or SVG first").into(),
             ));
         }
-        return Err(SvgError::Parse("not a PDF file".into()));
+        return Err(SvgError::Parse(text::tr("not a PDF file").into()));
     }
     let doc = Document::load_mem(data).map_err(|e| SvgError::Parse(format!("PDF: {e}")))?;
     let pages = doc.get_pages();
     let (_, &page_id) = pages
         .iter()
         .next()
-        .ok_or_else(|| SvgError::Parse("the PDF has no pages".into()))?;
+        .ok_or_else(|| SvgError::Parse(text::tr("the PDF has no pages").into()))?;
     let page = doc
         .get_dictionary(page_id)
-        .map_err(|e| SvgError::Parse(format!("PDF page: {e}")))?;
+        .map_err(|e| SvgError::Parse(text::fill("PDF page: {}", &[&e])))?;
     let media = inherited(&doc, page, b"MediaBox")
         .and_then(|m| m.as_array().ok())
         .map(|a| nums(a))

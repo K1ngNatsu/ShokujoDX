@@ -17,9 +17,9 @@ users.
 
 ## Decision
 
-- A ribbon at the top of the window (`emb-app/src/ribbon.rs`), in the style
-  of CAD programs. We describe and build it in our own words; we copy no
-  assets.
+- A ribbon at the top of the window (`emb-app/src/ribbon/`, a folder module
+  since 2026-10-29), in the style of CAD programs. We describe and build it
+  in our own words; we copy no assets.
   - A File button opens the application menu. New, Open, Save, Undo and Redo
     are next to it.
   - Five tabs: **Digitize** (select tools, lines, fills, columns, shapes,

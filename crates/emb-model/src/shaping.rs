@@ -2,7 +2,9 @@
 //!
 //! Objects take part by their area: fills, vectors with closed shapes,
 //! appliqué objects and satin columns (the area inside the column).
-//! Lines, lettering and stitch objects do not take part.
+//! Lines and stitch objects do not take part. Lettering takes part in
+//! Flatten and Remove overlaps only: it cuts by its letters, and when it
+//! is cut it gets a knockout and stays lettering (ADR 0093).
 //!
 //! An object that sews later is in front of the objects before it.
 //!
@@ -28,7 +30,7 @@
 use std::collections::BTreeSet;
 
 use emb_geom::region::{self, Join, Region};
-use emb_geom::{Path, Point};
+use emb_geom::{Path, Point, text};
 
 use crate::applique::AppliquePiece;
 use crate::{Design, ObjectId, ObjectKind};
@@ -100,21 +102,37 @@ impl Default for ShapeOptions {
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum ShapeError {
-    #[error("Select two or more objects with an area (fills, vectors with closed shapes, appliqué, satin columns).")]
+    #[error(
+        "{}",
+        text::tr(
+            "Select two or more objects with an area (fills, vectors with closed shapes, appliqué, satin columns)."
+        )
+    )]
     TooFew,
-    #[error("Nothing is left: the result has no area.")]
+    #[error("{}", text::tr("Nothing is left: the result has no area."))]
     NothingLeft,
-    #[error("Combine needs two or more vectors, or two or more appliqué objects.")]
+    #[error(
+        "{}",
+        text::tr("Combine needs two or more vectors, or two or more appliqué objects.")
+    )]
     CannotCombine,
-    #[error("Select objects with an outline first (not stitch objects).")]
+    #[error("{}", text::tr("Select objects with an outline first (not stitch objects)."))]
     NoOutline,
-    #[error("Nothing to cut: no object under the selection overlaps it.")]
+    #[error("{}", text::tr("Nothing to cut: no object under the selection overlaps it."))]
     NothingToCut,
     #[error(
-        "Some of these objects are linked (a border trace or linked shapes): use Artwork > Unlink first. To change the stitches of one object, double-click it."
+        "{}",
+        text::tr("Lettering takes part in Flatten and Remove Overlaps only. To weld letters, use Break Apart first.")
+    )]
+    LetteringNotShaped,
+    #[error(
+        "{}",
+        text::tr(
+            "Some of these objects are linked (a border trace or linked shapes): use Artwork > Unlink first. To change the stitches of one object, double-click it."
+        )
     )]
     AlreadyLinked,
-    #[error("Set a border width, a gap width, or both.")]
+    #[error("{}", text::tr("Set a border width, a gap width, or both."))]
     NothingToDo,
 }
 
@@ -162,6 +180,25 @@ pub fn area_of(kind: &ObjectKind) -> Option<Vec<Region>> {
     };
     let area = even_odd(&path);
     (!area.is_empty()).then_some(area)
+}
+
+/// The area that an object cuts out of the objects under it: its area if
+/// it takes part in shaping, and for lettering the area of its letters
+/// (ADR 0093).
+pub fn cut_area_of(kind: &ObjectKind) -> Option<Vec<Region>> {
+    let ObjectKind::Lettering(l) = kind else {
+        return area_of(kind);
+    };
+    let all = l
+        .parts()
+        .map(|p| even_odd(&crate::vector::area_outline(p)))
+        .fold(Vec::new(), |acc, a| region::union(&acc, &a));
+    (!all.is_empty()).then_some(all)
+}
+
+/// Returns `true` if the areas `a` and `b` overlap by more than a speck.
+pub(crate) fn overlaps(a: &[Region], b: &[Region]) -> bool {
+    region::intersection(a, b).iter().any(|r| r.area() >= MIN_AREA_MM2)
 }
 
 /// The area inside the subpaths of `path` by the even-odd rule.
@@ -285,6 +322,12 @@ impl Design {
     /// and returns the new objects in sew order. The objects that do not
     /// take part (lines, lettering) stay as they are.
     pub fn shape(&mut self, ids: &[ObjectId], op: ShapeOp, opts: ShapeOptions) -> Result<Vec<ObjectId>, ShapeError> {
+        let mut letterings: Vec<ObjectId> = ids
+            .iter()
+            .copied()
+            .filter(|id| matches!(self.object(*id).map(|o| &o.kind), Some(ObjectKind::Lettering(_))))
+            .collect();
+        letterings.sort_by_key(|id| self.index_of(*id));
         let mut parts: Vec<Part> = ids
             .iter()
             .filter_map(|id| self.object(*id))
@@ -303,8 +346,15 @@ impl Design {
         if op == ShapeOp::Combine {
             return self.combine(&parts, opts);
         }
+        if op == ShapeOp::Flatten && !letterings.is_empty() {
+            return self.flatten_with_lettering(&parts, &letterings, opts);
+        }
         if parts.len() < 2 {
-            return Err(ShapeError::TooFew);
+            return Err(if letterings.is_empty() {
+                ShapeError::TooFew
+            } else {
+                ShapeError::LetteringNotShaped
+            });
         }
         // Flatten and Divide can stay linked (see `link`).
         let link_op = match op {
@@ -346,25 +396,42 @@ impl Design {
         overlap_mm: f64,
         linked: bool,
     ) -> Result<Vec<ObjectId>, ShapeError> {
-        let cutters: Vec<(usize, Vec<Region>)> = ids
+        let cutters: Vec<(usize, ObjectId, Vec<Region>)> = ids
             .iter()
             .filter_map(|id| self.object(*id))
-            .filter_map(|o| Some((self.index_of(o.id)?, area_of(&o.kind)?)))
+            .filter_map(|o| Some((self.index_of(o.id)?, o.id, cut_area_of(&o.kind)?)))
             .collect();
-        let Some(last) = cutters.iter().map(|(i, _)| *i).max() else {
+        let Some(last) = cutters.iter().map(|(i, ..)| *i).max() else {
             return Err(ShapeError::NoOutline);
         };
+        // Lettering keeps its letters and gets a knockout: lettering under
+        // the cutters, and selected lettering that objects in front cover.
+        let knocked: Vec<ObjectId> = self
+            .objects
+            .iter()
+            .enumerate()
+            .filter(|(_, o)| matches!(o.kind, ObjectKind::Lettering(_)) && !self.is_linked(o.id))
+            .filter(|(i, o)| {
+                if ids.contains(&o.id) {
+                    return self.covered_in_front(o.id);
+                }
+                !o.locked
+                    && cut_area_of(&o.kind)
+                        .is_some_and(|area| cutters.iter().any(|(ci, _, a)| ci > i && overlaps(&area, a)))
+            })
+            .map(|(_, o)| o.id)
+            .collect();
         let mut targets = Vec::new();
         let mut results = Vec::new();
         for (i, o) in self.objects[..last].iter().enumerate() {
-            if ids.contains(&o.id) || o.locked || self.is_linked(o.id) {
+            if ids.contains(&o.id) || o.locked || self.is_linked(o.id) || matches!(o.kind, ObjectKind::Lettering(_)) {
                 continue;
             }
             let Some(area) = area_of(&o.kind) else { continue };
             let cutter = cutters
                 .iter()
-                .filter(|(ci, _)| *ci > i)
-                .fold(Vec::new(), |acc, (_, a)| region::union(&acc, a));
+                .filter(|(ci, ..)| *ci > i)
+                .fold(Vec::new(), |acc, (.., a)| region::union(&acc, a));
             if region::intersection(&area, &cutter)
                 .iter()
                 .all(|r| r.area() < MIN_AREA_MM2)
@@ -380,26 +447,119 @@ impl Design {
                 area,
             });
         }
-        if targets.is_empty() {
+        if targets.is_empty() && knocked.is_empty() {
             return Err(ShapeError::NothingToCut);
         }
+        let mut done: Vec<ObjectId> = Vec::new();
+        for id in knocked {
+            if self.add_knockout(id, overlap_mm) {
+                done.push(id);
+            }
+        }
+        if targets.is_empty() {
+            return Ok(done);
+        }
         if linked {
-            let cutter_ids: Vec<ObjectId> = ids
-                .iter()
-                .copied()
-                .filter(|id| self.object(*id).is_some_and(|o| area_of(&o.kind).is_some()))
-                .collect();
+            let cutter_ids: Vec<ObjectId> = cutters.iter().map(|(_, id, _)| *id).collect();
             let target_ids: Vec<ObjectId> = targets.iter().map(|p| p.id).collect();
-            return self.make_link(
+            let mut new = self.make_link(
                 crate::link::LinkOp::RemoveOverlaps,
                 &target_ids,
                 &cutter_ids,
                 overlap_mm,
-            );
+            )?;
+            new.extend(done);
+            return Ok(new);
         }
         // An object with nothing left has no result, so it goes.
         let results = results.into_iter().filter(|(_, k)| !k.is_empty()).collect();
-        Ok(self.place(&targets, results, false))
+        let mut new = self.place(&targets, results, false);
+        new.extend(done);
+        Ok(new)
+    }
+
+    /// Flatten with lettering in the selection (ADR 0093): each lettering
+    /// that the selected objects in front of it cover gets a knockout, and
+    /// the other objects are cut also by the lettering in front of them.
+    /// `letterings` are in sew order.
+    fn flatten_with_lettering(
+        &mut self,
+        parts: &[Part],
+        letterings: &[ObjectId],
+        opts: ShapeOptions,
+    ) -> Result<Vec<ObjectId>, ShapeError> {
+        if parts.len() + letterings.len() < 2 {
+            return Err(ShapeError::TooFew);
+        }
+        if letterings.iter().any(|id| self.is_linked(*id)) {
+            return Err(ShapeError::AlreadyLinked);
+        }
+        // Each selected object with its place and the area that it cuts.
+        let mut all: Vec<(usize, ObjectId, Vec<Region>)> = parts
+            .iter()
+            .map(|p| (p.id, p.area.clone()))
+            .chain(
+                letterings
+                    .iter()
+                    .filter_map(|id| Some((*id, cut_area_of(&self.object(*id)?.kind)?))),
+            )
+            .filter_map(|(id, a)| Some((self.index_of(id)?, id, a)))
+            .collect();
+        all.sort_by_key(|(i, ..)| *i);
+        // The lettering in front of each part that overlaps it.
+        let letters_over: Vec<Vec<Region>> = parts
+            .iter()
+            .map(|p| {
+                let at = self.index_of(p.id).unwrap_or(0);
+                all.iter()
+                    .filter(|(i, id, a)| *i > at && letterings.contains(id) && overlaps(&p.area, a))
+                    .fold(Vec::new(), |acc, (.., a)| region::union(&acc, a))
+            })
+            .collect();
+        let letters_cut_parts = letters_over.iter().any(|a| !a.is_empty());
+        let lettering_under = all
+            .iter()
+            .any(|(at, id, area)| letterings.contains(id) && all.iter().any(|(i, _, a)| i > at && overlaps(area, a)));
+        if !lettering_under && !letters_cut_parts && parts.len() < 2 {
+            return Err(ShapeError::NothingToCut);
+        }
+        let mut new = Vec::new();
+        if letters_cut_parts || parts.len() >= 2 {
+            if opts.linked && !opts.keep_originals {
+                let ids: Vec<ObjectId> = parts.iter().map(|p| p.id).collect();
+                new = self.make_link(crate::link::LinkOp::Flatten, &ids, letterings, opts.overlap_mm)?;
+            } else {
+                let fill = self.current.fill.clone();
+                let results: Vec<(usize, Vec<ObjectKind>)> = op_results(parts, ShapeOp::Flatten, opts.overlap_mm)
+                    .into_iter()
+                    .map(|(o, r)| {
+                        let r = region::difference(&r, &shrink(&letters_over[o], opts.overlap_mm));
+                        (o, clean(r))
+                    })
+                    .filter(|(_, r)| !r.is_empty())
+                    .map(|(o, r)| (o, rebuild(&parts[o].kind, &r, &fill)))
+                    .collect();
+                new = self.place(parts, results, opts.keep_originals);
+            }
+        }
+        // Each lettering that the results or the lettering in front of it
+        // cover gets a knockout (it is cut by all the objects in front).
+        let cutters: Vec<(usize, ObjectId, Vec<Region>)> = new
+            .iter()
+            .chain(letterings)
+            .filter_map(|id| Some((self.index_of(*id)?, *id, cut_area_of(&self.object(*id)?.kind)?)))
+            .collect();
+        for id in letterings {
+            let (Some(at), Some(area)) = (self.index_of(*id), self.object(*id).and_then(|o| cut_area_of(&o.kind)))
+            else {
+                continue;
+            };
+            let covered = cutters.iter().any(|(i, _, a)| *i > at && overlaps(&area, a));
+            if covered && self.add_knockout(*id, opts.overlap_mm) {
+                new.push(*id);
+            }
+        }
+        Ok(new)
     }
 
     fn combine(&mut self, parts: &[Part], opts: ShapeOptions) -> Result<Vec<ObjectId>, ShapeError> {
@@ -757,5 +917,112 @@ mod tests {
         assert_eq!(pieces.len(), 1);
         assert_eq!(pieces[0].holes.len(), 1);
         let _ = under;
+    }
+
+    #[test]
+    fn lettering_under_the_selection_gets_a_knockout() {
+        use crate::knockout::tests::{area, knockout, lettering, square};
+        let mut d = Design::new("k");
+        let t = d.add_thread("a", Rgb(0, 0, 0));
+        let fill = d.add_object(t, square(-10.0, -10.0, 8.0));
+        let text = d.add_object(t, lettering());
+        let front = d.add_object(t, square(5.0, -5.0, 10.0));
+        let new = d.remove_overlaps(&[front], 0.0, false).unwrap();
+        assert_eq!(new, vec![text]);
+        assert!((area(&knockout(&d, text).unwrap()) - 100.0).abs() < 0.5);
+        // The fill does not overlap the square: it stays.
+        assert!(d.object(fill).is_some());
+        // Lettering cuts the fill under it by its letters.
+        let mut d = Design::new("k");
+        let t = d.add_thread("a", Rgb(0, 0, 0));
+        d.add_object(t, square(0.0, -10.0, 10.0));
+        let text = d.add_object(t, lettering());
+        let pieces = d.remove_overlaps(&[text], 0.0, false).unwrap();
+        assert_eq!(pieces.len(), 1);
+        let left = area_of(&d.object(pieces[0]).unwrap().kind).unwrap();
+        // 10 x 10 less the 10 x 2 under the column.
+        assert!((left.iter().map(Region::area).sum::<f64>() - 80.0).abs() < 0.5);
+    }
+
+    #[test]
+    fn selected_lettering_under_objects_gets_a_knockout() {
+        use crate::knockout::tests::{knockout, lettering};
+        let mut d = Design::new("k");
+        let t = d.add_thread("a", Rgb(0, 0, 0));
+        let back = d.add_object(t, lettering());
+        let front = d.add_object(t, lettering());
+        // Both are selected: the one behind gets the knockout.
+        assert_eq!(d.remove_overlaps(&[back, front], 0.0, false).unwrap(), vec![back]);
+        assert!(knockout(&d, back).is_some());
+        assert!(knockout(&d, front).is_none());
+        // Only the one behind is selected: it sews round the one in front.
+        assert!(d.remove_knockout(back));
+        assert_eq!(d.remove_overlaps(&[back], 0.0, false).unwrap(), vec![back]);
+        assert!(knockout(&d, back).is_some());
+        // Only the one in front is selected and nothing is in front of it.
+        assert_eq!(d.remove_overlaps(&[front], 0.0, false).unwrap(), vec![back]);
+        let mut d = Design::new("k");
+        let t = d.add_thread("a", Rgb(0, 0, 0));
+        let text = d.add_object(t, lettering());
+        assert_eq!(d.remove_overlaps(&[text], 0.0, false), Err(ShapeError::NothingToCut));
+    }
+
+    #[test]
+    fn flatten_with_lettering_keeps_the_lettering() {
+        use crate::knockout::tests::{area, knockout, lettering, square};
+        let mut d = Design::new("k");
+        let t = d.add_thread("a", Rgb(0, 0, 0));
+        let back = d.add_object(t, lettering());
+        let fill = d.add_object(t, square(0.0, -10.0, 10.0));
+        let front = d.add_object(t, lettering());
+        let new = d
+            .shape(&[back, fill, front], ShapeOp::Flatten, ShapeOptions::default())
+            .unwrap();
+        assert!(new.contains(&back));
+        // The front lettering cuts the back one.
+        assert!(area(&knockout(&d, back).unwrap()) >= 79.0);
+        assert!(knockout(&d, front).is_none());
+        assert!(matches!(d.object(front).unwrap().kind, ObjectKind::Lettering(_)));
+        // The fill lost the part under the front lettering.
+        assert!(d.object(fill).is_none());
+        let pieces: Vec<&ObjectId> = new.iter().filter(|id| **id != back).collect();
+        assert_eq!(pieces.len(), 1);
+        // Weld does not use lettering.
+        let err = d
+            .shape(&[back, front], ShapeOp::Weld, ShapeOptions::default())
+            .unwrap_err();
+        assert_eq!(err, ShapeError::LetteringNotShaped);
+    }
+
+    #[test]
+    fn linked_flatten_follows_the_lettering_in_front() {
+        use crate::knockout::tests::{lettering, square};
+        let mut d = Design::new("k");
+        let t = d.add_thread("a", Rgb(0, 0, 0));
+        let a = d.add_object(t, square(0.0, -10.0, 10.0));
+        let b = d.add_object(t, square(30.0, -10.0, 10.0));
+        let text = d.add_object(t, lettering());
+        let opts = ShapeOptions {
+            linked: true,
+            ..ShapeOptions::default()
+        };
+        let pieces = d.shape(&[a, b, text], ShapeOp::Flatten, opts).unwrap();
+        // The area of the pieces left of x = 20 (the first square).
+        let left = |d: &Design| -> f64 {
+            d.objects()
+                .iter()
+                .filter(|o| !matches!(o.kind, ObjectKind::Lettering(_)))
+                .filter_map(|o| area_of(&o.kind))
+                .flatten()
+                .filter(|r| r.bbox().is_some_and(|b| b.center().x < 20.0))
+                .map(|r| r.area())
+                .sum()
+        };
+        assert_eq!(pieces.len(), 2);
+        assert!((left(&d) - 80.0).abs() < 0.5, "{}", left(&d));
+        // The lettering moves away from the first square: the cut follows.
+        let delta = emb_geom::Transform::translate(25.0, 0.0);
+        d.transform_objects(&[text], &delta);
+        assert!((left(&d) - 100.0).abs() < 0.5, "{}", left(&d));
     }
 }
