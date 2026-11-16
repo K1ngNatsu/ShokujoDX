@@ -42,6 +42,7 @@ Sizes are relative effort: S (days), M (one to two weeks), L (a month), XL (seve
 | 12. Picture to design: robust and better results | Done in software: Milestones 1 (photo orientation, previews in the background, true width for Auto, the picture bench; ADR 0052), 2 (details on top, fill angles, small areas, checks before Finish; ADR 0053) and 3 (line art, edge-preserving smoothing, colors from the thread chart; ADR 0054). The exit tests passed (a phone photo, a logo and a drawing sewn on the Topaz 20; owner, 2026-11-16); audit in "Audit of P11 and P12". See `docs/design/p12-plan.md`. |
 | 13. Shop tools | Done in software (owner request, 2026-10-27): Milestones 1 (quotes and run time on machines with more heads, ADR 0064), 2 (order details on the sheets, ADR 0065), 3 (thread stock and threads to buy, ADR 0066) and 4 (scripts, ADR 0067). Open: the exit tests with a shop tester (real orders, a printed sheet and its barcode, the spools to buy). See `docs/design/p13-plan.md`. |
 | 14. Sketch mode | Done (owner request, 2026-10-27): Milestones 1 (sketch model and constraint solver, ADR 0068), 2 (sketch mode in the app, ADR 0069), 3 (drawing help and sketch edits, ADR 0070), 4 (regions to embroidery, ADR 0075), 5 (objects that follow their sketch, ADR 0076) and 6 (parameters, splines and drawings to sketches, ADR 0078 and 0079). The owner's test in the app and the badge sew-outs on the Topaz 20 passed (owner, 2026-11-16). See `docs/design/p14-plan.md`. |
+| 15. Browser version | Later (owner decision, 2026-11-16): not started. Start after the first feedback of users on the desktop program (about v0.4). See "P15. Browser version" below. |
 
 ## Sew-out tests of 2026-11-16
 
@@ -832,7 +833,7 @@ management system), and on-line thread orders.
 **Exit:** the quotes and run times of real orders agree with a shop
 tester's numbers, and the sample scripts pass (see the plan).
 
-### P14. Sketch mode (XL) — Milestones 1 to 6 done in software (`docs/design/p14-plan.md`)
+### P14. Sketch mode (XL) — done (`docs/design/p14-plan.md`)
 
 A parametric sketch, as in CAD programs (owner request, 2026-10-27):
 
@@ -849,6 +850,76 @@ A parametric sketch, as in CAD programs (owner request, 2026-10-27):
 **Exit:** a badge made from a sketch sews on the Topaz 20, and sews again
 after a change of its width (see the plan).
 
+### P15. Browser version (L) — later, not started
+
+The program in a web browser: one link for computers, Chromebooks and
+tablets, with no install and no warning of an unknown publisher (owner
+question, 2026-11-16). The main reason is more testers and users: a link
+is easier to try than an installer. A version for touch is a separate
+decision, after users ask for it.
+
+**When to start.** After the first feedback of users on the desktop
+program is fixed (about v0.4), so that one version gets the fixes first.
+Code signing (ADR 0062) does not wait for this phase.
+
+**What we know (2026-11-16).**
+
+- The engine builds for the browser (`wasm32-unknown-unknown`): 7 of the
+  10 engine crates build with no change; `emb-formats`, `emb-library`
+  and `emb-script` need the `wasm_js` setting of `getrandom` (through
+  `lopdf` and `rand`).
+- eframe 0.36 runs in the browser (WebGPU, else WebGL2), so the canvas,
+  the ribbon and the windows stay the same code.
+- `emb-app` uses the desktop: 37 file dialogs (`rfd`), about 300 calls of
+  `std::fs`, 9 places that start threads, `sysinfo` (Send to USB),
+  `std::process` (open with another program, email, the start fallbacks),
+  and 26 MB of `data` (mostly fonts).
+
+**Steps.**
+
+1. **Trial build (S).** `emb-app` for the browser with the desktop parts
+   off (`cfg(target_arch = "wasm32")`): open is an upload, save is a
+   download, the data is in the page. A test page; the owner tries it in
+   a browser and on a tablet. Decide on step 2 from the result (speed,
+   memory, how it feels).
+2. **Web version for computers (M).**
+   - One storage layer for all file access: files of the user in and out
+     through upload and download; settings, backups, My Hoops and My
+     Machines in the storage of the browser.
+   - Long jobs (stitch plan, Picture to design, font samples) off the
+     screen thread: web workers, or short jobs that give the screen time.
+     Threads in WebAssembly need cross-origin isolation, which GitHub
+     Pages does not set (a service worker can do it).
+   - Fonts load when a design needs them; the user adds a TrueType font
+     by upload (no fonts of the system).
+   - Off in the browser: Send to USB, thumbnails, open with another
+     program, email, the installer and the renderer fallbacks, the
+     library of folders (a library in the storage of the browser can come
+     later).
+   - CI builds the web version, and the release workflow publishes it to
+     GitHub Pages. The README gets "Try it in your browser".
+   - An ADR: the targets, the storage layer, what is off on the web.
+3. **Tablets (L), only if users ask.** Touch: pinch zoom, two-finger pan,
+   long press for menus, larger targets (from simple mode); an install
+   for offline use ("Add to Home Screen"); tests on an iPad (memory of
+   Safari) and an Android tablet. The tasks of a tablet first: lettering,
+   placement, colors and output.
+
+**Not in this phase.** Apps in the App Store or Google Play: the GPL and
+the terms of the App Store do not agree (and the code ported from
+Ink/Stitch cannot get a new license), and both stores (and Android
+installs from outside the store, from 2026 to 2027) want the legal name
+of the developer.
+
+**Cost after the phase.** Each new feature works in both versions; code
+that uses files or threads needs a path for the browser.
+
+**Exit:** the web version opens, edits and outputs the corpus designs in
+Chrome, Edge, Firefox and Safari on a computer; a design made in the
+browser sews on the Topaz 20; the page works offline after the first
+visit. With step 3: a name on a towel is made on a tablet from start to
+machine file.
+
 ## Dependencies
 
 ```text
@@ -861,6 +932,7 @@ P1–P10 ─► P11 features of other programs (P5 stitch types, P7 hoopings, P1
 P6 + P11 ─► P12 Picture to design: robust and better results
 P3 + P8 + P11 ─► P13 shop tools (sew time, sheets, thread use)
 P6 ─► P14 sketch mode (vector objects, linked shapes)
+P1–P14 + user feedback (about v0.4) ─► P15 browser version (later)
 ```
 
 P5 engine work can run in parallel with P2–P4 app work, because the engine crates
