@@ -1,6 +1,6 @@
 # Plan: roadmap phase P12 (Picture to design: robust and better results)
 
-Date: 2026-10-25 · Status: Accepted (owner request, 2026-10-25). Milestones 1 to 3 done in software.
+Date: 2026-10-25 · Status: Accepted (owner request, 2026-10-25). Milestones 1 to 3 done; the exit tests passed on the Topaz 20 (owner, 2026-11-16).
 
 ## Goal
 

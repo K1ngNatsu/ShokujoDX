@@ -127,11 +127,15 @@ fn color_button(ui: &mut egui::Ui, c: &mut Rgb) {
 
 pub fn convert_help(to: ConvertTo) -> &'static str {
     match to {
-        ConvertTo::Fill => tr("Each closed shape becomes a fill, with its holes."),
-        ConvertTo::Satin => tr(
-            "Each line becomes a satin column along it; each closed shape becomes a turning column along its length.",
+        ConvertTo::Fill => tr(
+            "Each closed shape becomes a fill, with its holes. A selected sketch: each closed region becomes a fill that follows the sketch.",
         ),
-        ConvertTo::Outline => tr("All paths become one running-stitch line."),
+        ConvertTo::Satin => tr(
+            "Each line becomes a satin column along it; each closed shape becomes a turning column along its length. A selected sketch: each closed region becomes a satin that follows the sketch.",
+        ),
+        ConvertTo::Outline => tr(
+            "All paths become one running-stitch line. A selected sketch: a run along each of its curves, which follows the sketch.",
+        ),
     }
 }
 
@@ -151,7 +155,18 @@ impl AppState {
     /// in the sew order. The new objects take the thread nearest to the
     /// vector color. One undo step.
     pub fn convert_vectors(&mut self, to: ConvertTo) {
+        // Selected sketches make embroidery of their regions or curves,
+        // linked to them (as in sketch mode; v0.3 plan, sketch updates).
+        let sketches = self.convert_sketches(to);
         let design = self.doc.design();
+        if sketches > 0
+            && !self
+                .sel()
+                .iter()
+                .any(|id| matches!(design.object(*id).map(|o| &o.kind), Some(ObjectKind::Vector { .. })))
+        {
+            return;
+        }
         let current = design.current.clone();
         let width = self.settings.defaults.column_width_mm;
         let work: Vec<(ObjectId, Vec<ObjectKind>, Option<Rgb>)> = self

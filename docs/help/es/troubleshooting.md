@@ -2,9 +2,24 @@
 id: troubleshooting
 title: Preguntas y problemas
 group: start
-keywords: problema, pregunta, preguntas frecuentes, fruncido, hueco, corte, salto, rotura, rígido, texto pequeño, la máquina no lee, archivo, lento, cierre, falta, color equivocado, demasiadas puntadas, superposición, acumulación, svg, densidad, mapa de densidad, capas, imagen, foto, imagen a diseño, objetos, el hilo se rompe, nido de pájaro, bucles, el contorno no coincide, registro, desplazamiento, pelo, toalla, se hunde, descentrado, bastidor, demasiado grande, no cabe, las letras se cierran, botón atenuado, no puedo hacer clic, panel perdido
+keywords: problema, pregunta, preguntas frecuentes, fruncido, hueco, corte, salto, rotura, rígido, texto pequeño, la máquina no lee, archivo, lento, cierre, falta, color equivocado, demasiadas puntadas, superposición, acumulación, svg, densidad, mapa de densidad, capas, imagen, foto, imagen a diseño, objetos, el hilo se rompe, nido de pájaro, bucles, el contorno no coincide, registro, desplazamiento, pelo, toalla, se hunde, descentrado, bastidor, demasiado grande, no cabe, las letras se cierran, botón atenuado, no puedo hacer clic, panel perdido, inicio, no se inicia, gráficos, controlador, renderizador, diagnóstico
 ---
 # Preguntas y problemas
+
+## El programa no se inicia
+
+El programa necesita un controlador de gráficos. Si la tarjeta gráfica no
+se inicia, el programa se inicia de nuevo con OpenGL, después con el
+renderizador por software del sistema, y se lo indica. Instale el
+controlador de gráficos más reciente del fabricante de su PC o de sus
+gráficos (Intel, AMD o NVIDIA). Entonces el programa usa de nuevo la
+tarjeta gráfica.
+
+Si ningún renderizador funciona, un mensaje le indica el motivo. Cada
+inicio escribe `start.log` en la carpeta de configuración (por ejemplo
+`%APPDATA%\ShokujoDX`). Para hacer un informe de los gráficos, inicie
+`ShokujoDX.exe --diagnose`; escribe `diagnose.txt` en la misma carpeta.
+Envíe estos archivos con sus comentarios.
 
 ## La tela se frunce
 

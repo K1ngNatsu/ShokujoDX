@@ -97,6 +97,60 @@ pub enum Justify {
     Right,
 }
 
+/// The direction of the text (v0.3 plan, Stage 5).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TextDirection {
+    /// Left to right on the baseline.
+    #[default]
+    Horizontal,
+    /// Stacked: each letter upright, from top to bottom. Each line is a
+    /// column; the columns go from left to right.
+    Down,
+    /// Stacked: each letter upright, the first letter at the bottom.
+    Up,
+}
+
+impl TextDirection {
+    pub const ALL: [TextDirection; 3] = [TextDirection::Horizontal, TextDirection::Down, TextDirection::Up];
+
+    pub fn is_horizontal(&self) -> bool {
+        *self == TextDirection::Horizontal
+    }
+
+    pub fn is_stacked(&self) -> bool {
+        !self.is_horizontal()
+    }
+
+    /// The name (English; the app translates it).
+    pub fn name(self) -> &'static str {
+        match self {
+            TextDirection::Horizontal => "Left to right",
+            TextDirection::Down => "Stacked, top to bottom",
+            TextDirection::Up => "Stacked, bottom to top",
+        }
+    }
+}
+
+/// A line under each line of text (v0.3 plan, Stage 5): a satin bar.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct Underline {
+    /// From the baseline to the top of the bar, in mm.
+    pub gap_mm: f64,
+    /// The width of the bar, in mm.
+    pub thickness_mm: f64,
+}
+
+impl Underline {
+    /// An underline that suits letters of capital height `height_mm`.
+    pub fn for_height(height_mm: f64) -> Underline {
+        Underline {
+            gap_mm: (0.12 * height_mm).clamp(0.8, 3.0),
+            thickness_mm: (0.1 * height_mm).clamp(1.0, 4.0),
+        }
+    }
+}
+
 /// The stitch type of the letters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -289,6 +343,19 @@ pub struct Lettering {
     /// mitre corner, `crate::mitre`), not as a stop and a start.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub mitre_corners: bool,
+    /// A made bold: wider columns and larger fills, for a font with no bold
+    /// face (a font with one uses it; v0.3 plan, Stage 5).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub bold: bool,
+    /// A made italic: the letters slant, for a font with no italic face.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub italic: bool,
+    /// A line under each line of text (horizontal text only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub underline: Option<Underline>,
+    /// The direction of the text.
+    #[serde(default, skip_serializing_if = "TextDirection::is_horizontal")]
+    pub direction: TextDirection,
     /// The recommended height range of the font (min, max) in mm, from the
     /// last layout. The design checks warn outside it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -391,6 +458,10 @@ impl Lettering {
             satin: letter_satin(),
             fill: letter_fill(),
             mitre_corners: false,
+            bold: false,
+            italic: false,
+            underline: None,
+            direction: TextDirection::Horizontal,
             range_mm: None,
             placement: Transform::translate(at.x, at.y),
             edits: Vec::new(),

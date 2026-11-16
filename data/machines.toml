@@ -5,7 +5,7 @@
 #   name                   Text that the app shows.
 #   brand                  Optional.
 #   default_format         Format that the export dialog selects first. Must be in formats.
-#   formats                Formats that the machine reads: vp3, dst, pes, exp, jef, hus, vip,
+#   formats                Formats that the machine reads: vp3, dst, pes, exp, jef, xxx, hus, vip,
 #                          tbf, tap, dsb, dsz, 10o, 100, u01, dat. The default format must
 #                          be one that the app can write.
 #   hoops                  Hoop preset ids from hoops.toml that fit the machine.
@@ -41,12 +41,14 @@ min_stitch_length_mm = 0.3
 stitches_per_minute = 800
 
 # Generic profile for machines with no profile. Uses the Tajima DST limit.
+# The machine of a new install (v0.3 plan, Stage 2). Its first hoop is the hoop
+# of new designs: 130 x 180 mm (5 x 7 in), which most home machines have.
 [[machine]]
 id = "generic"
 name = "Generic machine (DST)"
 default_format = "dst"
 formats = ["dst", "pes", "vp3", "exp", "jef"]
-hoops = ["small_100x100", "medium_130x180", "square_200x200", "long_160x260", "large_200x300", "extra_large_360x200"]
+hoops = ["medium_130x180", "small_100x100", "square_200x200", "long_160x260", "large_200x300", "extra_large_360x200"]
 max_stitch_length_mm = 12.1
 min_stitch_length_mm = 0.3
 stitches_per_minute = 600
@@ -150,3 +152,415 @@ max_stitch_length_mm = 12.1
 min_stitch_length_mm = 0.3
 stitches_per_minute = 850
 needles = 15
+
+# ---------------------------------------------------------------------------
+# The machine library (v0.3 plan, Stage 6, ADR 0099).
+#
+# The largest embroidery field and the needles of each machine come from
+# the public data of the maker (product pages, spec sheets) or, where the
+# maker's page did not say, from dealers; the source is in the comment of
+# each machine (2026-11-16). The hoop list is the field of the machine and
+# the standard sizes that fit in it, not a list of the hoops of the brand.
+# max_stitch_length_mm and min_stitch_length_mm are safe values for home
+# machines (12.0 and 0.3 mm), not maker data.
+# UNVERIFIED unless a source is given: the speed. It is a typical speed for
+# the sew-time estimate; change it in Design > Machine Settings.
+# UNVERIFIED: the side of each hoop on the machine (see hoops.toml).
+# ---------------------------------------------------------------------------
+
+# Generic profiles, one for each file format of home machines. Use one when
+# your machine is not in the list. The first hoop is the hoop of new designs
+# (130 x 180 mm, which most home machines have).
+[[machine]]
+id = "generic_pes"
+name = "Generic PES machine (Brother, Baby Lock)"
+default_format = "pes"
+formats = ["pes", "dst"]
+hoops = ["medium_130x180", "small_100x100", "long_160x260", "square_200x200", "large_200x300", "field_240x360"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 700
+
+[[machine]]
+id = "generic_jef"
+name = "Generic JEF machine (Janome, Elna)"
+default_format = "jef"
+formats = ["jef", "dst"]
+hoops = ["medium_130x180", "small_100x100", "square_200x200", "field_200x280", "field_200x360"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 700
+
+[[machine]]
+id = "generic_vp3"
+name = "Generic VP3 machine (Husqvarna Viking, Pfaff)"
+default_format = "vp3"
+formats = ["vp3"]
+hoops = ["medium_130x180", "small_100x100", "topaz20_splendid_square", "field_150x240", "topaz20_crown", "field_200x360", "field_350x360"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 700
+
+[[machine]]
+id = "generic_exp"
+name = "Generic EXP machine (Bernina)"
+default_format = "exp"
+formats = ["exp", "dst"]
+hoops = ["medium_130x180", "small_100x100", "long_160x260", "field_150x400", "field_210x400"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 700
+
+# Brother. Field: brother-usa.com product pages.
+[[machine]]
+id = "brother_se700"
+name = "SE700"
+brand = "Brother"
+default_format = "pes"
+formats = ["pes", "dst"]
+# 4 x 4 in (brother-usa.com/products/se700).
+hoops = ["small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 650
+
+[[machine]]
+id = "brother_se1900"
+name = "SE1900"
+brand = "Brother"
+default_format = "pes"
+formats = ["pes", "dst"]
+# 5 x 7 in (brother-usa.com/products/se1900). Speed 650: a dealer.
+hoops = ["medium_130x180", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 650
+
+[[machine]]
+id = "brother_nq1700e"
+name = "Innov-is NQ1700E"
+brand = "Brother"
+default_format = "pes"
+formats = ["pes", "dst"]
+# 6 x 10 in (brother-usa.com/products/nq1700e). Speed 850: a dealer.
+hoops = ["long_160x260", "medium_130x180", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 850
+
+[[machine]]
+id = "brother_xe1"
+name = "Stellaire XE1 / XJ1"
+brand = "Brother"
+default_format = "pes"
+formats = ["pes", "dst"]
+# 9.5 x 14 in, 240 x 360 mm (brother.com.au, Stellaire XE1).
+hoops = ["field_240x360", "large_200x300", "square_200x200", "long_160x260", "medium_130x180", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 850
+
+[[machine]]
+id = "brother_xp3"
+name = "Luminaire XP3"
+brand = "Brother"
+default_format = "pes"
+formats = ["pes", "dst"]
+# 10 5/8 x 16 in, 272 x 408 mm (brother-usa.com/products/xp3, brother.com.au).
+hoops = ["field_272x408", "field_240x360", "large_200x300", "square_200x200", "long_160x260", "medium_130x180", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 850
+
+[[machine]]
+id = "brother_pr1055x"
+name = "Entrepreneur Pro X PR1055X"
+brand = "Brother"
+default_format = "pes"
+formats = ["pes", "dst"]
+# 8 x 14 in, 10 needles, 1000 stitches a minute (brother-usa.com/products/pr1055x).
+hoops = ["field_200x360", "large_200x300", "square_200x200", "long_160x260", "medium_130x180", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 1000
+needles = 10
+
+# Baby Lock. Field: babylock.com product pages.
+[[machine]]
+id = "babylock_altair2"
+name = "Altair 2"
+brand = "Baby Lock"
+default_format = "pes"
+formats = ["pes", "dst"]
+# 9.5 x 14 in (babylock.com/altair-2).
+hoops = ["field_240x360", "large_200x300", "square_200x200", "long_160x260", "medium_130x180", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 850
+
+[[machine]]
+id = "babylock_solaris2"
+name = "Solaris 2"
+brand = "Baby Lock"
+default_format = "pes"
+formats = ["pes", "dst"]
+# 10.6 x 16 in (babylock.com/solaris-2).
+hoops = ["field_272x408", "field_240x360", "large_200x300", "square_200x200", "long_160x260", "medium_130x180", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 850
+
+[[machine]]
+id = "babylock_venture"
+name = "Venture"
+brand = "Baby Lock"
+default_format = "pes"
+formats = ["pes", "dst"]
+# 7 7/8 x 14 in, 10 needles (babylock.com/venture). Speed 1000: Valiant spec sheet of a dealer.
+hoops = ["field_200x360", "large_200x300", "square_200x200", "long_160x260", "medium_130x180", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 1000
+needles = 10
+
+[[machine]]
+id = "babylock_valiant"
+name = "Valiant"
+brand = "Baby Lock"
+default_format = "pes"
+formats = ["pes", "dst"]
+# 7 7/8 x 14 in, 10 needles, 1000 stitches a minute (Valiant spec sheet of a dealer).
+hoops = ["field_200x360", "large_200x300", "square_200x200", "long_160x260", "medium_130x180", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 1000
+needles = 10
+
+# Janome. Field: janome.com and janome.com.au product pages.
+[[machine]]
+id = "janome_mc400e"
+name = "Memory Craft 400E"
+brand = "Janome"
+default_format = "jef"
+formats = ["jef", "dst"]
+# 200 x 200 mm (janome.com.au, Memory Craft 400E).
+hoops = ["square_200x200", "medium_130x180", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 800
+
+[[machine]]
+id = "janome_mc500e"
+name = "Memory Craft 500E"
+brand = "Janome"
+default_format = "jef"
+formats = ["jef", "dst"]
+# 200 x 280 mm; hoop RE28b 7.9 x 11 in (janome.com, Memory Craft 500E).
+hoops = ["field_200x280", "square_200x200", "medium_130x180", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 800
+
+[[machine]]
+id = "janome_mc550e"
+name = "Memory Craft 550E"
+brand = "Janome"
+default_format = "jef"
+formats = ["jef", "dst"]
+# 7.9 x 14.2 in (janome.com, Memory Craft 550E).
+hoops = ["field_200x360", "field_200x280", "square_200x200", "medium_130x180", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 800
+
+[[machine]]
+id = "janome_continental_m17"
+name = "Continental M17"
+brand = "Janome"
+default_format = "jef"
+formats = ["jef", "dst"]
+# Largest hoop 460 x 280 mm (janome.com.au, Continental M17).
+hoops = ["field_280x460", "field_200x280", "square_200x200", "medium_130x180", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 800
+
+[[machine]]
+id = "janome_mb7"
+name = "MB-7"
+brand = "Janome"
+default_format = "jef"
+formats = ["jef", "dst"]
+# 7 needles. UNVERIFIED: the field (about 240 x 200 mm) and the speed (800)
+# come from a dealer guide, not from Janome.
+hoops = ["field_240x200", "medium_130x180", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 800
+needles = 7
+
+# Elna (made by Janome; JEF files). Field: Elna sell sheet and spec sheet.
+[[machine]]
+id = "elna_830l"
+name = "eXpressive 830L"
+brand = "Elna"
+default_format = "jef"
+formats = ["jef"]
+# 200 x 360 mm, hoop RE36b (Elna eXpressive 830L sell sheet).
+hoops = ["field_200x360", "field_200x280", "square_200x200", "medium_130x180", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 800
+
+[[machine]]
+id = "elna_830"
+name = "eXpressive 830"
+brand = "Elna"
+default_format = "jef"
+formats = ["jef"]
+# 200 x 280 mm, hoop RE28b (Elna spec sheet).
+hoops = ["field_200x280", "square_200x200", "medium_130x180", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 800
+
+# Husqvarna Viking (VP3 files, as the Topaz 20).
+[[machine]]
+id = "husqvarna_topaz50"
+name = "DESIGNER TOPAZ 50"
+brand = "Husqvarna Viking"
+default_format = "vp3"
+formats = ["vp3"]
+# Embroidery area 360 x 200 mm (singer.com, DESIGNER TOPAZ 50).
+hoops = ["field_200x360", "topaz20_crown", "topaz20_splendid_square", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 800
+
+[[machine]]
+id = "husqvarna_jade35"
+name = "DESIGNER JADE 35"
+brand = "Husqvarna Viking"
+default_format = "vp3"
+formats = ["vp3"]
+# DESIGNER Jewel Hoop 240 x 150 mm, the largest (a Husqvarna Viking dealer).
+hoops = ["field_150x240", "topaz20_splendid_square", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 800
+
+[[machine]]
+id = "husqvarna_epic3"
+name = "DESIGNER EPIC 3"
+brand = "Husqvarna Viking"
+default_format = "vp3"
+formats = ["vp3"]
+# 360 x 350 mm (husqvarnaviking-australia.com.au). Dealers also give 450 x
+# 450 mm with an optional hoop. UNVERIFIED: the field with that hoop.
+hoops = ["field_350x360", "field_200x360", "topaz20_crown", "topaz20_splendid_square", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 800
+
+# Pfaff (VP3 files).
+[[machine]]
+id = "pfaff_creative_icon2"
+name = "creative icon 2"
+brand = "Pfaff"
+default_format = "vp3"
+formats = ["vp3"]
+# 360 x 350 mm, creative Grand Dream Hoop (singer.com, creative icon 2).
+hoops = ["field_350x360", "field_200x360", "field_150x240", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 800
+
+[[machine]]
+id = "pfaff_creative_45"
+name = "creative 4.5"
+brand = "Pfaff"
+default_format = "vp3"
+formats = ["vp3"]
+# 360 x 350 mm with the large embroidery unit; hoops 360 x 200, 240 x 150,
+# 120 x 120 (singer.com, creative 4.5). The small unit: 260 x 200 mm.
+hoops = ["field_350x360", "field_200x360", "field_150x240", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 800
+
+# Singer.
+[[machine]]
+id = "singer_se300"
+name = "Legacy SE300"
+brand = "Singer"
+default_format = "xxx"
+formats = ["xxx", "dst"]
+# Hoops 10.25 x 6 in and 4 x 4 in (singer.com, Legacy SE300). UNVERIFIED:
+# the formats (XXX is the Singer format; check the manual of your machine).
+hoops = ["field_150x260", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 600
+
+[[machine]]
+id = "singer_se9180"
+name = "SE9180"
+brand = "Singer"
+default_format = "pes"
+formats = ["pes", "jef", "dst"]
+# UNVERIFIED: the field (about 170 x 100 mm) and the formats come from
+# dealer guides; singer.com lists 100 x 100 and 40 x 40 mm hoops for it.
+hoops = ["field_100x170", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 600
+
+# Bernina (EXP files). Field and speed 1000: Bernina brochures and dealers.
+[[machine]]
+id = "bernina_500e"
+name = "500 E"
+brand = "Bernina"
+default_format = "exp"
+formats = ["exp", "dst"]
+# 400 x 150 mm (dealers), 1000 stitches a minute.
+hoops = ["field_150x400", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 1000
+
+[[machine]]
+id = "bernina_700e"
+name = "700 E"
+brand = "Bernina"
+default_format = "exp"
+formats = ["exp", "dst"]
+# 400 x 210 mm with the Maxi hoop (an option), 1000 stitches a minute
+# (Bernina 700 brochure).
+hoops = ["field_210x400", "field_150x400", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 1000
+
+[[machine]]
+id = "bernina_790pro"
+name = "790 PRO"
+brand = "Bernina"
+default_format = "exp"
+formats = ["exp", "dst"]
+# 400 x 210 mm (Bernina 790 PRO brochure), 1000 stitches a minute.
+hoops = ["field_210x400", "field_150x400", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 1000
+
+[[machine]]
+id = "bernette_b79"
+name = "b79"
+brand = "bernette"
+default_format = "exp"
+formats = ["exp", "dst", "pes", "jef", "vp3"]
+# 260 x 160 mm; reads EXP, DST, PES, JEF and VP3 (bernette brochure and dealers).
+hoops = ["long_160x260", "medium_130x180", "small_100x100"]
+max_stitch_length_mm = 12.0
+min_stitch_length_mm = 0.3
+stitches_per_minute = 800

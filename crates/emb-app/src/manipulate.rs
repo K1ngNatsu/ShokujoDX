@@ -264,6 +264,11 @@ fn new_key(st: &mut AppState, what: &str) -> MergeKey {
 pub fn begin_drag(st: &mut AppState, map: &ViewMap, press: Pos2, mods: Modifiers) {
     if let Some(h) = hit_handle(st, map, press) {
         let Some(bbox) = selection_box(st) else { return };
+        // A sketch and its objects scale only in sketch mode (v0.3 plan,
+        // Stage 4); a turn is fine.
+        if matches!(h, Handle::Scale { .. }) && st.refuse_sketch_scale() {
+            return;
+        }
         let originals = originals(st);
         st.drag = Some(match h {
             Handle::Scale { fx, fy } => DragOp::Scale {

@@ -229,6 +229,9 @@ impl AppState {
     /// Leaves the kiosk; the design stays in its tab.
     pub fn close_kiosk(&mut self) {
         self.kiosk = None;
+        // The kiosk shows the thread look; the View options of the user
+        // come back (they are not kept while the kiosk is open).
+        self.apply_view_options(self.settings.view);
         self.doc.end_merge();
         self.fit_requested = true;
         self.focus_canvas = true;

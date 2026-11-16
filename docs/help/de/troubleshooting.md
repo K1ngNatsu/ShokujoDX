@@ -2,9 +2,23 @@
 id: troubleshooting
 title: Fragen und Probleme
 group: start
-keywords: problem, frage, faq, falten, lücke, fadenschnitt, sprung, bruch, steif, kleine schrift, maschine liest nicht, datei, langsam, absturz, fehlt, falsche farbe, zu viele stiche, überlappung, anhäufung, svg, dichte, dichtekarte, lagen, bild, foto, bild zu design, objekte, faden reißt, vogelnest, schlaufen, umriss passt nicht, passgenauigkeit, verschiebung, flor, handtuch, sinkt ein, nicht mittig, rahmen, zu groß, passt nicht, buchstaben laufen zu, schaltfläche grau, kann nicht klicken, bereich weg
+keywords: problem, frage, faq, falten, lücke, fadenschnitt, sprung, bruch, steif, kleine schrift, maschine liest nicht, datei, langsam, absturz, fehlt, falsche farbe, zu viele stiche, überlappung, anhäufung, svg, dichte, dichtekarte, lagen, bild, foto, bild zu design, objekte, faden reißt, vogelnest, schlaufen, umriss passt nicht, passgenauigkeit, verschiebung, flor, handtuch, sinkt ein, nicht mittig, rahmen, zu groß, passt nicht, buchstaben laufen zu, schaltfläche grau, kann nicht klicken, bereich weg, start, startet nicht, grafik, treiber, renderer, diagnose
 ---
 # Fragen und Probleme
+
+## Das Programm startet nicht
+
+Das Programm braucht einen Grafiktreiber. Wenn die Grafikkarte nicht
+startet, startet das Programm erneut mit OpenGL, dann mit dem
+Software-Renderer des Systems, und sagt es Ihnen. Installieren Sie den
+neuesten Grafiktreiber vom Hersteller Ihres PCs oder seiner Grafik (Intel,
+AMD oder NVIDIA). Dann benutzt das Programm wieder die Grafikkarte.
+
+Wenn kein Renderer funktioniert, nennt eine Meldung den Grund. Jeder Start
+schreibt `start.log` in den Einstellungsordner (zum Beispiel
+`%APPDATA%\ShokujoDX`). Für einen Bericht über die Grafik starten Sie
+`ShokujoDX.exe --diagnose`; es schreibt `diagnose.txt` in denselben Ordner.
+Bitte senden Sie diese Dateien mit Ihrem Feedback.
 
 ## Der Stoff wirft Falten
 

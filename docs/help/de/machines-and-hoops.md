@@ -2,7 +2,7 @@
 id: machines-and-hoops
 title: Maschinen und Rahmen
 group: production
-keywords: maschine, topaz, husqvarna, brother, tajima, mehrnadel, nadeln, nadel, nadelfolge, garnwechsel, nadelplan, format, tempo, stickzeit, zeit für farbwechsel, zeit für fadenschnitt, dst fadenschnitte, sprünge für einen fadenschnitt, rahmen, feld, rand, meine rahmen, eigener rahmen, automatischer rahmen, rahmen drehen, design drehen, rahmenwinkel, rahmenoptionen, platzierung, automatisch zentrieren, anfangspunkt, endpunkt, rahmenschablone, drucken, mehrposition
+keywords: maschine, topaz, husqvarna, brother, tajima, mehrnadel, nadeln, nadel, nadelfolge, garnwechsel, nadelplan, format, tempo, stickzeit, zeit für farbwechsel, zeit für fadenschnitt, dst fadenschnitte, sprünge für einen fadenschnitt, rahmen, feld, rand, meine rahmen, eigener rahmen, automatischer rahmen, rahmen drehen, design drehen, rahmenwinkel, rahmenoptionen, platzierung, automatisch zentrieren, anfangspunkt, endpunkt, rahmenschablone, drucken, mehrposition, maschinenbibliothek, brother, baby lock, janome, elna, pfaff, singer, bernina, allgemein, meine maschinen, maschine hinzufügen, maschine exportieren, maschine importieren
 ---
 # Maschinen und Rahmen
 
@@ -17,6 +17,12 @@ des Designs fest. Die Maschine legt fest:
 - den längsten Stich und die Rahmen der Maschine;
 - das Tempo und die Zeiten für die Stickzeit.
 
+Beim ersten Start fragt das Programm nach Ihrer Maschine und Ihrem
+Rahmen. Neue Designs beim Start benutzen sie; bis Sie eine wählen,
+benutzen sie die allgemeine Maschine mit einem Rahmen von 130 × 180 mm.
+Eine Maschine oder einen Rahmen, die Sie in diesem Bereich wählen, behält
+das Programm auch für den nächsten Start.
+
 **Maschineneinstellungen** (Design > Maschine und Rahmen) hat:
 
 - **Tempo** (Stiche pro Minute) und die Zeit eines **Farbwechsels**, eines
@@ -30,6 +36,36 @@ des Designs fest. Die Maschine legt fest:
 - **Köpfe**, **Ein Stück einspannen**, **Rahmenwechsel** und **Die nächsten
   Stücke einspannen, während die Maschine stickt**: für die Laufzeit eines
   Auftrags. Siehe [Aufträge, Angebote und Laufzeiten](quotes).
+
+## Die Maschinenbibliothek und Ihre eigenen Maschinen
+
+Die Liste **Maschine** hat Maschinen von Brother, Baby Lock, Janome, Elna,
+Husqvarna Viking, Pfaff, Singer, Bernina und bernette sowie
+Mehrnadelmaschinen. Jede hat ihr Dateiformat, ihr größtes Stickfeld und
+die Standardrahmengrößen, die hineinpassen, aus den öffentlichen Daten
+des Herstellers. Einige Werte sind nicht bestätigt (zum Beispiel das
+Tempo oder die Lage eines Rahmens an der Maschine): Lesen Sie das Handbuch
+Ihrer Maschine, und drehen Sie den Rahmen, wenn Ihre Maschine ihn anders
+hält.
+
+Wenn Ihre Maschine nicht in der Liste ist, benutzen Sie eine
+**allgemeine** Maschine für ihr Dateiformat (PES, JEF, VP3, EXP oder DST),
+oder fügen Sie Ihre eigene Maschine hinzu:
+
+1. Klicken Sie auf **Design > Meine Maschinen** und dann auf **Meine
+   Maschine hinzufügen…** (der erste Start hat diese Schaltfläche auch).
+2. Geben Sie den Namen und die Marke ein. Wählen Sie die
+   **Dateiformate**, die die Maschine liest, und das **Format für neue
+   Dateien**.
+3. Stellen Sie die **Nadeln**, das **Tempo** und den **längsten Stich**
+   ein, und wählen Sie die Rahmen. Ein Rahmen, der nicht in der Liste ist:
+   Fügen Sie ihn zuerst unter **Design > Meine Rahmen** hinzu.
+4. Klicken Sie auf **Speichern**. Die Maschine ist jetzt in der Liste
+   **Maschine**.
+
+**Exportieren…** schreibt die Maschine (mit Ihren eigenen Rahmen, die sie
+benutzt) in eine Datei. **Importieren…** fügt die Maschinen einer solchen
+Datei hinzu, zum Beispiel von einer Freundin mit derselben Maschine.
 
 ## Nadeln einer Mehrnadelmaschine
 
@@ -71,8 +107,9 @@ U01-Datei behält ihre Nadeln.
 Die Liste **Rahmen** legt den Rahmen fest. Die Arbeitsfläche zeigt das
 Rahmenfeld (wohin die Nadel gehen kann) und den Sicherheitsrand.
 
-- **Meine Rahmen** kommt zuerst in der Liste. Ein Rahmen, den die Maschine
-  nicht benutzen kann, zeigt eine Warnung.
+- **Meine Rahmen** kommt zuerst in der Liste, dann die Rahmen der
+  Maschine, dann die anderen Rahmen. Ein Rahmen, den die Maschine nicht
+  benutzen kann, zeigt eine Warnung.
 - **Freies Feld** hat keinen Rahmen.
 - **Automatischer Rahmen** wählt den kleinsten Rahmen, in den das Design
   passt, aus Meine Rahmen (sonst aus den Rahmen der Maschine). Das Design

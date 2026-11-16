@@ -462,3 +462,27 @@ proptest! {
         prop_assert!(r.max_error < 1e-6);
     }
 }
+
+#[test]
+fn the_origin_is_fixed_and_stays() {
+    let mut s = Sketch::with_origin();
+    let o = s.origin.unwrap();
+    assert_eq!(s.point(o), Some(Point::ZERO));
+    // It cannot go, and its Fix cannot go.
+    assert!(!s.remove_point(o));
+    let fix = s.constraints[0].id;
+    assert!(!s.remove_constraint(fix));
+    // A drag does not move it.
+    s.drag(o, p(10.0, 5.0));
+    assert!(s.point(o).unwrap().distance(Point::ZERO) < 1e-6);
+    // A line can start at it.
+    let a = s.add_point(p(20.0, 0.0));
+    let l = s.add_line_between(o, a).unwrap();
+    assert!(s.remove_curve(l));
+    assert!(s.point(o).is_some(), "the origin stays when its line goes");
+    // Through a file, and a file of an older version has no origin.
+    let back: Sketch = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
+    assert_eq!(back.origin, Some(o));
+    let old: Sketch = serde_json::from_str(&serde_json::to_string(&Sketch::new()).unwrap()).unwrap();
+    assert_eq!(old.origin, None);
+}

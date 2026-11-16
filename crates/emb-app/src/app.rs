@@ -83,6 +83,10 @@ pub struct AppState {
     pub show_density: bool,
     pub density_cache: Option<crate::density::DensityCache>,
     pub cursor_mm: Option<Point>,
+    /// A jump of the pointer that the endless pan asked for and that has
+    /// not come yet, with the frames that it can still take
+    /// (`canvas::pan_wrap`).
+    pub pan_jump: Option<(egui::Vec2, u8)>,
     pub fit_requested: bool,
     pub message: String,
     /// The drag in progress on the canvas.
@@ -144,6 +148,8 @@ pub struct AppState {
     pub view_filter: crate::viewing::ViewFilter,
     /// The stitch cursor (an index into the stitch plan records).
     pub cursor: Option<usize>,
+    /// The first start asks for the user's machine (`first_start.rs`).
+    pub ask_machine: Option<crate::first_start::MachineStep>,
     pub show_needle_points: bool,
     pub show_functions: bool,
     /// Thread charts: the built-in ones and the ones the user imported.
@@ -238,6 +244,9 @@ pub struct AppState {
     pub show_hoop: bool,
     /// The user's own hoops (also in `hoops`), from their `hoops.toml`.
     pub user_hoops: HoopCatalog,
+    /// The user's own machines (Design > My Machines; ADR 0099).
+    pub user_machines: MachineCatalog,
+    pub machine_window: crate::my_machines::MachineWindow,
     /// The My hoops and Hoop options windows.
     pub hoop_windows: crate::hoops::HoopWindows,
     /// Hooping mode and Preview hoopings (see `hooping`).
@@ -354,6 +363,9 @@ pub struct EmbApp {
     last_title: String,
     /// False until the first frame, which maximizes the window.
     started: bool,
+    /// The number of frames so far (up to 2): after the first frame the
+    /// renderer works (`startup::first_frame`).
+    frames: u8,
     /// The window size of the last frame.
     last_size: egui::Vec2,
 }
@@ -452,21 +464,39 @@ impl EmbApp {
 
         let mut state = AppState::new(hoops, machines, message);
         state.settings = crate::workspace::Settings::load();
-        state.start_library(crate::library::library_dir());
-        state.focus_library = state.settings.library_open;
-        // The start page, unless a file is opened from the command line.
-        if state.settings.start_page && std::env::args_os().nth(1).is_none() {
-            state.show_start_page();
-            state.focus_library = false;
-        }
-        state.jobs = crate::jobs::Queue::load(crate::about::user_folder().map(|d| d.join("exports.json")));
-        // The user's own hoops (Design > My hoops).
+        // The View options of the last session, and the user's machine and
+        // hoop (v0.3 plan, Stage 2). The first start asks for the machine.
+        state.apply_view_options(state.settings.view);
+        // The user's own hoops (Design > My hoops) and machines (Design > My
+        // Machines), before the start design takes the user's machine.
         if let Some(p) = crate::hoops::user_hoops_path().filter(|p| p.is_file()) {
             match HoopCatalog::load(&p) {
                 Ok(user) => state.add_user_hoops(user),
                 Err(e) => state.message = crate::i18n::fill("{}; your own hoops are not loaded", &[&e]),
             }
         }
+        if let Some(p) = crate::my_machines::user_machines_path().filter(|p| p.is_file()) {
+            match MachineCatalog::load(&p).and_then(|m| m.validate_hoops(&state.hoops).map(|_| m)) {
+                Ok(user) => state.add_user_machines(user),
+                Err(e) => state.message = crate::i18n::fill("{}; your own machines are not loaded", &[&e]),
+            }
+        }
+        let machine = state.settings.machine.clone().unwrap_or_else(|| GENERIC_MACHINE.into());
+        let hoop = state.settings.hoop.clone();
+        state.start_on_machine(&machine, hoop.as_deref());
+        state.ask_machine = state
+            .settings
+            .machine
+            .is_none()
+            .then(|| crate::first_start::MachineStep::new(&state));
+        state.start_library(crate::library::library_dir());
+        state.focus_library = state.settings.library_open;
+        // The start page, unless a file is opened from the command line.
+        if state.settings.start_page && crate::startup::args().is_empty() {
+            state.show_start_page();
+            state.focus_library = false;
+        }
+        state.jobs = crate::jobs::Queue::load(crate::about::user_folder().map(|d| d.join("exports.json")));
         crate::canvas::set_calibration(state.settings.screen_calibration);
         state.save_settings = true;
         state.fabrics = fabrics;
@@ -481,6 +511,14 @@ impl EmbApp {
         if state.settings.template.is_some() {
             // The start design comes from the template for New.
             state.new_design();
+        }
+        // The program does not use the graphics card (v0.3 plan, Stage 1).
+        let adapter = cc.wgpu_render_state.as_ref().map(|r| r.adapter.get_info());
+        if let Some(lines) = crate::startup::graphics_notice(adapter.as_ref()) {
+            state.notice = Some(crate::file::Notice {
+                title: "Graphics".into(),
+                lines,
+            });
         }
         // A crash report from the last time: say where it is.
         if let Some(dir) = crate::crash::crashes_dir() {
@@ -510,13 +548,15 @@ impl EmbApp {
         // A file name on the command line (for example from a double-click in Explorer).
         // `--kiosk`: the program starts in the lettering kiosk (for a shop).
         // `--lang <code>` first: the language for this run (the settings keep theirs).
-        let mut args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+        let mut args: Vec<std::ffi::OsString> = crate::startup::args();
         if args.len() >= 2 && args[0] == "--lang" {
             state.lang_override = Some(args[1].to_string_lossy().into_owned());
             args.drain(..2);
         }
         let arg = args.into_iter().next();
         if arg.as_deref() == Some(std::ffi::OsStr::new("--kiosk")) {
+            // A shop kiosk does not ask for the machine.
+            state.ask_machine = None;
             state.show_start = false;
             state.open_kiosk();
         } else if let Some(arg) = arg {
@@ -527,16 +567,40 @@ impl EmbApp {
             dock,
             last_title: String::new(),
             started: false,
+            frames: 0,
             last_size: egui::Vec2::ZERO,
         }
     }
 }
 
+/// The machine of a new install (v0.3 plan, Stage 2).
+pub const GENERIC_MACHINE: &str = "generic";
+
 impl AppState {
-    /// Makes the state with an empty design on the Topaz 20 profile (if it exists).
+    /// Puts the current design on machine `id`, in hoop `hoop` if the
+    /// catalog has it (else the first hoop of the machine), with no undo
+    /// step. For the empty design at the start; nothing changes if the
+    /// catalog has no machine `id`.
+    pub fn start_on_machine(&mut self, id: &str, hoop: Option<&str>) {
+        let Some(m) = self.machines.get(id) else { return };
+        let hoop = hoop
+            .filter(|h| self.hoops.get(h).is_some())
+            .map(str::to_string)
+            .or_else(|| m.hoops.first().cloned());
+        let mut d = self.doc.design().clone();
+        d.machine = Some(m.id.clone());
+        if let Some(h) = hoop {
+            d.hoop.selection = HoopSelection::Preset { id: h };
+        }
+        self.doc = Document::new(d);
+    }
+
+    /// Makes the state with an empty design on the Generic machine (if it
+    /// exists) in its first hoop. The app then uses the user's machine
+    /// (`use_my_machine`).
     pub fn new(hoops: HoopCatalog, machines: MachineCatalog, message: String) -> Self {
         let mut design = Design::new("Untitled");
-        if let Some(m) = machines.get("husqvarna_topaz20") {
+        if let Some(m) = machines.get(GENERIC_MACHINE) {
             design.machine = Some(m.id.clone());
             if let Some(h) = m.hoops.first() {
                 design.hoop.selection = HoopSelection::Preset { id: h.clone() };
@@ -582,6 +646,8 @@ impl AppState {
             reshape: Default::default(),
             reshape_menu_hit: None,
             settings: crate::workspace::Settings::default(),
+            pan_jump: None,
+            ask_machine: None,
             save_settings: false,
             show_options: false,
             measure: None,
@@ -643,6 +709,8 @@ impl AppState {
             show_vectors: true,
             show_hoop: true,
             user_hoops: HoopCatalog::default(),
+            user_machines: MachineCatalog::default(),
+            machine_window: Default::default(),
             hoop_windows: Default::default(),
             hoopings_ui: Default::default(),
             product_window: false,
@@ -1585,6 +1653,15 @@ impl eframe::App for EmbApp {
             .as_deref()
             .unwrap_or(&self.state.settings.language);
         crate::workspace::apply_theme_in(&ctx, &self.state.settings, language);
+        if self.frames < 2 {
+            self.frames += 1;
+            // The first frame is on the screen: the renderer works.
+            if self.frames == 2 {
+                crate::startup::first_frame();
+            }
+        }
+        // A change of a View option stays for the next session.
+        self.state.keep_view_options();
         if !self.started {
             // The ribbon needs the width of a full screen to show all panels.
             // (`ViewportBuilder::with_maximized` keeps the small size on Windows.)
@@ -1651,6 +1728,8 @@ impl eframe::App for EmbApp {
         crate::product::window(&ctx, st);
         crate::repeats::window(&ctx, st);
         crate::about::window(&ctx, st);
+        crate::first_start::window(&ctx, st);
+        crate::my_machines::window(&ctx, st);
         crate::styles::windows(&ctx, st);
         crate::setup::sew_time_window(&ctx, st);
         crate::needles::window(&ctx, st);

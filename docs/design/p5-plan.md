@@ -1,6 +1,6 @@
 # Plan: roadmap phase P5 (decorative stitches and effects)
 
-Date: 2026-10-23 · Status: Accepted. Milestones 1 to 7 done in software; the exit test (sew-outs) is open.
+Date: 2026-10-23 · Status: Accepted. Milestones 1 to 7 done in software; the exit test (sew-outs) passed on the Topaz 20 (owner, 2026-11-16).
 
 ## Goal
 
@@ -55,7 +55,8 @@ when they showed). Use by hand in the app is still to do.
 **Exit test (2026-10-23).** Software part passed: each stitch type and
 effect has a corpus design (`outline-types`, `curved-fills`,
 `texture-fills`, `motifs`, `patterns`, `effects`, `blends`,
-`buttonholes`, `borders`) with a golden snapshot. Sew-out part open: the
+`buttonholes`, `borders`) with a golden snapshot. Sew-out part passed on the Topaz 20 (owner,
+2026-11-16): the
 files for the Topaz 20 (VP3, worksheet, picture) are in `out/p5-sewout`
 with a checklist; photos go to `tests/sewouts/`.
 

@@ -11,7 +11,8 @@ pub const BUILTIN_MACHINES_TOML: &str = include_str!("../../../data/machines.tom
 
 /// File format ids that a profile can name. Lowercase file extensions.
 pub const KNOWN_FORMATS: &[&str] = &[
-    "vp3", "dst", "pes", "pec", "exp", "jef", "hus", "vip", "tbf", "tap", "dsb", "dsz", "10o", "100", "u01", "dat",
+    "vp3", "dst", "pes", "pec", "exp", "jef", "xxx", "hus", "vip", "tbf", "tap", "dsb", "dsz", "10o", "100", "u01",
+    "dat",
 ];
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -278,6 +279,48 @@ mod tests {
         let topaz = MachineCatalog::builtin();
         let m = topaz.get("husqvarna_topaz20").unwrap();
         assert_eq!(m.sew_times().stitches_per_minute, m.stitches_per_minute);
+    }
+
+    #[test]
+    fn the_library_has_the_brands_and_a_generic_profile_for_each_format() {
+        let c = MachineCatalog::builtin();
+        let hoops = crate::HoopCatalog::builtin();
+        c.validate_hoops(&hoops).unwrap();
+        for brand in [
+            "Brother",
+            "Baby Lock",
+            "Janome",
+            "Elna",
+            "Husqvarna Viking",
+            "Pfaff",
+            "Singer",
+            "Bernina",
+            "Tajima",
+        ] {
+            assert!(c.machines.iter().any(|m| m.brand.as_deref() == Some(brand)), "{brand}");
+        }
+        for (id, format) in [
+            ("generic", "dst"),
+            ("generic_pes", "pes"),
+            ("generic_jef", "jef"),
+            ("generic_vp3", "vp3"),
+            ("generic_exp", "exp"),
+        ] {
+            assert_eq!(c.get(id).unwrap().default_format, format);
+        }
+        // The first hoop of a machine of the library is its largest field.
+        // A generic profile lists its hoop for new designs first; the Topaz
+        // 20 and the profiles of the multi-needle brands list their hoops
+        // another way.
+        let area = |id: &String| hoops.get(id).map_or(0.0, |h| h.width_mm * h.height_mm);
+        for m in &c.machines {
+            if m.brand.is_none() || m.id == "husqvarna_topaz20" || m.needles == Some(15) {
+                assert!(m.brand.is_some() || m.hoops[0] == "medium_130x180", "{}", m.id);
+                continue;
+            }
+            let first = area(&m.hoops[0]);
+            assert!(m.hoops.iter().all(|h| area(h) <= first), "{}", m.id);
+        }
     }
 
     #[test]

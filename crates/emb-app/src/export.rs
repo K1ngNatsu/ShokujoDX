@@ -498,6 +498,8 @@ mod tests {
 
     fn state_with_line(from: (f64, f64), to: (f64, f64)) -> AppState {
         let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        // The test is on the reference machine.
+        st.start_on_machine("husqvarna_topaz20", None);
         st.doc.edit("Line", |d| {
             let t = crate::draw::thread_for_new(d, None);
             d.add_object(
@@ -596,6 +598,8 @@ mod tests {
     #[test]
     fn corpus_line_art_imports_exports_and_reads_back() {
         let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        // The test is on the reference machine.
+        st.start_on_machine("husqvarna_topaz20", None);
         let svg = include_bytes!("../../../tests/corpus/svg/line-art-sampler.svg");
         st.import_svg_bytes(svg, "line-art-sampler.svg");
         assert!(st.notice.is_none(), "{:?}", st.notice);
@@ -660,6 +664,8 @@ mod tests {
     fn write_sampler() {
         let dir = PathBuf::from(std::env::var("EMB_SAMPLE_OUT").expect("set EMB_SAMPLE_OUT"));
         let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        // The test is on the reference machine.
+        st.start_on_machine("husqvarna_topaz20", None);
         st.import_svg_bytes(
             include_bytes!("../../../tests/corpus/svg/line-art-sampler.svg"),
             "sampler",

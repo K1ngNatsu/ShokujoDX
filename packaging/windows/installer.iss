@@ -77,6 +77,27 @@ ja.Thumbnails=エクスプローラーにデザインの画像を表示する（
 de.MachineType=Maschinenstickdatei
 es.MachineType=Archivo de bordado de máquina
 ja.MachineType=ミシン刺しゅうファイル
+; An older version is removed before the new one is installed (v0.3 plan, Stage 1).
+en.Upgrade=Upgrade:
+de.Upgrade=Aktualisierung:
+es.Upgrade=Actualización:
+ja.Upgrade=アップグレード:
+en.OldVersion={#AppName} %1 (%2) is removed first. Your settings and your designs stay.
+de.OldVersion={#AppName} %1 (%2) wird zuerst entfernt. Ihre Einstellungen und Ihre Designs bleiben.
+es.OldVersion={#AppName} %1 (%2) se quita primero. Su configuración y sus diseños se conservan.
+ja.OldVersion={#AppName} %1 (%2) を先に削除します。設定とデザインはそのまま残ります。
+en.ForThisUser=for this user
+de.ForThisUser=für diesen Benutzer
+es.ForThisUser=para este usuario
+ja.ForThisUser=このユーザー用
+en.ForAllUsers=for all users
+de.ForAllUsers=für alle Benutzer
+es.ForAllUsers=para todos los usuarios
+ja.ForAllUsers=すべてのユーザー用
+en.RemoveFailed=The older version of {#AppName} (%1) could not be removed. Remove it in Settings > Apps, then start this installer again.
+de.RemoveFailed=Die ältere Version von {#AppName} (%1) konnte nicht entfernt werden. Entfernen Sie sie unter Einstellungen > Apps und starten Sie dieses Installationsprogramm dann erneut.
+es.RemoveFailed=No se pudo quitar la versión anterior de {#AppName} (%1). Quítela en Configuración > Aplicaciones y vuelva a iniciar este instalador.
+ja.RemoveFailed=古いバージョンの {#AppName} (%1) を削除できませんでした。[設定] > [アプリ] で削除してから、このインストーラーをもう一度起動してください。
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
@@ -144,3 +165,105 @@ Root: HKA; Subkey: "Software\Classes\Applications\{#AppExe}\SupportedTypes"; Val
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+// An older version is removed before the new one is installed (v0.3 plan,
+// Stage 1). An install for this user and an install for all users have
+// their own uninstall entries, so a change of the install mode left two
+// copies before. The uninstaller removes only the files and the registry
+// entries of the program: the settings (%APPDATA%\ShokujoDX) and the
+// designs of the user stay.
+
+const
+  UninstallKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{4FDD400B-23A4-46D2-BC5E-2B6A425A358A}_is1';
+
+// The registry root of the installs for all users.
+function MachineRoot: Integer;
+begin
+  if IsWin64 then
+    Result := HKLM64
+  else
+    Result := HKLM;
+end;
+
+// The uninstaller and the version of the install in Root, if there is one.
+function OldInstall(Root: Integer; var Uninstaller, Version: String): Boolean;
+begin
+  Result := RegQueryStringValue(Root, UninstallKey, 'UninstallString', Uninstaller);
+  if Result then
+  begin
+    Uninstaller := RemoveQuotes(Uninstaller);
+    if not RegQueryStringValue(Root, UninstallKey, 'DisplayVersion', Version) then
+      Version := '?';
+  end;
+end;
+
+// One line for the Ready page if there is an install in Root.
+function OldLine(Root: Integer; Mode, NewLine: String): String;
+var
+  Uninstaller, Version: String;
+begin
+  Result := '';
+  if OldInstall(Root, Uninstaller, Version) then
+    Result := '      ' + FmtMessage(CustomMessage('OldVersion'), [Version, Mode]) + NewLine;
+end;
+
+function UpdateReadyMemo(Space, NewLine, MemoUserInfoInfo, MemoDirInfo, MemoTypeInfo,
+  MemoComponentsInfo, MemoGroupInfo, MemoTasksInfo: String): String;
+var
+  Old: String;
+begin
+  Old := OldLine(HKCU, CustomMessage('ForThisUser'), NewLine)
+    + OldLine(MachineRoot, CustomMessage('ForAllUsers'), NewLine);
+  Result := '';
+  if Old <> '' then
+    Result := CustomMessage('Upgrade') + NewLine + Old + NewLine;
+  if MemoDirInfo <> '' then
+    Result := Result + MemoDirInfo + NewLine + NewLine;
+  if MemoGroupInfo <> '' then
+    Result := Result + MemoGroupInfo + NewLine + NewLine;
+  if MemoTasksInfo <> '' then
+    Result := Result + MemoTasksInfo + NewLine;
+end;
+
+// Runs the uninstaller of the install in Root with no questions, and waits
+// until it is done. The uninstaller starts a copy of itself and stops, so
+// the wait is for its uninstall entry to go. Returns '' or an error text.
+function RemoveOld(Root: Integer): String;
+var
+  Uninstaller, Version: String;
+  Code, Waited: Integer;
+begin
+  Result := '';
+  if not OldInstall(Root, Uninstaller, Version) then
+    Exit;
+  Log('Removing the older version ' + Version + ': ' + Uninstaller);
+  // ShellExec, so that the uninstaller of an install for all users can ask
+  // for administrator rights.
+  if not ShellExec('', Uninstaller, '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART', '', SW_HIDE,
+    ewWaitUntilTerminated, Code) then
+  begin
+    Result := SysErrorMessage(Code);
+    Exit;
+  end;
+  Waited := 0;
+  while RegKeyExists(Root, UninstallKey) and (Waited < 60000) do
+  begin
+    Sleep(250);
+    Waited := Waited + 250;
+  end;
+  if RegKeyExists(Root, UninstallKey) then
+    Result := Version;
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  Error: String;
+begin
+  Error := RemoveOld(HKCU);
+  if Error = '' then
+    Error := RemoveOld(MachineRoot);
+  Result := '';
+  if Error <> '' then
+    Result := FmtMessage(CustomMessage('RemoveFailed'), [Error]);
+end;

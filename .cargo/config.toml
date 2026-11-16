@@ -1,0 +1,7 @@
+# Build settings for all builds of the workspace.
+
+# Windows: put the C runtime in the program (static CRT), so the program
+# does not need VCRUNTIME140.dll. A new PC does not always have the Visual
+# C++ runtime, and the installer does not install it (v0.3 plan, Stage 1).
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

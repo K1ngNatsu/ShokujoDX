@@ -1,6 +1,6 @@
 # Plan: roadmap phase P8 (management and connectivity)
 
-Date: 2026-10-23 · Status: Accepted. Milestones 1 to 7 done in software (audit: `docs/design/roadmap.md`, "Audit of P8"); exit test part 2 (the Topaz 20 reads the stick) is open.
+Date: 2026-10-23 · Status: Accepted. Milestones 1 to 7 done in software (audit: `docs/design/roadmap.md`, "Audit of P8"); exit test part 2 (the Topaz 20 reads the stick) passed (owner, 2026-11-16).
 
 ## Goal
 

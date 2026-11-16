@@ -3,11 +3,11 @@ resolver = "3"
 members = ["crates/*"]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.95"
 license = "GPL-3.0-or-later"
-repository = ""
+repository = "https://github.com/K1ngNatsu/ShokujoDX"
 
 [workspace.dependencies]
 emb-geom = { path = "crates/emb-geom" }
@@ -19,7 +19,6 @@ emb-letter = { path = "crates/emb-letter" }
 emb-cli = { path = "crates/emb-cli" }
 emb-art = { path = "crates/emb-art" }
 emb-library = { path = "crates/emb-library" }
-emb-thumbnail = { path = "crates/emb-thumbnail" }
 emb-script = { path = "crates/emb-script" }
 emb-sketch = { path = "crates/emb-sketch" }
 
@@ -34,7 +33,6 @@ serde = { version = "1", features = ["derive", "rc"] }
 serde_json = { version = "1", features = ["float_roundtrip"] }
 toml = "1"
 thiserror = "2"
-indexmap = { version = "2", features = ["serde"] }
 
 usvg = { version = "0.48", default-features = false }
 # PDF and PDF-based AI artwork import (emb-formats). Pure Rust, MIT. No
@@ -50,6 +48,7 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 flate2 = "1.1"
 crc32fast = "1.5"
 rfd = "0.17"
+pollster = "1"
 
 eframe = "0.36"
 # Local date and time for worksheets and JEF headers (app and CLI only; not in engine crates).

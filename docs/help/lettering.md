@@ -2,7 +2,7 @@
 id: lettering
 title: Lettering and monograms
 group: design
-keywords: lettering, text, name, font, knockout, overlap, overlapping text, embroidery font, truetype, opentype, size range, small text, height, letter spacing, line spacing, kerning, align, baseline, arc, circle, line, envelope, lettering art, sew order, trims, jumps, letter, reshape, alphabet, bitmap font, monogram, initials, team names, names list, csv, keyboard designs, kiosk, shop, mitre, mitre corners, corner
+keywords: lettering, text, name, font, knockout, overlap, overlapping text, embroidery font, truetype, opentype, size range, small text, height, letter spacing, line spacing, kerning, align, baseline, arc, circle, line, envelope, lettering art, sew order, trims, jumps, letter, reshape, alphabet, bitmap font, monogram, initials, team names, names list, csv, keyboard designs, kiosk, shop, mitre, mitre corners, corner, bold, italic, underline, style, vertical, stacked, text direction
 ---
 # Lettering and monograms
 
@@ -75,6 +75,28 @@ Select the lettering. Object Properties has:
   and a stroke that ends on another stroke, as in "T", do not change. The
   stitches stay in the shape of the letter: a corner that cannot turn in
   it stays as a stop and a start.
+
+## Bold, italic and underline
+
+The **Style** buttons are in **Object Properties** of the lettering:
+
+- **B** (Bold) and **I** (Italic) use the bold or italic face of the
+  font when the font has one. Else the program makes the style: bold
+  makes each satin column wider and each fill larger, italic slants the
+  letters.
+- **U** (Underline) adds a satin bar under each line of text. Set the
+  **Underline gap** (from the baseline) and the **Underline width**. On an
+  arc or a path, the bar follows the line.
+
+## Stacked text
+
+**Text direction** in **Object Properties** sets **Stacked, top to
+bottom** or **Stacked, bottom to top**: each letter stays upright, one
+under the other, as on a sign. Each line of the text is a column, and the
+columns go from left to right. **Align** puts the top, the middle or the
+bottom of each column at the start point. Stacked text has no arc,
+envelope or underline. To turn a whole line of text 90°, turn the text
+instead.
 
 ## Lettering on a line
 

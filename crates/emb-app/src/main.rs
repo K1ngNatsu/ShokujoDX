@@ -35,6 +35,7 @@ mod editing;
 mod effects_ui;
 mod export;
 mod file;
+mod first_start;
 mod fonts;
 mod functions;
 mod gaps;
@@ -56,6 +57,7 @@ mod manipulate;
 mod menus;
 mod monogram;
 mod motifs;
+mod my_machines;
 mod needles;
 mod order;
 mod output;
@@ -85,6 +87,7 @@ mod sketch;
 #[cfg(test)]
 mod smoke;
 mod start;
+mod startup;
 mod stitch_types;
 mod stock;
 #[cfg(test)]
@@ -114,6 +117,11 @@ const USAGE: &str = "Use: shokujodx [--lang <code>] [--kiosk | <file>]
   --thumbnail <file> <out.png> [<size>]
                  write the picture of a design file (for the file manager)
   --version      write the version and stop
+  --diagnose     write a report of the graphics adapters (diagnose.txt in
+                 the settings folder) and stop
+  --renderer=<auto|gl|software>
+                 draw with this renderer (the program selects one if this
+                 is not given, and tries the next if one fails)
   --help         write this text and stop";
 
 /// `--thumbnail <file> <out.png> [<size>]`: the picture of a design file, at
@@ -153,8 +161,22 @@ fn main() -> eframe::Result {
         }
         return Ok(());
     }
+    // The messages before the window use the language of the settings.
+    let settings = workspace::Settings::load();
+    match args.iter().position(|a| a == "--lang").and_then(|i| args.get(i + 1)) {
+        Some(code) => i18n::set_language(code),
+        None => i18n::set_language(&settings.language),
+    }
+    if args.iter().any(|a| a == "--diagnose") {
+        startup::diagnose();
+        return Ok(());
+    }
+    // The renderer, and the start again with the next renderer if this one
+    // fails (v0.3 plan, Stage 1).
+    let start = startup::Start::from_args(&args).begin();
     // A test build writes a report when it stops because of an error.
     crash::install();
+    startup::install_panic_hook();
     let mut viewport = egui::ViewportBuilder::default()
         .with_title(format!("ShokujoDX {}", about::VERSION))
         .with_app_id(icons::APP_ID)
@@ -165,7 +187,14 @@ fn main() -> eframe::Result {
     }
     let options = eframe::NativeOptions {
         viewport,
+        renderer: eframe::Renderer::Wgpu,
+        wgpu_options: start.renderer.wgpu(),
         ..Default::default()
     };
-    eframe::run_native("emb-app", options, Box::new(|cc| Ok(Box::new(app::EmbApp::new(cc)))))
+    let result = eframe::run_native("emb-app", options, Box::new(|cc| Ok(Box::new(app::EmbApp::new(cc)))));
+    match result {
+        // The next renderer runs in a new process.
+        Err(e) if startup::failed(&e.to_string()) => Ok(()),
+        other => other,
+    }
 }

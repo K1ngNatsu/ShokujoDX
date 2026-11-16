@@ -510,6 +510,7 @@ pub enum Cmd {
     TurnHoopRight,
     HoopOptions,
     MyHoops,
+    MyMachines,
     /// Save the hoop template as PDF.
     HoopTemplate,
     /// The fewest hoopings that cover the design.
@@ -1621,6 +1622,13 @@ impl Cmd {
                 tr("My Hoops"),
                 tr("Mark the hoops that you have, and add your own hoops."),
             ),
+            Cmd::MyMachines => (
+                g(ph::FACTORY),
+                tr("My Machines"),
+                tr(
+                    "Add your own machine when it is not in the list: its file formats, hoops, needles and speed. Export it to share it, or import one.",
+                ),
+            ),
             Cmd::ProductWindow => (
                 g(ph::T_SHIRT),
                 tr("Product"),
@@ -1791,9 +1799,9 @@ impl Cmd {
             Cmd::DeleteColorway => (g(ph::TRASH), tr("Delete Colorway"), tr("Delete the current colorway.")),
             Cmd::StartSketch => (
                 g(ph::SELECTION_PLUS),
-                tr("Start Sketch"),
+                tr("Parametric Sketch"),
                 tr(
-                    "Draw with exact sizes: lines, arcs and circles with constraints and dimensions, as in CAD programs. With a sketch selected, open it.",
+                    "Draw with exact sizes: lines, arcs and circles with constraints and dimensions, as in CAD programs. With a sketch selected, open it. Convert makes embroidery of a selected sketch.",
                 ),
             ),
             Cmd::Sketch(c) => sketch_meta(c),

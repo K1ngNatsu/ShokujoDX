@@ -1,6 +1,6 @@
 # Plan: roadmap phase P7 (hooping, layouts and presentation)
 
-Date: 2026-10-23 · Status: Accepted. Milestones 1 to 6 done in software; the exit test (kit in `out/p7-sewout`, made again for the upright hoop, ADR 0034) is open. Audit: `docs/design/roadmap.md`, "Audit of P7".
+Date: 2026-10-23 · Status: Accepted. Milestones 1 to 6 done in software; the exit test (kit in `out/p7-sewout`, made again for the upright hoop, ADR 0034) passed on the Topaz 20 (owner, 2026-11-16). Audit: `docs/design/roadmap.md`, "Audit of P7".
 
 ## Goal
 

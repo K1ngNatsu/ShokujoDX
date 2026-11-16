@@ -45,6 +45,14 @@ Copy-Item target\release\emb-app.exe $exe
 Copy-Item target\release\emb_app.pdb $out
 # The thumbnail handler of Explorer (ADR 0046; the installer registers it).
 Copy-Item target\release\emb_thumbnail.dll $out
+# The program must not need the Visual C++ runtime: a new PC does not
+# always have it (v0.3 plan, Stage 1; .cargo/config.toml).
+foreach ($f in @($exe, (Join-Path $out 'emb_thumbnail.dll'))) {
+    $text = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($f))
+    if ($text -match '(?i)vcruntime\d+\.dll|msvcp\d+\.dll|api-ms-win-crt-') {
+        throw "$f needs the Visual C++ runtime: build it with the static CRT (.cargo/config.toml)."
+    }
+}
 Copy-Item docs\testing\TESTERS.md (Join-Path $out 'READ ME FIRST.txt')
 Copy-Item docs\testing\FEEDBACK.md (Join-Path $out 'FEEDBACK FORM.txt')
 Copy-Item LICENSE (Join-Path $out 'licenses\LICENSE (GPL-3.0).txt')

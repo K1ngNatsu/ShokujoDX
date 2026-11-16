@@ -111,6 +111,117 @@ impl LookSettings {
     }
 }
 
+/// The View options that stay between sessions (v0.3 plan, Stage 2): the
+/// owner had to switch on Thread Look at each start. The program applies
+/// them at the start and keeps them after each frame
+/// ([`AppState::keep_view_options`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ViewOptions {
+    pub artwork: bool,
+    pub stitches: bool,
+    pub jumps: bool,
+    pub needle_points: bool,
+    pub functions: bool,
+    pub density: bool,
+    pub thread_look: bool,
+    pub overview: bool,
+    pub applique_fabric: bool,
+    pub stones: bool,
+    pub split: bool,
+    pub vectors: bool,
+    pub dim_vectors: bool,
+    pub draw_vectors: bool,
+    pub hoop: bool,
+}
+
+impl Default for ViewOptions {
+    /// The options of a new install.
+    fn default() -> Self {
+        ViewOptions {
+            artwork: true,
+            stitches: true,
+            jumps: false,
+            needle_points: false,
+            functions: false,
+            density: false,
+            thread_look: false,
+            overview: false,
+            applique_fabric: true,
+            stones: true,
+            split: false,
+            vectors: true,
+            dim_vectors: false,
+            draw_vectors: false,
+            hoop: true,
+        }
+    }
+}
+
+impl AppState {
+    /// The View options as they are now. While the stitch player shows,
+    /// Stitches is the value from before the player (the player shows
+    /// the stitches).
+    pub fn view_options(&self) -> ViewOptions {
+        ViewOptions {
+            artwork: self.show_artwork,
+            stitches: if self.player.shown {
+                self.settings.view.stitches
+            } else {
+                self.show_plan
+            },
+            jumps: self.show_jumps,
+            needle_points: self.show_needle_points,
+            functions: self.show_functions,
+            density: self.show_density,
+            thread_look: self.show_thread_look,
+            overview: self.show_overview,
+            applique_fabric: self.show_applique_fabric,
+            stones: self.show_stones,
+            split: self.show_split,
+            vectors: self.show_vectors,
+            dim_vectors: self.dim_vectors,
+            draw_vectors: self.draw_vectors,
+            hoop: self.show_hoop,
+        }
+    }
+
+    /// Sets the View options (at the start, from the settings).
+    pub fn apply_view_options(&mut self, v: ViewOptions) {
+        self.show_artwork = v.artwork;
+        self.show_plan = v.stitches;
+        self.show_jumps = v.jumps;
+        self.show_needle_points = v.needle_points;
+        self.show_functions = v.functions;
+        self.show_density = v.density;
+        self.show_thread_look = v.thread_look;
+        self.show_overview = v.overview;
+        self.show_applique_fabric = v.applique_fabric;
+        self.show_stones = v.stones;
+        self.show_split = v.split;
+        self.show_vectors = v.vectors;
+        self.dim_vectors = v.dim_vectors;
+        self.draw_vectors = v.draw_vectors;
+        self.show_hoop = v.hoop;
+    }
+
+    /// Keeps the View options in the settings if they changed (call it
+    /// once a frame; the settings file is written only on a change).
+    pub fn keep_view_options(&mut self) {
+        // The kiosk sets its own View options (`open_kiosk`); they are not
+        // the user's.
+        if self.kiosk.is_some() {
+            return;
+        }
+        let v = self.view_options();
+        if v != self.settings.view {
+            let mut s = self.settings.clone();
+            s.view = v;
+            self.set_settings(s);
+        }
+    }
+}
+
 /// The fabric texture of the canvas: its weave and color, and the texture.
 pub struct FabricTexture {
     pub key: (emb_render::thread3d::Weave, Rgb),
@@ -601,6 +712,44 @@ mod tests {
 
     use super::*;
     use crate::test_util::Harness;
+
+    #[test]
+    fn view_options_stay_for_the_next_session() {
+        let mut h = Harness::new();
+        // A new install: the options of the state are the default options.
+        assert_eq!(h.st.view_options(), ViewOptions::default());
+        h.st.show_thread_look = true;
+        h.st.show_jumps = true;
+        h.st.keep_view_options();
+        let kept = h.st.settings.view;
+        assert!(kept.thread_look && kept.jumps && kept.stitches);
+        // The settings go through the file as JSON.
+        let text = serde_json::to_string(&h.st.settings).unwrap();
+        let back: crate::workspace::Settings = serde_json::from_str(&text).unwrap();
+        assert_eq!(back.view, kept);
+        // A settings file of an older version has no View options.
+        let old: crate::workspace::Settings = serde_json::from_str("{}").unwrap();
+        assert_eq!(old.view, ViewOptions::default());
+        // The next session starts with them.
+        let mut next = Harness::new();
+        next.st.apply_view_options(back.view);
+        assert!(next.st.show_thread_look && next.st.show_jumps);
+        // The stitch player shows the stitches, but does not change the option.
+        next.st.show_plan = false;
+        next.st.keep_view_options();
+        next.st.toggle_player();
+        next.st.keep_view_options();
+        assert!(!next.st.settings.view.stitches);
+        // The kiosk shows the thread look, but does not keep it.
+        next.st.show_thread_look = false;
+        next.st.keep_view_options();
+        next.st.open_kiosk();
+        assert!(next.st.show_thread_look);
+        next.st.keep_view_options();
+        next.st.close_kiosk();
+        next.st.keep_view_options();
+        assert!(!next.st.show_thread_look && !next.st.settings.view.thread_look);
+    }
 
     fn two_lines(h: &mut Harness) {
         h.st.doc.edit("t", |d| {

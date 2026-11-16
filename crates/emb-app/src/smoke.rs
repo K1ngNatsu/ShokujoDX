@@ -237,7 +237,13 @@ fn sketch_mode_works_with_the_mouse_and_drawing_changes_nothing() {
     }
     let s = h.st.sketch_obj().unwrap().sketch().clone();
     assert_eq!(s.curves.len(), 7);
-    assert_eq!(s.points.len(), 7, "the triangle shares its corners");
+    // The origin and the 7 points of the drawing.
+    assert!(s.origin.is_some());
+    assert_eq!(
+        s.points.iter().filter(|p| !s.is_origin(p.id)).count(),
+        7,
+        "the triangle shares its corners"
+    );
     assert!(h.st.sketch.as_ref().unwrap().clicks.is_empty(), "the chain is closed");
     // The Dimension tool on the bottom side of the rectangle, then a click
     // on an empty place: a length to type.

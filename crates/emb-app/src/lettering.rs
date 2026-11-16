@@ -1447,6 +1447,7 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, l: &Letter
         );
     }
     font_picker(ui, st, &mut n.font, "properties");
+    style_ui(ui, st, &mut n, &mut drag);
     let mut slider = |ui: &mut egui::Ui,
                       label: &str,
                       help: &str,
@@ -1508,6 +1509,18 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, l: &Letter
         for j in [Justify::Left, Justify::Center, Justify::Right] {
             ui.selectable_value(&mut n.justify, j, justify_name(j));
         }
+    });
+    ui.horizontal(|ui| {
+        ui.label(tr("Text direction")).on_hover_text(tr(
+            "Stacked: each letter upright, one under the other. Each line of text is a column. Stacked text has no arc, envelope or underline.",
+        ));
+        egui::ComboBox::from_id_salt("text_direction")
+            .selected_text(tr(n.direction.name()))
+            .show_ui(ui, |ui| {
+                for d in emb_model::TextDirection::ALL {
+                    ui.selectable_value(&mut n.direction, d, tr(d.name()));
+                }
+            });
     });
     let mut layout = baseline_ui(ui, &mut n, &mut drag);
     layout |= envelope_ui(ui, &mut n, &mut drag);
@@ -1630,6 +1643,10 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, l: &Letter
         || n.justify != l.justify
         || n.kerning != l.kerning
         || n.mitre_corners != l.mitre_corners
+        || n.bold != l.bold
+        || n.italic != l.italic
+        || n.underline != l.underline
+        || n.direction != l.direction
         || n.stitch != l.stitch;
     if shape_changed && !relayout(st, &mut n) {
         st.message = crate::i18n::fill("{} is not on this computer: choose another font.", &[&(n.font.label())]);
@@ -1687,6 +1704,112 @@ fn knockout_ui(ui: &mut egui::Ui, n: &mut Lettering, overlap_mm: f64, drag: &mut
         );
         *drag |= r.dragged();
     });
+}
+
+/// Returns `true` if the style name of a face is bold.
+fn is_bold_face(style: &str) -> bool {
+    style.to_lowercase().contains("bold")
+}
+
+/// Returns `true` if the style name of a face is italic.
+fn is_italic_face(style: &str) -> bool {
+    let s = style.to_lowercase();
+    s.contains("italic") || s.contains("oblique")
+}
+
+/// The face of a family (its style names `styles`) that is bold and
+/// italic as asked, the plain names first ("Bold" before "ExtraBold").
+/// `None` if the family has no such face.
+pub fn face_for(styles: &[String], bold: bool, italic: bool) -> Option<String> {
+    const PLAIN: [&str; 7] = ["", "Regular", "Normal", "Bold", "Italic", "Bold Italic", "BoldItalic"];
+    styles
+        .iter()
+        .filter(|s| is_bold_face(s) == bold && is_italic_face(s) == italic)
+        .min_by_key(|s| (!PLAIN.iter().any(|p| p.eq_ignore_ascii_case(s)), s.len()))
+        .cloned()
+}
+
+/// The face and the made styles for bold `bold` and italic `italic` in a
+/// family with the faces `styles` (now on face `current`): the face that
+/// has the most of the two, then a made style for the rest. Returns the
+/// face, the made bold and the made italic.
+pub fn styled_face(styles: &[String], current: &str, bold: bool, italic: bool) -> (String, bool, bool) {
+    let face = face_for(styles, bold, italic)
+        .or_else(|| face_for(styles, bold, false))
+        .or_else(|| face_for(styles, false, italic))
+        .or_else(|| face_for(styles, false, false))
+        .unwrap_or_else(|| current.to_string());
+    let made_bold = bold && !is_bold_face(&face);
+    let made_italic = italic && !is_italic_face(&face);
+    (face, made_bold, made_italic)
+}
+
+/// Bold, Italic and Underline (v0.3 plan, Stage 5). Bold and Italic use
+/// the face of the family when it has one, else a made style
+/// (`Lettering::bold`, `italic`; `emb_letter::style`).
+fn style_ui(ui: &mut egui::Ui, st: &AppState, n: &mut Lettering, drag: &mut bool) {
+    let styles = st.fonts.styles(&n.font.family, n.font.kind);
+    let bold = is_bold_face(&n.font.style) || n.bold;
+    let italic = is_italic_face(&n.font.style) || n.italic;
+    let (mut want_bold, mut want_italic) = (bold, italic);
+    ui.horizontal(|ui| {
+        ui.label(tr("Style"));
+        let b = ui.selectable_label(bold, egui::RichText::new("B").strong());
+        if crate::a11y::named(b, tr("Bold"))
+            .on_hover_text(tr("Bold: the bold face of the font, else wider strokes."))
+            .clicked()
+        {
+            want_bold = !bold;
+        }
+        let i = ui.selectable_label(italic, egui::RichText::new("I").italics());
+        if crate::a11y::named(i, tr("Italic"))
+            .on_hover_text(tr("Italic: the italic face of the font, else slanted letters."))
+            .clicked()
+        {
+            want_italic = !italic;
+        }
+        let on = n.underline.is_some();
+        let u = ui.selectable_label(on, egui::RichText::new("U").underline());
+        if crate::a11y::named(u, tr("Underline"))
+            .on_hover_text(tr("Underline: a satin bar under each line of text."))
+            .clicked()
+        {
+            n.underline = if on {
+                None
+            } else {
+                Some(emb_model::Underline::for_height(n.height_mm))
+            };
+        }
+    });
+    if (want_bold, want_italic) != (bold, italic) {
+        let (style, made_bold, made_italic) = styled_face(&styles, &n.font.style, want_bold, want_italic);
+        n.font.style = style;
+        n.bold = made_bold;
+        n.italic = made_italic;
+    }
+    if let Some(u) = &mut n.underline {
+        ui.horizontal(|ui| {
+            ui.label(tr("Underline gap"))
+                .on_hover_text(tr("From the baseline to the bar."));
+            let r = ui.add(
+                egui::Slider::new(&mut u.gap_mm, 0.0..=10.0)
+                    .clamping(egui::SliderClamping::Edits)
+                    .suffix(" mm")
+                    .fixed_decimals(1),
+            );
+            *drag |= r.dragged();
+        });
+        ui.horizontal(|ui| {
+            ui.label(tr("Underline width"));
+            let r = ui.add(
+                egui::Slider::new(&mut u.thickness_mm, 0.5..=10.0)
+                    .clamping(egui::SliderClamping::Edits)
+                    .suffix(" mm")
+                    .fixed_decimals(1),
+            );
+            *drag |= r.dragged();
+        });
+    }
 }
 
 /// "Lettering · Lato Bold · 25 mm · Anna", for the Sequence panel.
@@ -1957,6 +2080,72 @@ mod tests {
             h.st.last_cmd,
             Some(crate::ribbon::Cmd::Tool(crate::draw::Tool::Rectangle))
         );
+    }
+
+    #[test]
+    fn bold_and_italic_use_the_faces_of_the_family_else_made_styles() {
+        let faces = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        // Lato here: Bold and Regular, no italic.
+        let lato = faces(&["Regular", "Bold", "Light"]);
+        assert_eq!(
+            styled_face(&lato, "Regular", true, false),
+            ("Bold".into(), false, false)
+        );
+        assert_eq!(
+            styled_face(&lato, "Bold", false, false),
+            ("Regular".into(), false, false)
+        );
+        // Italic on the bold face keeps it and slants it.
+        assert_eq!(styled_face(&lato, "Bold", true, true), ("Bold".into(), false, true));
+        // A family with all four faces uses them.
+        let full = faces(&["Regular", "Italic", "Bold", "Bold Italic", "ExtraBold Italic"]);
+        assert_eq!(
+            styled_face(&full, "Regular", true, true),
+            ("Bold Italic".into(), false, false)
+        );
+        assert_eq!(
+            styled_face(&full, "Bold Italic", false, true),
+            ("Italic".into(), false, false)
+        );
+        // An embroidery font has one face: made styles.
+        let one = faces(&[""]);
+        assert_eq!(styled_face(&one, "", true, true), (String::new(), true, true));
+    }
+
+    #[test]
+    fn style_direction_and_underline_change_the_letters() {
+        let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        st.add_lettering(LetteringDialog::new(
+            Point::new(-30.0, 10.0),
+            "ABC",
+            FontRef::new("Lato", "Bold"),
+            20.0,
+        ));
+        let id = st.doc.design().objects()[0].id;
+        let get = |st: &AppState| match &st.doc.design().object(id).unwrap().kind {
+            ObjectKind::Lettering(l) => (**l).clone(),
+            _ => unreachable!(),
+        };
+        let mut n = get(&st);
+        n.underline = Some(emb_model::Underline::for_height(20.0));
+        n.direction = emb_model::TextDirection::Down;
+        assert!(relayout(&mut st, &mut n));
+        st.doc.edit("t", |d| {
+            d.object_mut(id).unwrap().kind = ObjectKind::Lettering(Box::new(n))
+        });
+        let l = get(&st);
+        // Stacked: no underline, three letters one under the other.
+        assert_eq!(l.letters.len(), 3);
+        let b = st.doc.design().object(id).unwrap().control_bbox().unwrap();
+        assert!(b.height() > 3.0 * 20.0, "{b:?}");
+        let mut n = get(&st);
+        n.direction = emb_model::TextDirection::Horizontal;
+        assert!(relayout(&mut st, &mut n));
+        assert_eq!(n.letters.len(), 4, "three letters and the underline");
+        // The panel draws.
+        let ctx = eframe::egui::Context::default();
+        let mut out = ctx.run_ui(Default::default(), |ui| properties(ui, &mut st, id, &l));
+        out.textures_delta.clear();
     }
 
     #[test]

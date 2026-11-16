@@ -24,7 +24,8 @@ the portable zip (`…-windows-portable.zip`).
    **Run anyway**.
 
 To remove the program, use **Settings > Apps** (installer) or delete the
-folder (zip).
+folder (zip). The installer of a new version removes the older version
+first; your settings and your designs stay.
 
 **macOS 10.15 or later** (Apple silicon or Intel). Open the disk image
 (`…-macos.dmg`) and drag **ShokujoDX** to **Applications**.
@@ -99,7 +100,7 @@ them; delete that folder too if you want.
   samples (Outline Every Fill, Same Density for All Satins, Name Threads
   by Code, Check Before Output). If you write your own (Help > Scripts),
   tell us which functions you miss.
-- **Sketch** (Digitize tab, Shapes > Start Sketch): draw with exact sizes,
+- **Sketch** (Digitize tab, Parametric Sketch): draw with exact sizes,
   as in a CAD program. Draw lines, arcs and circles, add constraints
   (horizontal, tangent, equal and more) and dimensions, and drag the
   shape: the constraints stay true. Blue parts can move, green parts are
@@ -204,6 +205,16 @@ Use the feedback form (`FEEDBACK FORM.txt`). Most useful:
 - Errors and crashes (see below).
 
 Send only designs that you are free to share.
+
+## If the program does not start
+
+The program needs a graphics driver. If the graphics card does not start,
+the program tries OpenGL, then the software renderer of Windows, and tells
+you so. If nothing works, a message tells you the reason. Please send
+`start.log` from the settings folder (for example `%APPDATA%\ShokujoDX`).
+For a report of the graphics, start `ShokujoDX.exe --diagnose` (from the
+Run box, Windows+R, with the full path of the program) and send
+`diagnose.txt` from the same folder.
 
 ## If the program stops
 

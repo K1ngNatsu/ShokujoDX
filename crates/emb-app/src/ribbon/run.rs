@@ -22,6 +22,8 @@ pub struct SelInfo {
     pub shapes: usize,
     /// Stitch objects (from a machine file or a photo stitch).
     pub stitches: usize,
+    /// Sketch objects (parametric sketches).
+    pub sketches: usize,
 }
 
 impl SelInfo {
@@ -43,6 +45,7 @@ impl SelInfo {
             single_shape: objs.len() == 1 && lines == 0 && vectors == 0,
             appliques: count(|k| matches!(k, ObjectKind::Applique { .. })),
             stitches: count(|k| matches!(k, ObjectKind::Stitches { .. })),
+            sketches: count(|k| matches!(k, ObjectKind::Sketch(_))),
             letterings: count(|k| matches!(k, ObjectKind::Lettering(_))),
             columns: count(|k| match k {
                 ObjectKind::Satin { .. } => true,
@@ -77,7 +80,7 @@ impl AppState {
             Cmd::SelectAtCursor | Cmd::CenterAtCursor => self.cursor.is_some(),
             Cmd::RemoveHoles | Cmd::FillHoles => s.holes,
             Cmd::ContinueLine => s.single_line,
-            Cmd::Convert(_) => s.vectors > 0,
+            Cmd::Convert(_) => s.vectors > 0 || (s.sketches > 0 && self.sketch.is_none()),
             Cmd::Shape(emb_model::ShapeOp::Combine) => s.vectors >= 2 || s.appliques >= 2,
             Cmd::Shape(emb_model::ShapeOp::Flatten) => s.shapes + s.letterings >= 2,
             Cmd::Shape(_) => s.shapes >= 2,
@@ -519,6 +522,7 @@ impl AppState {
             Cmd::TurnHoopRight => self.turn_hoop(crate::hoops::HOOP_STEP_DEG),
             Cmd::HoopOptions => self.hoop_windows.options = true,
             Cmd::MyHoops => self.hoop_windows.my_hoops = true,
+            Cmd::MyMachines => self.machine_window.open = true,
             Cmd::HoopTemplate => self.hoop_template_dialog(),
             Cmd::AutoLayout => self.auto_layout(),
             Cmd::ProductWindow => self.product_window = true,

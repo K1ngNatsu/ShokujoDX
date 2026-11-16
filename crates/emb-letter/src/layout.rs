@@ -3,9 +3,10 @@
 //! bent by the envelope.
 
 use emb_geom::{BBox, Point, Transform};
-use emb_model::{Justify, Letter, Lettering};
+use emb_model::{Justify, Letter, Lettering, ObjectKind};
 
 use crate::source::LetterSource;
+use crate::style;
 
 /// A letter on a straight line before justification.
 struct Placed {
@@ -28,7 +29,12 @@ pub fn layout(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> Vec<Letter> 
 /// height of the first line to the baseline of the last line. `None` with
 /// no envelope.
 pub fn layout_with_box(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> (Vec<Letter>, Option<BBox>) {
+    if l.direction.is_stacked() {
+        return (stacked(l, src), None);
+    }
     let scale = l.height_mm / src.cap_height();
+    // A made bold makes each letter wider on both sides (v0.3 plan, Stage 5).
+    let bold_w = if l.bold { style::bold_width(l.height_mm) } else { 0.0 };
     let line_step = src.line_height() * scale * l.line_spacing.max(0.0);
     let path_length = l.baseline.path_length();
     let mut letters = Vec::new();
@@ -58,7 +64,7 @@ pub fn layout_with_box(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> (Ve
             {
                 x += src.kerning(p, g) * scale;
             }
-            let advance = src.advance(g) * scale;
+            let advance = src.advance(g) * scale + 2.0 * bold_w;
             placed.push(Placed {
                 index: i,
                 c,
@@ -79,32 +85,24 @@ pub fn layout_with_box(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> (Ve
             (Justify::Center, Some(len)) => (len - width) / 2.0,
             (Justify::Right, Some(len)) => len - width,
         };
+        // The underline goes from the start of the first letter to the end
+        // of the last one.
+        let line_span = placed
+            .first()
+            .zip(placed.last())
+            .map(|(a, b)| (a.x + shift, b.x + shift + b.advance));
         for p in placed {
             let edit = l.edit(p.index);
             let text = p.c.to_string();
-            let mut parts = match edit.and_then(|e| e.shape.as_ref()).filter(|s| s.text == text) {
-                Some(shape) => {
-                    let k = l.height_mm / shape.height_mm;
-                    let mut parts = shape.parts.clone();
-                    for q in &mut parts {
-                        q.transform(&Transform::scale(k, k));
-                    }
-                    parts
-                }
-                None => {
-                    let stitch = edit.and_then(|e| e.stitch).unwrap_or(l.stitch);
-                    let mut parts = src.parts(p.letter, stitch, scale);
-                    for q in &mut parts {
-                        q.transform(&Transform::scale(scale, scale));
-                    }
-                    if l.mitre_corners {
-                        emb_model::mitre::join_parts(&mut parts);
-                    }
-                    parts
-                }
-            };
+            let mut parts = letter_parts(l, src, p.letter, &text, edit, scale);
             if parts.is_empty() {
                 continue;
+            }
+            if bold_w > 0.0 {
+                // The letter starts after its left side.
+                for q in &mut parts {
+                    q.transform(&Transform::translate(bold_w, 0.0));
+                }
             }
             let px = p.x + shift;
             let half = p.advance / 2.0;
@@ -126,6 +124,23 @@ pub fn layout_with_box(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> (Ve
                 parts,
             });
         }
+        // The underline is a letter with no text, at the index of the line
+        // break (no edit uses that index).
+        if let (Some(u), Some((x0, x1))) = (&l.underline, line_span)
+            && let Some(geometry) = style::underline(&l.baseline, y, x0, x1, u)
+        {
+            letters.push(Letter {
+                text: String::new(),
+                line: line_no,
+                index: index - 1,
+                frame: Transform::IDENTITY,
+                center: Point::new((x0 + x1) / 2.0, y),
+                parts: vec![ObjectKind::Satin {
+                    geometry,
+                    params: l.satin.clone(),
+                }],
+            });
+        }
     }
     let warp = !l.envelope.is_none() && l.baseline.is_straight();
     let Some((x0, x1)) = span.filter(|_| warp) else {
@@ -136,6 +151,143 @@ pub fn layout_with_box(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> (Ve
         l.envelope.warp_kind(&b, q);
     }
     (letters, Some(b))
+}
+
+/// The parts of one letter in letter space (the baseline at y = 0, scaled
+/// to the lettering): the shape of an edit of the letter, else the letter
+/// of the font, with the made bold and italic of `l`.
+fn letter_parts(
+    l: &Lettering,
+    src: &(impl LetterSource + ?Sized),
+    letter: u32,
+    text: &str,
+    edit: Option<&emb_model::LetterEdit>,
+    scale: f64,
+) -> Vec<ObjectKind> {
+    let mut parts = match edit.and_then(|e| e.shape.as_ref()).filter(|s| s.text == text) {
+        Some(shape) => {
+            let k = l.height_mm / shape.height_mm;
+            let mut parts = shape.parts.clone();
+            for q in &mut parts {
+                q.transform(&Transform::scale(k, k));
+            }
+            parts
+        }
+        None => {
+            let stitch = edit.and_then(|e| e.stitch).unwrap_or(l.stitch);
+            let mut parts = src.parts(letter, stitch, scale);
+            for q in &mut parts {
+                q.transform(&Transform::scale(scale, scale));
+            }
+            if l.mitre_corners {
+                emb_model::mitre::join_parts(&mut parts);
+            }
+            parts
+        }
+    };
+    if l.bold {
+        let w = style::bold_width(l.height_mm);
+        for q in &mut parts {
+            style::embolden(q, w);
+        }
+    }
+    if l.italic {
+        let t = style::italic();
+        for q in &mut parts {
+            q.transform(&t);
+        }
+    }
+    parts
+}
+
+/// The space between stacked letters, as a factor of the capital height.
+const STACK_GAP: f64 = 0.3;
+/// The step of a space in stacked text, as a factor of the letter step.
+const STACK_SPACE: f64 = 0.6;
+
+/// Stacked text (v0.3 plan, Stage 5): each letter upright, centered on the
+/// vertical line of its column, from top to bottom (`TextDirection::Down`)
+/// or with the first letter at the bottom (`Up`). Each line of the text is
+/// a column; the columns go from left to right. Justify puts the top
+/// (Left), the middle (Center) or the bottom (Right) of each column at the
+/// origin. A straight baseline only: no envelope and no underline.
+fn stacked(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> Vec<Letter> {
+    let scale = l.height_mm / src.cap_height();
+    let bold_w = if l.bold { style::bold_width(l.height_mm) } else { 0.0 };
+    let step = l.height_mm * (1.0 + STACK_GAP) + l.letter_spacing_mm;
+    // The columns are as far apart as the widest letter of the text.
+    let widest = l
+        .text
+        .chars()
+        .filter_map(|c| src.letter(c))
+        .map(|g| src.advance(g) * scale + 2.0 * bold_w)
+        .fold(0.0, f64::max);
+    let column_step = (widest + l.height_mm * STACK_GAP) * l.line_spacing.max(0.0);
+    let mut letters = Vec::new();
+    let mut index = 0;
+    for (line_no, line) in l.text.split('\n').enumerate() {
+        let cx = line_no as f64 * column_step;
+        let mut chars: Vec<(usize, char)> = Vec::new();
+        for c in line.chars() {
+            chars.push((index, c));
+            index += 1;
+        }
+        // The line break.
+        index += 1;
+        if l.direction == emb_model::TextDirection::Up {
+            chars.reverse();
+        }
+        // (index, char, letter, advance, baseline y) of each letter.
+        let mut column = Vec::new();
+        let mut y = 0.0;
+        for (i, c) in chars {
+            y += l.edit(i).map_or(0.0, |e| e.kern_mm);
+            match src.letter(c) {
+                Some(g) => {
+                    let advance = src.advance(g) * scale + 2.0 * bold_w;
+                    column.push((i, c, g, advance, y + l.height_mm));
+                    y += step;
+                }
+                None if c.is_whitespace() => y += step * STACK_SPACE,
+                None => {}
+            }
+        }
+        let length = column.last().map_or(0.0, |c| c.4);
+        let shift = match l.justify {
+            Justify::Left => 0.0,
+            Justify::Center => -length / 2.0,
+            Justify::Right => -length,
+        };
+        for (i, c, g, advance, base) in column {
+            let edit = l.edit(i);
+            let text = c.to_string();
+            let mut parts = letter_parts(l, src, g, &text, edit, scale);
+            if parts.is_empty() {
+                continue;
+            }
+            if bold_w > 0.0 {
+                for q in &mut parts {
+                    q.transform(&Transform::translate(bold_w, 0.0));
+                }
+            }
+            let half = advance / 2.0;
+            let frame = Transform::translate(cx - half, base + shift);
+            let center = Point::new(half, -l.height_mm / 2.0);
+            let t = edit.map_or(Transform::IDENTITY, |e| e.transform(center)).then(frame);
+            for q in &mut parts {
+                q.transform(&t);
+            }
+            letters.push(Letter {
+                text,
+                line: line_no,
+                index: i,
+                frame,
+                center,
+                parts,
+            });
+        }
+    }
+    letters
 }
 
 /// Makes the letters of `l` again from `src`, in place, with the size range
@@ -504,5 +656,106 @@ mod tests {
         assert!(matches!(layout(&l, &f)[0].parts[0], ObjectKind::Fill { .. }));
         l.height_mm = 10.0;
         assert!(matches!(layout(&l, &f)[0].parts[0], ObjectKind::Satin { .. }));
+    }
+}
+
+#[cfg(test)]
+mod style_tests {
+    use emb_geom::BBox;
+    use emb_model::{FontRef, TextDirection, Underline};
+
+    use super::*;
+    use crate::bundled;
+
+    fn bbox(letters: &[Letter]) -> BBox {
+        letters
+            .iter()
+            .flat_map(|l| l.parts.iter())
+            .filter_map(|p| p.paths().filter_map(|q| q.control_bbox()).reduce(BBox::union))
+            .reduce(BBox::union)
+            .unwrap()
+    }
+
+    fn lettering(text: &str) -> Lettering {
+        Lettering::new(
+            text,
+            FontRef::embroidery(bundled::DEFAULT_EMBROIDERY, ""),
+            20.0,
+            Point::new(0.0, 0.0),
+        )
+    }
+
+    #[test]
+    fn made_bold_and_italic_change_the_letters() {
+        let f = bundled::embroidery(bundled::DEFAULT_EMBROIDERY).unwrap();
+        let mut l = lettering("HIL");
+        let plain = bbox(&layout(&l, &f));
+        l.bold = true;
+        let bold = bbox(&layout(&l, &f));
+        assert!(bold.width() > plain.width() + 2.0, "{plain:?} {bold:?}");
+        assert!(
+            bold.height() > plain.height(),
+            "the strokes are wider at the top and bottom too"
+        );
+        l.bold = false;
+        l.italic = true;
+        let letters = layout(&l, &f);
+        // The top of the "I" moves to the right; its bottom does not.
+        let i = &letters[1];
+        let b = bbox(std::slice::from_ref(i));
+        let plain_i = bbox(&layout(&lettering("HIL"), &f)[1..2]);
+        assert!(b.max.x > plain_i.max.x + 2.0, "{plain_i:?} {b:?}");
+        assert!((b.min.x - plain_i.min.x).abs() < 1.0);
+    }
+
+    #[test]
+    fn an_underline_is_under_each_line() {
+        let f = bundled::embroidery(bundled::DEFAULT_EMBROIDERY).unwrap();
+        let mut l = lettering("AB\nCDE");
+        l.underline = Some(Underline::for_height(20.0));
+        let letters = layout(&l, &f);
+        let bars: Vec<&Letter> = letters.iter().filter(|x| x.text.is_empty()).collect();
+        assert_eq!(bars.len(), 2);
+        let line0 = bbox(
+            &letters
+                .iter()
+                .filter(|x| x.line == 0 && !x.text.is_empty())
+                .cloned()
+                .collect::<Vec<_>>(),
+        );
+        let bar0 = bbox(&[bars[0].clone()]);
+        assert!(bar0.min.y > 0.0, "under the baseline: {bar0:?}");
+        assert!(bar0.min.x <= line0.min.x + 0.5 && bar0.max.x >= line0.max.x - 0.5);
+        // Stacked text has no underline.
+        l.direction = TextDirection::Down;
+        assert!(layout(&l, &f).iter().all(|x| !x.text.is_empty()));
+    }
+
+    #[test]
+    fn stacked_letters_go_down_or_up_on_one_line() {
+        let f = bundled::embroidery(bundled::DEFAULT_EMBROIDERY).unwrap();
+        let mut l = lettering("OPEN");
+        l.direction = TextDirection::Down;
+        let letters = layout(&l, &f);
+        assert_eq!(letters.len(), 4);
+        let boxes: Vec<BBox> = letters.iter().map(|x| bbox(std::slice::from_ref(x))).collect();
+        // Each letter is under the one before it, on one vertical line.
+        for w in boxes.windows(2) {
+            assert!(w[1].min.y > w[0].max.y, "{w:?}");
+            assert!((w[1].center().x - w[0].center().x).abs() < 2.0, "{w:?}");
+        }
+        assert_eq!(letters[0].text, "O");
+        // Up: the first letter is at the bottom.
+        l.direction = TextDirection::Up;
+        let up = layout(&l, &f);
+        assert_eq!(up[0].text, "N");
+        assert_eq!(up[3].text, "O");
+        // A second line is a column to the right.
+        l.direction = TextDirection::Down;
+        l.text = "AB\nCD".into();
+        let two = layout(&l, &f);
+        let c = two.iter().find(|x| x.text == "C").unwrap();
+        let a = two.iter().find(|x| x.text == "A").unwrap();
+        assert!(bbox(std::slice::from_ref(c)).min.x > bbox(std::slice::from_ref(a)).max.x);
     }
 }

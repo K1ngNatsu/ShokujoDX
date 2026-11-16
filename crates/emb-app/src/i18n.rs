@@ -368,6 +368,7 @@ pub(crate) mod tests {
         out.extend(emb_model::ShapeOp::ALL.iter().map(|p| p.name()));
         out.extend(crate::manipulate::ScaleFrom::ALL.iter().map(|(_, name)| *name));
         out.extend(emb_model::ConvertTo::ALL.iter().map(|p| p.name()));
+        out.extend(emb_model::TextDirection::ALL.iter().map(|d| d.name()));
         out.extend(emb_model::BorderPlace::ALL.iter().map(|p| p.name()));
         out.extend(emb_model::ProductKind::ALL.iter().map(|p| p.name()));
         out.extend(

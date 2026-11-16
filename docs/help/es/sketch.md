@@ -16,11 +16,14 @@ bordado).
 
 ## Empezar y terminar
 
-- **Digitalizar > Iniciar boceto** crea un boceto nuevo, o abre el boceto
-  seleccionado. Un doble clic en un boceto también lo abre.
+- **Digitalizar > Boceto paramétrico** crea un boceto nuevo, o abre el
+  boceto seleccionado. Un doble clic en un boceto también lo abre.
 - La pestaña **Boceto** aparece mientras el boceto está abierto. Los demás
   objetos están atenuados y no reciben clics.
 - **Terminar boceto** cierra el boceto. Un boceto sin nada desaparece.
+- Un boceto nuevo tiene su **origen**: un punto auxiliar en (0, 0), un
+  anillo con una cruz. Las líneas y los puntos se ajustan a él. No se
+  mueve, y no se puede borrar.
 
 Cada cambio es un paso de deshacer; un arrastre es un paso.
 
@@ -357,7 +360,9 @@ Para las curvas (también las de construcción): selecciónelas, y después
 Los objetos nuevos toman las propiedades actuales y el hilo actual, y van
 al final del orden de bordado. Cuando el boceto está cerrado, su panel
 Propiedades crea bordado con todas sus regiones, o rectas a lo largo de
-todas sus curvas.
+todas sus curvas. También **Arte > Convertir** lo hace con los bocetos
+seleccionados: **A relleno** y **A satén** usan todas las regiones
+cerradas, **A contorno** crea una recta a lo largo de cada curva.
 
 ## Objetos que siguen al boceto
 
@@ -369,15 +374,18 @@ bordado. Deshacer quita el cambio y los objetos nuevos en un paso.
 - Para cambiar el boceto otra vez, haga doble clic en uno de sus objetos,
   o haga clic en **Editar boceto** (menú del clic derecho o panel
   Propiedades).
-- Cuando mueve, gira o escala el boceto, sus objetos se mueven con él.
-  Cuando mueve solo los objetos, se quedan a esa distancia del boceto.
+- Un boceto y sus objetos se quedan juntos: cuando mueve, gira o refleja
+  el boceto o uno de sus objetos, todos se mueven. Fuera del modo de boceto
+  no se escalan: cambie las cotas del boceto. **Separar** (o
+  **Desvincular**) convierte los objetos seleccionados en objetos normales
+  que se mueven, se escalan y cambian sus nodos solos.
 - Si un cambio abre una región o borra una curva, sus objetos se quedan
   como están, y el programa muestra una advertencia. Cierre la región de
   nuevo, o haga clic en **Desvincular** para convertirlos en objetos
   normales.
 - Los comandos de forma no aceptan objetos vinculados. Desvincúlelos
-  primero. Un cambio a mano de la forma de un objeto vinculado no se
-  conserva después del siguiente cambio del boceto.
+  primero. Los nodos de un objeto vinculado no cambian con Remodelar:
+  cambie el boceto, o use Separar primero.
 
 ## Arrastrar
 

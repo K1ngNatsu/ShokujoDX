@@ -2,7 +2,7 @@
 id: lettering
 title: Letras y monogramas
 group: design
-keywords: letras, texto, nombre, fuente, recorte, superposición, fuente de bordado, truetype, opentype, rango de tamaños, texto pequeño, altura, espaciado entre letras, interlineado, interletraje, alinear, línea base, arco, círculo, línea, envolvente, arte de letras, orden de bordado, cortes, saltos, letra, remodelar, alfabeto, fuente de mapa de bits, monograma, iniciales, nombres de equipo, lista de nombres, csv, diseños de teclado, quiosco, tienda, inglete, esquinas en inglete, esquina
+keywords: letras, texto, nombre, fuente, recorte, superposición, fuente de bordado, truetype, opentype, rango de tamaños, texto pequeño, altura, espaciado entre letras, interlineado, interletraje, alinear, línea base, arco, círculo, línea, envolvente, arte de letras, orden de bordado, cortes, saltos, letra, remodelar, alfabeto, fuente de mapa de bits, monograma, iniciales, nombres de equipo, lista de nombres, csv, diseños de teclado, quiosco, tienda, inglete, esquinas en inglete, esquina, negrita, cursiva, subrayado, estilo, vertical, apiladas, dirección del texto
 ---
 # Letras y monogramas
 
@@ -79,6 +79,30 @@ Seleccione las letras. Propiedades del objeto tiene:
   en otro trazo, como en «T», no cambian. Las puntadas quedan dentro de la
   forma de la letra: una esquina que no puede girar dentro de ella queda
   como un final y un comienzo.
+
+## Negrita, cursiva y subrayado
+
+Los botones de **Estilo** están en **Propiedades del objeto** de las
+letras:
+
+- **B** (Negrita) e **I** (Cursiva) usan la variante negrita o cursiva de
+  la fuente cuando la fuente la tiene. Si no, el programa crea el estilo:
+  la negrita hace más ancha cada columna de satén y más grande cada
+  relleno, la cursiva inclina las letras.
+- **U** (Subrayado) añade una barra de satén debajo de cada línea de
+  texto. Ajuste la **Separación del subrayado** (desde la línea base) y el
+  **Ancho del subrayado**. En un arco o un trazado, la barra sigue la
+  línea.
+
+## Texto apilado
+
+**Dirección del texto** en **Propiedades del objeto** pone **Apiladas, de
+arriba abajo** o **Apiladas, de abajo arriba**: cada letra queda derecha,
+una debajo de otra, como en un letrero. Cada línea del texto es una
+columna, y las columnas van de izquierda a derecha. **Alinear** pone el
+principio, el centro o el final de cada columna en el punto de inicio. El
+texto apilado no tiene arco, envolvente ni subrayado. Para girar 90° una
+línea entera de texto, gire el texto.
 
 ## Letras sobre una línea
 

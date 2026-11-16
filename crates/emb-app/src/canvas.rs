@@ -109,6 +109,48 @@ pub fn color32(c: Rgb) -> Color32 {
     Color32::from_rgb(c.0, c.1, c.2)
 }
 
+/// The distance from an edge of the canvas, in points, at which the
+/// endless pan makes the pointer jump.
+const WRAP_EDGE: f32 = 3.0;
+/// The frames in which the jump of the pointer can come.
+const JUMP_FRAMES: u8 = 10;
+
+/// Endless pan: where the pointer at `pos` goes if it is at an edge of
+/// `rect` (on the other side, a little inside), else `None`.
+pub fn pan_wrap(rect: Rect, pos: Pos2) -> Option<Pos2> {
+    let inner = rect.shrink(WRAP_EDGE);
+    if inner.width() <= WRAP_EDGE * 4.0 || inner.height() <= WRAP_EDGE * 4.0 {
+        return None;
+    }
+    let mut to = pos;
+    let gap = WRAP_EDGE * 2.0;
+    if pos.x <= inner.left() {
+        to.x = inner.right() - gap;
+    } else if pos.x >= inner.right() {
+        to.x = inner.left() + gap;
+    }
+    if pos.y <= inner.top() {
+        to.y = inner.bottom() - gap;
+    } else if pos.y >= inner.bottom() {
+        to.y = inner.top() + gap;
+    }
+    (to != pos).then_some(to)
+}
+
+/// The pan movement `delta` of this frame without the jump of the pointer
+/// that the endless pan asked for: the jump is taken out in the frame
+/// where it comes (the movement is near the jump). A jump that does not come
+/// in [`JUMP_FRAMES`] frames is forgotten.
+pub fn take_jump(delta: Vec2, jump: &mut Option<(Vec2, u8)>) -> Vec2 {
+    let Some((j, left)) = *jump else { return delta };
+    if (delta - j).length() < j.length() * 0.5 {
+        *jump = None;
+        return delta - j;
+    }
+    *jump = left.checked_sub(1).filter(|l| *l > 0).map(|l| (j, l));
+    delta
+}
+
 /// Shows the canvas and handles its input.
 pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
     let (response, painter) = ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
@@ -165,9 +207,21 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
         st.view.fit(rect, b);
     }
     if response.dragged_by(egui::PointerButton::Middle) || response.dragged_by(egui::PointerButton::Secondary) {
-        let d = response.drag_delta();
+        let d = take_jump(response.drag_delta(), &mut st.pan_jump);
         let s = st.view.scale();
         st.view.center -= Point::new(f64::from(d.x) / s, f64::from(d.y) / s);
+        // Endless pan (v0.3 plan, Stage 3): at an edge the pointer goes to
+        // the other side. Touch input cannot jump.
+        if st.settings.endless_pan
+            && !ui.input(|i| i.any_touches())
+            && let Some(pos) = response.interact_pointer_pos()
+            && let Some(to) = pan_wrap(rect, pos)
+        {
+            ui.ctx().send_viewport_cmd(egui::ViewportCommand::CursorPosition(to));
+            st.pan_jump = Some((to - pos, JUMP_FRAMES));
+        }
+    } else {
+        st.pan_jump = None;
     }
 
     let map = ViewMap::new(rect, st.view, st.doc.design());
@@ -1003,11 +1057,117 @@ mod tests {
     }
 
     #[test]
+    fn pan_wrap_goes_to_the_other_side() {
+        let r = Rect::from_min_max(Pos2::new(100.0, 50.0), Pos2::new(900.0, 650.0));
+        assert_eq!(pan_wrap(r, Pos2::new(500.0, 300.0)), None);
+        let to = pan_wrap(r, Pos2::new(101.0, 300.0)).unwrap();
+        assert!(to.x > 880.0 && to.x < 900.0 && to.y == 300.0, "{to:?}");
+        let to = pan_wrap(r, Pos2::new(500.0, 649.0)).unwrap();
+        assert!(to.y > 50.0 && to.y < 70.0 && to.x == 500.0, "{to:?}");
+        // A corner: both.
+        let to = pan_wrap(r, Pos2::new(899.0, 51.0)).unwrap();
+        assert!(to.x < 120.0 && to.y > 630.0, "{to:?}");
+        // The jump is taken out of the movement once; a small move stays.
+        let mut jump = Some((Vec2::new(780.0, 0.0), JUMP_FRAMES));
+        assert_eq!(take_jump(Vec2::new(-4.0, 1.0), &mut jump), Vec2::new(-4.0, 1.0));
+        assert!(jump.is_some());
+        assert_eq!(take_jump(Vec2::new(774.0, 1.0), &mut jump), Vec2::new(-6.0, 1.0));
+        assert!(jump.is_none());
+        // A jump that does not come is forgotten.
+        let mut jump = Some((Vec2::new(780.0, 0.0), 2));
+        take_jump(Vec2::ZERO, &mut jump);
+        take_jump(Vec2::ZERO, &mut jump);
+        assert!(jump.is_none());
+    }
+
+    #[test]
+    fn endless_pan_goes_on_past_the_edge() {
+        use eframe::egui::{Event, Modifiers, PointerButton, RawInput, ViewportCommand};
+        use emb_model::{HoopCatalog, MachineCatalog};
+
+        let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        let ctx = egui::Context::default();
+        let screen = Rect::from_min_size(Pos2::ZERO, Vec2::new(1000.0, 700.0));
+        // Runs a frame and returns the pointer jump that the frame asked for.
+        let run = |st: &mut AppState, events: Vec<Event>| -> Option<Pos2> {
+            let input = RawInput {
+                screen_rect: Some(screen),
+                events,
+                ..Default::default()
+            };
+            let mut out = ctx.run_ui(input, |ui| {
+                egui::CentralPanel::default().show(ui, |ui| show(ui, st));
+            });
+            out.textures_delta.clear();
+            out.viewport_output
+                .values()
+                .flat_map(|v| v.commands.iter())
+                .find_map(|c| match c {
+                    ViewportCommand::CursorPosition(p) => Some(*p),
+                    _ => None,
+                })
+        };
+        run(&mut st, vec![]);
+        let canvas = st.canvas_rect.unwrap();
+        let button = |pos, pressed| Event::PointerButton {
+            pos,
+            button: PointerButton::Middle,
+            pressed,
+            modifiers: Modifiers::NONE,
+        };
+        let start = canvas.center();
+        run(&mut st, vec![Event::PointerMoved(start)]);
+        run(&mut st, vec![button(start, true)]);
+        let before = st.view.center;
+        let scale = st.view.scale();
+        // Drag left to the edge, in steps.
+        let mut x = start.x;
+        let mut jump = None;
+        while jump.is_none() && x > canvas.left() - 10.0 {
+            x -= 25.0;
+            jump = run(
+                &mut st,
+                vec![Event::PointerMoved(Pos2::new(x.max(canvas.left()), start.y))],
+            );
+        }
+        let to = jump.expect("the pointer jumps at the left edge");
+        assert!(to.x > canvas.right() - 20.0, "{to:?}");
+        let moved = start.x - x.max(canvas.left());
+        // The jump comes (as the window system sends it) with 5 more points
+        // of movement to the left: the view goes on, with no lurch.
+        run(&mut st, vec![Event::PointerMoved(Pos2::new(to.x - 5.0, to.y))]);
+        let panned = (st.view.center.x - before.x) * scale;
+        assert!(
+            (panned - f64::from(moved + 5.0)).abs() < 1.0,
+            "{panned} vs {}",
+            moved + 5.0
+        );
+        run(&mut st, vec![button(Pos2::new(to.x - 5.0, to.y), false)]);
+        assert!(st.pan_jump.is_none());
+        // With the option off, the pointer does not jump.
+        st.settings.endless_pan = false;
+        run(&mut st, vec![Event::PointerMoved(start), button(start, true)]);
+        let mut x = start.x;
+        while x > canvas.left() {
+            x -= 25.0;
+            assert!(
+                run(
+                    &mut st,
+                    vec![Event::PointerMoved(Pos2::new(x.max(canvas.left()), start.y))]
+                )
+                .is_none()
+            );
+        }
+    }
+
+    #[test]
     fn double_middle_click_zooms_to_extents() {
         use eframe::egui::{Event, Modifiers, PointerButton, RawInput};
         use emb_model::{HoopCatalog, MachineCatalog};
 
         let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        // The test is on the reference machine.
+        st.start_on_machine("husqvarna_topaz20", None);
         st.add_sample_objects();
         let ctx = egui::Context::default();
         let screen = Rect::from_min_size(Pos2::ZERO, Vec2::new(1000.0, 700.0));

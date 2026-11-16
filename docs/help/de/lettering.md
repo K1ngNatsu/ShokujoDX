@@ -2,7 +2,7 @@
 id: lettering
 title: Schrift und Monogramme
 group: design
-keywords: schrift, text, name, schriftart, aussparung, überlappung, stickschrift, truetype, opentype, größenbereich, kleine schrift, höhe, buchstabenabstand, zeilenabstand, unterschneidung, ausrichten, grundlinie, bogen, kreis, linie, hülle, schrifteffekte, stickreihenfolge, fadenschnitte, sprünge, buchstabe, umformen, alphabet, bitmapschrift, monogramm, initialen, teamnamen, namensliste, csv, tastatur-designs, kiosk, geschäft, gehrung, gehrungsecken, ecke
+keywords: schrift, text, name, schriftart, aussparung, überlappung, stickschrift, truetype, opentype, größenbereich, kleine schrift, höhe, buchstabenabstand, zeilenabstand, unterschneidung, ausrichten, grundlinie, bogen, kreis, linie, hülle, schrifteffekte, stickreihenfolge, fadenschnitte, sprünge, buchstabe, umformen, alphabet, bitmapschrift, monogramm, initialen, teamnamen, namensliste, csv, tastatur-designs, kiosk, geschäft, gehrung, gehrungsecken, ecke, fett, kursiv, unterstrichen, stil, senkrecht, gestapelt, textrichtung
 ---
 # Schrift und Monogramme
 
@@ -82,6 +82,31 @@ Wählen Sie die Schrift aus. Die Objekteigenschaften haben:
   Strich endet, wie in „T“, ändern sich nicht. Die Stiche bleiben in der
   Form des Buchstabens: Eine Ecke, die darin nicht umbiegen kann, bleibt
   ein Aufhören und Anfangen.
+
+## Fett, kursiv und unterstrichen
+
+Die Schaltflächen **Stil** sind in den **Objekteigenschaften** des
+Schriftzugs:
+
+- **B** (Fett) und **I** (Kursiv) benutzen den fetten oder kursiven
+  Schnitt der Schrift, wenn die Schrift einen hat. Sonst erstellt das
+  Programm den Stil: Fett macht jede Satinsäule breiter und jede Füllung
+  größer, Kursiv neigt die Buchstaben.
+- **U** (Unterstrichen) fügt unter jeder Textzeile einen Satinbalken
+  hinzu. Stellen Sie den **Abstand der Unterstreichung** (von der
+  Grundlinie) und die **Breite der Unterstreichung** ein. Auf einem Bogen
+  oder einem Pfad folgt der Balken der Linie.
+
+## Gestapelter Text
+
+**Textrichtung** in den **Objekteigenschaften** stellt **Gestapelt, von
+oben nach unten** oder **Gestapelt, von unten nach oben** ein: Jeder
+Buchstabe bleibt aufrecht, einer unter dem anderen, wie auf einem Schild.
+Jede Textzeile ist eine Spalte, und die Spalten gehen von links nach
+rechts. **Ausrichten** setzt den Anfang, die Mitte oder das Ende jeder
+Spalte auf den Startpunkt. Gestapelter Text hat keinen Bogen, keine Hülle
+und keine Unterstreichung. Um eine ganze Textzeile um 90° zu drehen,
+drehen Sie stattdessen den Text.
 
 ## Schrift auf einer Linie
 

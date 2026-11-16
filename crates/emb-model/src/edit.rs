@@ -255,6 +255,16 @@ impl Design {
         if *t == Transform::IDENTITY {
             return false;
         }
+        // A sketch and its objects do not scale outside sketch mode (v0.3
+        // plan, Stage 4); the app says so before it asks.
+        let kept: Vec<ObjectId>;
+        let ids = if self.scales_sketch(ids, t) {
+            let family = self.sketch_family(ids);
+            kept = ids.iter().copied().filter(|id| !family.contains(id)).collect();
+            &kept[..]
+        } else {
+            ids
+        };
         let mut changed = false;
         for id in ids {
             if let Some(o) = self.object_mut(*id) {

@@ -15,12 +15,15 @@ regions and its curves (see Make embroidery).
 
 ## Start and finish
 
-- **Digitize > Start Sketch** makes a new sketch, or opens the selected
-  sketch. A double-click on a sketch also opens it.
+- **Digitize > Parametric Sketch** makes a new sketch, or opens the
+  selected sketch. A double-click on a sketch also opens it.
 - The **Sketch** tab shows while the sketch is open. The other objects are
   dim and take no clicks.
 - **Finish Sketch** closes the sketch. A sketch with nothing in it goes
   away.
+- A new sketch has its **origin**: a construction point at (0, 0), a ring
+  with a cross. Lines and points snap to it. It does not move, and you
+  cannot delete it.
 
 Each change is one undo step; a drag is one step.
 
@@ -332,6 +335,9 @@ satin column with the two curves as its sides).
 The new objects take the current properties and the current thread, and go
 at the end of the sew order. When the sketch is closed, its Properties
 panel makes embroidery of all its regions, or runs along all its curves.
+Also **Artwork > Convert** does it for the selected sketches: **To Fill**
+and **To Satin** use all the closed regions, **To Outline** makes a run
+along each curve.
 
 ## Objects that follow the sketch
 
@@ -342,14 +348,17 @@ back the change and the new objects in one step.
 
 - To change the sketch again, double-click one of its objects, or click
   **Edit Sketch** (right-click menu or Properties panel).
-- When you move, turn or scale the sketch, its objects move with it. When
-  you move only the objects, they stay at that distance from the sketch.
+- A sketch and its objects stay together: when you move, turn or mirror
+  the sketch or one of its objects, all of them move. Outside sketch mode
+  they do not scale: change the dimensions of the sketch. **Break Apart**
+  (or **Unlink**) makes the selected objects plain objects that move,
+  scale and change their nodes alone.
 - If a change opens a region or deletes a curve, its objects stay as they
   are, and the program shows a warning. Close the region again, or click
   **Unlink** to make them plain objects.
-- Shaping commands do not take linked objects. Unlink them first. A change
-  of the shape of a linked object by hand does not stay after the next
-  change of the sketch.
+- Shaping commands do not take linked objects. Unlink them first. The
+  nodes of a linked object do not change with Reshape: change the sketch,
+  or use Break Apart first.
 
 ## Drag
 

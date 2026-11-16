@@ -32,6 +32,30 @@ jobs:
           if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup --no-progress -y }
       - name: Packages
         run: powershell -ExecutionPolicy Bypass -File tools\package-windows.ps1 -Installer
+      # The last published version, installed for all users, is removed by
+      # the new installer (for this user); the settings stay (v0.3 plan,
+      # Stage 1). The runner is an administrator, so no question shows.
+      - name: The installer removes an older version and keeps the settings
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download --repo ${{ github.repository }} --pattern '*-windows-setup.exe' --dir old
+          $old = Get-ChildItem old\*-windows-setup.exe | Select-Object -First 1
+          Write-Output "older version: $($old.Name)"
+          Start-Process $old.FullName -ArgumentList '/VERYSILENT', '/ALLUSERS', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait
+          $key = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{4FDD400B-23A4-46D2-BC5E-2B6A425A358A}_is1'
+          if (-not (Test-Path "HKLM:\$key")) { Write-Output 'the older version is not installed'; exit 1 }
+          $settings = "$env:APPDATA\ShokujoDX"
+          New-Item -ItemType Directory -Force $settings | Out-Null
+          Set-Content "$settings\upgrade-test.txt" 'keep'
+          $setup = Get-ChildItem dist\*-windows-setup.exe | Select-Object -First 1
+          Start-Process $setup.FullName -ArgumentList '/VERYSILENT', '/CURRENTUSER', '/SUPPRESSMSGBOXES', '/NORESTART', '/LOG=upgrade.log' -Wait
+          Get-Content upgrade.log | Select-String 'older version'
+          if (Test-Path "HKLM:\$key") { Get-Content upgrade.log -Tail 40; Write-Output 'the older version is still installed'; exit 1 }
+          if (Test-Path "$env:ProgramFiles\ShokujoDX\ShokujoDX.exe") { Write-Output 'the files of the older version are still there'; exit 1 }
+          if (-not (Test-Path "HKCU:\$key")) { Write-Output 'the new version is not installed'; exit 1 }
+          if ((Get-Content "$settings\upgrade-test.txt") -ne 'keep') { Write-Output 'the settings did not stay'; exit 1 }
       - name: The installer installs and the program starts
         shell: pwsh
         run: |

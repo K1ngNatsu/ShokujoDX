@@ -56,10 +56,10 @@ does not load on the machine.
 
 | # | State | Notes |
 | --- | --- | --- |
-| 1 | Software done; sew-out open | `emb-stitch` (running, plan, cache), `emb_formats::dst`, Stitches view, Export dialog. `tests/corpus/svg/line-art-sampler.svg` exports to DST; pyembroidery reads it back with the same stitches, 3 colors and 5 trims. To write the sample files: `EMB_SAMPLE_OUT=<dir> cargo test -p emb-app -- --ignored write_sampler`. |
-| 2 | Software done; sew-out open | `emb_formats::vp3`. The VP3 of the sampler has the same bytes as pyembroidery writes, except the stitch-count field (pyembroidery counts the records of its own pattern). The Export dialog selects VP3 for the Topaz 20. |
-| 3 | Software done; sew-out open | `emb_stitch::{fill, travel}`: tatami rows, sections, travel inside the shape, staggered needle points, pull compensation, tatami and edge-walk underlay. |
-| 4 | Software done; sew-out open | `emb_stitch::satin`: rails and rungs, spacing, pull compensation, short stitches, auto split, center-walk, edge-walk and zigzag underlay. Column C (`SatinGeometry::from_centerline`) and the Column C draw tool. |
+| 1 | Done; sew-out covered (P4 to P14 sew-outs on the Topaz 20) | `emb-stitch` (running, plan, cache), `emb_formats::dst`, Stitches view, Export dialog. `tests/corpus/svg/line-art-sampler.svg` exports to DST; pyembroidery reads it back with the same stitches, 3 colors and 5 trims. To write the sample files: `EMB_SAMPLE_OUT=<dir> cargo test -p emb-app -- --ignored write_sampler`. |
+| 2 | Done; sew-out covered (P4 to P14 sew-outs on the Topaz 20) | `emb_formats::vp3`. The VP3 of the sampler has the same bytes as pyembroidery writes, except the stitch-count field (pyembroidery counts the records of its own pattern). The Export dialog selects VP3 for the Topaz 20. |
+| 3 | Done; sew-out covered (P4 to P14 sew-outs on the Topaz 20) | `emb_stitch::{fill, travel}`: tatami rows, sections, travel inside the shape, staggered needle points, pull compensation, tatami and edge-walk underlay. |
+| 4 | Done; sew-out covered (P4 to P14 sew-outs on the Topaz 20) | `emb_stitch::satin`: rails and rungs, spacing, pull compensation, short stitches, auto split, center-walk, edge-walk and zigzag underlay. Column C (`SatinGeometry::from_centerline`) and the Column C draw tool. |
 | 5 | Software done; Brother test open | `emb_formats::pes`: PES version 1 with the PEC part. For all corpus designs the bytes are the same as pyembroidery writes (with the same rounding). |
 | 6 | Done, except CI and the Ink/Stitch comparison | `emb-cli` (`convert`, `stitch`, `corpus`), the corpus in code (`emb_cli::corpus`), golden tests in `crates/emb-cli/tests/golden.rs`. CI on three platforms was deferred by the owner; it is now in `.github/workflows/ci.yml` (and the release builds, ADR 0043). The comparison with Ink/Stitch needs an Ink/Stitch install; it is open. |
 

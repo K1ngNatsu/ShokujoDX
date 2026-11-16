@@ -423,6 +423,19 @@ pub struct Settings {
     pub display: crate::viewtools::DisplayColors,
     /// The thread look: flat or 3D, the light and the fabric texture.
     pub look: crate::viewtools::LookSettings,
+    /// The View options that stay between sessions (Thread Look, Stitches,
+    /// Jumps and the others; v0.3 plan, Stage 2).
+    pub view: crate::viewtools::ViewOptions,
+    /// The user's machine (an id of the machine catalog): new designs at
+    /// the start use it. `None` until the first start asks for it
+    /// (`first_start.rs`; v0.3 plan, Stage 2).
+    pub machine: Option<String>,
+    /// The user's hoop (an id of the hoop catalog), for new designs at the
+    /// start. `None`: the first hoop of the machine.
+    pub hoop: Option<String>,
+    /// Endless pan: during a pan drag, the pointer goes to the other side
+    /// of the canvas at an edge (v0.3 plan, Stage 3).
+    pub endless_pan: bool,
     /// The start page shows when the program starts.
     pub start_page: bool,
     /// Simple mode: fewer tools and larger buttons (P10 Milestone 5).
@@ -485,6 +498,10 @@ impl Default for Settings {
             favorite_styles: Vec::new(),
             display: Default::default(),
             look: Default::default(),
+            view: Default::default(),
+            machine: None,
+            hoop: None,
+            endless_pan: true,
             start_page: true,
             simple_mode: false,
             trims: Default::default(),
@@ -1353,6 +1370,12 @@ pub fn options_window(ctx: &egui::Context, st: &mut AppState) {
                         ui.checkbox(&mut s.show_rulers, tr("Show rulers"));
                         ui.checkbox(&mut s.snap_guides, tr("Snap to Guides"));
                     });
+                    ui.end_row();
+                    ui.label(tr("Pan"));
+                    ui.checkbox(&mut s.endless_pan, tr("Endless pan"))
+                        .on_hover_text(tr(
+                            "During a pan with the middle or right button, the pointer goes to the other side of the canvas at an edge, so the pan does not stop.",
+                        ));
                     ui.end_row();
                     ui.label(tr("Snap distance"));
                     ui.add(egui::DragValue::new(&mut s.snap_px).range(2.0..=30.0).clamp_existing_to_range(false).suffix(" px"));

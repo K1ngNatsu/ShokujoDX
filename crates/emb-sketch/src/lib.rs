@@ -508,6 +508,11 @@ pub struct Sketch {
     /// sketch (0 is 1; see `Sketch::expr_scale`).
     #[serde(default, skip_serializing_if = "unscaled")]
     pub expr_scale: f64,
+    /// The origin: a construction point at (0, 0) that does not move (a
+    /// `Fix` constraint holds it) and that the user cannot delete (v0.3
+    /// plan, Stage 4). Sketches of older versions have none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<PointId>,
 }
 
 fn unscaled(k: &f64) -> bool {
@@ -545,6 +550,33 @@ mod id_map {
 impl Sketch {
     pub fn new() -> Sketch {
         Sketch::default()
+    }
+
+    /// A new sketch with its origin: a fixed point at (0, 0).
+    pub fn with_origin() -> Sketch {
+        let mut s = Sketch::new();
+        let p = s.add_point(Point::ZERO);
+        let _ = s.add_constraint(Constraint::Fix {
+            point: p,
+            at: Point::ZERO,
+        });
+        s.origin = Some(p);
+        s
+    }
+
+    /// Returns `true` if the sketch has nothing but its origin.
+    pub fn is_empty(&self) -> bool {
+        self.curves.is_empty() && self.points.iter().all(|p| self.is_origin(p.id))
+    }
+
+    /// Returns `true` if `id` is the origin point.
+    pub fn is_origin(&self, id: PointId) -> bool {
+        self.origin == Some(id)
+    }
+
+    /// Returns `true` if constraint `id` holds the origin in its place.
+    fn holds_origin(&self, id: ConstraintId) -> bool {
+        matches!(self.constraint(id), Some(Constraint::Fix { point, .. }) if self.is_origin(*point))
     }
 
     fn take_id(&mut self) -> u32 {
@@ -903,7 +935,11 @@ impl Sketch {
         Ok(())
     }
 
+    /// Removes a constraint. The constraint that holds the origin stays.
     pub fn remove_constraint(&mut self, id: ConstraintId) -> bool {
+        if self.holds_origin(id) {
+            return false;
+        }
         let n = self.constraints.len();
         self.constraints.retain(|c| c.id != id);
         self.constraints.len() != n
@@ -925,9 +961,10 @@ impl Sketch {
         true
     }
 
-    /// Removes a point that no curve uses, and its constraints.
+    /// Removes a point that no curve uses, and its constraints. The origin
+    /// stays.
     pub fn remove_point(&mut self, id: PointId) -> bool {
-        if self.curves.iter().any(|x| x.points().contains(&id)) {
+        if self.is_origin(id) || self.curves.iter().any(|x| x.points().contains(&id)) {
             return false;
         }
         let n = self.points.len();

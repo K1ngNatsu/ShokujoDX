@@ -83,7 +83,12 @@ pub fn prompt(st: &AppState) -> Option<&'static str> {
 
 /// The diamond of letter `i`: its anchor on the baseline, in the design.
 fn anchor(l: &Lettering, i: usize) -> Option<Point> {
-    let c = l.letters.get(i)?.center;
+    let letter = l.letters.get(i)?;
+    // The underline is a letter with no text: it has no handle.
+    if letter.text.is_empty() {
+        return None;
+    }
+    let c = letter.center;
     l.letter_point(i, Point::new(c.x, 0.0))
 }
 

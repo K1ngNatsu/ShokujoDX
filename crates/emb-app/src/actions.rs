@@ -266,6 +266,31 @@ fn closest_points(a: &[Polyline], b: &[Polyline]) -> Option<(Point, Point)> {
     best.map(|(_, p, q)| (p, q))
 }
 
+/// The objects `ids` in units that move as one, each with the box of its
+/// objects. A sketch and the objects made from it move together (ADR 0097):
+/// a move of one of them moves all, so the selected objects of one sketch
+/// are one unit (else Align and Space Evenly move them more than once).
+fn move_units(design: &Design, ids: &[ObjectId]) -> Vec<(Vec<ObjectId>, BBox)> {
+    let mut units: Vec<(Vec<ObjectId>, BBox)> = Vec::new();
+    let mut done: HashSet<ObjectId> = HashSet::new();
+    for id in ids {
+        if done.contains(id) {
+            continue;
+        }
+        let family = design.sketch_family(&[*id]);
+        let unit: Vec<ObjectId> = if family.is_empty() {
+            vec![*id]
+        } else {
+            ids.iter().copied().filter(|x| family.contains(x)).collect()
+        };
+        done.extend(unit.iter().copied());
+        if let Some(b) = design.bbox_of(&unit) {
+            units.push((unit, b));
+        }
+    }
+    units
+}
+
 impl AppState {
     pub(crate) fn sel(&self) -> Vec<ObjectId> {
         self.selection.in_sew_order(self.doc.design())
@@ -470,7 +495,21 @@ impl AppState {
     /// Splits objects with several parts into one object per part: lines
     /// per subpath, fills per separate area (with their holes).
     pub fn break_apart(&mut self) {
-        if self.refuse_linked(&self.sel()) {
+        // Objects made from a sketch follow it until Break Apart frees them
+        // (v0.3 plan, Stage 4); other links still refuse.
+        let design = self.doc.design();
+        let freed: Vec<u32> = design
+            .sketch_links
+            .iter()
+            .filter(|l| self.sel().iter().any(|id| l.has(*id)))
+            .map(|l| l.id)
+            .collect();
+        let other_links: Vec<ObjectId> = self
+            .sel()
+            .into_iter()
+            .filter(|id| design.sketch_link_of(*id).is_none())
+            .collect();
+        if self.refuse_linked(&other_links) {
             return;
         }
         let design = self.doc.design();
@@ -565,13 +604,14 @@ impl AppState {
             .copied()
             .filter(|id| design.object(*id).is_some_and(|o| o.group.is_some()))
             .collect();
-        if parts.is_empty() && grouped.is_empty() {
+        if parts.is_empty() && grouped.is_empty() && freed.is_empty() {
             self.message = tr("Nothing to break apart: the selection has one part per object.").into();
             return;
         }
         let split: Vec<ObjectId> = parts.iter().map(|(id, _)| *id).collect();
         let (n_split, n_grouped) = (parts.len(), grouped.len());
         let new = self.doc.edit(tr("Break Apart"), |d| {
+            d.sketch_links.retain(|l| !freed.contains(&l.id));
             for id in &grouped {
                 if let Some(o) = d.object_mut(*id) {
                     o.group = None;
@@ -586,6 +626,7 @@ impl AppState {
         keep.extend(new);
         self.selection.set_all(keep);
         self.message = match (n_split, n_grouped) {
+            (0, 0) => tr("The objects are free of their sketch: they no longer follow it.").into(),
             (0, g) => crate::i18n::fill("{} objects are out of their group: click one to edit it alone.", &[&g]),
             (s, 0) => crate::i18n::fill("Broke {} objects apart.", &[&s]),
             (s, g) => crate::i18n::fill("Broke {} objects apart; {} objects are out of their group.", &[&s, &g]),
@@ -747,9 +788,8 @@ impl AppState {
         let ids = self.sel();
         let design = self.doc.design();
         let Some(all) = design.bbox_of(&ids) else { return };
-        let moves: Vec<(ObjectId, Point)> = ids
-            .iter()
-            .filter_map(|id| design.bbox_of(&[*id]).map(|b| (*id, b)))
+        let moves: Vec<(Vec<ObjectId>, Point)> = move_units(design, &ids)
+            .into_iter()
             .map(|(id, b)| {
                 let d = match how {
                     Align::Left => Point::new(all.min.x - b.min.x, 0.0),
@@ -763,8 +803,8 @@ impl AppState {
             })
             .collect();
         self.doc.edit(tr("Align"), |d| {
-            for (id, m) in &moves {
-                d.transform_objects(&[*id], &Transform::translate(m.x, m.y));
+            for (unit, m) in &moves {
+                d.transform_objects(unit, &Transform::translate(m.x, m.y));
             }
         });
     }
@@ -773,10 +813,7 @@ impl AppState {
     pub fn space_evenly(&mut self, horizontal: bool) {
         let ids = self.sel();
         let design = self.doc.design();
-        let mut boxes: Vec<(ObjectId, BBox)> = ids
-            .iter()
-            .filter_map(|id| design.bbox_of(&[*id]).map(|b| (*id, b)))
-            .collect();
+        let mut boxes = move_units(design, &ids);
         if boxes.len() < 3 {
             self.message = tr("Select three or more objects to space them.").into();
             return;
@@ -791,10 +828,10 @@ impl AppState {
         let gap = (span - total) / (boxes.len() - 1) as f64;
         let mut at = lo(&boxes[0].1);
         let mut moves = Vec::new();
-        for (id, b) in &boxes {
+        for (unit, b) in &boxes {
             let d = at - lo(b);
             moves.push((
-                *id,
+                unit.clone(),
                 if horizontal {
                     Point::new(d, 0.0)
                 } else {
@@ -804,8 +841,8 @@ impl AppState {
             at += size(b) + gap;
         }
         self.doc.edit(tr("Space Evenly"), |d| {
-            for (id, m) in &moves {
-                d.transform_objects(&[*id], &Transform::translate(m.x, m.y));
+            for (unit, m) in &moves {
+                d.transform_objects(unit, &Transform::translate(m.x, m.y));
             }
         });
     }
@@ -840,6 +877,11 @@ impl AppState {
                 d.transform_objects(&[*id], t);
             }
         });
+        for (id, t) in &scales {
+            if self.warn_sketch_scale(&[*id], t) {
+                break;
+            }
+        }
     }
 
     /// Skews the selection about its center: `x_deg` slants vertical lines, `y_deg` horizontal lines.
@@ -1374,6 +1416,77 @@ mod tests {
         h.st.selection.set_all([c, a]);
         h.st.make_same_size(true, true);
         assert!((h.st.doc.design().bbox_of(&[a]).unwrap().width() - 20.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn align_and_space_move_the_objects_of_a_sketch_once() {
+        use emb_model::LinkSource;
+        use emb_model::sketch::{RegionTo, SketchObject};
+
+        let mut h = Harness::empty();
+        // A 60 × 40 mm frame (5 mm wide) as a sketch, with its inner region
+        // as a fill and its ring as a satin border.
+        let mut s = emb_sketch::Sketch::new();
+        let c = [p(0.0, 0.0), p(60.0, 0.0), p(60.0, 40.0), p(0.0, 40.0)].map(|q| s.add_point(q));
+        let l = [0, 1, 2, 3].map(|i| s.add_line_between(c[i], c[(i + 1) % 4]).unwrap());
+        s.offset(&l, 5.0).unwrap();
+        assert!(s.solve().converged);
+        let (sk, fill, border) = h.st.doc.edit("Sketch", |d| {
+            let t = d.thread_for_color(Rgb(200, 0, 0));
+            let sk = d.add_object(t, ObjectKind::Sketch(Box::new(SketchObject::new(s))));
+            let ObjectKind::Sketch(o) = d.object(sk).unwrap().kind.clone() else {
+                unreachable!()
+            };
+            let regions = o.regions();
+            let ring = regions.iter().position(|r| !r.holes.is_empty()).unwrap();
+            let source = |i: usize, to: RegionTo| LinkSource::Region {
+                key: o.region_key(&regions[i]),
+                to,
+                width_mm: 6.0,
+                color: Rgb(0, 0, 0),
+            };
+            let current = d.current.clone();
+            let fill = d.make_from_sketch(sk, source(1 - ring, RegionTo::Fill), &current, t);
+            let border = d.make_from_sketch(sk, source(ring, RegionTo::Satin), &current, t);
+            (sk, fill[0], border[0])
+        });
+        let other = add(&mut h, square_fill(100.0, 30.0, 10.0));
+        let d = h.st.doc.design();
+        let gap = |d: &Design, a: ObjectId, b: ObjectId| d.bbox_of(&[b]).unwrap().min - d.bbox_of(&[a]).unwrap().min;
+        let (fill_in_border, sketch_at) = (gap(d, border, fill), d.bbox_of(&[sk]).unwrap().min);
+        // The fill and its border have the same center: Align Center moves
+        // the sketch once, by the distance from its center to the center
+        // of the selection.
+        h.st.selection.set_all([sk, fill, border, other]);
+        let all = h.st.doc.design().bbox_of(&h.st.sel()).unwrap();
+        let family = h.st.doc.design().bbox_of(&[sk, fill, border]).unwrap();
+        h.st.align(Align::CenterY);
+        let d = h.st.doc.design();
+        let moved = d.bbox_of(&[sk]).unwrap().min - sketch_at;
+        assert!(
+            (moved.y - (all.center().y - family.center().y)).abs() < 1e-6 && moved.x.abs() < 1e-9,
+            "{moved:?}"
+        );
+        assert!(
+            (gap(d, border, fill) - fill_in_border).length() < 1e-6,
+            "the family stays together"
+        );
+        assert!((d.bbox_of(&[other]).unwrap().center().y - all.center().y).abs() < 1e-6);
+        // Space Evenly needs three units: the sketch is one.
+        let third = add(&mut h, square_fill(200.0, 0.0, 10.0));
+        h.st.selection.set_all([sk, fill, border, other, third]);
+        h.st.space_evenly(true);
+        let d = h.st.doc.design();
+        let (b1, b2, b3) = (
+            d.bbox_of(&[sk, fill, border]).unwrap(),
+            d.bbox_of(&[other]).unwrap(),
+            d.bbox_of(&[third]).unwrap(),
+        );
+        assert!(
+            ((b2.min.x - b1.max.x) - (b3.min.x - b2.max.x)).abs() < 1e-6,
+            "{b1:?} {b2:?} {b3:?}"
+        );
+        assert!((gap(d, border, fill) - fill_in_border).length() < 1e-6);
     }
 
     #[test]

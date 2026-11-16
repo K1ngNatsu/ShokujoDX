@@ -60,6 +60,35 @@ impl AppState {
         let t = make(b);
         self.doc.edit(label, |d| d.transform_objects(&ids, &t));
         self.message = label.to_string();
+        self.warn_sketch_scale(&ids, &t);
+    }
+
+    /// The message when a sketch or an object made from one does not scale.
+    pub fn sketch_scale_message() -> &'static str {
+        tr(
+            "Sketches and the objects made from them change size only in sketch mode. Open the sketch to change its dimensions, or use Break Apart to free the objects.",
+        )
+    }
+
+    /// Says so if `t` scales a sketch or an object made from one (the
+    /// design leaves them as they are). Returns `true` if it did.
+    pub fn warn_sketch_scale(&mut self, ids: &[ObjectId], t: &Transform) -> bool {
+        let scales = self.doc.design().scales_sketch(ids, t);
+        if scales {
+            self.message = Self::sketch_scale_message().into();
+        }
+        scales
+    }
+
+    /// Before a scale drag of the selection: says so and returns `true` if
+    /// the selection has a sketch or an object made from one.
+    pub fn refuse_sketch_scale(&mut self) -> bool {
+        let ids = self.selected();
+        let refuse = !self.doc.design().sketch_family(&ids).is_empty();
+        if refuse {
+            self.message = Self::sketch_scale_message().into();
+        }
+        refuse
     }
 
     /// Rotates the selection about its center. Positive turns clockwise on screen.

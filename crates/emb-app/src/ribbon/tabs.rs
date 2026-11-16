@@ -66,8 +66,12 @@ pub(super) const DIGITIZE: &[Panel] = &[
         title: "Shapes",
         items: &[
             Small(&[t(Tool::Rectangle), t(Tool::RoundRect), t(Tool::Ellipse)]),
-            Small(&[t(Tool::Star), Cmd::StartSketch]),
+            Small(&[t(Tool::Star)]),
         ],
+    },
+    Panel {
+        title: "Sketch",
+        items: &[Large(Cmd::StartSketch)],
     },
     Panel {
         title: "Decorate",
@@ -207,62 +211,103 @@ pub(super) fn icon_cmd(ui: &mut egui::Ui, st: &mut AppState, s: &SelInfo, cmd: C
     }
 }
 
-/// The Sketch tab (sketch mode, P14 Milestone 2).
+/// The drop-down buttons of the Sketch tab: the line, circle, arc and
+/// rectangle tools, each with its kinds (v0.3 plan, Stage 4).
+pub(super) const SKETCH_LINES: [Cmd; 2] = {
+    use crate::sketch::SketchTool as T;
+    [sk(T::Line), sk(T::Spline)]
+};
+pub(super) const SKETCH_CIRCLES: [Cmd; 2] = {
+    use crate::sketch::SketchTool as T;
+    [sk(T::Circle), sk(T::TangentCircle)]
+};
+pub(super) const SKETCH_ARCS: [Cmd; 3] = {
+    use crate::sketch::SketchTool as T;
+    [sk(T::Arc3), sk(T::ArcCenter), sk(T::ArcTangent)]
+};
+pub(super) const SKETCH_RECTANGLES: [Cmd; 6] = {
+    use crate::sketch::SketchTool as T;
+    [
+        sk(T::Rectangle),
+        sk(T::Rect3),
+        sk(T::RectCenter),
+        sk(T::RectCenter3),
+        sk(T::Slot),
+        sk(T::Polygon),
+    ]
+};
+
+fn drop_lines(ui: &mut egui::Ui, st: &mut AppState, s: &SelInfo) {
+    split_large(ui, st, s, "lines", &SKETCH_LINES);
+}
+
+fn drop_circles(ui: &mut egui::Ui, st: &mut AppState, s: &SelInfo) {
+    split_large(ui, st, s, "circles", &SKETCH_CIRCLES);
+}
+
+fn drop_arcs(ui: &mut egui::Ui, st: &mut AppState, s: &SelInfo) {
+    split_large(ui, st, s, "arcs", &SKETCH_ARCS);
+}
+
+fn drop_rectangles(ui: &mut egui::Ui, st: &mut AppState, s: &SelInfo) {
+    split_large(ui, st, s, "rectangles", &SKETCH_RECTANGLES);
+}
+
+/// The Sketch tab (sketch mode, P14 Milestone 2). The groups are as in the
+/// reference CAD program (v0.3 plan, Stage 4): Create with drop-down
+/// buttons, Modify, Pattern, Constrain, Format, and Finish at the end.
 pub(super) const SKETCH: &[Panel] = {
     use crate::sketch::SketchTool as T;
     &[
         Panel {
             title: "Sketch",
-            items: &[
-                Large(Cmd::Sketch(SketchCmd::Finish)),
-                Large(sk(T::Select)),
-                Large(sk(T::Regions)),
-            ],
+            items: &[Large(sk(T::Select)), Large(sk(T::Regions))],
         },
         Panel {
-            title: "Draw",
+            title: "Create",
             items: &[
-                Large(sk(T::Line)),
-                Large(sk(T::Spline)),
-                Small(&[sk(T::Rectangle), sk(T::RectCenter), sk(T::Rect3)]),
-                Small(&[sk(T::RectCenter3), sk(T::Slot), sk(T::Polygon)]),
-                Small(&[sk(T::Circle), sk(T::TangentCircle), sk(T::Point)]),
-                Small(&[sk(T::Arc3), sk(T::ArcCenter), sk(T::ArcTangent)]),
-                Small(&[
-                    Cmd::Sketch(SketchCmd::Construction),
-                    Cmd::Sketch(SketchCmd::Centerline),
-                    Cmd::Sketch(SketchCmd::CenterPoint),
-                ]),
-            ],
-        },
-        Panel {
-            title: "Constrain",
-            items: &[Custom(constraint_icons, &SKETCH_CONSTRAINTS)],
-        },
-        Panel {
-            title: "Dimension",
-            items: &[
-                Large(sk(T::Dimension)),
-                Large(Cmd::Sketch(SketchCmd::Parameters)),
-                Small(&[
-                    Cmd::Sketch(SketchCmd::AutoDimension),
-                    Cmd::Sketch(SketchCmd::Relax),
-                    Cmd::Sketch(SketchCmd::RelaxMode),
-                ]),
+                Custom(drop_lines, &SKETCH_LINES),
+                Custom(drop_circles, &SKETCH_CIRCLES),
+                Custom(drop_arcs, &SKETCH_ARCS),
+                Custom(drop_rectangles, &SKETCH_RECTANGLES),
+                Small(&[sk(T::Fillet), sk(T::Chamfer), sk(T::Point)]),
             ],
         },
         Panel {
             title: "Modify",
             items: &[
-                Small(&[sk(T::Trim), sk(T::Extend), sk(T::Split)]),
-                Small(&[sk(T::Fillet), sk(T::Chamfer), sk(T::Offset)]),
                 Small(&[sk(T::Move), sk(T::Copy), sk(T::Rotate)]),
-                Small(&[sk(T::Scale), sk(T::Stretch)]),
+                Small(&[sk(T::Trim), sk(T::Extend), sk(T::Split)]),
+                Small(&[sk(T::Scale), sk(T::Stretch), sk(T::Offset)]),
             ],
         },
         Panel {
-            title: "Copy",
-            items: &[Small(&[sk(T::Mirror), sk(T::RectPattern), sk(T::CircularPattern)])],
+            title: "Pattern",
+            items: &[Small(&[sk(T::RectPattern), sk(T::CircularPattern), sk(T::Mirror)])],
+        },
+        Panel {
+            title: "Constrain",
+            items: &[
+                Large(sk(T::Dimension)),
+                Custom(constraint_icons, &SKETCH_CONSTRAINTS),
+                Small(&[
+                    Cmd::Sketch(SketchCmd::AutoDimension),
+                    Cmd::Sketch(SketchCmd::Parameters),
+                ]),
+                Small(&[Cmd::Sketch(SketchCmd::Relax), Cmd::Sketch(SketchCmd::RelaxMode)]),
+            ],
+        },
+        Panel {
+            title: "Format",
+            items: &[Small(&[
+                Cmd::Sketch(SketchCmd::Construction),
+                Cmd::Sketch(SketchCmd::Centerline),
+                Cmd::Sketch(SketchCmd::CenterPoint),
+            ])],
+        },
+        Panel {
+            title: "Exit",
+            items: &[Large(Cmd::Sketch(SketchCmd::Finish))],
         },
     ]
 };
@@ -575,7 +620,10 @@ pub(super) const VIEW: &[Panel] = &[
 pub(super) const DESIGN: &[Panel] = &[
     Panel {
         title: "Machine and Hoop",
-        items: &[Custom(machine_hoop, &[]), Small(&[Cmd::SewTimes, Cmd::Needles])],
+        items: &[
+            Custom(machine_hoop, &[]),
+            Small(&[Cmd::SewTimes, Cmd::Needles, Cmd::MyMachines]),
+        ],
     },
     Panel {
         title: "Hoop",

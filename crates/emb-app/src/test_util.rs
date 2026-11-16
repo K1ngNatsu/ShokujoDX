@@ -27,7 +27,9 @@ pub struct Harness {
 
 impl Harness {
     pub fn new() -> Self {
+        // The tests of the harness are on the reference machine.
         let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        st.start_on_machine("husqvarna_topaz20", None);
         st.add_sample_objects();
         st.selection.clear();
         let mut h = Harness {

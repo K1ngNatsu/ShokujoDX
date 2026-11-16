@@ -1,6 +1,6 @@
 # Plan: roadmap phase P14 (Sketch mode)
 
-Date: 2026-10-27 · Status: Accepted (owner request, 2026-10-27). Milestones 1 to 6 done in software.
+Date: 2026-10-27 · Status: Accepted (owner request, 2026-10-27). Milestones 1 to 6 done; the owner's test in the app and the badge sew-out passed on the Topaz 20 (owner, 2026-11-16).
 
 ## Goal
 
@@ -67,6 +67,7 @@ done, ◐ part, ✗ open (with the milestone or batch that takes it).
 | Draw | Slot: center to center, overall, center point, three-point arc, center point arc | ✓ (ADR 0072, 0074) |
 | Draw | Polygon in a circle and round a circle | ✓ (ADR 0072) |
 | Draw | Point, center point | ✓ (center point: ADR 0074) |
+| Draw | The origin: a fixed point at (0, 0) in each new sketch | ✓ (ADR 0097) |
 | Draw | Spline (through points, control points) | ✓ (ADR 0079): cubic pieces with their handles as points; trim and split of splines ✗ |
 | Draw | Text in a sketch | ✗ (lettering objects exist) |
 | Draw | Project geometry, import (SVG, DXF) | ✓ import (ADR 0079: Vector to Sketch, DXF files); project the edges of other objects ✗ |
@@ -93,6 +94,8 @@ done, ◐ part, ✗ open (with the milestone or batch that takes it).
 | Format | Construction curves, driven dimensions | ✓ |
 | Format | Centerline (for diameter dimensions), center point | ✓ (ADR 0073, 0074) |
 | Use | Esc, Delete, right-click menus, double-click to change a value, box selection, hover light | ✓ (ADR 0071) |
+| Use | Drop-down buttons for the kinds of each tool, grouped as Create, Modify, Pattern, Constrain, Format and Exit | ✓ (ADR 0097) |
+| Use | Objects made from a sketch follow it and do not scale or change alone until Break Apart | ✓ (ADR 0097) |
 
 ## Not in this phase
 

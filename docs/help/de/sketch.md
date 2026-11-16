@@ -16,13 +16,16 @@ erstellen Stickerei aus ihren geschlossenen Bereichen und ihren Kurven
 
 ## Beginnen und beenden
 
-- **Digitalisieren > Skizze beginnen** erstellt eine neue Skizze oder
-  öffnet die ausgewählte Skizze. Ein Doppelklick auf eine Skizze öffnet sie
+- **Digitalisieren > Parametrische Skizze** erstellt eine neue Skizze
+  oder öffnet die ausgewählte Skizze. Ein Doppelklick auf eine Skizze öffnet sie
   auch.
 - Der Tab **Skizze** zeigt sich, während die Skizze offen ist. Die anderen
   Objekte sind abgeblendet und nehmen keine Klicks an.
 - **Skizze beenden** schließt die Skizze. Eine Skizze ohne Inhalt
   verschwindet.
+- Eine neue Skizze hat ihren **Ursprung**: einen Hilfspunkt bei (0, 0),
+  einen Ring mit einem Kreuz. Linien und Punkte rasten an ihm ein. Er
+  bewegt sich nicht, und Sie können ihn nicht löschen.
 
 Jede Änderung ist ein Schritt zum Rückgängigmachen; ein Ziehen ist ein
 Schritt.
@@ -374,7 +377,10 @@ Seiten).
 Die neuen Objekte bekommen die aktuellen Eigenschaften und das aktuelle
 Garn und kommen ans Ende der Stickreihenfolge. Wenn die Skizze geschlossen
 ist, erstellt ihr Bereich Eigenschaften Stickerei aus allen ihren
-Bereichen oder Steppstiche entlang aller ihrer Kurven.
+Bereichen oder Steppstiche entlang aller ihrer Kurven. Auch **Grafik >
+Umwandeln** tut das für die ausgewählten Skizzen: **Zu Füllung** und
+**Zu Satin** benutzen alle geschlossenen Bereiche, **Zu Umriss** erstellt
+einen Steppstich entlang jeder Kurve.
 
 ## Objekte, die der Skizze folgen
 
@@ -387,16 +393,19 @@ Objekte in einem Schritt zurück.
 - Um die Skizze wieder zu ändern, doppelklicken Sie auf eines ihrer
   Objekte, oder klicken Sie auf **Skizze bearbeiten** (Rechtsklickmenü oder
   Bereich Eigenschaften).
-- Wenn Sie die Skizze verschieben, drehen oder skalieren, bewegen sich ihre
-  Objekte mit. Wenn Sie nur die Objekte verschieben, bleiben sie in diesem
-  Abstand zur Skizze.
+- Eine Skizze und ihre Objekte bleiben zusammen: Wenn Sie die Skizze oder
+  eines ihrer Objekte verschieben, drehen oder spiegeln, bewegen sich alle.
+  Außerhalb des Skizzenmodus werden sie nicht skaliert: Ändern Sie die Maße
+  der Skizze. **Aufteilen** (oder **Verknüpfung lösen**) macht die
+  ausgewählten Objekte zu einfachen Objekten, die sich allein bewegen,
+  skalieren und in ihren Knoten ändern lassen.
 - Wenn eine Änderung einen Bereich öffnet oder eine Kurve löscht, bleiben
   seine Objekte, wie sie sind, und das Programm zeigt eine Warnung.
   Schließen Sie den Bereich wieder, oder klicken Sie auf **Verknüpfung
   lösen**, um daraus einfache Objekte zu machen.
 - Formbefehle nehmen keine verknüpften Objekte an. Lösen Sie zuerst die
-  Verknüpfung. Eine Änderung der Form eines verknüpften Objekts von Hand
-  bleibt nach der nächsten Änderung der Skizze nicht erhalten.
+  Verknüpfung. Die Knoten eines verknüpften Objekts ändern sich nicht mit
+  Umformen: Ändern Sie die Skizze, oder benutzen Sie zuerst Aufteilen.
 
 ## Ziehen
 

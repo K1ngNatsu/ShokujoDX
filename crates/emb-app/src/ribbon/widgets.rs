@@ -145,10 +145,12 @@ pub(super) fn large(ui: &mut egui::Ui, icon: Icon, label: &str, on: bool, enable
     let (fg, bg) = colors(ui, enabled);
     let icon_rect = Rect::from_center_size(egui::pos2(rect.center().x, rect.top() + 20.0), Vec2::splat(28.0));
     icons::paint(ui.painter(), icon_rect, icon, fg, bg);
-    let galley = ui
-        .painter()
-        .layout(label.to_string(), FontId::proportional(size), fg, w - 4.0);
-    let pos = egui::pos2(rect.center().x - galley.size().x / 2.0, rect.top() + 38.0);
+    // Each line of the name is centered (a short second line too); the
+    // rows of a centered layout go round x = 0.
+    let mut job = egui::text::LayoutJob::simple(label.to_string(), FontId::proportional(size), fg, w - 4.0);
+    job.halign = egui::Align::Center;
+    let galley = ui.painter().layout_job(job);
+    let pos = egui::pos2(rect.center().x, rect.top() + 38.0);
     ui.painter().galley(pos, galley, fg);
     resp
 }
@@ -210,6 +212,52 @@ pub(super) fn cmd_button(ui: &mut egui::Ui, st: &mut AppState, s: &SelInfo, cmd:
     if resp.clicked() {
         st.run(cmd, &ctx);
     }
+}
+
+/// A drop-down button of the Sketch tab (v0.3 plan, Stage 4): a large
+/// button that runs the command it shows, and an arrow at its right that
+/// opens a menu of all of `cmds`. The button shows the command in use, else
+/// the last one picked from the menu, else the first. `key` keeps the last
+/// pick.
+pub(super) fn split_large(ui: &mut egui::Ui, st: &mut AppState, s: &SelInfo, key: &'static str, cmds: &[Cmd]) {
+    let id = ui.id().with(("split", key));
+    let picked: usize = ui
+        .data(|d| d.get_temp(id))
+        .unwrap_or(0)
+        .min(cmds.len().saturating_sub(1));
+    let shown = cmds.iter().position(|c| st.is_on(*c)).unwrap_or(picked);
+    let Some(&cmd) = cmds.get(shown) else { return };
+    let ctx = ui.ctx().clone();
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 0.0;
+        cmd_button(ui, st, s, cmd, true);
+        let enabled = cmds.iter().any(|c| st.can(*c, s));
+        let (rect, resp) = ui.allocate_exact_size(vec2(12.0, LARGE.y), sense(enabled));
+        let more = crate::i18n::fill("More: {}", &[&cmd.meta().1]);
+        let resp = crate::a11y::named(resp, &more).on_hover_text(&more);
+        note_focus(ui, &resp);
+        frame(ui, rect, &resp, false, enabled);
+        let (fg, _) = colors(ui, enabled);
+        ui.painter().text(
+            rect.center(),
+            Align2::CENTER_CENTER,
+            ph::CARET_DOWN,
+            FontId::proportional(10.0),
+            fg,
+        );
+        egui::Popup::menu(&resp).show(|ui| {
+            for (i, c) in cmds.iter().enumerate() {
+                let (icon, label, _) = c.meta();
+                let r = small(ui, icon, label, st.is_on(*c), st.can(*c, s), false);
+                let r = tooltip(r, &ctx, *c);
+                if r.clicked() {
+                    ui.data_mut(|d| d.insert_temp(id, i));
+                    st.run(*c, &ctx);
+                    ui.close();
+                }
+            }
+        });
+    });
 }
 
 /// A small button that opens a menu.

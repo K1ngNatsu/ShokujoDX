@@ -26,6 +26,7 @@ pub mod layout;
 pub mod monogram;
 pub mod source;
 pub mod stroke;
+pub mod style;
 pub mod teamnames;
 
 pub use embfont::{EmbFont, EmbLetter};

@@ -529,7 +529,7 @@ impl Sketch {
         }
         // The points at the corner that no curve uses now become one.
         for q in self.joined(corner) {
-            if q != corner && !self.is_used(q) {
+            if q != corner && !self.is_origin(q) && !self.is_used(q) {
                 self.merge_point(q, corner);
                 self.remove_point(q);
             }

@@ -643,6 +643,8 @@ mod tests {
 
     fn state() -> AppState {
         let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        // The test is on the reference machine.
+        st.start_on_machine("husqvarna_topaz20", None);
         st.add_sample_objects();
         st
     }

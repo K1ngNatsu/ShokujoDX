@@ -32,16 +32,41 @@ Sizes are relative effort: S (days), M (one to two weeks), L (a month), XL (seve
 | 2. Digitizing toolset | Done in software: all seven milestones (tracing, workspace, input methods, stitch angles and holes, split/join/select, arrange, viewing and travel). Open: the exit test with users. See `docs/design/p2-plan.md`. |
 | 3. Production, color and quality | Done in software: Milestones 1 (thread charts, Threads panel, colorways), 2 (machine functions, split at needle, stitch list) 3 (machine files: open as stitch objects; EXP, JEF, XXX, SEW, HUS, SHV) 4 (stitch player, thread look, design info, warnings, overview), 5 (worksheets, PDF, picture, Output design, batch output), 6 (fabrics, styles, templates, plain-language labels), 7 (appliqué) and 8 (design tabs, split view, backups and recovery, calibration, sew time, P2 carry-overs) done in software; the exit test with users is open. See `docs/design/p3-plan.md`. |
 | 4. Lettering | Done: Milestones 1 (TrueType lettering: satin letters from glyph strokes, fill letters, lines, spacing, kerning, alignment, bundled OFL fonts and the fonts of the computer) 2 (embroidery fonts: `.embfont` format, converter, four starter fonts, Fonts window with previews, size ranges and warnings) 3 (arc, circle and line baselines; kerning, move, scale, turn and reshape of single letters) 4 (envelopes and lettering art; stitch type and underlay for each letter; sew order with optimized connections) 5 (monograms: styles, borders, ornaments, templates), 6 (team names and keyboard design collections) and 7 (custom alphabets, bitmap fonts) done: all seven milestones, and the exit test (sew-outs on towel and cap, 2026-10-23). See `docs/design/p4-plan.md`. |
-| 5. Decorative stitches and effects | Done in software: Milestones 1 (column types satin, zigzag, E stitch, raised satin, tatami, square, coil and contour; lines with a width as outline types; sculpture run) 2 (fill types contour, offset, spiral, island coil, radial, maze and Florentine; liquid satin) 3 (texture fills: satin, zigzag, E stitch, raised satin and coil across shapes, square, double square, string, cross stitch, stipple, laydown) 4 (motifs: motif run, column and fill, gradient, 3D warp, library, create from the selection) 5 (patterned stitching: program split, flexi split, user split, carving stamps) 6 (stitch effects: auto jump, fractional and auto spacing, accordion spacing, corners, jagged edge, trapunto, hand stitch, cording, double underlay, pull compensation for each side and as a percent) and 7 (color blends and multi blend, buttonholes, decorative borders) done in software: all seven milestones. Open: the exit test (sew-outs of the nine corpus designs of the phase, with photos). See `docs/design/p5-plan.md`. |
-| 6. Artwork, vector tools and auto-digitizing | Done in software: Milestones 1 (vector objects) 2 (shaping) 3 (offsets and arrangements) 4 (border trace) 5 (picture tools; PDF, AI, EMF and WMF import) 6 (auto-trace, click to stitch) 7 (Picture to design wizard) and 8 (photo stitch, recognize outlines), with the owner requests (linked shapes, cut out subject). Open: the exit tests (logo, photo sew-out). See `docs/design/p6-plan.md`. |
-| 7. Hooping, layouts and presentation | Done in software: Milestones 1 (hoop placement) 2 (multi-hooping engine) 3 (hooping mode, output for each hooping) 4 (multi-position hoops) 5 (product backdrops) and 6 (repeats); the upright Crown hoop (ADR 0034). Open: the exit test (kit in `out/p7-sewout`). See `docs/design/p7-plan.md`. |
-| 8. Management and connectivity | Done in software: Milestones 1 (design library engine) 2 (Library tab, catalog) 3 (Send to USB) 4 (export queue) 5 (clipart) 6 (more machine formats, the slow function) and 7 (cutter files, barcodes). Exit test part 1 passed (1000-design search in about 1 ms); part 2 open (the Topaz 20 reads a stick from Send to USB). See `docs/design/p8-plan.md`. |
-| 9. Specialty decoration | Done in software for the parts that the owner can test: Milestones 1 (cross-stitch objects, ADR 0038), 2 (picture to cross stitch, charts), 3 (rhinestone objects, ADR 0039), 4 (rhinestone templates) and 5 (mixed decoration: sewn template marks, template files from Output design, order of work); audit in "Audit of P9". Open: the sew-outs (with a cut template). Milestones 6 (sequins, beads) and 7 (chenille, Schiffli) wait for a tester with such a machine. See `docs/design/p9-plan.md`. |
+| 5. Decorative stitches and effects | Done in software: Milestones 1 (column types satin, zigzag, E stitch, raised satin, tatami, square, coil and contour; lines with a width as outline types; sculpture run) 2 (fill types contour, offset, spiral, island coil, radial, maze and Florentine; liquid satin) 3 (texture fills: satin, zigzag, E stitch, raised satin and coil across shapes, square, double square, string, cross stitch, stipple, laydown) 4 (motifs: motif run, column and fill, gradient, 3D warp, library, create from the selection) 5 (patterned stitching: program split, flexi split, user split, carving stamps) 6 (stitch effects: auto jump, fractional and auto spacing, accordion spacing, corners, jagged edge, trapunto, hand stitch, cording, double underlay, pull compensation for each side and as a percent) and 7 (color blends and multi blend, buttonholes, decorative borders) done in software: all seven milestones. The exit test passed: the sew-outs on the Topaz 20 passed (owner, 2026-11-16). See `docs/design/p5-plan.md`. |
+| 6. Artwork, vector tools and auto-digitizing | Done in software: Milestones 1 (vector objects) 2 (shaping) 3 (offsets and arrangements) 4 (border trace) 5 (picture tools; PDF, AI, EMF and WMF import) 6 (auto-trace, click to stitch) 7 (Picture to design wizard) and 8 (photo stitch, recognize outlines), with the owner requests (linked shapes, cut out subject). The exit tests passed: the logo and the photo, sew-outs on the Topaz 20 passed (owner, 2026-11-16). See `docs/design/p6-plan.md`. |
+| 7. Hooping, layouts and presentation | Done in software: Milestones 1 (hoop placement) 2 (multi-hooping engine) 3 (hooping mode, output for each hooping) 4 (multi-position hoops) 5 (product backdrops) and 6 (repeats); the upright Crown hoop (ADR 0034). The exit test passed: the kit in `out/p7-sewout`, sew-outs on the Topaz 20 passed (owner, 2026-11-16). See `docs/design/p7-plan.md`. |
+| 8. Management and connectivity | Done in software: Milestones 1 (design library engine) 2 (Library tab, catalog) 3 (Send to USB) 4 (export queue) 5 (clipart) 6 (more machine formats, the slow function) and 7 (cutter files, barcodes). Exit test part 1 passed (1000-design search in about 1 ms); part 2 passed (the Topaz 20 reads a stick from Send to USB; owner, 2026-11-16). See `docs/design/p8-plan.md`. |
+| 9. Specialty decoration | Done in software for the parts that the owner can test: Milestones 1 (cross-stitch objects, ADR 0038), 2 (picture to cross stitch, charts), 3 (rhinestone objects, ADR 0039), 4 (rhinestone templates) and 5 (mixed decoration: sewn template marks, template files from Output design, order of work); audit in "Audit of P9". The sew-outs on the Topaz 20 passed (owner, 2026-11-16) (with a cut template). Milestones 6 (sequins, beads) and 7 (chenille, Schiffli) wait for a tester with such a machine. See `docs/design/p9-plan.md`. |
 | 10. Polish and assistance | Done in software (the exit tests are open; see "Audit of the whole project"): Milestones 1 (editing helpers: paste after selected, paste special, close shape, reverse direction, swap sides, omit last stitch, single stones, editing options) , 2 (view and workspace helpers: center at stitch, travel by function, zoom steps, panels that close and open, close all, favorite styles, display colors, color wheel, show or hide the rhinestones) , 3 (the 3D thread look on the canvas and in the pictures, ADR 0040) , 4 (start page and help: topics in `docs/help`, search, F1) , 5 (simple mode and the lettering kiosk), 6 (files, assets and content), 7 (translations and accessibility, ADR 0042: German, Spanish, Japanese) and 8 (installers and release builds, ADR 0043) done in software; Milestone 9 (assistant) is benched. The small features that the audits moved here are in the P10 plan. See `docs/design/p10-plan.md`. |
-| 11. Features of other programs | Done in software: Milestones 1 (density map and thread use, ADR 0044), 2 (brand thread charts, thirty embroidery fonts, joins of satin letters, ADR 0045), 3 (pictures of designs in the file manager, ADR 0046), 4 (tartan, gradient, meander, circular, guided fills and ripple stitch, ADR 0047), 5 (free-standing lace, ADR 0048), 6 (quilting helpers, ADR 0049), 7 (puff and cap sequencing, ADR 0050) and 8 (cutwork needles, ADR 0051); audit in "Audit of P11 and P12". Open: the exit tests (sew-outs on the Topaz 20, thumbnails after an install, a tester with a cap frame, a tester with a cutwork machine). See `docs/design/p11-plan.md`. |
-| 12. Picture to design: robust and better results | Done in software: Milestones 1 (photo orientation, previews in the background, true width for Auto, the picture bench; ADR 0052), 2 (details on top, fill angles, small areas, checks before Finish; ADR 0053) and 3 (line art, edge-preserving smoothing, colors from the thread chart; ADR 0054). Open: the exit tests (a phone photo, a logo and a drawing sewn on the Topaz 20); audit in "Audit of P11 and P12". See `docs/design/p12-plan.md`. |
+| 11. Features of other programs | Done in software: Milestones 1 (density map and thread use, ADR 0044), 2 (brand thread charts, thirty embroidery fonts, joins of satin letters, ADR 0045), 3 (pictures of designs in the file manager, ADR 0046), 4 (tartan, gradient, meander, circular, guided fills and ripple stitch, ADR 0047), 5 (free-standing lace, ADR 0048), 6 (quilting helpers, ADR 0049), 7 (puff and cap sequencing, ADR 0050) and 8 (cutwork needles, ADR 0051); audit in "Audit of P11 and P12". The sew-outs on the Topaz 20 passed (owner, 2026-11-16). Open: the thread use against weighed spools, thumbnails after an install on macOS and Linux, a tester with a cap frame, a tester with a cutwork machine. See `docs/design/p11-plan.md`. |
+| 12. Picture to design: robust and better results | Done in software: Milestones 1 (photo orientation, previews in the background, true width for Auto, the picture bench; ADR 0052), 2 (details on top, fill angles, small areas, checks before Finish; ADR 0053) and 3 (line art, edge-preserving smoothing, colors from the thread chart; ADR 0054). The exit tests passed (a phone photo, a logo and a drawing sewn on the Topaz 20; owner, 2026-11-16); audit in "Audit of P11 and P12". See `docs/design/p12-plan.md`. |
 | 13. Shop tools | Done in software (owner request, 2026-10-27): Milestones 1 (quotes and run time on machines with more heads, ADR 0064), 2 (order details on the sheets, ADR 0065), 3 (thread stock and threads to buy, ADR 0066) and 4 (scripts, ADR 0067). Open: the exit tests with a shop tester (real orders, a printed sheet and its barcode, the spools to buy). See `docs/design/p13-plan.md`. |
-| 14. Sketch mode | In progress (owner request, 2026-10-27): Milestones 1 (sketch model and constraint solver, ADR 0068), 2 (sketch mode in the app, ADR 0069), 3 (drawing help and sketch edits, ADR 0070), 4 (regions to embroidery, ADR 0075) and 5 (objects that follow their sketch, ADR 0076) done in software; Milestones 5 (parametric links) and 6 (parameters and more curves) open. See `docs/design/p14-plan.md`. |
+| 14. Sketch mode | Done (owner request, 2026-10-27): Milestones 1 (sketch model and constraint solver, ADR 0068), 2 (sketch mode in the app, ADR 0069), 3 (drawing help and sketch edits, ADR 0070), 4 (regions to embroidery, ADR 0075), 5 (objects that follow their sketch, ADR 0076) and 6 (parameters, splines and drawings to sketches, ADR 0078 and 0079). The owner's test in the app and the badge sew-outs on the Topaz 20 passed (owner, 2026-11-16). See `docs/design/p14-plan.md`. |
+
+## Sew-out tests of 2026-11-16
+
+The owner sewed the test kits of P1 to P14 on the Topaz 20 (the weekend of 2026-11-14) and cleared all the exit tests on that machine. The tables of exit tests in this file, the phase table of the spec and the plans say so.
+
+Still open, because they need other people, machines or systems:
+
+- Tests with users: P2 (a new user digitizes a patch in 15 minutes), P3 (five test users), P10 (the patch test on Windows, macOS and Linux, F1 and the help search with a new user, a screen reader, a review of the German, Spanish and Japanese texts by native speakers).
+- Other machines: cap order on a cap frame and cutwork on a cutwork machine (P11); sequins, beads, chenille and Schiffli (P9 Milestones 6 and 7).
+- Other systems and tools: the thumbnails after an install on macOS and Linux (P11); a phone app reads the barcode of a worksheet, and a cutter program opens a cutter file at real size (P8 Milestone 7, P13).
+- Measurements and shop tests: the thread use against weighed spools (P11); the quotes and run times of real orders with a shop tester (P13); the comparison with Ink/Stitch (P1).
+
+## Owner list of 2026-11-16 (v0.2.1 and v0.3.0)
+
+After v0.2.0 the owner sent a list of changes and a start bug (the program showed nothing on a friend's PC). The work is in six stages: the start bug and the installer (v0.2.1), first start and saved preferences, endless drag, sketch changes, bold, italic, underline and stacked lettering, and a machine library. See `docs/design/v0.3-plan.md`.
+
+### Audit of the v0.3 work (2026-11-16)
+
+The audit of Stages 1 to 6 and the IP review of the release (the rules of the review of 2026-10-26: no names of closed-source programs, the trademark notes, the third-party list, a scan for secrets, the install documentation):
+
+- Fixed: Align and Space Evenly moved the objects of one sketch once for each selected object (a sketch and its objects move together, ADR 0097); the objects of one sketch are now one unit. The lettering kiosk turned on Thread Look in the saved View options; the kiosk options are no longer kept. A panic of a background thread before the first frame started the program again with another renderer; only the main thread counts now. In My Machines, the format for new files follows the selected formats.
+- Clean: no names of closed-source programs (Blender, FreeCAD and SolveSpace are open source), no secrets or personal data in the new commits, `THIRD-PARTY.txt` is current, and the code builds with Rust 1.95 (the `rust-version`).
+- Docs: the README has the v0.3 features, the upgrade and start notes and a repaired install table; the spec has the machine library and a roadmap row for this work.
+- Open: the start test on the PC of the owner's friends. Passed (owner, 2026-11-16): endless pan with a real mouse, the My Machines window. The installer removes the older version before it asks to close a running ShokujoDX, so a Cancel at that question leaves no version installed (install again to fix).
+
 
 ## Owner requests of 2026-10-22
 
@@ -199,9 +224,9 @@ with another machine; the software parts passed.
 
 | Phase | Exit test | State |
 | --- | --- | --- |
-| P11 | Thread use within 15 % of weighed spools; 4 mm and 6 mm small-text lettering; thumbnails after an install on three systems; a sew-out of each new stitch type; a lace ornament and edge washed; a 300 × 300 mm quilt block in four hoopings; puff letters | Open (Topaz 20, the three systems) |
+| P11 | Thread use within 15 % of weighed spools; 4 mm and 6 mm small-text lettering; thumbnails after an install on three systems; a sew-out of each new stitch type; a lace ornament and edge washed; a 300 × 300 mm quilt block in four hoopings; puff letters | The sew-outs on the Topaz 20 passed (owner, 2026-11-16). Open: the thread use against weighed spools, and the thumbnails after an install on macOS and Linux |
 | P11 | Cap order on a cap frame; cutwork files on a cutwork machine | Open: wait for a tester with such a machine |
-| P12 | A phone photo upright and the window responsive at the finest detail; a logo with no gaps and a drawing with outlines sewn on the Topaz 20 | Open |
+| P12 | A phone photo upright and the window responsive at the finest detail; a logo with no gaps and a drawing with outlines sewn on the Topaz 20 | Passed (owner, 2026-11-16) |
 
 ## Audit of the whole project (2026-10-25)
 
@@ -350,10 +375,10 @@ software parts passed.
 | P1 | Corpus sew-outs on the Topaz 20 from VP3 (`emb-cli corpus out/corpus`) | Covered (owner decision, 2026-10-23): the engine changed much since P1; VP3 sewed correctly in the P4 sew-outs, and the P5, P6 and P7 kits sew running, satin and fill stitches of the current engine. |
 | P2 | A new user digitizes a two-color patch from a bitmap in less than 15 minutes | Open. Test package for test users: `tools/package-windows.ps1` (tasks in `docs/testing/TESTERS.md`, ADR 0033). |
 | P3 | Five test users complete three set tasks with no help | Open. The same test package (tasks 1 to 4). |
-| P5 | Sew-outs of the nine P5 corpus designs (kit and checklist in `out/p5-sewout`) | Open |
-| P6 | A two-color logo PNG becomes a sewable design with less than 10 minutes of touch-up; a photo becomes a recognizable stitch portrait; sew-outs of the P6 corpus designs (kit and checklist in `out/p6-sewout`) | Open |
-| P7 | A 360 × 260 mm design split for the 260 × 200 hoop sews with aligned joins (kit and checklist in `out/p7-sewout`, made again for the upright hoop) | Open |
-| P8 | A 1000-design library is searchable in under a second; a design goes to a USB stick for the Topaz 20 in one action | Part 1 passed (about 1 ms, `crates/emb-library/tests/thousand.rs`). Part 2 open: File > Send to USB to a stick, then the Topaz 20 reads it. Also open (Milestone 7): a phone app reads the barcode of a printed worksheet, and a cutter program opens a cutter file at real size. |
+| P5 | Sew-outs of the nine P5 corpus designs (kit and checklist in `out/p5-sewout`) | Passed (owner, Topaz 20, 2026-11-16) |
+| P6 | A two-color logo PNG becomes a sewable design with less than 10 minutes of touch-up; a photo becomes a recognizable stitch portrait; sew-outs of the P6 corpus designs (kit and checklist in `out/p6-sewout`) | Passed (owner, Topaz 20, 2026-11-16) |
+| P7 | A 360 × 260 mm design split for the 260 × 200 hoop sews with aligned joins (kit and checklist in `out/p7-sewout`, made again for the upright hoop) | Passed (owner, Topaz 20, 2026-11-16) |
+| P8 | A 1000-design library is searchable in under a second; a design goes to a USB stick for the Topaz 20 in one action | Part 1 passed (about 1 ms, `crates/emb-library/tests/thousand.rs`). Part 2 passed (owner, 2026-11-16): File > Send to USB to a stick, then the Topaz 20 reads it. Open (Milestone 7): a phone app reads the barcode of a printed worksheet, and a cutter program opens a cutter file at real size. |
 
 ## Audit of P9 (2026-10-24)
 
@@ -645,7 +670,7 @@ The main reason many home users buy software.
 **Exit:** names at 10 mm and 25 mm sew legibly on towel and cap; a 20-name team
 list exports in one step.
 
-### P5. Decorative stitches and effects (XL) — done in software, sew-outs open (`docs/design/p5-plan.md`)
+### P5. Decorative stitches and effects (XL) — done (sew-outs passed, 2026-11-16) (`docs/design/p5-plan.md`)
 
 The Designing-level stitch catalog. Each item is a pure engine function with
 golden tests (spec, "Stitch engine requirements").
@@ -665,7 +690,7 @@ golden tests (spec, "Stitch engine requirements").
 **Exit:** every stitch type and effect has a corpus design, a golden test and a
 sew-out photo in `tests/sewouts/`.
 
-### P6. Artwork, vector tools and auto-digitizing (XL) — done in software, exit tests open (`docs/design/p6-plan.md`)
+### P6. Artwork, vector tools and auto-digitizing (XL) — done (exit tests passed, 2026-11-16) (`docs/design/p6-plan.md`)
 
 Replaces the separate graphics mode with vector tools in the same canvas.
 
@@ -701,7 +726,7 @@ Replaces the separate graphics mode with vector tools in the same canvas.
 **Exit:** a two-color logo PNG becomes a sewable design with less than 10 minutes
 of manual touch-up; a photo becomes a recognizable stitch portrait.
 
-### P7. Hooping, layouts and presentation (L) — done in software, exit test open (`docs/design/p7-plan.md`)
+### P7. Hooping, layouts and presentation (L) — done (exit test passed, 2026-11-16) (`docs/design/p7-plan.md`)
 
 - Hoop templates, hoop placement settings, auto hoop, multi-position hoops.
 - Multi-hooping: auto layout, split lines, overlap, registration marks, preview and
@@ -711,7 +736,7 @@ of manual touch-up; a photo becomes a recognizable stitch portrait.
 
 **Exit:** a 360 × 260 mm design split for the 260 × 200 hoop sews with aligned joins.
 
-### P8. Management and connectivity (L) — done in software, exit test part 2 open (`docs/design/p8-plan.md`)
+### P8. Management and connectivity (L) — done (exit test part 2 passed, 2026-11-16) (`docs/design/p8-plan.md`)
 
 - Design library: folders, search, sort, group, filter, thumbnails, catalog print,
   CSV list, new from selected.
@@ -751,7 +776,7 @@ machine can test it.
 
 **Exit:** the 15-minute patch test passes for users of Windows, macOS and Linux.
 
-### P11. Features of other programs (XL) — done in software, exit tests open (`docs/design/p11-plan.md`)
+### P11. Features of other programs (XL) — done in software, sew-outs passed (2026-11-16), tests with other machines and systems open (`docs/design/p11-plan.md`)
 
 Features that the reference product does not have, or that the inventory did not
 list, from a review of other programs (owner request, 2026-10-25):
@@ -771,7 +796,7 @@ WiFi and cloud send (no published protocol).
 
 **Exit:** the sew-outs and user tests of each milestone pass (see the plan).
 
-### P12. Picture to design: robust and better results (L) — done in software, exit tests open (`docs/design/p12-plan.md`)
+### P12. Picture to design: robust and better results (L) — done (exit tests passed, 2026-11-16) (`docs/design/p12-plan.md`)
 
 The owner asked (2026-10-25) to make the Picture to design wizard more
 effective and more robust:

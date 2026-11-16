@@ -62,10 +62,22 @@ enum Hit {
     Outline(usize, SegId, f64),
 }
 
-/// The selected object.
+/// The selected object. An object made from a sketch has no nodes to
+/// edit: it follows its sketch until Break Apart (v0.3 plan, Stage 4).
 fn target(st: &AppState) -> Option<DesignObject> {
     let id = st.selection.single()?;
-    st.doc.design().object(id).cloned()
+    let d = st.doc.design();
+    if d.sketch_link_of(id).is_some() {
+        return None;
+    }
+    d.object(id).cloned()
+}
+
+/// Returns `true` if the selected object follows its sketch.
+fn follows_sketch(st: &AppState) -> bool {
+    st.selection
+        .single()
+        .is_some_and(|id| st.doc.design().sketch_link_of(id).is_some())
 }
 
 /// Single stones as a path with one node for each stone (each stone a
@@ -333,6 +345,12 @@ impl AppState {
 pub fn handle_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState, map: &ViewMap) {
     if crate::letter_edit::handle_input(ui, response, st, map) {
         return;
+    }
+    if follows_sketch(st) && (response.drag_started_by(egui::PointerButton::Primary) || response.double_clicked()) {
+        st.message = tr(
+            "This object follows its sketch: change the sketch (double-click it), or use Break Apart to edit the nodes of the object.",
+        )
+        .into();
     }
     let mods = ui.input(|i| i.modifiers);
     let hover = response.hover_pos().and_then(|p| hit(st, map, p));

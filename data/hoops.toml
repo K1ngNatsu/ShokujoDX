@@ -153,3 +153,96 @@ width_mm = 360
 height_mm = 75
 shape = "rectangle"
 cap = true
+
+# Embroidery fields of the machine library (v0.3 plan, Stage 6, ADR 0099).
+# Each is the largest field (or a common hoop) of machines in
+# machines.toml, from the public data of the makers (see the sources there).
+# The makers give the size, not the way the hoop goes on the machine. As
+# the Topaz 20 (owner test, 2026-10-23), a hoop of a sewing and embroidery
+# machine has its long side from front to back (height); the field of a
+# multi-needle machine (MB-7) has its long side from left to right.
+# UNVERIFIED: the side of each hoop on the machine. Turn the hoop
+# (Design > Hoop) if your machine holds it the other way.
+[[hoop]]
+id = "field_240x360"
+name = "Field 240 x 360 (9.5 x 14 in)"
+width_mm = 240
+height_mm = 360
+shape = "rectangle"
+
+[[hoop]]
+id = "field_272x408"
+name = "Field 272 x 408 (10 5/8 x 16 in)"
+width_mm = 272
+height_mm = 408
+shape = "rectangle"
+
+[[hoop]]
+id = "field_200x360"
+name = "Field 200 x 360 (7.9 x 14 in)"
+width_mm = 200
+height_mm = 360
+shape = "rectangle"
+
+[[hoop]]
+id = "field_200x280"
+name = "Field 200 x 280 (7.9 x 11 in)"
+width_mm = 200
+height_mm = 280
+shape = "rectangle"
+
+[[hoop]]
+id = "field_280x460"
+name = "Field 280 x 460 (11 x 18 in)"
+width_mm = 280
+height_mm = 460
+shape = "rectangle"
+
+[[hoop]]
+id = "field_240x200"
+name = "Field 240 x 200 (9.4 x 7.9 in)"
+width_mm = 240
+height_mm = 200
+shape = "rectangle"
+
+[[hoop]]
+id = "field_150x240"
+name = "Field 150 x 240 (6 x 9.5 in)"
+width_mm = 150
+height_mm = 240
+shape = "rectangle"
+
+[[hoop]]
+id = "field_350x360"
+name = "Field 350 x 360 (13.8 x 14.2 in)"
+width_mm = 350
+height_mm = 360
+shape = "rectangle"
+
+[[hoop]]
+id = "field_150x260"
+name = "Field 150 x 260 (6 x 10.25 in)"
+width_mm = 150
+height_mm = 260
+shape = "rectangle"
+
+[[hoop]]
+id = "field_100x170"
+name = "Field 100 x 170 (3.9 x 6.7 in)"
+width_mm = 100
+height_mm = 170
+shape = "rectangle"
+
+[[hoop]]
+id = "field_150x400"
+name = "Field 150 x 400 (5.9 x 15.7 in)"
+width_mm = 150
+height_mm = 400
+shape = "rectangle"
+
+[[hoop]]
+id = "field_210x400"
+name = "Field 210 x 400 (8.3 x 15.7 in)"
+width_mm = 210
+height_mm = 400
+shape = "rectangle"

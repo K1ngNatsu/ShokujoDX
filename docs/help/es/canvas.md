@@ -13,7 +13,8 @@ la parte trasera de la máquina.
 
 - Gire la rueda del ratón para hacer zoom en el puntero.
 - Arrastre con el botón central o el derecho del ratón para mover la
-  vista.
+  vista. En un borde del lienzo, el puntero pasa al otro lado y la vista
+  sigue moviéndose (**Desplazamiento sin fin** en Opciones).
 - Haga doble clic con la rueda del ratón, o pulse **Inicio**, para ver el
   bastidor y todo el diseño (**Ver > Zoom a la extensión**).
 - **+** y **-** acercan y alejan (**Ver > Acercar**, **Alejar**). Opciones
@@ -87,6 +88,7 @@ la parte trasera de la máquina.
   hilo**, los **Saltos**, las **Penetraciones de aguja**, los símbolos de
   **Cortes y colores**, la **Tela de aplique**, los **Vectores** y el
   **Mapa de densidad**.
+  Estas opciones se conservan para el próximo inicio.
 
 ## Cuadrícula, reglas y guías
 

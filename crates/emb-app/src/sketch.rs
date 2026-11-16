@@ -675,7 +675,10 @@ impl AppState {
                 let thread = self.current_thread_id();
                 self.doc.edit(tr("Start Sketch"), |d| {
                     let t = thread.unwrap_or_else(|| d.add_thread("Sketch", emb_model::Rgb(90, 90, 90)));
-                    let id = d.add_object(t, ObjectKind::Sketch(Box::new(SketchObject::new(Sketch::new()))));
+                    let id = d.add_object(
+                        t,
+                        ObjectKind::Sketch(Box::new(SketchObject::new(Sketch::with_origin()))),
+                    );
                     if let Some(o) = d.object_mut(id) {
                         o.name = Some("Sketch".into());
                     }
@@ -712,7 +715,7 @@ impl AppState {
     pub fn finish_sketch(&mut self) {
         let Some(e) = self.sketch.take() else { return };
         self.doc.end_merge();
-        let empty = self.sketch_of(e.object).is_some_and(|s| s.sketch().points.is_empty());
+        let empty = self.sketch_of(e.object).is_some_and(|s| s.sketch().is_empty());
         if empty {
             self.doc.edit(tr("Remove Empty Sketch"), |d| {
                 d.remove_object(e.object);
@@ -1161,7 +1164,10 @@ impl AppState {
                 }
             }
             for p in &sel {
-                if let Pick::Point(id) = *p {
+                // The origin stays (v0.3 plan, Stage 4).
+                if let Pick::Point(id) = *p
+                    && !sk.is_origin(id)
+                {
                     let users: Vec<CurveId> = sk
                         .curves
                         .iter()
@@ -1332,6 +1338,54 @@ impl AppState {
                 .flat_map(|s| d.make_from_sketch(sketch, s, &current, t))
                 .collect()
         })
+    }
+
+    /// Convert (Artwork > Convert) with sketches selected, outside sketch
+    /// mode: To Fill and To Satin make fills or satins of all the closed
+    /// regions of each sketch, To Outline makes runs along its curves (not
+    /// the construction curves). The objects follow the sketch. Returns the
+    /// number of sketches.
+    pub fn convert_sketches(&mut self, to: emb_model::ConvertTo) -> usize {
+        if self.sketch.is_some() {
+            return 0;
+        }
+        let d = self.doc.design();
+        let sketches: Vec<(ObjectId, SketchObject)> = self
+            .sel()
+            .into_iter()
+            .filter_map(|id| match d.object(id).map(|o| &o.kind) {
+                Some(ObjectKind::Sketch(s)) => Some((id, (**s).clone())),
+                _ => None,
+            })
+            .collect();
+        let mut made = 0;
+        for (id, s) in &sketches {
+            match to {
+                emb_model::ConvertTo::Fill | emb_model::ConvertTo::Satin => {
+                    let region_to = if to == emb_model::ConvertTo::Fill {
+                        RegionTo::Fill
+                    } else {
+                        RegionTo::Satin
+                    };
+                    self.make_regions(*id, s.regions(), region_to);
+                }
+                emb_model::ConvertTo::Outline => {
+                    let sources: Vec<LinkSource> = s
+                        .sketch()
+                        .curves
+                        .iter()
+                        .filter(|c| !c.construction)
+                        .map(|c| LinkSource::Curve {
+                            curve: c.id,
+                            to: CurveTo::Run,
+                        })
+                        .collect();
+                    made += self.make_linked("Sketch to Stitches", *id, sources).len();
+                    self.message = fill("{} objects made from the sketch.", &[&made]);
+                }
+            }
+        }
+        sketches.len()
     }
 
     /// Makes embroidery objects of the picked regions of the open sketch,
@@ -1874,7 +1928,7 @@ impl AppState {
             prompt.to_string()
         };
         let a = self.sketch_analysis()?;
-        let empty = self.sketch_obj()?.sketch().points.is_empty();
+        let empty = self.sketch_obj()?.sketch().is_empty();
         let state = if empty {
             tr("empty").to_string()
         } else if !a.conflicting.is_empty() {
@@ -4191,6 +4245,14 @@ pub fn draw_overlay(painter: &egui::Painter, ui: &egui::Ui, map: &ViewMap, st: &
             free
         };
         let r = if selected(Pick::Point(p.id)) { 4.5 } else { 3.0 };
+        if s.is_origin(p.id) {
+            // The origin: a ring with a cross through it.
+            let k = 8.0;
+            let st = Stroke::new(1.4, fixed);
+            painter.circle_stroke(pos, 5.0, st);
+            painter.line_segment([pos + Vec2::new(-k, 0.0), pos + Vec2::new(k, 0.0)], st);
+            painter.line_segment([pos + Vec2::new(0.0, -k), pos + Vec2::new(0.0, k)], st);
+        }
         if p.center {
             // A center point: a cross.
             let k = 6.0;
@@ -4571,7 +4633,7 @@ pub fn edit_panel(ui: &mut egui::Ui, st: &mut AppState) {
     let Some(a) = st.sketch_analysis() else { return };
     let s = obj.sketch();
     ui.heading(tr("Sketch"));
-    if s.points.is_empty() {
+    if s.is_empty() {
         ui.label(tr(
             "Draw with the tools of the Sketch tab: lines, rectangles, circles, arcs and polygons.",
         ));
@@ -5020,7 +5082,9 @@ pub fn made_from_sketch_ui(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId) {
             tr("Made from a sketch, but its region or curve is gone: the object stays as it is."),
         );
     } else {
-        ui.weak(tr("Made from a sketch: it changes when the sketch changes."));
+        ui.weak(tr(
+            "Made from a sketch: it changes and moves with the sketch, and does not scale or change its nodes alone. Break Apart or Unlink frees it.",
+        ));
     }
     ui.horizontal_wrapped(|ui| {
         if ui.button(tr("Edit Sketch")).clicked() {
@@ -5038,7 +5102,16 @@ mod tests {
     use super::*;
     use crate::test_util::Harness;
 
+    /// A harness in sketch mode, with a sketch with no origin (as from an
+    /// older version), so points at (0, 0) do not snap to it.
     fn sketching() -> Harness {
+        let mut h = sketching_with_origin();
+        h.st.edit_sketch("No origin", None, |sk| *sk = Sketch::new());
+        h
+    }
+
+    /// A harness in sketch mode with a new sketch (it has its origin).
+    fn sketching_with_origin() -> Harness {
         let mut h = Harness::empty();
         h.st.start_sketch();
         assert!(h.st.sketch.is_some());
@@ -6250,6 +6323,77 @@ mod tests {
         h.st.selection.set(fill);
         h.st.unlink_selection();
         assert!(!h.st.doc.design().is_linked(fill));
+    }
+
+    #[test]
+    fn a_sketch_and_its_fill_stay_together_until_break_apart() {
+        let mut h = sketching_with_origin();
+        // A new sketch has its origin, and Delete does not take it.
+        let origin = sk(&h).origin.expect("the origin");
+        h.st.sketch.as_mut().unwrap().selection = vec![Pick::Point(origin)];
+        h.st.delete_sketch_selection();
+        assert_eq!(sk(&h).origin, Some(origin));
+        assert!(sk(&h).point(origin).is_some());
+        click_tool(
+            &mut h,
+            SketchTool::Rectangle,
+            &[Point::new(10.0, 10.0), Point::new(70.0, 50.0)],
+        );
+        h.st.set_sketch_tool(SketchTool::Regions);
+        h.st.make_picked_regions(RegionTo::Fill);
+        let sketch = h.st.sketch.as_ref().unwrap().object;
+        h.st.finish_sketch();
+        let d = h.st.doc.design();
+        let fill = d.objects().iter().find(|o| o.kind.type_name() == "Fill").unwrap().id;
+        let at = |h: &Harness, id| h.st.doc.design().bbox_of(&[id]).unwrap();
+        // A move of the fill moves the sketch.
+        let (sketch_at, fill_at) = (at(&h, sketch), at(&h, fill));
+        h.st.selection.set(fill);
+        h.st.nudge_selection(5.0, 0.0);
+        assert!((at(&h, sketch).min.x - sketch_at.min.x - 5.0).abs() < 1e-6);
+        assert!((at(&h, fill).min.x - fill_at.min.x - 5.0).abs() < 1e-6);
+        // A scale does not change them, and says why.
+        let before = at(&h, fill);
+        h.st.transform_selection("Scale", |b| emb_model::edit::scale_about(b.center(), 2.0, 2.0));
+        assert_eq!(at(&h, fill), before);
+        assert!(h.st.message.contains("sketch mode"), "{}", h.st.message);
+        assert!(h.st.refuse_sketch_scale());
+        // Break Apart frees the fill: it moves alone now.
+        h.st.break_apart();
+        assert!(h.st.doc.design().sketch_link_of(fill).is_none());
+        let sketch_at = at(&h, sketch);
+        h.st.selection.set(fill);
+        h.st.nudge_selection(5.0, 0.0);
+        assert_eq!(at(&h, sketch), sketch_at);
+        assert!(!h.st.refuse_sketch_scale());
+    }
+
+    #[test]
+    fn convert_makes_embroidery_of_a_selected_sketch() {
+        let mut h = sketching_with_origin();
+        click_tool(
+            &mut h,
+            SketchTool::Rectangle,
+            &[Point::new(10.0, 10.0), Point::new(70.0, 50.0)],
+        );
+        let sketch = h.st.sketch.as_ref().unwrap().object;
+        h.st.finish_sketch();
+        h.st.selection.set(sketch);
+        let info = crate::ribbon::SelInfo::of(&h.st);
+        assert!(h.st.can(crate::ribbon::Cmd::Convert(emb_model::ConvertTo::Fill), &info));
+        h.st.convert_vectors(emb_model::ConvertTo::Fill);
+        assert_eq!(kinds(&h), vec!["Fill"]);
+        h.st.selection.set(sketch);
+        h.st.convert_vectors(emb_model::ConvertTo::Outline);
+        assert_eq!(kinds(&h), vec!["Fill", "Running", "Running", "Running", "Running"]);
+        // They follow the sketch.
+        let d = h.st.doc.design();
+        assert!(
+            d.objects()
+                .iter()
+                .filter(|o| o.id != sketch)
+                .all(|o| d.sketch_link_of(o.id).is_some())
+        );
     }
 
     #[test]

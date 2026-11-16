@@ -2,7 +2,7 @@
 id: machines-and-hoops
 title: Machines and hoops
 group: production
-keywords: machine, topaz, husqvarna, brother, tajima, multi-needle, needles, needle, needle sequence, thread change, needle chart, format, speed, sew time, color change time, trim time, dst trims, jumps for a trim, hoop, frame, field, margin, my hoops, own hoop, auto hoop, turn hoop, rotate design, hoop angle, hoop options, placement, auto centering, start point, end point, hoop template, print, multi-position
+keywords: machine, topaz, husqvarna, brother, tajima, multi-needle, needles, needle, needle sequence, thread change, needle chart, format, speed, sew time, color change time, trim time, dst trims, jumps for a trim, hoop, frame, field, margin, my hoops, own hoop, auto hoop, turn hoop, rotate design, hoop angle, hoop options, placement, auto centering, start point, end point, hoop template, print, multi-position, machine library, brother, baby lock, janome, elna, pfaff, singer, bernina, generic, my machines, add my machine, export machine, import machine
 ---
 # Machines and hoops
 
@@ -17,6 +17,11 @@ design. The machine sets:
 - the longest stitch, and the hoops of the machine;
 - the speed and the times for the sew time.
 
+The first start asks for your machine and your hoop. New designs at the
+start use them; until you pick one, they use the Generic machine in a
+130 × 180 mm hoop. A machine or a hoop that you pick in this panel is
+kept for the next start too.
+
 **Machine Settings** (Design > Machine and Hoop) has:
 
 - **Speed** (stitches a minute), and the time of a **Color change**, a
@@ -29,6 +34,32 @@ design. The machine sets:
 - **Heads**, **Hoop one piece**, **Frame change** and **Hoop the next
   pieces while the machine sews**: for the run time of an order. See
   [Quotes and run times](quotes).
+
+## The machine library and your own machines
+
+The **Machine** list has machines of Brother, Baby Lock, Janome, Elna,
+Husqvarna Viking, Pfaff, Singer, Bernina and bernette, and multi-needle
+machines. Each has its file format, its largest embroidery field and the
+standard hoop sizes that fit in it, from the public data of the maker.
+Some values are not confirmed (for example the speed, or the side of a
+hoop on the machine): check the manual of your machine, and turn the hoop
+if your machine holds it the other way.
+
+When your machine is not in the list, use a **Generic** machine for its
+file format (PES, JEF, VP3, EXP or DST), or add your own machine:
+
+1. Click **Design > My Machines**, then **Add My Machine…** (the first
+   start has this button too).
+2. Type the name and the brand. Select the **File formats** that the
+   machine reads and the **Format for new files**.
+3. Set the **Needles**, the **Speed** and the **Longest stitch**, and
+   select the hoops. A hoop that is not in the list: add it in **Design >
+   My Hoops** first.
+4. Click **Save**. The machine is in the **Machine** list now.
+
+**Export…** writes the machine (with your own hoops that it uses) to a
+file. **Import…** adds the machines of such a file, for example from a
+friend with the same machine.
 
 ## Needles of a multi-needle machine
 
@@ -69,8 +100,9 @@ file keeps its needles.
 The **Hoop** list sets the hoop. The canvas shows the hoop field (where
 the needle can go) and the safety margin.
 
-- **My Hoops** comes first in the list. A hoop that the machine cannot
-  use shows a warning.
+- **My Hoops** comes first in the list, then the hoops of the machine,
+  then the other hoops. A hoop that the machine cannot use shows a
+  warning.
 - **Open field** has no hoop.
 - **Auto Hoop** selects the smallest hoop that the design fits, from My
   hoops (else the hoops of the machine). The design turns 90° if it fits

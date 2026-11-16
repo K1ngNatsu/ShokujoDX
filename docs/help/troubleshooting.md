@@ -2,9 +2,23 @@
 id: troubleshooting
 title: Questions and problems
 group: start
-keywords: problem, question, faq, pucker, gap, trim, jump, break, stiff, small text, machine does not read, file, slow, crash, missing, wrong color, too many stitches, overlap, build up, svg, density, density map, layers, picture, photo, picture to design, objects, thread breaks, birdnest, loops, outline does not line up, registration, shift, pile, towel, sinks, off center, hoop, too large, does not fit, letters fill in, button dimmed, cannot click, lost panel
+keywords: problem, question, faq, pucker, gap, trim, jump, break, stiff, small text, machine does not read, file, slow, crash, missing, wrong color, too many stitches, overlap, build up, svg, density, density map, layers, picture, photo, picture to design, objects, thread breaks, birdnest, loops, outline does not line up, registration, shift, pile, towel, sinks, off center, hoop, too large, does not fit, letters fill in, button dimmed, cannot click, lost panel, start, does not start, graphics, driver, renderer, diagnose
 ---
 # Questions and problems
+
+## The program does not start
+
+The program needs a graphics driver. If the graphics card does not start,
+the program starts again with OpenGL, then with the software renderer of
+the system, and tells you so. Install the newest graphics driver from the
+maker of your PC or of its graphics (Intel, AMD or NVIDIA). Then the
+program uses the graphics card again.
+
+If no renderer works, a message tells you the reason. Each start writes
+`start.log` in the settings folder (for example `%APPDATA%\ShokujoDX`).
+To make a report of the graphics, start `ShokujoDX.exe --diagnose`; it
+writes `diagnose.txt` in the same folder. Please send these files with
+your feedback.
 
 ## The fabric puckers
 

@@ -86,6 +86,15 @@ impl Transform {
         Point::new(self.a * v.x + self.c * v.y, self.b * v.x + self.d * v.y)
     }
 
+    /// Returns `true` if the transform keeps all lengths: a move, a turn,
+    /// a mirror or a mix of them (no scale, no slant).
+    pub fn is_rigid(&self) -> bool {
+        const EPS: f64 = 1e-9;
+        ((self.a * self.a + self.b * self.b) - 1.0).abs() < EPS
+            && ((self.c * self.c + self.d * self.d) - 1.0).abs() < EPS
+            && (self.a * self.c + self.b * self.d).abs() < EPS
+    }
+
     /// Returns the inverse transform, or `None` if the transform is singular.
     pub fn inverse(&self) -> Option<Transform> {
         let det = self.a * self.d - self.b * self.c;
@@ -133,5 +142,24 @@ mod tests {
         let p = Point::new(7.0, 11.0);
         let q = t.inverse().unwrap().apply(t.apply(p));
         assert!(p.distance(q) < 1e-9);
+    }
+}
+
+#[cfg(test)]
+mod rigid_tests {
+    use super::*;
+
+    #[test]
+    fn moves_turns_and_mirrors_are_rigid() {
+        assert!(Transform::IDENTITY.is_rigid());
+        assert!(Transform::translate(5.0, -3.0).is_rigid());
+        assert!(
+            Transform::rotate_deg(37.0)
+                .then(Transform::translate(2.0, 1.0))
+                .is_rigid()
+        );
+        assert!(Transform::scale(-1.0, 1.0).is_rigid());
+        assert!(!Transform::scale(1.01, 1.0).is_rigid());
+        assert!(!Transform::scale(2.0, 2.0).is_rigid());
     }
 }

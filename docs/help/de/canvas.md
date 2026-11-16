@@ -13,7 +13,9 @@ Arbeitsfläche ist die Rückseite der Maschine.
 
 - Drehen Sie das Mausrad, um am Zeiger zu zoomen.
 - Ziehen Sie mit der mittleren oder der rechten Maustaste, um die Ansicht
-  zu verschieben.
+  zu verschieben. Am Rand der Arbeitsfläche springt der Zeiger auf die
+  andere Seite, und die Ansicht bewegt sich weiter (**Endloses
+  Verschieben** in den Optionen).
 - Doppelklicken Sie mit dem Mausrad oder drücken Sie **Pos1**, um den
   Rahmen und das ganze Design zu sehen (**Ansicht > Alles zeigen**).
 - **+** und **-** zoomen hinein und heraus (**Ansicht > Vergrößern**,
@@ -87,6 +89,7 @@ Arbeitsfläche ist die Rückseite der Maschine.
   die **Sprünge**, die **Einstichpunkte**, die Symbole **Fadenschnitte und
   Farben**, den **Applikationsstoff**, die **Vektoren** und die
   **Dichtekarte**.
+  Diese Auswahl bleibt für den nächsten Start.
 
 ## Raster, Lineale und Hilfslinien
 

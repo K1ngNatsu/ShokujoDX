@@ -1087,6 +1087,7 @@ fn transform_section(ui: &mut egui::Ui, st: &mut AppState, ids: &[ObjectId]) {
         };
         let label = if matches!(which, "x" | "y") { "Move" } else { "Resize" };
         let ids = ids.to_vec();
+        st.warn_sketch_scale(&ids, &t);
         st.doc
             .edit_merged(label, MergeKey::new(format!("{key_base}-{which}")), |d| {
                 d.transform_objects(&ids, &t)
@@ -1124,6 +1125,7 @@ fn transform_section(ui: &mut egui::Ui, st: &mut AppState, ids: &[ObjectId]) {
     if (h1, v1) != (h0, v0) {
         let t = slant_change(rot, anchor, (h0, v0), (h1, v1));
         let ids = ids.to_vec();
+        st.warn_sketch_scale(&ids, &t);
         st.doc
             .edit_merged(tr("Slant"), MergeKey::new(format!("{key_base}-slant")), |d| {
                 d.transform_objects(&ids, &t)

@@ -504,16 +504,13 @@ pub(super) fn machine_hoop(ui: &mut egui::Ui, st: &mut AppState, _s: &SelInfo) {
                     {
                         new_hoop = Some(HoopSelection::OpenField);
                     }
-                    // My hoops first.
-                    let mine = &st.settings.my_hoops;
-                    let (first, rest): (Vec<_>, Vec<_>) = st.hoops.hoops.iter().partition(|h| mine.contains(&h.id));
-                    for (k, list) in [first, rest].into_iter().enumerate() {
-                        if list.is_empty() {
-                            continue;
-                        }
-                        if !mine.is_empty() {
+                    // My hoops, the hoops of the machine, then the others.
+                    let groups = st.hoop_menu();
+                    let headings = groups.len() > 1;
+                    for (heading, list) in groups {
+                        if headings {
                             ui.separator();
-                            ui.weak(if k == 0 { tr("My Hoops") } else { tr("Other hoops") });
+                            ui.weak(heading);
                         }
                         for h in list {
                             let sel = HoopSelection::Preset { id: h.id.clone() };
@@ -530,9 +527,18 @@ pub(super) fn machine_hoop(ui: &mut egui::Ui, st: &mut AppState, _s: &SelInfo) {
             ui.end_row();
         });
     if let Some(m) = new_machine {
+        // The machine that the user picks is the machine of the next start.
+        let mut s = st.settings.clone();
+        s.machine = Some(m.clone());
+        st.set_settings(s);
         st.doc.edit(tr("Change machine"), |d| d.machine = Some(m));
     }
     if let Some(sel) = new_hoop {
+        if let HoopSelection::Preset { id } = &sel {
+            let mut s = st.settings.clone();
+            s.hoop = Some(id.clone());
+            st.set_settings(s);
+        }
         st.doc.edit(tr("Change hoop"), |d| {
             // In a hoop, the hoop center goes to the center of the design. Object coordinates do not change.
             if d.hoop.selection == HoopSelection::OpenField

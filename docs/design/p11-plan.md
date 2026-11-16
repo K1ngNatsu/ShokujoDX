@@ -1,6 +1,6 @@
 # Plan: roadmap phase P11 (features of other programs)
 
-Date: 2026-10-25 · Status: Accepted (owner request, 2026-10-25). Milestones 1 to 8 done in software.
+Date: 2026-10-25 · Status: Accepted (owner request, 2026-10-25). Milestones 1 to 8 done in software; the sew-outs passed on the Topaz 20 (owner, 2026-11-16). Open: the thread use against weighed spools, the thumbnails on macOS and Linux, cap order and cutwork (testers with such machines).
 
 ## Goal
 

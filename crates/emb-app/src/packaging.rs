@@ -117,7 +117,7 @@ fn the_windows_installer_agrees() {
         .filter_map(|l| l.strip_prefix("en."))
         .filter_map(|l| l.split('=').next())
         .collect();
-    assert_eq!(keys.len(), 5);
+    assert_eq!(keys.len(), 10);
     // The thumbnail handler: its class id, and the file types that it
     // knows from their first bytes (ADR 0046).
     let lib = read("crates/emb-thumbnail/src/lib.rs");

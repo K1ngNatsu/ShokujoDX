@@ -2,7 +2,7 @@
 id: machines-and-hoops
 title: Máquinas y bastidores
 group: production
-keywords: máquina, topaz, husqvarna, brother, tajima, varias agujas, agujas, aguja, secuencia de agujas, cambio de hilo, plan de agujas, formato, velocidad, tiempo de bordado, tiempo de cambio de color, tiempo de corte, cortes dst, saltos para un corte, bastidor, marco, campo, margen, mis bastidores, bastidor propio, bastidor automático, girar bastidor, girar diseño, ángulo del bastidor, opciones de bastidor, colocación, centrado automático, punto de inicio, punto final, plantilla del bastidor, imprimir, varias posiciones
+keywords: máquina, topaz, husqvarna, brother, tajima, varias agujas, agujas, aguja, secuencia de agujas, cambio de hilo, plan de agujas, formato, velocidad, tiempo de bordado, tiempo de cambio de color, tiempo de corte, cortes dst, saltos para un corte, bastidor, marco, campo, margen, mis bastidores, bastidor propio, bastidor automático, girar bastidor, girar diseño, ángulo del bastidor, opciones de bastidor, colocación, centrado automático, punto de inicio, punto final, plantilla del bastidor, imprimir, varias posiciones, biblioteca de máquinas, brother, baby lock, janome, elna, pfaff, singer, bernina, genérica, mis máquinas, añadir mi máquina, exportar máquina, importar máquina
 ---
 # Máquinas y bastidores
 
@@ -17,6 +17,11 @@ diseño. La máquina define:
 - la puntada más larga, y los bastidores de la máquina;
 - la velocidad y los tiempos para el tiempo de bordado.
 
+El primer inicio le pregunta por su máquina y su bastidor. Los diseños
+nuevos del inicio los usan; hasta que elija una, usan la máquina genérica
+con un bastidor de 130 × 180 mm. La máquina o el bastidor que elija en
+este panel se conservan también para el próximo inicio.
+
 **Ajustes de la máquina** (Diseño > Máquina y bastidor) tiene:
 
 - **Velocidad** (puntadas por minuto), y el tiempo de un **Cambio de
@@ -30,6 +35,33 @@ diseño. La máquina define:
   **Enmarcar las siguientes piezas mientras la máquina borda**: para el
   tiempo de producción de un pedido. Vea [Pedidos, presupuestos y tiempos de
   producción](quotes).
+
+## La biblioteca de máquinas y sus propias máquinas
+
+La lista **Máquina** tiene máquinas de Brother, Baby Lock, Janome, Elna,
+Husqvarna Viking, Pfaff, Singer, Bernina y bernette, y máquinas de varias
+agujas. Cada una tiene su formato de archivo, su campo de bordado más
+grande y los tamaños de bastidor estándar que caben en él, de los datos
+públicos del fabricante. Algunos valores no están confirmados (por
+ejemplo la velocidad, o el lado de un bastidor en la máquina): consulte
+el manual de su máquina, y gire el bastidor si su máquina lo sujeta al
+revés.
+
+Cuando su máquina no está en la lista, use una máquina **genérica** de su
+formato de archivo (PES, JEF, VP3, EXP o DST), o añada su propia máquina:
+
+1. Haga clic en **Diseño > Mis máquinas** y después en **Añadir mi
+   máquina…** (el primer inicio también tiene este botón).
+2. Escriba el nombre y la marca. Seleccione los **Formatos de archivo**
+   que lee la máquina y el **Formato para archivos nuevos**.
+3. Ajuste las **Agujas**, la **Velocidad** y la **Puntada más larga**, y
+   seleccione los bastidores. Un bastidor que no está en la lista:
+   añádalo primero en **Diseño > Mis bastidores**.
+4. Haga clic en **Guardar**. La máquina ya está en la lista **Máquina**.
+
+**Exportar…** escribe la máquina (con sus propios bastidores que usa) en
+un archivo. **Importar…** añade las máquinas de un archivo así, por
+ejemplo de una amiga con la misma máquina.
 
 ## Agujas de una máquina de varias agujas
 
@@ -70,7 +102,8 @@ archivo TBF o U01 abierto conserva sus agujas.
 La lista **Bastidor** define el bastidor. El lienzo muestra el campo del
 bastidor (adonde puede ir la aguja) y el margen de seguridad.
 
-- **Mis bastidores** van primero en la lista. Un bastidor que la máquina no
+- **Mis bastidores** van primero en la lista, después los bastidores de
+  la máquina y después los otros bastidores. Un bastidor que la máquina no
   puede usar muestra una advertencia.
 - **Campo abierto** no tiene bastidor.
 - **Bastidor automático** selecciona el bastidor más pequeño en el que cabe

@@ -13,6 +13,8 @@ back of the machine.
 
 - Turn the mouse wheel to zoom at the pointer.
 - Drag with the middle or the right mouse button to move the view.
+  At an edge of the canvas the pointer goes to the other side, so the
+  view keeps moving (**Endless pan** in Options).
 - Double-click the mouse wheel, or push **Home**, to see the hoop and all
   the design (**View > Zoom Extents**).
 - **+** and **-** zoom in and out (**View > Zoom In**, **Zoom Out**).
@@ -78,6 +80,7 @@ back of the machine.
   outlines (**Artwork**), the **Stitches**, the **Thread Look**, the
   **Jumps**, the **Needle Points**, the **Trims and Colors** symbols, the
   **Appliqué Fabric**, the **Vectors** and the **Density Map**.
+  These choices stay for the next start.
 
 ## Grid, rulers and guides
 

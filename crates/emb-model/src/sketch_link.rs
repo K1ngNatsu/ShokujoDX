@@ -281,25 +281,58 @@ impl Design {
         self.replace_with_kinds(old[0], kinds, &reuse)
     }
 
-    /// After objects `ids` moved by `delta`: the objects of a moved sketch
-    /// move with it; a move of linked objects without their sketch goes
-    /// into the offset of their link (and the other objects of the link
-    /// move with them).
-    pub(crate) fn sketch_objects_moved(&mut self, ids: &[ObjectId], delta: &Transform) {
-        let mut follow: Vec<ObjectId> = Vec::new();
-        for l in &mut self.sketch_links {
-            let others = l.objects.iter().filter(|id| !ids.contains(id));
-            if ids.contains(&l.sketch) {
-                // The offset stays the same move after the sketch.
-                if let Some(inv) = delta.inverse() {
-                    l.offset = inv.then(l.offset).then(*delta);
-                }
-                follow.extend(others);
-            } else if l.objects.iter().any(|id| ids.contains(id)) {
-                l.offset = l.offset.then(*delta);
-                follow.extend(others);
-            }
+    /// The sketches of objects `ids` (a sketch, or the sketch that an
+    /// object was made from) with all the objects made from them, in sew
+    /// order. Empty if no object of `ids` belongs to a sketch.
+    pub fn sketch_family(&self, ids: &[ObjectId]) -> Vec<ObjectId> {
+        let sketches: Vec<ObjectId> = ids.iter().filter_map(|id| self.sketch_for(*id)).collect();
+        if sketches.is_empty() {
+            return Vec::new();
         }
+        self.objects
+            .iter()
+            .map(|o| o.id)
+            .filter(|id| {
+                sketches.contains(id) || self.sketch_link_of(*id).is_some_and(|l| sketches.contains(&l.sketch))
+            })
+            .collect()
+    }
+
+    /// Returns `true` if `t` scales or slants and an object of `ids`
+    /// belongs to a sketch: a sketch changes its size only in sketch mode
+    /// (v0.3 plan, Stage 4).
+    pub fn scales_sketch(&self, ids: &[ObjectId], t: &Transform) -> bool {
+        !t.is_rigid() && ids.iter().any(|id| self.sketch_for(*id).is_some())
+    }
+
+    /// After objects `ids` moved by `delta`: a sketch and the objects made
+    /// from it stay together (v0.3 plan, Stage 4). The objects of a moved
+    /// sketch move with it, and a move of an object made from a sketch
+    /// moves the sketch and its other objects too. The offsets of the links
+    /// (moves of the objects alone, from older versions) stay the same move
+    /// after the sketch.
+    pub(crate) fn sketch_objects_moved(&mut self, ids: &[ObjectId], delta: &Transform) {
+        let sketches: Vec<ObjectId> = self
+            .sketch_links
+            .iter()
+            .filter(|l| ids.contains(&l.sketch) || l.objects.iter().any(|id| ids.contains(id)))
+            .map(|l| l.sketch)
+            .collect();
+        if sketches.is_empty() {
+            return;
+        }
+        let mut follow: Vec<ObjectId> = sketches.iter().copied().filter(|s| !ids.contains(s)).collect();
+        for l in &mut self.sketch_links {
+            if !sketches.contains(&l.sketch) {
+                continue;
+            }
+            if let Some(inv) = delta.inverse() {
+                l.offset = inv.then(l.offset).then(*delta);
+            }
+            follow.extend(l.objects.iter().filter(|id| !ids.contains(id)));
+        }
+        follow.sort();
+        follow.dedup();
         for id in follow {
             if let Some(o) = self.object_mut(id) {
                 o.transform(delta);
@@ -449,13 +482,21 @@ mod tests {
     }
 
     #[test]
-    fn the_objects_follow_a_move_of_the_sketch_and_keep_their_own_move() {
-        let (mut d, sk, fill, _, w) = design();
+    fn the_sketch_and_its_objects_move_together() {
+        let (mut d, sk, fill, border, w) = design();
         let at = bbox(&d, fill).min;
         d.transform_objects(&[sk], &Transform::translate(100.0, 0.0));
         assert!((bbox(&d, fill).min - at - p(100.0, 0.0)).length() < 1e-6);
-        // The fill alone moves 10 mm down; after a change it stays there.
+        // A move of the fill moves the sketch and the border with it (v0.3
+        // plan, Stage 4); after a change the fill stays in its place.
+        let (sk_at, border_at) = (bbox(&d, sk).min, bbox(&d, border[0]).min);
         d.transform_objects(&[fill], &Transform::translate(0.0, 10.0));
+        assert!(
+            (bbox(&d, sk).min - sk_at - p(0.0, 10.0)).length() < 1e-6,
+            "the sketch follows"
+        );
+        assert!((bbox(&d, border[0]).min - border_at - p(0.0, 10.0)).length() < 1e-6);
+        assert_eq!(d.sketch_link_of(fill).unwrap().offset, Transform::IDENTITY);
         change(&mut d, sk, |s| s.set_value(w, 70.0).unwrap());
         assert!(
             (bbox(&d, fill).min - at - p(100.0, 10.0)).length() < 1e-6,
@@ -472,6 +513,36 @@ mod tests {
             "{b:?} {c:?}"
         );
         assert!(c.height() > c.width(), "the long side is upright now");
+    }
+
+    #[test]
+    fn a_sketch_does_not_scale_outside_sketch_mode() {
+        let (mut d, sk, fill, border, _) = design();
+        let family = d.sketch_family(&[fill]);
+        assert!(family.contains(&sk) && family.contains(&fill) && family.contains(&border[0]));
+        let grow = Transform::scale(2.0, 2.0);
+        assert!(d.scales_sketch(&[fill], &grow));
+        assert!(
+            !d.scales_sketch(&[fill], &Transform::scale(-1.0, 1.0)),
+            "a mirror is not a scale"
+        );
+        let before = d.clone();
+        assert!(!d.transform_objects(&[sk, fill], &grow));
+        assert_eq!(bbox(&d, sk), bbox(&before, sk));
+        assert_eq!(bbox(&d, fill), bbox(&before, fill));
+        // Other objects of the selection still scale.
+        let t = d.object(fill).unwrap().thread;
+        let other = d.add_object(
+            t,
+            ObjectKind::Fill {
+                outer: emb_geom::Path::rect(BBox::new(p(200.0, 0.0), p(210.0, 10.0))),
+                holes: Vec::new(),
+                params: Default::default(),
+            },
+        );
+        assert!(d.transform_objects(&[fill, other], &grow));
+        assert_eq!(bbox(&d, fill), bbox(&before, fill));
+        assert!(bbox(&d, other).width() > 19.0);
     }
 
     #[test]

@@ -61,7 +61,7 @@ fn anchor_name(a: Option<Anchor>) -> String {
 }
 
 /// A new hoop for the form.
-fn blank_hoop() -> HoopPreset {
+pub(crate) fn blank_hoop() -> HoopPreset {
     HoopPreset {
         id: String::new(),
         name: tr("My hoop").into(),
@@ -85,6 +85,42 @@ impl AppState {
             }
         }
         self.user_hoops = user;
+    }
+
+    /// The hoops of the Hoop list on the Design tab, in groups with their
+    /// headings: the user's favorite hoops (My Hoops), the hoops of the
+    /// machine of the design (in the order of the machine), then the other
+    /// hoops. Empty groups are not in the list.
+    pub fn hoop_menu(&self) -> Vec<(&'static str, Vec<&HoopPreset>)> {
+        let mine = &self.settings.my_hoops;
+        let machine: Vec<String> = self
+            .doc
+            .design()
+            .machine
+            .as_deref()
+            .and_then(|m| self.machines.get(m))
+            .map(|m| m.hoops.clone())
+            .unwrap_or_default();
+        let favorites: Vec<&HoopPreset> = self.hoops.hoops.iter().filter(|h| mine.contains(&h.id)).collect();
+        let of_machine: Vec<&HoopPreset> = machine
+            .iter()
+            .filter(|id| !mine.contains(id))
+            .filter_map(|id| self.hoops.get(id))
+            .collect();
+        let others: Vec<&HoopPreset> = self
+            .hoops
+            .hoops
+            .iter()
+            .filter(|h| !mine.contains(&h.id) && !machine.contains(&h.id))
+            .collect();
+        [
+            (tr("My Hoops"), favorites),
+            (tr("Hoops of this machine"), of_machine),
+            (tr("Other hoops"), others),
+        ]
+        .into_iter()
+        .filter(|(_, list)| !list.is_empty())
+        .collect()
     }
 
     /// Returns `true` if the hoop goes on the machine of the design: it is
@@ -713,6 +749,29 @@ mod tests {
 
     use super::*;
     use crate::test_util::Harness;
+
+    #[test]
+    fn the_hoop_list_shows_the_hoops_of_the_machine_first() {
+        let mut h = Harness::new();
+        let names = |h: &Harness| -> Vec<(String, Vec<String>)> {
+            h.st.hoop_menu()
+                .into_iter()
+                .map(|(t, l)| (t.to_string(), l.iter().map(|x| x.id.clone()).collect()))
+                .collect()
+        };
+        let machine = h.st.machines.get("husqvarna_topaz20").unwrap().hoops.clone();
+        let groups = names(&h);
+        assert_eq!(groups.len(), 2, "no favorites yet");
+        assert_eq!(groups[0].1, machine, "in the order of the machine");
+        assert!(groups[1].1.iter().all(|id| !machine.contains(id)));
+        assert_eq!(groups[0].1.len() + groups[1].1.len(), h.st.hoops.hoops.len());
+        // A favorite of the machine is only in My Hoops.
+        h.st.settings.my_hoops = vec![machine[0].clone()];
+        let groups = names(&h);
+        assert_eq!(groups.len(), 3);
+        assert_eq!(groups[0].1, [machine[0].clone()]);
+        assert_eq!(groups[1].1, machine[1..]);
+    }
 
     fn add_box(h: &mut Harness, w: f64, ht: f64) {
         h.st.doc.edit("Add", |d| {

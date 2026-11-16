@@ -409,6 +409,8 @@ mod tests {
     #[test]
     fn the_fonts_for_small_text_are_marked() {
         let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        // The test is on the reference machine.
+        st.start_on_machine("husqvarna_topaz20", None);
         let entries: Vec<FontRef> = st.fonts.entries.iter().map(|e| e.font.clone()).collect();
         let small: Vec<String> = entries
             .iter()
@@ -431,6 +433,8 @@ mod tests {
     #[test]
     fn previews_and_font_change_of_the_selection() {
         let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        // The test is on the reference machine.
+        st.start_on_machine("husqvarna_topaz20", None);
         let block = FontRef::embroidery("Block Sans", "");
         let p = st.preview_of(&block).unwrap();
         assert!(p.letters.len() >= 10);
