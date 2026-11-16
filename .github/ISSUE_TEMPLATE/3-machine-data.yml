@@ -1,0 +1,45 @@
+name: Machine data
+description: A machine is missing from the library, or a value of a machine is wrong.
+title: "[Machine] "
+labels: ["machine-data"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The machine library comes from the public data of the makers. Some values are marked UNVERIFIED in `data/machines.toml`. Corrections from owners of the machines are very welcome.
+        Your own machine can also go in the program at once: **Design > My Machines**. Its **Export…** file can go in this form.
+  - type: input
+    id: machine
+    attributes:
+      label: Brand and model
+      placeholder: "Janome Memory Craft 550E"
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What is it?
+      options:
+        - The machine is not in the library
+        - A value of the machine is wrong
+    validations:
+      required: true
+  - type: textarea
+    id: values
+    attributes:
+      label: The values
+      description: The largest embroidery field, the hoops (sewing field in mm), the file formats that the machine reads, the needles, and the speed. Only the values that you know.
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: Where do the values come from?
+      description: "The manual (with the page), the maker's web page (a link), or your own machine. Please do not attach pages of a manual: a link or the values are enough."
+    validations:
+      required: true
+  - type: textarea
+    id: file
+    attributes:
+      label: My Machines file (optional)
+      description: Drag the file that **Design > My Machines > Export…** wrote.

@@ -1,0 +1,62 @@
+name: Sew-out result
+description: Tell us how a design sews on your machine, good or bad.
+title: "[Sew-out] "
+labels: ["sew-out"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Sew-out results from real machines make the stitches better. Good results help too: they tell us what works on your machine.
+        The [tester guide](https://github.com/K1ngNatsu/ShokujoDX/blob/main/docs/testing/TESTERS.md) has designs to try.
+  - type: dropdown
+    id: result
+    attributes:
+      label: Result
+      options:
+        - Sews well
+        - Sews, but with problems
+        - Does not sew (the machine refuses the file, or the thread breaks)
+    validations:
+      required: true
+  - type: input
+    id: build
+    attributes:
+      label: Version and build
+      description: "File > About, then **Copy build information**."
+    validations:
+      required: true
+  - type: input
+    id: machine
+    attributes:
+      label: Machine and hoop
+      placeholder: "Husqvarna Viking Topaz 20, 260 × 200 mm hoop"
+    validations:
+      required: true
+  - type: input
+    id: format
+    attributes:
+      label: File format
+      placeholder: "VP3, PES, DST, …"
+    validations:
+      required: true
+  - type: input
+    id: fabric
+    attributes:
+      label: Fabric, stabilizer and thread
+      placeholder: "Cotton twill, medium tear-away, 40 wt polyester"
+  - type: textarea
+    id: what
+    attributes:
+      label: What sewed well, and what did not?
+      description: "For example: gaps between areas, puckers, loops, the outline does not line up, small text fills in, too many trims."
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: Photos and files
+      description: |
+        Drag files here: a photo of the sew-out (close, in good light), the project file (`.embproj`) and the machine file.
+        Attach only designs that you are free to share.
+    validations:
+      required: true

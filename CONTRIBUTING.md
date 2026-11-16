@@ -6,8 +6,11 @@ gets better with each bug report, sew-out photo, translation and fix.
 ## Ways to help
 
 - **Report a bug** or a design that sews badly (see below).
-- **Sew test designs** on your machine and tell us how they sew. The
-  [tester guide](docs/testing/TESTERS.md) tells what to try.
+- **Sew test designs** on your machine and tell us how they sew, with the
+  **Sew-out result** form. The [tester guide](docs/testing/TESTERS.md)
+  tells what to try.
+- **Correct the machine library**: a missing machine or a wrong value,
+  with the **Machine data** form.
 - **Translate** the program (German, Spanish and Japanese exist; more
   are welcome).
 - **Improve the help** in [docs/help](docs/help).
@@ -19,7 +22,9 @@ before you start.
 
 ## Report a bug
 
-Open an issue on GitHub. Tell us:
+Open an issue on GitHub (**Issues > New issue**) and select a form: **Bug
+report**, **Sew-out result**, **Machine data** or **Feature request**.
+The form asks for what we need. For a bug, that is:
 
 - The version and the build: **File > About**, then **Copy build
   information**.

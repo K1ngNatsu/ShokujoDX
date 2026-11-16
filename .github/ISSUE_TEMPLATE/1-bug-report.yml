@@ -1,0 +1,61 @@
+name: Bug report
+description: The program does something wrong, shows an error or stops.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for the report. A design that sews badly? Use the **Sew-out result** form.
+        Attach only files that you are free to share.
+  - type: input
+    id: build
+    attributes:
+      label: Version and build
+      description: "In the program: File > About (or Help > About), then **Copy build information**, and paste it here."
+      placeholder: "ShokujoDX 0.3.0 (…)"
+    validations:
+      required: true
+  - type: dropdown
+    id: system
+    attributes:
+      label: System
+      options:
+        - Windows 11
+        - Windows 10
+        - macOS
+        - Linux
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: machine
+    attributes:
+      label: Embroidery machine
+      description: The machine selected in the program (Design > Machine and Hoop), if it is important for the problem.
+      placeholder: "Brother SE1900, Generic PES machine, …"
+  - type: textarea
+    id: steps
+    attributes:
+      label: What did you do?
+      description: The steps, one for each line, so that we can do the same.
+      placeholder: |
+        1. Open a new design.
+        2. Type "Hello" on the Lettering tab.
+        3. Click …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect, and what happened?
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: Files and pictures
+      description: |
+        Drag files here: a screenshot, the project file (`.embproj`), the machine file.
+        If the program stopped: the crash report from the `crashes` folder in the settings folder (for example `%APPDATA%\ShokujoDX\crashes`). It has no design data.
+        If the program does not start: `start.log` from the settings folder, and the report that `ShokujoDX.exe --diagnose` writes (`diagnose.txt`).

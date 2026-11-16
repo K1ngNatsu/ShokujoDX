@@ -1,0 +1,27 @@
+name: Feature request
+description: An idea for a new tool or a better way to do something.
+title: "[Idea] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please describe the work that you want to do, not only the tool. Do not name or copy other embroidery programs: describe the result in your own words (the project is a clean-room project).
+  - type: textarea
+    id: problem
+    attributes:
+      label: What do you want to do?
+      description: The design or the task, and what is difficult now.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How could the program help?
+    validations:
+      required: true
+  - type: textarea
+    id: more
+    attributes:
+      label: Pictures or examples
+      description: Sketches, photos of embroidery, or screenshots of ShokujoDX.

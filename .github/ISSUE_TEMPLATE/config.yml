@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security problem
+    url: https://github.com/K1ngNatsu/ShokujoDX/security/advisories/new
+    about: Report a security problem in private. Do not open a public issue for it.
+  - name: Help topics
+    url: https://github.com/K1ngNatsu/ShokujoDX/tree/main/docs/help
+    about: The user guide of the program (also in the program, push F1). "Questions and problems" answers many questions.
