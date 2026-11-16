@@ -2,6 +2,8 @@
 
 Date: 2026-10-26 · Status: Accepted (owner decision); to do after the first public release
 
+The checklist of the steps (2026-11-16): `docs/design/code-signing-steps.md`.
+
 ## Context
 
 The Windows installer and program have no signature, so Windows shows
