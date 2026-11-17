@@ -62,7 +62,7 @@ const END_DARK: f64 = 0.82;
 
 impl Lighting {
     /// The unit vector toward the light.
-    fn vector(&self) -> [f64; 3] {
+    pub(crate) fn vector(&self) -> [f64; 3] {
         let (sa, ca) = math::sin_cos_deg(self.azimuth_deg);
         let (se, ce) = math::sin_cos_deg(self.elevation_deg.clamp(5.0, 90.0));
         [ca * ce, -sa * ce, se]

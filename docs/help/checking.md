@@ -98,6 +98,9 @@ product (**My picture…**, at its real width). Set the **Color** and where
 the design goes (**Put the design at**). **Show Product** shows or hides
 it. **Picture on Product** saves a PNG picture of the design with the
 thread look on the product, for a customer. The product does not sew.
+A drawn product has light and shade, folds and the texture of its
+fabric, in the light of the thread look; in the picture, the embroidery
+has a soft shadow on it.
 
 ## Repeats
 

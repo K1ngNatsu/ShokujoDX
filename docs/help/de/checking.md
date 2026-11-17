@@ -106,7 +106,9 @@ seiner echten Breite). Legen Sie die **Farbe** fest und wohin das Design
 kommt (**Das Design setzen auf**). **Produkt zeigen** zeigt oder verbirgt
 es. **Bild auf Produkt** speichert ein PNG-Bild des Designs mit der
 Garnansicht auf dem Produkt, für einen Kunden. Das Produkt wird nicht
-gestickt.
+gestickt. Ein gezeichnetes Produkt hat Licht und Schatten, Falten und
+die Struktur seines Stoffs, im Licht der Garnansicht; im Bild wirft die
+Stickerei einen weichen Schatten darauf.
 
 ## Wiederholungen
 

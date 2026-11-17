@@ -20,10 +20,12 @@ pub const DECORATION_PX_PER_MM: f64 = 4.0;
 /// The default product color: white.
 const WHITE: Rgb = Rgb(250, 250, 250);
 
-/// The texture of the product, and what it shows.
+/// The texture of the product, and what it shows. The shading of the
+/// drawn product stays while only the color changes (P16 Milestone 1).
 pub struct ProductTexture {
     key: (ProductKind, Rgb, usize, usize),
     texture: TextureHandle,
+    shading: Option<Arc<emb_render::product::Shading>>,
 }
 
 fn key(v: &ProductView) -> (ProductKind, Rgb, usize, usize) {
@@ -200,15 +202,27 @@ impl AppState {
     fn product_texture(&mut self, ctx: &egui::Context) -> Option<TextureHandle> {
         let v = self.doc.design().product.clone()?;
         let k = key(&v);
+        // A change of the light (Options) makes the shading again.
         if let Some(t) = &self.product_tex
             && t.key == k
+            && t.shading
+                .as_ref()
+                .is_none_or(|s| s.fits(v.kind, TEXTURE_PX_PER_MM, &self.settings.look.light))
         {
             return Some(t.texture.clone());
         }
+        let light = self.settings.look.light;
+        let mut shading = self
+            .product_tex
+            .as_ref()
+            .and_then(|t| t.shading.clone())
+            .filter(|s| s.fits(v.kind, TEXTURE_PX_PER_MM, &light));
         let image = match &v.picture {
             Some(p) => crate::backdrop::decode(&p.data, crate::resources::max_texture_side(ctx)).ok()?,
             None => {
-                let (pic, _) = emb_render::product::product_picture(&v, TEXTURE_PX_PER_MM);
+                let s = shading
+                    .get_or_insert_with(|| Arc::new(emb_render::product::Shading::new(&v, TEXTURE_PX_PER_MM, &light)));
+                let (pic, _) = emb_render::product::product_picture_with(&v, s);
                 egui::ColorImage::from_rgba_unmultiplied([pic.width as usize, pic.height as usize], &pic.rgba)
             }
         };
@@ -216,6 +230,7 @@ impl AppState {
         self.product_tex = Some(ProductTexture {
             key: k,
             texture: texture.clone(),
+            shading,
         });
         Some(texture)
     }

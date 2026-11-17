@@ -47,6 +47,10 @@ pub enum ProductPart {
     Area(Path, Shade),
     /// A line (a seam or an edge) of this width in mm, drawn darker.
     Line(Path, f64),
+    /// A fold of the cloth along the path: no color, only light and shade.
+    /// `width` is the width in mm; `height` (mm) is positive for a ridge
+    /// and negative for a valley.
+    Fold { path: Path, width: f64, height: f64 },
 }
 
 /// A usual place for a design on a product: the design center goes to
@@ -202,6 +206,46 @@ fn neck_line(w: f64, depth: f64) -> Path {
         .cubic_to(p(w * 0.55, depth), p(w, depth * 0.6), p(w, 0.0))
 }
 
+/// A fold along a smooth curve through `points`.
+fn fold(points: &[(f64, f64)], width: f64, height: f64) -> ProductPart {
+    let pts: Vec<(Point, bool)> = points.iter().map(|&(x, y)| (Point::new(x, y), true)).collect();
+    ProductPart::Fold {
+        path: Path::through_points(&pts, false),
+        width,
+        height,
+    }
+}
+
+/// A fold and its mirror at x = 0.
+fn folds_both(points: &[(f64, f64)], width: f64, height: f64) -> [ProductPart; 2] {
+    let m: Vec<(f64, f64)> = points.iter().map(|&(x, y)| (-x, y)).collect();
+    [fold(points, width, height), fold(&m, width, height)]
+}
+
+/// The folds of a short-sleeve garment (T-shirt, polo): drape from the
+/// arms, folds of the sleeves, and soft folds at the sides and the hem.
+/// They stay out of the usual places of the large designs.
+fn shirt_folds() -> Vec<ProductPart> {
+    let mut v = Vec::new();
+    v.extend(folds_both(
+        &[(258.0, 240.0), (215.0, 320.0), (180.0, 430.0)],
+        22.0,
+        -1.6,
+    ));
+    v.extend(folds_both(&[(250.0, 270.0), (222.0, 360.0), (205.0, 450.0)], 12.0, 0.9));
+    v.extend(folds_both(&[(250.0, 70.0), (282.0, 115.0), (318.0, 160.0)], 16.0, -1.0));
+    v.extend(folds_both(&[(272.0, 205.0), (300.0, 190.0), (326.0, 172.0)], 10.0, 0.7));
+    v.extend(folds_both(
+        &[(245.0, 470.0), (240.0, 580.0), (248.0, 680.0)],
+        24.0,
+        -1.0,
+    ));
+    v.push(fold(&[(-210.0, 575.0), (-90.0, 598.0), (40.0, 588.0)], 30.0, 1.2));
+    v.push(fold(&[(70.0, 630.0), (160.0, 618.0), (225.0, 600.0)], 22.0, -1.0));
+    v.push(fold(&[(-150.0, 650.0), (-40.0, 660.0)], 16.0, -0.7));
+    v
+}
+
 /// The area that shows the inside of the back neck through a front neck.
 fn inside_neck(w: f64, front: f64, back: f64) -> Path {
     let p = Point::new;
@@ -270,24 +314,28 @@ impl ProductKind {
         match self {
             ProductKind::TShirt => {
                 let [s1, s2] = both(&[(333.0, 191.0), (273.0, 248.0)]);
-                vec![
+                let mut v = vec![
                     Area(short_sleeves(95.0), Shade::Body),
                     Area(inside_neck(95.0, 95.0, 22.0), Shade::Dark),
                     Line(neck_line(113.0, 113.0), rib),
                     Line(s1, rib),
                     Line(s2, rib),
                     Line(line(&[(-269.0, 690.0), (269.0, 690.0)]), rib),
-                ]
+                ];
+                v.extend(shirt_folds());
+                v
             }
             ProductKind::TShirtBack => {
                 let [s1, s2] = both(&[(333.0, 191.0), (273.0, 248.0)]);
-                vec![
+                let mut v = vec![
                     Area(short_sleeves(22.0), Shade::Body),
                     Line(neck_line(95.0, 40.0), rib),
                     Line(s1, rib),
                     Line(s2, rib),
                     Line(line(&[(-269.0, 690.0), (269.0, 690.0)]), rib),
-                ]
+                ];
+                v.extend(shirt_folds());
+                v
             }
             ProductKind::Polo => {
                 let [s1, s2] = both(&[(333.0, 191.0), (273.0, 248.0)]);
@@ -318,6 +366,7 @@ impl ProductKind {
                 for y in [130.0, 180.0, 230.0] {
                     v.push(Area(circle(0.0, y, 5.0), Shade::Dark));
                 }
+                v.extend(shirt_folds());
                 v
             }
             ProductKind::Sweatshirt => {
@@ -334,14 +383,33 @@ impl ProductKind {
                     ],
                 );
                 let [c1, c2] = both(&[(410.0, 532.0), (352.0, 557.0)]);
-                vec![
+                let mut v = vec![
                     Area(body, Shade::Body),
                     Area(inside_neck(95.0, 90.0, 22.0), Shade::Dark),
                     Line(neck_line(115.0, 112.0), rib),
                     Line(c1, rib),
                     Line(c2, rib),
                     Line(line(&[(-266.0, 660.0), (266.0, 660.0)]), rib),
-                ]
+                ];
+                // Drape from the arms, creases at the elbows and above the
+                // cuffs, and soft folds above the waist rib.
+                v.extend(folds_both(
+                    &[(258.0, 255.0), (218.0, 340.0), (190.0, 450.0)],
+                    22.0,
+                    -1.6,
+                ));
+                v.extend(folds_both(
+                    &[(245.0, 480.0), (242.0, 560.0), (250.0, 640.0)],
+                    22.0,
+                    -1.0,
+                ));
+                for (y, h) in [(318.0, -1.2), (352.0, 1.0), (388.0, -1.0), (498.0, -0.9), (528.0, 0.8)] {
+                    let (xo, xi) = (240.0 + (y - 40.0) / 550.0 * 190.0, 262.0 + (y - 240.0) / 375.0 * 108.0);
+                    v.extend(folds_both(&[(xi + 4.0, y + 6.0), (xo - 4.0, y - 4.0)], 12.0, h));
+                }
+                v.push(fold(&[(-200.0, 615.0), (-80.0, 632.0), (60.0, 625.0)], 24.0, 1.0));
+                v.push(fold(&[(90.0, 640.0), (200.0, 630.0)], 16.0, -0.8));
+                v
             }
             ProductKind::Cap => {
                 let crown = symmetric((0.0, -130.0), &[C(70.0, -130.0, 115.0, -70.0, 115.0, 0.0), L(0.0, 0.0)]);
@@ -374,26 +442,48 @@ impl ProductKind {
                     Point::new(100.0, -190.0),
                     Point::new(100.0, 0.0),
                 );
-                vec![
+                let mut v = vec![
                     Area(body, Shade::Body),
                     Line(handle, 25.0),
                     Line(line(&[(-190.0, 30.0), (190.0, 30.0)]), rib),
-                ]
+                ];
+                // The handles pull the top; the bottom sags a little.
+                v.extend(folds_both(&[(100.0, 34.0), (122.0, 62.0), (150.0, 84.0)], 14.0, -0.9));
+                v.push(fold(&[(-170.0, 395.0), (0.0, 405.0), (170.0, 395.0)], 24.0, -1.0));
+                v
             }
             ProductKind::Towel => {
                 let body = Path::rect(BBox::new(Point::new(-250.0, 0.0), Point::new(250.0, 900.0)));
                 let border = Path::rect(BBox::new(Point::new(-250.0, 760.0), Point::new(250.0, 830.0)));
-                vec![
+                let mut v = vec![
                     Area(body, Shade::Body),
                     Area(border, Shade::Light),
                     Line(line(&[(-250.0, 760.0), (250.0, 760.0)]), rib),
                     Line(line(&[(-250.0, 830.0), (250.0, 830.0)]), rib),
                     Line(line(&[(-250.0, 885.0), (250.0, 885.0)]), rib),
-                ]
+                ];
+                // A towel on a rail hangs in soft waves at its sides.
+                v.extend(folds_both(&[(228.0, 40.0), (224.0, 400.0), (230.0, 740.0)], 34.0, 1.8));
+                v.extend(folds_both(&[(170.0, 60.0), (175.0, 300.0), (168.0, 560.0)], 30.0, -1.2));
+                v
             }
             ProductKind::Cushion => {
                 let body = Path::rect(BBox::new(Point::new(-225.0, 0.0), Point::new(225.0, 450.0)));
-                vec![Area(body.clone(), Shade::Body), Line(body, 6.0)]
+                let mut v = vec![Area(body.clone(), Shade::Body), Line(body, 6.0)];
+                // The corners pinch where the filling pulls the cover.
+                for (sx, sy) in [(1.0, 0.0), (-1.0, 0.0), (1.0, 450.0), (-1.0, 450.0)] {
+                    let dy = if sy > 0.0 { -1.0 } else { 1.0 };
+                    v.push(fold(
+                        &[
+                            (sx * 222.0, sy + dy * 3.0),
+                            (sx * 200.0, sy + dy * 25.0),
+                            (sx * 178.0, sy + dy * 50.0),
+                        ],
+                        12.0,
+                        -1.4,
+                    ));
+                }
+                v
             }
         }
     }
@@ -453,6 +543,7 @@ impl ProductKind {
             .iter()
             .filter_map(|p| match p {
                 ProductPart::Area(path, _) | ProductPart::Line(path, _) => path.control_bbox(),
+                ProductPart::Fold { .. } => None,
             })
             .reduce(BBox::union)
             .unwrap_or_else(|| BBox::new(Point::ZERO, Point::ZERO))

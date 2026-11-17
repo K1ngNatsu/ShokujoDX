@@ -100,7 +100,9 @@ una imagen de su propio producto (**Mi imagen…**, a su ancho real). Defina
 el **Color** y dónde va el diseño (**Poner el diseño en**). **Mostrar
 producto** lo muestra u oculta. **Imagen en el producto** guarda una
 imagen PNG del diseño con el aspecto de hilo sobre el producto, para un
-cliente. El producto no se borda.
+cliente. El producto no se borda. Un producto dibujado tiene luz y
+sombra, pliegues y la textura de su tejido, con la luz del aspecto de
+hilo; en la imagen, el bordado tiene una sombra suave sobre él.
 
 ## Repeticiones
 
