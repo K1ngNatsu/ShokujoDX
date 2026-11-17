@@ -499,18 +499,66 @@ fn draw_background(painter: &egui::Painter, rect: Rect, st: &AppState) {
     }
 }
 
+/// The brightness of a color, 0 (black) to 1 (white).
+fn brightness(c: Color32) -> f32 {
+    (0.299 * f32::from(c.r()) + 0.587 * f32::from(c.g()) + 0.114 * f32::from(c.b())) / 255.0
+}
+
+/// The colors of the hoop lines: the line, and a halo under it if a
+/// product or a fabric color is under the hoop. The line then contrasts
+/// with that color (if the user did not set a hoop color), and the halo
+/// keeps the line clear on a picture and on the canvas round the product.
+fn hoop_inks(st: &AppState, dark: bool) -> (Color32, Option<Color32>) {
+    let design = st.doc.design();
+    let theme = st.settings.display.hoop(dark);
+    // Some(Some(color)): a product or a fabric color; Some(None): a picture.
+    let under = match &design.product {
+        Some(v) if v.visible => Some(v.picture.is_none().then_some(v.color)),
+        _ => design.background.map(Some),
+    };
+    let Some(under) = under else {
+        return (theme, None);
+    };
+    let ink = match (st.settings.display.hoop, under) {
+        (None, Some(c)) if brightness(color32(c)) > 0.5 => Color32::from_gray(35),
+        (None, Some(_)) => Color32::from_gray(235),
+        _ => theme,
+    };
+    let halo = if brightness(ink) > 0.5 {
+        Color32::from_black_alpha(150)
+    } else {
+        Color32::from_white_alpha(170)
+    };
+    (ink, Some(halo))
+}
+
+/// Draws a line of the hoop, with its halo first.
+fn hoop_line(painter: &egui::Painter, pts: Vec<Pos2>, width: f32, ink: Color32, halo: Option<Color32>, dash: bool) {
+    let add = |w: f32, c: Color32| {
+        if dash {
+            painter.extend(Shape::dashed_line(&pts, Stroke::new(w, c), 6.0, 4.0));
+        } else {
+            painter.add(Shape::line(pts.clone(), Stroke::new(w, c)));
+        }
+    };
+    if let Some(h) = halo {
+        add(width + 2.5, h);
+    }
+    add(width, ink);
+}
+
 fn draw_hoop(painter: &egui::Painter, rect: Rect, st: &AppState, dark: bool) {
     let design = st.doc.design();
     let center = design.hoop.center;
-    let ink = st.settings.display.hoop(dark);
+    let (ink, halo) = hoop_inks(st, dark);
 
     // Hoop center cross, along the axes of the hoop.
     let c = st.view.to_screen(rect, center);
-    let cross = Stroke::new(1.0, ink.gamma_multiply(0.5));
     let (s, co) = emb_geom::math::sin_cos_deg(design.hoop.angle_deg);
     let (ax, ay) = (Vec2::new(co as f32, s as f32), Vec2::new(-s as f32, co as f32));
-    painter.line_segment([c - ax * 8.0, c + ax * 8.0], cross);
-    painter.line_segment([c - ay * 8.0, c + ay * 8.0], cross);
+    for a in [ax, ay] {
+        hoop_line(painter, vec![c - a * 8.0, c + a * 8.0], 1.0, ink, halo, false);
+    }
 
     // The auto start and end points (ADR 0032).
     let se = design.start_end;
@@ -543,18 +591,15 @@ fn draw_hoop(painter: &egui::Painter, rect: Rect, st: &AppState, dark: bool) {
     if let Some(field) = st.hoop_outline(0.0) {
         for (mut pts, _) in screen_polylines(&field, &id_t, rect, &st.view) {
             pts.push(pts[0]);
-            painter.add(Shape::line(pts, Stroke::new(1.5, ink)));
+            hoop_line(painter, pts, 1.5, ink, halo, false);
         }
     }
     if let Some(safe) = st.hoop_outline(st.margin_mm) {
+        // With a halo, the dashes need the full color to show.
+        let dash_ink = if halo.is_some() { ink } else { ink.gamma_multiply(0.6) };
         for (mut pts, _) in screen_polylines(&safe, &id_t, rect, &st.view) {
             pts.push(pts[0]);
-            painter.extend(Shape::dashed_line(
-                &pts,
-                Stroke::new(1.0, ink.gamma_multiply(0.6)),
-                6.0,
-                4.0,
-            ));
+            hoop_line(painter, pts, 1.0, dash_ink, halo, true);
         }
     }
     // The back of the machine: a small arrow out of the back edge. The top
@@ -568,15 +613,14 @@ fn draw_hoop(painter: &egui::Painter, rect: Rect, st: &AppState, dark: bool) {
         painter.add(Shape::convex_polygon(
             vec![b + out * 10.0, b + side * 6.0 + out * 2.0, b - side * 6.0 + out * 2.0],
             ink,
-            Stroke::NONE,
+            halo.map_or(Stroke::NONE, |h| Stroke::new(1.5, h)),
         ));
-        painter.text(
-            b + out * 20.0,
-            egui::Align2::CENTER_CENTER,
-            tr("Back"),
-            egui::FontId::proportional(11.0),
-            ink,
-        );
+        let text = painter.layout_no_wrap(tr("Back").into(), egui::FontId::proportional(11.0), ink);
+        let at = b + out * 20.0 - text.size() * 0.5;
+        if let Some(h) = halo {
+            painter.rect_filled(Rect::from_min_size(at, text.size()).expand(2.0), 3.0, h);
+        }
+        painter.galley(at, text, ink);
     }
 }
 
@@ -885,6 +929,25 @@ mod tests {
 
     fn rect() -> Rect {
         Rect::from_min_size(Pos2::ZERO, Vec2::new(800.0, 600.0))
+    }
+
+    #[test]
+    fn the_hoop_lines_contrast_with_the_product() {
+        let mut h = crate::test_util::Harness::new();
+        // No product and no fabric color: the theme color, no halo.
+        assert_eq!(hoop_inks(&h.st, true), (Color32::from_gray(200), None));
+        // A white shirt in the dark theme: dark lines with a light halo.
+        h.st.set_product(emb_model::ProductKind::TShirt);
+        let (ink, halo) = hoop_inks(&h.st, true);
+        assert!(brightness(ink) < 0.2 && halo.is_some_and(|c| brightness(c) > 0.5));
+        // A black shirt: light lines with a dark halo.
+        h.st.doc
+            .edit("Color", |d| d.product.as_mut().unwrap().color = Rgb(20, 20, 25));
+        let (ink, halo) = hoop_inks(&h.st, false);
+        assert!(brightness(ink) > 0.8 && halo.is_some_and(|c| c.r() < 50));
+        // A hoop color of the user stays, with a halo.
+        h.st.settings.display.hoop = Some(Rgb(255, 0, 0));
+        assert_eq!(hoop_inks(&h.st, false).0, Color32::from_rgb(255, 0, 0));
     }
 
     #[test]
