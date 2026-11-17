@@ -47,16 +47,18 @@ TrueType lettering that was satin before sews the same.
 
 ## Consequences
 
-- Of the four bundled fonts made from the fonts in the repository, Block
-  Sans keeps one fill character (×) of ten, Anton none of three, Pacifico
-  none of eight, Varsity one (×) of three. GothicE has none of 22. Only the
-  former fill letters change.
+- All 30 bundled embroidery fonts are made again (2026-11-17): 311 fill
+  characters in satin fonts became 13. Only the former fill letters
+  change. The 13: eight symbols (× in six fonts, +, ¢), "¶" and "ä", and
+  three letters of very heavy fonts ("c" of Fat Face Serif, "r" of Round
+  Sans, "N" of Shrikhand), whose widest strokes are 20 % to 36 % of the
+  capital height: a fill suits them. GothicE (a font of the owner's
+  computer) has none of 22.
 - The golden designs `sewout-towel` and `sewout-cap` change: the "u" of
   Pacifico in "Joshua" is satin now (2 more trims). They need a new
-  sew-out.
-- The other 26 bundled fonts come from the google/fonts repository
-  (`tools/make-embroidery-fonts.py`); they get the change when they are
-  made again. An embroidery font that a user converted gets it when the
-  user converts the TrueType font again.
+  sew-out. `embroidery-fonts-2` to `-4` change too ("Team 26": former fill
+  letters of Fat Face Serif, Brush Hand, Slab Heavy and others).
+- An embroidery font that a user converted gets the change when the user
+  converts the TrueType font again.
 - A letter can have a stroke of the second pass that overlaps a stroke of
   the first pass a little at the join.
