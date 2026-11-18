@@ -192,7 +192,7 @@ pub enum LetterConnection {
 pub const TRIM_OVER_MM: f64 = 1.0;
 
 /// One letter: its text (one character) and its parts, in sew order.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Letter {
     pub text: String,
     /// The line of the text that the letter is on (from 0).
@@ -214,6 +214,39 @@ pub struct Letter {
     pub center: Point,
     /// Satin and fill parts in design coordinates.
     pub parts: Vec<ObjectKind>,
+    /// The parts sew in this order, each column from its start to its end
+    /// (a letter of an embroidery font that a person put in order; else the
+    /// stitch engine finds the order and the directions).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub fixed: bool,
+    /// The settings that the font gives to each part, in the order of
+    /// `parts` (empty: none). [`Lettering::apply_params`] applies them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tuning: Vec<PartTuning>,
+}
+
+/// The settings that an embroidery font gives to one part of a letter (a
+/// letter correction, ADR 0112). They change the settings of the lettering
+/// object for this part only.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct PartTuning {
+    /// The underlay of the part, if not the one of the object.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub underlay: Option<Underlay>,
+    /// Added to the pull compensation of the object, in mm (can be
+    /// negative; the result is not less than 0).
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub pull_mm: f64,
+    /// Added to the fill angle of the object, in degrees (fill parts).
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub angle_deg: f64,
+}
+
+impl PartTuning {
+    /// No change.
+    pub fn is_empty(&self) -> bool {
+        *self == PartTuning::default()
+    }
 }
 
 /// A letter shape changed by hand, kept in the design.
@@ -689,7 +722,8 @@ impl Lettering {
     }
 
     /// Copies the satin and fill settings of the object to the parts, with
-    /// the underlay of each letter that has its own. The fill angle of each
+    /// the settings that the font gives to a part ([`PartTuning`]) and the
+    /// underlay of each letter that has its own. The fill angle of each
     /// part keeps the turn of the placement.
     pub fn apply_params(&mut self) {
         let (satin, fill, t) = (self.satin.clone(), self.fill.clone(), self.placement);
@@ -699,18 +733,29 @@ impl Lettering {
             .map(|l| self.edit(l.index).and_then(|e| e.underlay.clone()))
             .collect();
         for (letter, underlay) in self.letters.iter_mut().zip(underlays) {
-            for part in &mut letter.parts {
+            // The settings of the font are for the parts as the font has
+            // them; a letter with other parts has none.
+            let tuned = letter.tuning.len() == letter.parts.len();
+            for (i, part) in letter.parts.iter_mut().enumerate() {
+                let tune = tuned.then(|| &letter.tuning[i]);
+                // The underlay: of the letter in this design, else of the
+                // font, else of the object.
+                let underlay = underlay.as_ref().or(tune.and_then(|t| t.underlay.as_ref()));
+                let pull = tune.map_or(0.0, |t| t.pull_mm);
                 match part {
                     ObjectKind::Satin { params, .. } => {
                         *params = satin.clone();
-                        if let Some(u) = &underlay {
+                        params.pull_compensation_mm = (params.pull_compensation_mm + pull).max(0.0);
+                        if let Some(u) = underlay {
                             params.underlay = u.clone();
                         }
                     }
                     ObjectKind::Fill { params, .. } => {
                         *params = fill.clone();
-                        params.angle_deg = crate::edit::transform_angle(fill.angle_deg, &t);
-                        if let Some(u) = &underlay {
+                        let angle = fill.angle_deg + tune.map_or(0.0, |t| t.angle_deg);
+                        params.angle_deg = crate::edit::transform_angle(angle, &t);
+                        params.pull_compensation_mm = (params.pull_compensation_mm + pull).max(0.0);
+                        if let Some(u) = underlay {
                             params.underlay = u.clone();
                         }
                     }
@@ -774,6 +819,8 @@ mod tests {
                 frame: Transform::IDENTITY,
                 center: Point::ZERO,
                 parts: vec![square(0.0)],
+                fixed: false,
+                tuning: Vec::new(),
             },
             Letter {
                 text: "B".into(),
@@ -790,6 +837,8 @@ mod tests {
                     ),
                     params: SatinParams::default(),
                 }],
+                fixed: false,
+                tuning: Vec::new(),
             },
         ]);
         let b = l
@@ -833,6 +882,8 @@ mod tests {
             frame: Transform::translate(at, 0.0),
             center: Point::new(2.5, -5.0),
             parts: vec![square(at)],
+            fixed: false,
+            tuning: Vec::new(),
         };
         l.set_letters(vec![letter(0.0, 0), letter(7.0, 1)]);
         assert_eq!(l.paths_of_letter(1), 1..2);
@@ -907,6 +958,8 @@ mod tests {
             frame: Transform::IDENTITY,
             center: Point::ZERO,
             parts: vec![square(0.0)],
+            fixed: false,
+            tuning: Vec::new(),
         }]);
         let kind = ObjectKind::Lettering(Box::new(l));
         let json = serde_json::to_string(&kind).unwrap();

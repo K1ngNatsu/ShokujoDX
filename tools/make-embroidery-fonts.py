@@ -8,6 +8,11 @@
 # Version use it); the converter writes the source and the license in the
 # notes of the font.
 #
+# Letter corrections (ADR 0112): if data/fonts/embroidery/corrections/<name>.json
+# is there, the converter applies it after the conversion, so a corrected
+# letter stays corrected. A correction that does not apply stops the tool:
+# correct the file (the letter of the new conversion has other parts).
+#
 # Use:  python tools/make-embroidery-fonts.py <google-fonts-folder> [name ...]
 #       (<google-fonts-folder>/ofl/<folder>/<file>.ttf; build emb-cli first:
 #       cargo build --release -p emb-cli)
@@ -71,7 +76,13 @@ def main():
             ofl = os.path.join(gfonts, "ofl", source, "OFL.txt")
         out = os.path.join(OUT, slug + ".embfont")
         cmd = [exe, "font", src, out, "--name", family] + (["--small-text"] if small else [])
-        print(subprocess.run(cmd, check=True, capture_output=True, text=True).stdout.strip())
+        fixes = os.path.join(OUT, "corrections", slug + ".json")
+        if os.path.isfile(fixes):
+            cmd += ["--corrections", fixes]
+        done = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
+        if done.returncode != 0:
+            sys.exit(done.stderr.strip() or done.stdout.strip())
+        print(done.stdout.strip())
         shutil.copyfile(ofl, os.path.join(OUT, slug + "-OFL.txt"))
 
 

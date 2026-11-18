@@ -49,6 +49,26 @@ den Größenbereich sehen, und **Alle**, **Stickerei**, **TrueType** oder
 TrueType-Schrift, mit einem Namen, einem Größenbereich und einer Stichart.
 Prüfen Sie, ob die Lizenz der Schrift Ihnen erlaubt, sie zu ändern.
 
+## Schrift-Testblatt
+
+**Schrift > Schrift-Testblatt** (oder **Testblatt** in der Schriftliste)
+erstellt ein neues Design mit den Buchstaben einer Schrift, zum Sticken und
+Ansehen:
+
+- **Kleinste**, **Mitte** und **Größte**: die Größen des Größenbereichs der
+  Schrift. Schalten Sie eine Größe aus, die Sie nicht möchten, oder geben
+  Sie eine andere Höhe ein.
+- **Zeichen**: die Buchstaben, Ziffern und Zeichen, alle Zeichen der
+  Schrift, ein Teil davon oder **Mein Text**.
+- **Zeilenbreite**: Die Buchstabenzeilen sind nicht breiter als dieser
+  Wert. Er beginnt mit der Breite des Rahmens.
+
+Jede Größe hat eine Beschriftung mit dem Namen der Schrift und der Größe.
+Das Fenster zeigt die Größe des Blatts. Wenn das Blatt größer als der
+Rahmen ist, nehmen Sie weniger Größen oder Zeichen, oder sticken Sie es in
+mehreren Einspannungen (siehe [Designs, die größer als der Rahmen
+sind](hooping)).
+
 ## Die Einstellungen der Schrift
 
 Wählen Sie die Schrift aus. Die Objekteigenschaften haben:
@@ -156,6 +176,34 @@ gehen.
 **Importieren** liest eine Stickschrift (.embfont) oder eine Bitmapschrift
 (.bdf, .fon). **Exportieren** schreibt das Alphabet. **Umbenennen** und
 **Löschen** ändern es.
+
+## Einen Buchstaben einer Schrift korrigieren
+
+Sie können einen Buchstaben einer Stickschrift ändern, auch bei einer
+Schrift, die mit dem Programm kommt. In **Schrift > Alphabete**, unter
+**Buchstabenkorrekturen**:
+
+1. Wählen Sie die **Schrift** und geben Sie das **Zeichen** ein.
+2. Klicken Sie auf **Buchstaben platzieren**. Die Objekte des Buchstabens
+   sind im Design, zwischen Hilfslinien, in ihrer Stickreihenfolge.
+3. Ändern Sie die Objekte: die Reihenfolge (das Bedienfeld Reihenfolge),
+   die Richtung (**Richtung umkehren**), die Form, die Unterlage oder den
+   Zugausgleich.
+4. Wählen Sie die Objekte aus und klicken Sie auf **Korrektur speichern**.
+
+Neue Schrift verwendet den korrigierten Buchstaben. Schrift, die schon in
+einem Design ist, ändert sich, wenn Sie ihren Text oder ihre Schriftart
+ändern. **Korrektur entfernen** gibt den Buchstaben der Schrift zurück.
+
+- **Stickreihenfolge beibehalten**: Der Buchstabe stickt seine Objekte in
+  ihrer Reihenfolge, jede Säule von ihrem Anfang bis zu ihrem Ende. Ist das
+  aus, findet das Programm die Reihenfolge.
+- **Einstellungen beibehalten**: Der Buchstabe behält die Unterlage, den
+  Zugausgleich und den Füllwinkel jedes Objekts.
+
+Die Korrekturen einer Schrift sind eine Datei im Ordner `corrections` Ihres
+Schriftenordners (**Datei anzeigen**). Eine neue Version des Programms
+behält sie.
 
 ## Monogramme
 

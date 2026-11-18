@@ -583,6 +583,8 @@ pub enum Cmd {
     Monogram,
     TeamNames,
     Alphabets,
+    /// A new design with the letters of a font at some sizes (ADR 0112).
+    FontTestSheet,
     KeyboardDesigns,
     QuickSimplify,
     CopyProperties,
@@ -2017,6 +2019,13 @@ impl Cmd {
                 tr("Alphabets"),
                 tr(
                     "Make your own alphabets: letters from objects you draw, between guides. Rename, delete, import (also bitmap fonts: .bdf, .fon) and export alphabets.",
+                ),
+            ),
+            Cmd::FontTestSheet => (
+                g(ph::TEXT_COLUMNS),
+                tr("Font Test Sheet"),
+                tr(
+                    "Make a new design with all letters of a font at its smallest, middle and largest size, to sew and to look at.",
                 ),
             ),
             Cmd::NewView => (

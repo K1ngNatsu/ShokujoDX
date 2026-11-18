@@ -6,14 +6,21 @@
 //!   select its objects, type the character and create the letter.
 //! - Manage: new, rename, delete, import (an embroidery font, or a bitmap
 //!   font: BDF or Windows `.fon`), export, delete a letter.
+//! - Letter corrections (P17 Milestone 4, ADR 0112): place a letter of an
+//!   embroidery font as objects, change them, and save them as the
+//!   correction of the letter. The corrections of a font are a file in the
+//!   `corrections` folder of the fonts folder; the font library applies
+//!   them when it reads the font.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use eframe::egui;
+use emb_geom::Point;
 use emb_letter::EmbFont;
-use emb_letter::embfont::FILE_EXTENSION;
-use emb_model::{FontRef, Guide, LetterStitch, ObjectKind};
+use emb_letter::correction::{Corrections, LetterCorrection};
+use emb_letter::embfont::{FILE_EXTENSION, LetterFrame};
+use emb_model::{FontKind, FontRef, Guide, LetterStitch, ObjectKind};
 
 use crate::a11y::Named;
 use crate::app::AppState;
@@ -37,6 +44,17 @@ pub struct AlphabetsWindow {
     pub baseline_y: f64,
     /// The stitch type of imported bitmap fonts.
     pub import_stitch: LetterStitch,
+    /// A letter keeps the sew order and the directions of its objects.
+    pub keep_order: bool,
+    /// A letter keeps the underlay, the pull compensation and the fill
+    /// angle of its objects, where they are not the standard settings.
+    pub keep_settings: bool,
+    /// Letter corrections: the embroidery font and the character.
+    pub fix_font: FontRef,
+    pub fix_ch: String,
+    /// Where Place Letter put the start of a letter: the font, the
+    /// character and the X in the design.
+    pub placed: Option<(FontRef, char, f64)>,
     /// The alphabets and the selected font, read when the window opens and
     /// after a change of the files (not on each frame).
     pub cache: Option<Arc<AlphabetsCache>>,
@@ -50,6 +68,10 @@ pub struct AlphabetsCache {
     /// The file that `font` is from.
     pub font_path: Option<PathBuf>,
     pub font: Option<EmbFont>,
+    /// The font that `fixed` is of.
+    pub fix_font: Option<FontRef>,
+    /// The letters with a correction of the user.
+    pub fixed: Vec<char>,
 }
 
 impl Default for AlphabetsWindow {
@@ -64,6 +86,11 @@ impl Default for AlphabetsWindow {
             height_mm: 25.0,
             baseline_y: 12.5,
             import_stitch: LetterStitch::Auto,
+            keep_order: true,
+            keep_settings: false,
+            fix_font: FontRef::embroidery(emb_letter::bundled::DEFAULT_EMBROIDERY, ""),
+            fix_ch: "A".into(),
+            placed: None,
             cache: None,
         }
     }
@@ -197,7 +224,14 @@ impl AppState {
             .map(|o| o.kind.clone())
             .collect();
         let w = &self.alphabets_window;
-        let letter = emb_letter::embfont::letter_from_objects(&kinds, w.baseline_y, w.height_mm)
+        let frame = LetterFrame {
+            baseline_y: w.baseline_y,
+            height_mm: w.height_mm,
+            origin_x: None,
+            keep_order: w.keep_order,
+            keep_settings: w.keep_settings,
+        };
+        let letter = emb_letter::embfont::letter_from(&kinds, &frame)
             .ok_or(tr("Select the satin, fill or running objects of the letter."))?;
         let mut f = EmbFont::load(path)?;
         f.set_letter(c, letter);
@@ -214,6 +248,159 @@ impl AppState {
         self.fonts.add_user_font(path)?;
         self.alphabets_window.cache = None;
         Ok(())
+    }
+
+    /// The folder of the letter corrections. The font library reads it
+    /// from now on.
+    fn corrections_dir(&mut self) -> Result<PathBuf, String> {
+        let dir = self.alphabets_dir()?.join(crate::lettering::CORRECTIONS_DIR);
+        self.fonts.corrections_dir = Some(dir.clone());
+        Ok(dir)
+    }
+
+    /// The file of the letter corrections of `font`.
+    pub fn corrections_file(&mut self, font: &FontRef) -> Result<PathBuf, String> {
+        Ok(self
+            .corrections_dir()?
+            .join(emb_letter::correction::file_name(&font.family)))
+    }
+
+    /// The letters of `font` that have a correction of the user.
+    pub fn corrected_letters(&mut self, font: &FontRef) -> Vec<char> {
+        self.corrections_file(font)
+            .ok()
+            .filter(|p| p.is_file())
+            .and_then(|p| Corrections::load(&p).ok())
+            .map(|c| c.letters.keys().copied().collect())
+            .unwrap_or_default()
+    }
+
+    fn embroidery_font(&mut self, font: &FontRef) -> Result<Arc<EmbFont>, String> {
+        match self.fonts.get(font) {
+            Some(emb_letter::AnyFont::Embroidery(f)) => Ok(f),
+            _ => Err(tr("Select an embroidery font.").into()),
+        }
+    }
+
+    /// Puts letter `c` of the embroidery font `font` in the design as
+    /// objects, in sew order, with the height and the baseline of the
+    /// window, between guides at the start and the end of the letter. The
+    /// objects are selected.
+    pub fn place_letter(&mut self, font: &FontRef, c: char) -> Result<(), String> {
+        let f = self.embroidery_font(font)?;
+        let letter = f
+            .letters
+            .get(&c)
+            .filter(|l| !l.parts.is_empty())
+            .ok_or_else(|| crate::i18n::fill("{} has no letter \"{}\".", &[&f.family, &c]))?;
+        let (h, base) = (self.alphabets_window.height_mm, self.alphabets_window.baseline_y);
+        let width = letter.advance_mm * h / f.cap_height_mm.max(1e-6);
+        let x0 = -width / 2.0;
+        let kinds = emb_letter::embfont::objects_of_letter(&f, letter, Point::new(x0, base), h);
+        let current = self.current_thread;
+        let ids = self.doc.edit(tr("Place letter"), |d| {
+            for (vertical, pos) in [(false, base), (false, base - h), (true, x0), (true, x0 + width)] {
+                if !d
+                    .guides
+                    .iter()
+                    .any(|g| g.vertical == vertical && (g.pos - pos).abs() < 1e-6)
+                {
+                    d.guides.push(Guide::new(vertical, pos));
+                }
+            }
+            let thread = current
+                .filter(|t| d.thread(*t).is_some())
+                .or(d.threads.first().map(|t| t.id))
+                .unwrap_or_else(|| d.add_thread("Black", emb_model::Rgb(0, 0, 0)));
+            kinds.into_iter().map(|k| d.add_object(thread, k)).collect::<Vec<_>>()
+        });
+        self.selection.set_all(ids);
+        self.fit_requested = true;
+        let w = &mut self.alphabets_window;
+        w.placed = Some((font.clone(), c, x0));
+        // The objects have the standard settings and the settings of the
+        // letter, so a change of them is a change of the letter.
+        w.keep_settings = true;
+        Ok(())
+    }
+
+    /// Makes the selected objects the correction of letter `c` of `font`,
+    /// with the baseline and the height of the window. A letter that Place
+    /// Letter put there keeps its start and its width.
+    pub fn save_correction(&mut self, font: &FontRef, c: char) -> Result<(), String> {
+        let f = self.embroidery_font(font)?;
+        let d = self.doc.design();
+        let kinds: Vec<ObjectKind> = self
+            .sel()
+            .iter()
+            .filter_map(|id| d.object(*id))
+            .map(|o| o.kind.clone())
+            .collect();
+        let w = &self.alphabets_window;
+        let origin_x = w
+            .placed
+            .as_ref()
+            .filter(|(pf, pc, _)| pf.same(font) && *pc == c)
+            .map(|p| p.2);
+        let frame = LetterFrame {
+            baseline_y: w.baseline_y,
+            height_mm: w.height_mm,
+            origin_x,
+            keep_order: w.keep_order,
+            keep_settings: w.keep_settings,
+        };
+        let mut letter = emb_letter::embfont::letter_from(&kinds, &frame)
+            .ok_or(tr("Select the satin, fill or running objects of the letter."))?;
+        // The letters of a correction are at the design size of the font.
+        let k = f.cap_height_mm / emb_letter::embfont::DESIGN_CAP_MM;
+        if (k - 1.0).abs() > 1e-9 {
+            for p in &mut letter.parts {
+                p.transform(&emb_geom::Transform::scale(k, k));
+            }
+            letter.advance_mm *= k;
+        }
+        if origin_x.is_some()
+            && let Some(old) = f.letters.get(&c)
+        {
+            letter.advance_mm = old.advance_mm;
+        }
+        for p in &mut letter.parts {
+            emb_letter::embfont::round_part(p);
+        }
+        letter.advance_mm = (letter.advance_mm * 100.0).round() / 100.0;
+        let path = self.corrections_file(font)?;
+        let mut all = if path.is_file() {
+            Corrections::load(&path)?
+        } else {
+            Corrections::new(&f.family)
+        };
+        all.family = f.family.clone();
+        all.letters.insert(c, LetterCorrection::from_letter(&letter));
+        all.save(&path)?;
+        self.fonts.reload(font);
+        self.alphabets_window.cache = None;
+        Ok(())
+    }
+
+    /// Removes the correction of letter `c` of `font`. Returns `false` if
+    /// the letter has none.
+    pub fn remove_correction(&mut self, font: &FontRef, c: char) -> Result<bool, String> {
+        let path = self.corrections_file(font)?;
+        if !path.is_file() {
+            return Ok(false);
+        }
+        let mut all = Corrections::load(&path)?;
+        if all.letters.remove(&c).is_none() {
+            return Ok(false);
+        }
+        if all.letters.is_empty() {
+            std::fs::remove_file(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        } else {
+            all.save(&path)?;
+        }
+        self.fonts.reload(font);
+        self.alphabets_window.cache = None;
+        Ok(true)
     }
 
     /// Guides at the baseline and at the capital height of the window.
@@ -243,6 +430,8 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                 list,
                 font_path: None,
                 font: None,
+                fix_font: None,
+                fixed: Vec::new(),
             })
         }
     };
@@ -257,6 +446,20 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
             list: cache.list.clone(),
             font_path: w.selected.clone(),
             font: w.selected.as_deref().and_then(|p| EmbFont::load(p).ok()),
+            fix_font: cache.fix_font.clone(),
+            fixed: cache.fixed.clone(),
+        })
+    } else {
+        cache
+    };
+    // The corrected letters: read again only for another font.
+    let cache = if cache.fix_font.as_ref().is_none_or(|f| !f.same(&w.fix_font)) {
+        Arc::new(AlphabetsCache {
+            list: cache.list.clone(),
+            font_path: cache.font_path.clone(),
+            font: cache.font.clone(),
+            fix_font: Some(w.fix_font.clone()),
+            fixed: st.corrected_letters(&w.fix_font),
         })
     } else {
         cache
@@ -264,6 +467,14 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
     w.cache = Some(cache.clone());
     let list = &cache.list;
     let font = cache.font.as_ref();
+    let fixed = &cache.fixed;
+    let fix_fonts: Vec<FontRef> = st
+        .fonts
+        .entries
+        .iter()
+        .filter(|e| e.font.kind == FontKind::Embroidery)
+        .map(|e| e.font.clone())
+        .collect();
     let mut open = true;
     #[derive(PartialEq)]
     enum Act {
@@ -277,6 +488,10 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         Guides,
         RemoveLetter(char),
         LetterWith,
+        Place,
+        SaveFix,
+        RemoveFix,
+        ShowFixes,
     }
     let mut act = Act::None;
     crate::dock::docked(
@@ -423,6 +638,97 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                 act = Act::Create;
             }
         });
+        ui.horizontal(|ui| {
+            ui.checkbox(&mut w.keep_order, tr("Keep the sew order"))
+                .on_hover_text(tr(
+                    "The letter sews its objects in their order, each column from its start to its end. \
+                 Off: the program finds the order.",
+                ));
+            ui.checkbox(&mut w.keep_settings, tr("Keep the settings"))
+                .on_hover_text(tr(
+                    "The letter keeps the underlay, the pull compensation and the fill angle of each \
+                 object, where they are not the standard settings of lettering.",
+                ));
+        });
+        ui.separator();
+        ui.strong(tr("Letter corrections"));
+        ui.add(
+            egui::Label::new(
+                egui::RichText::new(tr(
+                    "Place a letter of an embroidery font, change its objects (the order, the \
+                     direction, the shape, the settings), select them and save the correction. A new \
+                     version of the font keeps your corrections.",
+                ))
+                .weak(),
+            )
+            .wrap(),
+        );
+        ui.horizontal(|ui| {
+            ui.label(tr("Font"));
+            egui::ComboBox::from_id_salt("fix_font")
+                .selected_text(w.fix_font.label())
+                .show_ui(ui, |ui| {
+                    for f in &fix_fonts {
+                        ui.selectable_value(&mut w.fix_font, f.clone(), f.label());
+                    }
+                });
+            ui.label(tr("Character"));
+            ui.add(
+                egui::TextEdit::singleline(&mut w.fix_ch)
+                    .desired_width(30.0)
+                    .char_limit(1),
+            );
+        });
+        let ch = w.fix_ch.chars().next();
+        ui.horizontal(|ui| {
+            if ui
+                .add_enabled(ch.is_some(), egui::Button::new(tr("Place Letter")))
+                .on_hover_text(tr(
+                    "Put the objects of this letter in the design, between guides, in their sew order.",
+                ))
+                .clicked()
+            {
+                act = Act::Place;
+            }
+            if ui
+                .add_enabled(ch.is_some(), egui::Button::new(tr("Save Correction")))
+                .on_hover_text(tr("The selected objects become this letter of the font."))
+                .clicked()
+            {
+                act = Act::SaveFix;
+            }
+            if ui
+                .add_enabled(
+                    ch.is_some_and(|c| fixed.contains(&c)),
+                    egui::Button::new(tr("Remove Correction")),
+                )
+                .on_hover_text(tr("The letter is as the font has it again."))
+                .clicked()
+            {
+                act = Act::RemoveFix;
+            }
+        });
+        if !fixed.is_empty() {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(tr("Corrected letters:"));
+                for c in fixed {
+                    if ui
+                        .small_button(c.to_string())
+                        .on_hover_text(tr("Click: this character."))
+                        .clicked()
+                    {
+                        w.fix_ch = c.to_string();
+                    }
+                }
+                if ui
+                    .small_button(tr("Show File"))
+                    .on_hover_text(tr("Show the file of the corrections of this font in its folder."))
+                    .clicked()
+                {
+                    act = Act::ShowFixes;
+                }
+            });
+        }
     });
     if act != Act::Delete {
         w.confirm_delete = false;
@@ -510,6 +816,39 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
             }
             None => Ok(String::new()),
         },
+        Act::Place => match w.fix_ch.chars().next() {
+            Some(c) => st.place_letter(&w.fix_font, c).map(|()| {
+                crate::i18n::fill(
+                    "\"{}\" of {} is in the design. Change its objects, select them and save the correction.",
+                    &[&c, &w.fix_font.label()],
+                )
+            }),
+            None => Ok(String::new()),
+        },
+        Act::SaveFix => match w.fix_ch.chars().next() {
+            Some(c) => st.save_correction(&w.fix_font, c).map(|()| {
+                crate::i18n::fill(
+                    "\"{}\" of {} is corrected. New lettering uses it.",
+                    &[&c, &w.fix_font.label()],
+                )
+            }),
+            None => Ok(String::new()),
+        },
+        Act::RemoveFix => match w.fix_ch.chars().next() {
+            Some(c) => st.remove_correction(&w.fix_font, c).map(|removed| {
+                if removed {
+                    crate::i18n::fill("\"{}\" is as the font has it again.", &[&c])
+                } else {
+                    String::new()
+                }
+            }),
+            None => Ok(String::new()),
+        },
+        Act::ShowFixes => st.corrections_file(&w.fix_font).and_then(|p| {
+            crate::share::show_in_folder(&p)
+                .map(|()| String::new())
+                .map_err(|e| format!("{}: {e}", p.display()))
+        }),
     };
     match result {
         Ok(m) if !m.is_empty() => st.message = m,
@@ -591,6 +930,114 @@ mod tests {
         let b = l.parts().filter_map(|p| p.control_bbox()).reduce(BBox::union).unwrap();
         assert!((b.height() - 40.0).abs() < 0.1, "the capital height: {b:?}");
         assert!(st.plan_view().plan.stitches.stitch_count() > 100);
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn correct_a_letter_of_a_bundled_font() {
+        let (mut st, dir) = state("fix");
+        let font = FontRef::embroidery("Block Sans", "");
+        let before = st.embroidery_font(&font).unwrap().letters[&'H'].clone();
+        let n = before.parts.len();
+        assert!(n >= 3 && !before.fixed && before.tuning.is_empty());
+        // Place the letter: its objects are in the design, selected,
+        // between four guides.
+        st.alphabets_window.height_mm = 40.0;
+        st.alphabets_window.baseline_y = 10.0;
+        st.place_letter(&font, 'H').unwrap();
+        let ids = st.sel();
+        assert_eq!(ids.len(), n);
+        assert_eq!(st.doc.design().guides.len(), 4);
+        let area = |st: &AppState| {
+            st.sel()
+                .iter()
+                .filter_map(|id| st.doc.design().object(*id))
+                .filter_map(|o| o.kind.control_bbox())
+                .reduce(BBox::union)
+                .unwrap()
+        };
+        let b = area(&st);
+        assert!((b.max.y - 10.0).abs() < 0.5 && (b.height() - 40.0).abs() < 0.5, "{b:?}");
+        assert!(
+            st.alphabets_window.keep_settings,
+            "the settings of the objects are kept"
+        );
+        // A save with no change gives the letter of the font, in a fixed order.
+        st.save_correction(&font, 'H').unwrap();
+        let same = st.embroidery_font(&font).unwrap().letters[&'H'].clone();
+        assert!(same.fixed && same.tuning.is_empty());
+        assert_eq!(same.advance_mm, before.advance_mm);
+        let boxes =
+            |l: &emb_letter::EmbLetter| -> Vec<BBox> { l.parts.iter().filter_map(|p| p.control_bbox()).collect() };
+        for (x, y) in boxes(&same).iter().zip(boxes(&before)) {
+            assert!(
+                x.min.distance(y.min) < 0.02 && x.max.distance(y.max) < 0.02,
+                "{x:?} {y:?}"
+            );
+        }
+        // Change the objects: the first one sews last, the other way, with
+        // a heavy underlay and more pull compensation.
+        let first = ids[0];
+        st.doc.edit("Change", |d| {
+            d.reverse_objects(&[first]);
+            let o = d.object(first).unwrap().clone();
+            let mut kind = o.kind.clone();
+            if let ObjectKind::Satin { params, .. } = &mut kind {
+                params.underlay = emb_model::Underlay::Heavy;
+                params.pull_compensation_mm += 0.1;
+            }
+            d.remove_object(first);
+            d.add_object(o.thread, kind);
+        });
+        let all: Vec<_> = st.doc.design().objects().iter().map(|o| o.id).collect();
+        st.selection.set_all(all);
+        st.save_correction(&font, 'H').unwrap();
+        let file = dir.join("corrections").join("block-sans.json");
+        assert!(file.is_file());
+        assert_eq!(st.corrected_letters(&font), vec!['H']);
+        let after = st.embroidery_font(&font).unwrap().letters[&'H'].clone();
+        assert!(after.fixed);
+        assert_eq!(after.parts.len(), n);
+        let (a, b) = (boxes(&after), boxes(&before));
+        assert!(a[0].min.distance(b[1].min) < 0.02, "the second part is the first now");
+        assert!(a[n - 1].min.distance(b[0].min) < 0.02, "the first part is the last now");
+        assert_eq!(after.tuning.len(), n);
+        assert_eq!(after.tuning[n - 1].underlay, Some(emb_model::Underlay::Heavy));
+        assert!((after.tuning[n - 1].pull_mm - 0.1).abs() < 1e-9);
+        assert!(after.tuning[0].is_empty());
+        // New lettering has the corrected letter.
+        st.doc.edit("Clear", |d| {
+            let ids: Vec<_> = d.objects().iter().map(|o| o.id).collect();
+            for id in ids {
+                d.remove_object(id);
+            }
+        });
+        st.add_lettering(LetteringDialog::new(Point::new(0.0, 0.0), "HI", font.clone(), 20.0));
+        let ObjectKind::Lettering(l) = &st.doc.design().objects()[0].kind else {
+            panic!()
+        };
+        assert!(l.letters[0].fixed && !l.letters[1].fixed);
+        let ObjectKind::Satin { params, .. } = &l.letters[0].parts[n - 1] else {
+            panic!("a column")
+        };
+        assert_eq!(params.underlay, emb_model::Underlay::Heavy);
+        assert!((params.pull_compensation_mm - l.satin.pull_compensation_mm - 0.1).abs() < 1e-9);
+        // The window shows the corrected letters.
+        st.alphabets_window.open = true;
+        let ctx = egui::Context::default();
+        let mut out = ctx.run_ui(egui::RawInput::default(), |ui| window(ui.ctx(), &mut st));
+        out.textures_delta.clear();
+        assert_eq!(st.alphabets_window.cache.as_ref().unwrap().fixed, vec!['H']);
+        // With no correction, the letter is the letter of the font again.
+        assert!(st.remove_correction(&font, 'H').unwrap());
+        assert!(!st.remove_correction(&font, 'H').unwrap());
+        assert!(!file.exists());
+        assert_eq!(st.embroidery_font(&font).unwrap().letters[&'H'], before);
+        // A font with no such letter, and a font that is not an embroidery font.
+        assert!(st.place_letter(&font, '\u{4e00}').is_err());
+        assert!(st.place_letter(&FontRef::new("Lato", "Bold"), 'H').is_err());
+        st.selection.clear();
+        assert!(st.save_correction(&font, 'H').is_err());
         std::fs::remove_dir_all(dir).ok();
     }
 

@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use emb_model::{FontRef, LetterStitch, ObjectKind};
+use emb_model::{FontRef, LetterStitch, ObjectKind, PartTuning};
 
 use crate::embfont::EmbFont;
 use crate::font::Font;
@@ -43,6 +43,16 @@ pub trait LetterSource {
     fn parts(&self, letter: u32, stitch: LetterStitch, scale: f64) -> Vec<ObjectKind>;
     /// The recommended capital height range in mm.
     fn size_range(&self, stitch: LetterStitch) -> Option<(f64, f64)>;
+    /// The parts of the letter sew in the order of the source, each column
+    /// from its start to its end (a letter that a person put in order).
+    fn fixed(&self, _letter: u32) -> bool {
+        false
+    }
+    /// The settings that the source gives to each part of the letter, in
+    /// the order of the parts (empty: none).
+    fn tuning(&self, _letter: u32) -> Vec<PartTuning> {
+        Vec::new()
+    }
 }
 
 /// The recommended height range for strokes `ratio` times the capital

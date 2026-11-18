@@ -58,6 +58,10 @@ pub struct FontLibrary {
     /// The name of each family in its own font, for the font lists
     /// (`None`: the font cannot show its name).
     samples: HashMap<(String, FontKind), Option<Arc<NameSample>>>,
+    /// The folder of the letter corrections of the user (ADR 0112): an
+    /// embroidery font takes the corrections of its family when it is
+    /// read. `None`: no corrections.
+    pub corrections_dir: Option<PathBuf>,
 }
 
 /// A font name in its own font: the outlines of the letters, each letter
@@ -74,8 +78,23 @@ pub const SAMPLES_PER_FRAME: usize = 6;
 /// The height of a row of the font list, in points.
 const FONT_ROW: f32 = 26.0;
 
-/// Reads a font.
-fn load(source: &FontSource) -> Option<AnyFont> {
+/// Applies the letter corrections of the user in `dir` to `font`. A
+/// correction that does not apply leaves its letter as it is.
+fn correct(mut font: EmbFont, dir: Option<&Path>) -> EmbFont {
+    let file = dir.map(|d| d.join(emb_letter::correction::file_name(&font.family)));
+    if let Some(c) = file
+        .filter(|f| f.is_file())
+        .and_then(|f| emb_letter::correction::Corrections::load(&f).ok())
+        .filter(|c| c.family.eq_ignore_ascii_case(&font.family))
+    {
+        c.apply(&mut font);
+    }
+    font
+}
+
+/// Reads a font. An embroidery font gets the letter corrections of the
+/// user in `corrections`.
+fn load(source: &FontSource, corrections: Option<&Path>) -> Option<AnyFont> {
     Some(match source {
         FontSource::Bundled(i) => AnyFont::TrueType(Arc::new(
             Font::from_bytes(emb_letter::bundled::FILES.get(*i)?.1.to_vec(), 0).ok()?,
@@ -83,10 +102,11 @@ fn load(source: &FontSource) -> Option<AnyFont> {
         FontSource::File(path, face) => {
             AnyFont::TrueType(Arc::new(Font::from_bytes(std::fs::read(path).ok()?, *face).ok()?))
         }
-        FontSource::EmbBundled(i) => AnyFont::Embroidery(Arc::new(
+        FontSource::EmbBundled(i) => AnyFont::Embroidery(Arc::new(correct(
             EmbFont::from_json(&emb_letter::bundled::embroidery_text(*i)?).ok()?,
-        )),
-        FontSource::EmbFile(path) => AnyFont::Embroidery(Arc::new(EmbFont::load(path).ok()?)),
+            corrections,
+        ))),
+        FontSource::EmbFile(path) => AnyFont::Embroidery(Arc::new(correct(EmbFont::load(path).ok()?, corrections))),
     })
 }
 
@@ -210,6 +230,10 @@ impl Default for FontLibrary {
             scan: None,
             scanned: false,
             samples: HashMap::new(),
+            // The tests do not read the files of the user.
+            corrections_dir: user_fonts_dir()
+                .filter(|_| !cfg!(test))
+                .map(|d| d.join(CORRECTIONS_DIR)),
         };
         if let Some(dir) = user_fonts_dir() {
             lib.add_user_fonts(&dir);
@@ -217,6 +241,9 @@ impl Default for FontLibrary {
         lib
     }
 }
+
+/// The folder of the letter corrections, in the folder of the user's fonts.
+pub const CORRECTIONS_DIR: &str = "corrections";
 
 /// The folder of the user's embroidery fonts, next to the settings file.
 pub fn user_fonts_dir() -> Option<PathBuf> {
@@ -277,7 +304,7 @@ impl FontLibrary {
 
     /// Adds one embroidery font file. A font with the same name is replaced.
     pub fn add_user_font(&mut self, path: &Path) -> Result<FontRef, String> {
-        let f = EmbFont::load(path)?;
+        let f = correct(EmbFont::load(path)?, self.corrections_dir.as_deref());
         let r = FontRef::embroidery(&f.family, &f.style);
         self.entries.retain(|e| !e.font.same(&r));
         self.loaded.retain(|k, _| !k.same(&r));
@@ -288,6 +315,13 @@ impl FontLibrary {
         self.loaded.insert(r.clone(), AnyFont::Embroidery(Arc::new(f)));
         self.sort();
         Ok(r)
+    }
+
+    /// Reads the font again when it is used next (after a change of its
+    /// letter corrections).
+    pub fn reload(&mut self, r: &FontRef) {
+        self.loaded.retain(|k, _| !k.same(r));
+        self.samples.remove(&(r.family.to_lowercase(), r.kind));
     }
 
     /// Removes a font (a deleted or renamed alphabet) from the lists.
@@ -303,7 +337,7 @@ impl FontLibrary {
             return Some(f.clone());
         }
         let e = self.entries.iter().find(|e| e.font.same(r))?.clone();
-        let font = load(&e.source)?;
+        let font = load(&e.source, self.corrections_dir.as_deref())?;
         self.loaded.insert(e.font, font.clone());
         Some(font)
     }
@@ -336,7 +370,7 @@ impl FontLibrary {
                 .iter()
                 .find(|(k, _)| k.same(&e.font))
                 .map(|(_, f)| f.clone())
-                .or_else(|| load(&e.source))
+                .or_else(|| load(&e.source, self.corrections_dir.as_deref()))
         });
         let sample = font.and_then(|f| name_sample(&f, family)).map(Arc::new);
         self.samples.insert(key, sample.clone());

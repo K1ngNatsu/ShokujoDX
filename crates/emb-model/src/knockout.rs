@@ -189,6 +189,8 @@ pub(crate) mod tests {
                 geometry: g,
                 params: SatinParams::default(),
             }],
+            fixed: false,
+            tuning: Vec::new(),
         }];
         ObjectKind::Lettering(Box::new(l))
     }

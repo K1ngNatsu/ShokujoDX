@@ -30,6 +30,11 @@ un producto que parece tela.
   el giro como imagen animada o como cuatro vistas.
 - La hoja de aprobación puede mostrar el diseño sobre el producto.
 
+**Letras.** **Letras > Hoja de prueba de fuente** crea un diseño con las
+letras de una fuente en varios tamaños, para bordarlo y verlo. En **Letras >
+Alfabetos** puede corregir una letra de una fuente de bordado: su orden de
+bordado, su forma y sus ajustes. Consulte [Letras](lettering).
+
 **Versiones nuevas.** El programa puede avisarle cuando hay una versión
 nueva disponible. Consulte [Opciones](options).
 

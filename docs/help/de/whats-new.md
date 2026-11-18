@@ -30,6 +30,12 @@ Produkt, das wie Stoff aussieht.
   Drehung als animiertes Bild oder als vier Ansichten speichern.
 - Das Freigabeblatt kann das Design auf dem Produkt zeigen.
 
+**Schrift.** **Schrift > Schrift-Testblatt** erstellt ein Design mit den
+Buchstaben einer Schrift in mehreren Größen, zum Sticken und Ansehen. In
+**Schrift > Alphabete** können Sie einen Buchstaben einer Stickschrift
+korrigieren: seine Stickreihenfolge, seine Form und seine Einstellungen.
+Siehe [Schrift](lettering).
+
 **Neue Versionen.** Das Programm kann Ihnen sagen, wenn eine neue Version
 verfügbar ist. Siehe [Optionen](options).
 

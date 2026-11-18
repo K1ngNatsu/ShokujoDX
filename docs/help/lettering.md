@@ -2,7 +2,7 @@
 id: lettering
 title: Lettering and monograms
 group: design
-keywords: lettering, text, name, font, knockout, overlap, overlapping text, embroidery font, truetype, opentype, size range, small text, height, letter spacing, line spacing, kerning, align, baseline, arc, circle, line, envelope, lettering art, sew order, trims, jumps, letter, reshape, alphabet, bitmap font, monogram, initials, team names, names list, csv, keyboard designs, kiosk, shop, mitre, mitre corners, corner, bold, italic, underline, style, vertical, stacked, text direction
+keywords: lettering, text, name, font, knockout, overlap, overlapping text, embroidery font, truetype, opentype, size range, small text, height, letter spacing, line spacing, kerning, align, baseline, arc, circle, line, envelope, lettering art, sew order, trims, jumps, letter, reshape, alphabet, bitmap font, monogram, initials, team names, names list, csv, keyboard designs, kiosk, shop, mitre, mitre corners, corner, bold, italic, underline, style, vertical, stacked, text direction, test sheet, font test, letter correction, correct a letter, stroke order
 ---
 # Lettering and monograms
 
@@ -44,6 +44,23 @@ selected lettering** changes the font of the selection.
 **Convert to embroidery font** makes an embroidery font from a TrueType
 font, with a name, a size range and a stitch type. Check that the license
 of the font lets you change it.
+
+## Font test sheet
+
+**Lettering > Font Test Sheet** (or **Test Sheet** in the font list) makes
+a new design with the letters of a font, to sew and to look at:
+
+- **Smallest**, **Middle** and **Largest**: the sizes of the size range of
+  the font. Clear a size that you do not want, or type another height.
+- **Characters**: the letters, digits and marks, all characters of the
+  font, a part of them, or **My text**.
+- **Row width**: the rows of letters are not wider than this. It starts at
+  the width of the hoop.
+
+Each size has a label with the name of the font and the size. The window
+shows the size of the sheet. If the sheet is larger than the hoop, use
+fewer sizes or characters, or sew it in more than one hooping (see
+[Designs larger than the hoop](hooping)).
 
 ## The settings of lettering
 
@@ -140,6 +157,33 @@ the letters go under the objects in front.
 **Import** reads an embroidery font (.embfont) or a bitmap font (.bdf,
 .fon). **Export** writes the alphabet. **Rename** and **Delete** change
 it.
+
+## Correct a letter of a font
+
+You can change a letter of an embroidery font, also of a font that comes
+with the program. In **Lettering > Alphabets**, under **Letter
+corrections**:
+
+1. Select the **Font** and type the **Character**.
+2. Click **Place Letter**. The objects of the letter are in the design,
+   between guides, in their sew order.
+3. Change the objects: the order (the Sequence panel), the direction
+   (**Reverse Direction**), the shape, the underlay or the pull
+   compensation.
+4. Select the objects and click **Save Correction**.
+
+New lettering uses the corrected letter. Lettering that is in a design
+changes when you change its text or its font. **Remove Correction** gives
+the letter of the font back.
+
+- **Keep the sew order**: the letter sews its objects in their order, each
+  column from its start to its end. With this off, the program finds the
+  order.
+- **Keep the settings**: the letter keeps the underlay, the pull
+  compensation and the fill angle of each object.
+
+The corrections of a font are a file in the `corrections` folder of your
+fonts folder (**Show File**). A new version of the program keeps them.
 
 ## Monograms
 

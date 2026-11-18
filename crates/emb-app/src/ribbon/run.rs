@@ -596,6 +596,7 @@ impl AppState {
             Cmd::Monogram => self.open_monogram(),
             Cmd::TeamNames => self.open_team_names(),
             Cmd::Alphabets => self.alphabets_window.open = true,
+            Cmd::FontTestSheet => self.open_font_sheet(None),
             Cmd::KeyboardDesigns => self.keyboard_window.open = true,
             Cmd::QuickSimplify => self.quick_simplify(),
             Cmd::ExportSvg => self.export_svg_dialog(),

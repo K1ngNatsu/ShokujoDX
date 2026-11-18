@@ -91,7 +91,7 @@ pub use import::design_from_stitches;
 pub use keyboard::{KeyDesign, KeyObject, KeyboardCollection};
 pub use lettering::{
     CutArea, FontKind, FontRef, Justify, Knockout, Letter, LetterConnection, LetterEdit, LetterOrder, LetterShape,
-    LetterStitch, Lettering, TextDirection, Underline,
+    LetterStitch, Lettering, PartTuning, TextDirection, Underline,
 };
 pub use link::{LinkOp, ShapeLink};
 pub use machine::{MachineCatalog, MachineProfile, SewTimes};

@@ -310,6 +310,15 @@ fn details(ui: &mut egui::Ui, st: &mut AppState) {
             ],
         );
     }
+    if ui
+        .button(tr("Test Sheet…"))
+        .on_hover_text(tr(
+            "Make a new design with all letters of this font at its smallest, middle and largest size.",
+        ))
+        .clicked()
+    {
+        st.open_font_sheet(Some(sel.clone()));
+    }
     if sel.kind == FontKind::TrueType {
         convert_ui(ui, st, &sel);
     }

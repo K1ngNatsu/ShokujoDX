@@ -17,6 +17,7 @@
 #![forbid(unsafe_code)]
 
 pub mod bitmap;
+pub mod correction;
 pub mod embfont;
 pub mod font;
 pub mod glyph;
@@ -24,6 +25,7 @@ pub mod grid;
 pub mod keyboard;
 pub mod layout;
 pub mod monogram;
+pub mod sheet;
 pub mod source;
 pub mod stroke;
 pub mod style;
@@ -238,6 +240,61 @@ pub mod bundled {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Each file of letter corrections in `data/fonts/embroidery/corrections`
+    /// is for a bundled font, and the bundled font has its corrections:
+    /// `tools/make-embroidery-fonts.py` ran after the last change of the
+    /// file (ADR 0112).
+    #[test]
+    fn the_bundled_fonts_have_their_corrections() {
+        let dir = std::path::Path::new("../../data/fonts/embroidery/corrections");
+        let Ok(files) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for path in files.flatten().map(|e| e.path()) {
+            let name = path.display().to_string();
+            assert!(
+                path.extension().is_some_and(|e| e == correction::FILE_EXTENSION),
+                "{name}"
+            );
+            let c = correction::Corrections::load(&path).unwrap_or_else(|e| panic!("{e}"));
+            assert_eq!(
+                path.file_name().and_then(|n| n.to_str()),
+                Some(correction::file_name(&c.family).as_str()),
+                "the file name of {}",
+                c.family
+            );
+            let font = bundled::embroidery(&c.family).unwrap_or_else(|| panic!("{name}: no bundled font {}", c.family));
+            for (ch, fix) in &c.letters {
+                let letter = font
+                    .letters
+                    .get(ch)
+                    .unwrap_or_else(|| panic!("{name}: the font has no {ch:?}"));
+                let steps = !(fix.order.is_empty() && fix.reverse.is_empty() && fix.join.is_empty());
+                assert_eq!(
+                    letter.fixed,
+                    fix.fixed.unwrap_or(fix.parts.is_some() || steps),
+                    "{name}: {ch:?} is not corrected in the font; make the fonts again"
+                );
+                if let Some(of) = fix.of.filter(|_| fix.parts.is_none()) {
+                    assert_eq!(letter.parts.len() + fix.join.len(), of, "{name}: the parts of {ch:?}");
+                }
+                if fix.parts.is_some() && !steps {
+                    // A shape gives the letter that the font has.
+                    let mut again = font.clone();
+                    again.set_letter(
+                        *ch,
+                        fix.apply(Some(letter))
+                            .unwrap_or_else(|e| panic!("{name}: {ch:?}: {e}")),
+                    );
+                    assert_eq!(&again.letters[ch], letter, "{name}: {ch:?}; make the fonts again");
+                }
+                for (i, tune) in &fix.tuning {
+                    assert_eq!(letter.tuning.get(*i), Some(tune), "{name}: the settings of {ch:?}");
+                }
+            }
+        }
+    }
 
     #[test]
     fn bundled_embroidery_fonts_load() {

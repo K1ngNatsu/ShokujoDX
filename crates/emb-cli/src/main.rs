@@ -88,7 +88,16 @@ Usage:
       --small-text: a font for letters 4 to 6 mm high (satin columns from
       0.8 mm).
       Check that the license of the font lets you do this; an OFL font
-      with a Reserved Font Name needs a new --name.";
+      with a Reserved Font Name needs a new --name.
+      --corrections <file>: apply the letter corrections of the file after
+      the conversion (ADR 0112). A correction that does not apply is an
+      error.
+  emb-cli font-sheet <font.embfont> <out.embproj> [--sizes <mm>,<mm>,...]
+                     [--chars basic|all|capitals|lowercase|digits|accented]
+                     [--text <text>] [--row <mm>] [--corrections <file>]
+      Write the test sheet of an embroidery font: its letters at its
+      smallest, middle and largest size (or at --sizes), in rows not
+      wider than --row (180 mm), with the size at each group.";
 
 /// The files of `emb-cli library`.
 struct LibraryFiles<'a> {
@@ -205,6 +214,8 @@ fn run(args: &[String]) -> Result<(), String> {
         (String::new(), emb_library::SortKey::Name, false, None, None, None);
     let (mut name, mut style, mut stitch) = (None, String::new(), emb_model::LetterStitch::Auto);
     let mut small_text = false;
+    let mut corrections: Option<PathBuf> = None;
+    let (mut sheet_sizes, mut sheet_chars, mut sheet_row) = (Vec::new(), emb_letter::sheet::Characters::Basic, 180.0);
     let mut bench = emb_cli::bench::FolderSettings::default();
     let mut bench_out: Option<PathBuf> = None;
     let mut quote = emb_cli::QuoteOptions::default();
@@ -251,6 +262,38 @@ fn run(args: &[String]) -> Result<(), String> {
             "--name" => name = Some(it.next().ok_or("--name needs a font name")?.clone()),
             "--style" => style = it.next().ok_or("--style needs a style name")?.clone(),
             "--small-text" => small_text = true,
+            "--corrections" => corrections = Some(PathBuf::from(it.next().ok_or("--corrections needs a file")?)),
+            "--sizes" => {
+                sheet_sizes = it
+                    .next()
+                    .ok_or("--sizes needs a list such as 7,15,30")?
+                    .split(',')
+                    .map(|s| s.trim().parse::<f64>().ok().filter(|v| *v > 0.0))
+                    .collect::<Option<Vec<f64>>>()
+                    .ok_or("--sizes needs a list such as 7,15,30")?;
+            }
+            "--chars" => {
+                use emb_letter::sheet::Characters;
+                sheet_chars = match it.next().map(|s| s.to_lowercase()).as_deref() {
+                    Some("basic") => Characters::Basic,
+                    Some("all") => Characters::All,
+                    Some("capitals") => Characters::Capitals,
+                    Some("lowercase") => Characters::Lowercase,
+                    Some("digits") => Characters::Digits,
+                    Some("accented") => Characters::Accented,
+                    _ => return Err("--chars needs basic, all, capitals, lowercase, digits or accented".into()),
+                }
+            }
+            "--text" => {
+                sheet_chars = emb_letter::sheet::Characters::Text(it.next().ok_or("--text needs a text")?.clone());
+            }
+            "--row" => {
+                sheet_row = it
+                    .next()
+                    .and_then(|v| v.parse::<f64>().ok())
+                    .filter(|v| *v > 0.0)
+                    .ok_or("--row needs a number of mm")?;
+            }
             "--background" => {
                 bench.background = match it.next().map(|s| s.to_lowercase()).as_deref() {
                     Some("keep") => emb_cli::bench::Background::Keep,
@@ -526,6 +569,10 @@ fn run(args: &[String]) -> Result<(), String> {
                     small_text,
                 )
             };
+            let mut f = f;
+            if let Some(file) = &corrections {
+                println!("{}", correct(&mut f, file)?);
+            }
             f.save(Path::new(output))?;
             println!(
                 "wrote {output}: {} letters, {} kerning pairs, {:.1}-{:.0} mm",
@@ -533,6 +580,39 @@ fn run(args: &[String]) -> Result<(), String> {
                 f.kerning.len(),
                 f.min_height_mm,
                 f.max_height_mm
+            );
+            Ok(())
+        }
+        ["font-sheet", input, output] => {
+            use emb_letter::LetterSource;
+            let mut f = emb_letter::EmbFont::load(Path::new(input))?;
+            if let Some(file) = &corrections {
+                println!("{}", correct(&mut f, file)?);
+            }
+            let label = emb_letter::bundled::embroidery("Atkinson Hyperlegible");
+            let sizes = if sheet_sizes.is_empty() {
+                emb_letter::sheet::sizes(f.size_range(emb_model::LetterStitch::Auto)).to_vec()
+            } else {
+                sheet_sizes
+            };
+            let spec = emb_letter::sheet::Spec {
+                name: &f.family,
+                sizes: &sizes,
+                characters: &sheet_chars,
+                width_mm: sheet_row,
+            };
+            let made = emb_letter::sheet::sheet(&f, label.as_ref().map(|l| l as &dyn LetterSource), &spec);
+            let (letters, b) = (
+                made.letters(),
+                made.bbox().ok_or("the font has none of these characters")?,
+            );
+            let design = made.into_design(&format!("{} test sheet", f.family));
+            emb_model::project::save(&design, Path::new(output)).map_err(|e| format!("{output}: {e}"))?;
+            println!(
+                "wrote {output}: {letters} letters at {} sizes, {:.0} x {:.0} mm",
+                sizes.len(),
+                b.width(),
+                b.height()
             );
             Ok(())
         }
@@ -639,6 +719,34 @@ fn run(args: &[String]) -> Result<(), String> {
 }
 
 /// Reads an input and sets its fabric, if one is given.
+/// Applies the letter corrections of `file` to `font`. Returns a line
+/// for the user; a correction that does not apply is an error.
+fn correct(font: &mut emb_letter::EmbFont, file: &Path) -> Result<String, String> {
+    let c = emb_letter::correction::Corrections::load(file)?;
+    if !c.family.eq_ignore_ascii_case(&font.family) {
+        return Err(format!(
+            "{}: the corrections are for {}, not for {}",
+            file.display(),
+            c.family,
+            font.family
+        ));
+    }
+    let problems = c.apply(font);
+    if !problems.is_empty() {
+        let lines: Vec<String> = problems
+            .iter()
+            .map(|p| format!("  {:?}: {}", p.letter, p.text))
+            .collect();
+        return Err(format!(
+            "{}: {} corrections do not apply:\n{}",
+            file.display(),
+            problems.len(),
+            lines.join("\n")
+        ));
+    }
+    Ok(format!("{}: {} letters corrected", file.display(), c.letters.len()))
+}
+
 fn read_fabric(input: &str, fabric: &Option<String>) -> Result<emb_cli::Input, String> {
     let mut i = read_input(Path::new(input))?;
     if let Some(f) = fabric {

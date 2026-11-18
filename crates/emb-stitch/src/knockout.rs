@@ -375,6 +375,8 @@ mod tests {
                 geometry: column(),
                 params: SatinParams::default(),
             }],
+            fixed: false,
+            tuning: Vec::new(),
         }];
         let mut d = emb_model::Design::new("k");
         let t = d.add_thread("a", emb_model::Rgb(0, 0, 0));

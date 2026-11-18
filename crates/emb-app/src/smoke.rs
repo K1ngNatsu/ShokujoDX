@@ -57,6 +57,7 @@ fn draw_all(h: &mut Harness) {
         crate::teamnames::window(&ctx, st);
         crate::keyboard::window(&ctx, st);
         crate::alphabets::window(&ctx, st);
+        crate::font_sheet::window(&ctx, st);
         crate::editing::paste_special_window(&ctx, st);
         crate::help::window(&ctx, st);
         crate::assets::window(&ctx, st);

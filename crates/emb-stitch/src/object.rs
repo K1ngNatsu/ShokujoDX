@@ -660,6 +660,19 @@ fn satin_ends(k: &ObjectKind) -> Option<(Point, Point)> {
     (a0.distance(a1) > 1e-6).then(|| (a0.midpoint(b0), a1.midpoint(b1)))
 }
 
+/// The start and the end of a part that has them: a satin column with two
+/// ends, or an open line of run stitches.
+fn part_ends(k: &ObjectKind) -> Option<(Point, Point)> {
+    match k {
+        ObjectKind::Running { path, .. } => {
+            let pts: Vec<Point> = path.points().collect();
+            let (a, b) = (*pts.first()?, *pts.last()?);
+            (a.distance(b) > 1e-6).then_some((a, b))
+        }
+        _ => satin_ends(k),
+    }
+}
+
 /// The point of the outline of `k` nearest `p` (where a fill starts).
 fn nearest_on_outline(k: &ObjectKind, p: Point) -> Point {
     let mut best = (f64::MAX, p);
@@ -849,13 +862,13 @@ struct LetterSewer<'a> {
     runs: Vec<Run>,
     needle: Point,
     long_gap: RunLink,
-    smart: bool,
 }
 
 impl LetterSewer<'_> {
     /// Sews `part` from `from` (to `exit`). `unsewn` are the parts that sew
-    /// from now on, `part` too: their stitches can cover a connection.
-    fn sew(&mut self, part: &ObjectKind, from: Point, exit: Option<Point>, unsewn: &[&ObjectKind]) {
+    /// from now on, `part` too: with `smart`, their stitches can cover a
+    /// connection.
+    fn sew(&mut self, part: &ObjectKind, from: Point, exit: Option<Point>, unsewn: &[&ObjectKind], smart: bool) {
         let Ok(mut st) = stitch_kind(part, from, exit) else {
             return;
         };
@@ -868,7 +881,7 @@ impl LetterSewer<'_> {
                 let areas: Vec<Vec<Vec<Point>>> = unsewn.iter().map(|k| part_area(k)).collect();
                 hidden(self.needle, p, &areas)
             };
-            first.link = if short || (self.smart && covered()) {
+            first.link = if short || (smart && covered()) {
                 RunLink::Travel
             } else {
                 self.long_gap
@@ -906,7 +919,6 @@ fn lettering_runs(l: &emb_model::Lettering, entry: Point, exit: Option<Point>) -
             LetterConnection::Trim => RunLink::Trim,
             LetterConnection::Jump => RunLink::Jump,
         },
-        smart,
     };
     let seq = letter_sequence(l, entry);
     for (n, &li) in seq.iter().enumerate() {
@@ -919,13 +931,33 @@ fn lettering_runs(l: &emb_model::Lettering, entry: Point, exit: Option<Point>) -
                 .zip(letter_box(letter))
                 .map(|(nb, b)| nearest_in(&nb, b.center())),
         };
+        if letter.fixed {
+            // A letter that a person put in order (ADR 0112): the parts
+            // in the order of the font, each column from its start to its
+            // end. A part with no ends starts near the needle and ends
+            // near the start of the next part.
+            let last = letter.parts.len().saturating_sub(1);
+            for (k, part) in letter.parts.iter().enumerate() {
+                let ends = part_ends(part);
+                let from = ends.map_or(w.needle, |(a, _)| a);
+                let next = letter.parts.get(k + 1).and_then(part_ends).map(|(a, _)| a);
+                let to = ends.map(|(_, b)| b).or(next).or(if k == last {
+                    target.or(exit.filter(|_| n + 1 == seq.len()))
+                } else {
+                    None
+                });
+                let unsewn: Vec<&ObjectKind> = letter.parts[k..].iter().collect();
+                w.sew(part, from, to, &unsewn, true);
+            }
+            continue;
+        }
         if smart {
             let plan = plan_letter(&letter.parts, w.needle, target, l.trim_over_mm, w.runs.is_empty());
             let last = plan.len().saturating_sub(1);
             for (k, &(pi, from, end)) in plan.iter().enumerate() {
                 let unsewn: Vec<&ObjectKind> = plan[k..].iter().map(|&(i, _, _)| &letter.parts[i]).collect();
                 let to = if k == last { end.or(target) } else { end };
-                w.sew(&letter.parts[pi], from, to, &unsewn);
+                w.sew(&letter.parts[pi], from, to, &unsewn, true);
             }
             continue;
         }
@@ -941,7 +973,7 @@ fn lettering_runs(l: &emb_model::Lettering, entry: Point, exit: Option<Point>) -
                 .unwrap_or(0);
             let part = left.remove(i);
             let last = left.is_empty() && n + 1 == seq.len();
-            w.sew(part, needle, if last { exit } else { None }, &[]);
+            w.sew(part, needle, if last { exit } else { None }, &[], false);
         }
     }
     w.runs
@@ -1213,6 +1245,51 @@ mod tests {
             },
         );
         (d, id)
+    }
+
+    /// A lettering with one letter of two upright columns: the first one
+    /// at X = 20 from the top down, the second one at X = 0 from the
+    /// bottom up.
+    fn two_columns(fixed: bool) -> emb_model::Lettering {
+        let column = |x: f64, from: f64, to: f64| ObjectKind::Satin {
+            geometry: emb_model::SatinGeometry::from_centerline(
+                &Path::new().move_to(Point::new(x, from)).line_to(Point::new(x, to)),
+                2.0,
+            ),
+            params: Default::default(),
+        };
+        let mut l = emb_model::Lettering::new("H", Default::default(), 10.0, Point::ZERO);
+        l.letters = vec![emb_model::Letter {
+            text: "H".into(),
+            parts: vec![column(20.0, -10.0, 0.0), column(0.0, 0.0, -10.0)],
+            fixed,
+            ..Default::default()
+        }];
+        l
+    }
+
+    #[test]
+    fn a_fixed_letter_sews_in_the_order_and_direction_of_the_font() {
+        let ends = |l: &emb_model::Lettering| {
+            let runs = lettering_runs(l, Point::new(0.0, -10.0), None);
+            let first = runs.first().and_then(|r| r.points.first()).copied().unwrap();
+            let last = runs.last().and_then(|r| r.points.last()).copied().unwrap();
+            (first, last)
+        };
+        // The stitch engine starts with the column at the needle, at the
+        // end that is nearest.
+        let (first, _) = ends(&two_columns(false));
+        assert!(first.distance(Point::new(0.0, -10.0)) < 1.5, "{first:?}");
+        // The order of the font: the column at X = 20 first, from its top
+        // to its bottom; then the column at X = 0, from its bottom to its
+        // top.
+        let (first, last) = ends(&two_columns(true));
+        assert!(first.distance(Point::new(20.0, -10.0)) < 1.5, "{first:?}");
+        assert!(last.distance(Point::new(0.0, -10.0)) < 1.5, "{last:?}");
+        // The closest order of the letters does not change a fixed letter.
+        let mut l = two_columns(true);
+        l.order = emb_model::LetterOrder::Closest;
+        assert_eq!(ends(&l), (first, last));
     }
 
     #[test]

@@ -140,6 +140,7 @@ pub const WINDOW_HELP: &[(&str, &str)] = &[
     ("Keyboard Designs", "lettering"),
     ("Fonts", "lettering"),
     ("Alphabets", "lettering"),
+    ("Font Test Sheet", "lettering"),
     ("Offsets", "artwork"),
     ("Border Trace", "artwork"),
     ("Arrangements", "arranging"),

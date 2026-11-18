@@ -30,6 +30,11 @@ that looks like cloth.
   turn as an animated picture or as four views.
 - The approval sheet can show the design on the product.
 
+**Lettering.** **Lettering > Font Test Sheet** makes a design with the
+letters of a font at some sizes, to sew and to look at. In **Lettering >
+Alphabets** you can correct a letter of an embroidery font: its sew order,
+its shape and its settings. See [Lettering](lettering).
+
 **New versions.** The program can tell you when a new version is
 available. See [Options](options).
 

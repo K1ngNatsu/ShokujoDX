@@ -384,6 +384,8 @@ pub fn to_embfont(b: &BitmapFont, family: &str, stitch: LetterStitch) -> EmbFont
             EmbLetter {
                 advance_mm: f.space_mm,
                 parts: Vec::new(),
+                fixed: false,
+                tuning: Vec::new(),
             },
         );
     }
@@ -412,6 +414,8 @@ pub fn to_embfont(b: &BitmapFont, family: &str, stitch: LetterStitch) -> EmbFont
             EmbLetter {
                 advance_mm: f64::from(g.advance) * s,
                 parts,
+                fixed: false,
+                tuning: Vec::new(),
             },
         );
     }

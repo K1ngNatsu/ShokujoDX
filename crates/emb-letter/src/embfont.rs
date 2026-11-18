@@ -5,7 +5,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use emb_geom::{Transform, text};
-use emb_model::{FontRef, LetterStitch, ObjectKind};
+use emb_model::{FontRef, LetterStitch, ObjectKind, PartTuning};
 use serde::{Deserialize, Serialize};
 
 use crate::font::Font;
@@ -45,6 +45,13 @@ pub struct EmbLetter {
     pub advance_mm: f64,
     /// Satin and fill parts in mm at the design size, baseline at Y = 0.
     pub parts: Vec<ObjectKind>,
+    /// The parts sew in this order, each column from its start to its end
+    /// (a person put them in order; ADR 0112).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub fixed: bool,
+    /// The settings of each part, in the order of `parts` (empty: none).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tuning: Vec<PartTuning>,
 }
 
 /// An embroidery font.
@@ -112,6 +119,8 @@ impl EmbFont {
             EmbLetter {
                 advance_mm: round(0.3 * DESIGN_CAP_MM),
                 parts: Vec::new(),
+                fixed: false,
+                tuning: Vec::new(),
             },
         );
         EmbFont {
@@ -205,6 +214,19 @@ impl LetterSource for EmbFont {
     fn size_range(&self, _stitch: LetterStitch) -> Option<(f64, f64)> {
         Some((self.min_height_mm, self.max_height_mm))
     }
+
+    fn fixed(&self, letter: u32) -> bool {
+        char::from_u32(letter)
+            .and_then(|c| self.letters.get(&c))
+            .is_some_and(|l| l.fixed)
+    }
+
+    fn tuning(&self, letter: u32) -> Vec<PartTuning> {
+        char::from_u32(letter)
+            .and_then(|c| self.letters.get(&c))
+            .map(|l| l.tuning.clone())
+            .unwrap_or_default()
+    }
 }
 
 fn round(v: f64) -> f64 {
@@ -219,6 +241,114 @@ fn round(v: f64) -> f64 {
 /// `height_mm`, in design coordinates. The letter starts at the left of the
 /// objects. `None` if there are no such parts.
 pub fn letter_from_objects(objects: &[ObjectKind], baseline_y: f64, height_mm: f64) -> Option<EmbLetter> {
+    letter_from(
+        objects,
+        &LetterFrame {
+            baseline_y,
+            height_mm,
+            origin_x: None,
+            keep_order: false,
+            keep_settings: false,
+        },
+    )
+}
+
+/// Where a letter is drawn in a design, and what a letter made from the
+/// objects keeps.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LetterFrame {
+    /// The Y of the baseline, in design mm.
+    pub baseline_y: f64,
+    /// The capital height as drawn, in mm.
+    pub height_mm: f64,
+    /// The X where the letter starts (`None`: the left of the objects, and
+    /// the letter gets a width from its objects).
+    pub origin_x: Option<f64>,
+    /// The parts sew in the order and the direction of the objects.
+    pub keep_order: bool,
+    /// The underlay, the pull compensation and the fill angle of each
+    /// object, where they are not the standard settings of lettering.
+    pub keep_settings: bool,
+}
+
+/// The settings of `parts` that are not the standard settings of lettering
+/// (empty: all are standard).
+pub fn tuning_of(parts: &[ObjectKind]) -> Vec<PartTuning> {
+    let (satin, fill) = (
+        emb_model::lettering::letter_satin(),
+        emb_model::lettering::letter_fill(),
+    );
+    let own = |u: &emb_model::Underlay, standard: &emb_model::Underlay| (u != standard).then(|| u.clone());
+    let tuning: Vec<PartTuning> = parts
+        .iter()
+        .map(|p| match p {
+            ObjectKind::Satin { params, .. } => PartTuning {
+                underlay: own(&params.underlay, &satin.underlay),
+                pull_mm: round(params.pull_compensation_mm - satin.pull_compensation_mm),
+                angle_deg: 0.0,
+            },
+            ObjectKind::Fill { params, .. } => PartTuning {
+                underlay: own(&params.underlay, &fill.underlay),
+                pull_mm: round(params.pull_compensation_mm - fill.pull_compensation_mm),
+                angle_deg: round((params.angle_deg - fill.angle_deg).rem_euclid(180.0)),
+            },
+            _ => PartTuning::default(),
+        })
+        .collect();
+    if tuning.iter().all(PartTuning::is_empty) {
+        Vec::new()
+    } else {
+        tuning
+    }
+}
+
+/// The parts of `letter` as objects in a design: the capital height
+/// `height_mm`, the start of the letter on the baseline at `at`, with the
+/// standard settings of lettering and the settings of the letter.
+/// [`letter_from`] makes the letter from them again.
+pub fn objects_of_letter(font: &EmbFont, letter: &EmbLetter, at: emb_geom::Point, height_mm: f64) -> Vec<ObjectKind> {
+    let s = height_mm / font.cap_height_mm.max(1e-6);
+    let t = Transform::scale(s, s).then(Transform::translate(at.x, at.y));
+    let (satin, fill) = (
+        emb_model::lettering::letter_satin(),
+        emb_model::lettering::letter_fill(),
+    );
+    let tuned = letter.tuning.len() == letter.parts.len();
+    letter
+        .parts
+        .iter()
+        .enumerate()
+        .map(|(i, p)| {
+            let mut p = p.clone();
+            p.transform(&t);
+            let tune = tuned.then(|| &letter.tuning[i]);
+            let pull = tune.map_or(0.0, |t| t.pull_mm);
+            match &mut p {
+                ObjectKind::Satin { params, .. } => {
+                    *params = satin.clone();
+                    params.pull_compensation_mm = (params.pull_compensation_mm + pull).max(0.0);
+                    if let Some(u) = tune.and_then(|t| t.underlay.as_ref()) {
+                        params.underlay = u.clone();
+                    }
+                }
+                ObjectKind::Fill { params, .. } => {
+                    *params = fill.clone();
+                    params.angle_deg += tune.map_or(0.0, |t| t.angle_deg);
+                    params.pull_compensation_mm = (params.pull_compensation_mm + pull).max(0.0);
+                    if let Some(u) = tune.and_then(|t| t.underlay.as_ref()) {
+                        params.underlay = u.clone();
+                    }
+                }
+                _ => {}
+            }
+            p
+        })
+        .collect()
+}
+
+/// A letter from objects (see [`letter_from_objects`]) drawn in `frame`.
+pub fn letter_from(objects: &[ObjectKind], frame: &LetterFrame) -> Option<EmbLetter> {
+    let (baseline_y, height_mm) = (frame.baseline_y, frame.height_mm);
     let mut parts: Vec<ObjectKind> = Vec::new();
     for o in objects {
         match o {
@@ -232,18 +362,26 @@ pub fn letter_from_objects(objects: &[ObjectKind], baseline_y: f64, height_mm: f
         .filter_map(|p| p.control_bbox())
         .reduce(emb_geom::BBox::union)?;
     let s = DESIGN_CAP_MM / height_mm.max(1e-6);
-    let t = Transform::translate(-b.min.x, -baseline_y).then(Transform::scale(s, s));
+    let left = frame.origin_x.unwrap_or(b.min.x);
+    let t = Transform::translate(-left, -baseline_y).then(Transform::scale(s, s));
+    let tuning = if frame.keep_settings {
+        tuning_of(&parts)
+    } else {
+        Vec::new()
+    };
     for p in &mut parts {
         p.transform(&t);
     }
     Some(EmbLetter {
-        advance_mm: b.width() * s + 0.08 * DESIGN_CAP_MM,
+        advance_mm: (b.max.x - left).max(0.0) * s + 0.08 * DESIGN_CAP_MM,
         parts,
+        fixed: frame.keep_order,
+        tuning,
     })
 }
 
 /// Rounds all coordinates of a part to [`GRID_MM`].
-pub(crate) fn round_part(kind: &mut ObjectKind) {
+pub fn round_part(kind: &mut ObjectKind) {
     let r = |p: &mut emb_geom::Point| {
         p.x = round(p.x);
         p.y = round(p.y);
@@ -316,6 +454,8 @@ pub fn convert_with(
             EmbLetter {
                 advance_mm: round(font.advance(g) * scale),
                 parts,
+                fixed: false,
+                tuning: Vec::new(),
             },
         );
         glyphs.push((c, g));

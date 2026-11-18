@@ -36,6 +36,7 @@ mod effects_ui;
 mod export;
 mod file;
 mod first_start;
+mod font_sheet;
 mod fonts;
 mod functions;
 mod gaps;

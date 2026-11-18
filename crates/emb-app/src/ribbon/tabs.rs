@@ -94,6 +94,7 @@ pub(super) const LETTERING: &[Panel] = &[
         items: &[
             Large(t(Tool::Lettering)),
             Small(&[Cmd::Fonts, Cmd::Alphabets, Cmd::LetteringOnLine]),
+            Small(&[Cmd::FontTestSheet]),
         ],
     },
     Panel {

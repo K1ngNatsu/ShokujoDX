@@ -365,6 +365,7 @@ pub struct AppState {
     pub quilting: crate::quilting::QuiltingWindow,
     pub cutwork: crate::cutwork::CutworkWindow,
     pub alphabets_window: crate::alphabets::AlphabetsWindow,
+    pub font_sheet_window: crate::font_sheet::FontSheetWindow,
     /// The folder of the user's alphabets, if not the `fonts` folder (tests).
     pub alphabets_dir_override: Option<std::path::PathBuf>,
 }
@@ -817,6 +818,7 @@ impl AppState {
             quilting: Default::default(),
             cutwork: Default::default(),
             alphabets_window: Default::default(),
+            font_sheet_window: Default::default(),
             alphabets_dir_override: None,
         }
     }
@@ -1815,6 +1817,7 @@ impl EmbApp {
         crate::teamnames::window(&ctx, st);
         crate::keyboard::window(&ctx, st);
         crate::alphabets::window(&ctx, st);
+        crate::font_sheet::window(&ctx, st);
         crate::guides::window(&ctx, st);
         crate::send::window(&ctx, st);
         crate::clipart::window(&ctx, st);

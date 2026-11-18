@@ -1,6 +1,6 @@
 # Plan: polish and lettering (phase P17)
 
-Date: 2026-11-18 · Status: Accepted (owner, 2026-11-18). Milestones 1 (ADR 0109) and 2 (ADR 0110) done; the owner checks the exit test of Milestone 1 with the next release.
+Date: 2026-11-18 · Status: Accepted (owner, 2026-11-18). Milestones 1 (ADR 0109), 2 (ADR 0110) and 4 (ADR 0112) done in software; Milestone 3 is set aside by the owner (2026-11-18). The owner checks the exit test of Milestone 1 with the next release and sews the test sheet of Milestone 4.
 
 ## Goal
 
@@ -173,7 +173,7 @@ A font can be checked on a machine and corrected for good.
 
 1. **Font test sheet.** Lettering > Fonts > Test Sheet makes a design
    with all letters, digits and common marks of a font at its smallest,
-   middle and largest size, with the size next to each row.
+   middle and largest size, with the size at each group of rows.
 2. **Letter corrections.** A correction file for each bundled font keeps
    the changes of single letters: the order of the strokes, the entry and
    exit, the joins, the stitch angle, the underlay, the pull compensation,
@@ -185,6 +185,44 @@ A font can be checked on a machine and corrected for good.
 
 **Exit test:** a corrected letter stays corrected after the fonts are
 made again; the owner sews the test sheet of one font.
+
+**Done in software (2026-11-18, ADR 0112).** The owner set Milestone 3
+aside and started this one.
+
+- **Font test sheet:** Lettering > Font Test Sheet (also Test Sheet in the
+  Fonts window, and `emb-cli font-sheet`). One group for each size, with a
+  label (the name of the font and the size) above it, so the rows have the
+  full width. The window starts with the sizes whose sheet fits the hoop,
+  because all characters at the largest size are some meters of
+  lettering; it shows the area of each size. Character sets: letters,
+  digits and marks; all characters; capitals; small letters; digits and
+  marks; accents; the text of the user.
+- **Two changes of the engine** made a correction have an effect. Before,
+  the stitch engine found the order and the directions of the parts of
+  each letter, and the lettering object gave its settings to all parts.
+  Now a letter can be **fixed** (it sews in the order of the font, each
+  column from its start to its end), and a part can have its own
+  underlay, pull compensation and fill angle.
+- **Correction files:** `data/fonts/embroidery/corrections/<name>.json`,
+  applied by `tools/make-embroidery-fonts.py` through `emb-cli font
+  --corrections`. A correction is a new shape, or steps on the converted
+  letter (order, reverse, join). A correction that does not fit a new
+  conversion stops the tool. A test fails if a bundled font does not
+  have a correction of its file.
+- **Alphabets window:** Place Letter puts a letter of an embroidery font
+  in the design as objects; Save Correction writes the selected objects
+  as its correction, to the fonts folder of the user. The font library
+  applies it, also to a bundled font. The file can go into the
+  repository as it is.
+
+Checked: all 30 bundled fonts were made again with the new code and are
+the same bytes. A trial correction of "H" of Block Sans (not kept) stayed
+after two runs of the tool, the other letters did not change, and a
+correction for another number of parts stopped the tool. The windows
+were looked at in the four languages (ADR 0110).
+
+Not done: no bundled font has a correction yet (Milestone 5 does this
+work). The owner must sew a test sheet.
 
 ## Milestone 5: ten tuned fonts (L)
 

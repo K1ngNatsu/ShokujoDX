@@ -3,7 +3,7 @@
 //! bent by the envelope.
 
 use emb_geom::{BBox, Point, Transform};
-use emb_model::{Justify, Letter, Lettering, ObjectKind};
+use emb_model::{Justify, Letter, Lettering, ObjectKind, PartTuning};
 
 use crate::source::LetterSource;
 use crate::style;
@@ -94,7 +94,7 @@ pub fn layout_with_box(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> (Ve
         for p in placed {
             let edit = l.edit(p.index);
             let text = p.c.to_string();
-            let mut parts = letter_parts(l, src, p.letter, &text, edit, scale);
+            let (mut parts, fixed, tuning) = letter_parts(l, src, p.letter, &text, edit, scale);
             if parts.is_empty() {
                 continue;
             }
@@ -122,6 +122,8 @@ pub fn layout_with_box(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> (Ve
                 frame,
                 center,
                 parts,
+                fixed,
+                tuning,
             });
         }
         // The underline is a letter with no text, at the index of the line
@@ -139,6 +141,8 @@ pub fn layout_with_box(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> (Ve
                     geometry,
                     params: l.satin.clone(),
                 }],
+                fixed: false,
+                tuning: Vec::new(),
             });
         }
     }
@@ -155,7 +159,9 @@ pub fn layout_with_box(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> (Ve
 
 /// The parts of one letter in letter space (the baseline at y = 0, scaled
 /// to the lettering): the shape of an edit of the letter, else the letter
-/// of the font, with the made bold and italic of `l`.
+/// of the font, with the made bold and italic of `l`. Also: the parts sew
+/// in this order ([`Letter::fixed`]), and the settings that the font gives
+/// to each part ([`Letter::tuning`]); a shape of an edit has none of these.
 fn letter_parts(
     l: &Lettering,
     src: &(impl LetterSource + ?Sized),
@@ -163,15 +169,15 @@ fn letter_parts(
     text: &str,
     edit: Option<&emb_model::LetterEdit>,
     scale: f64,
-) -> Vec<ObjectKind> {
-    let mut parts = match edit.and_then(|e| e.shape.as_ref()).filter(|s| s.text == text) {
+) -> (Vec<ObjectKind>, bool, Vec<PartTuning>) {
+    let (mut parts, fixed, tuning) = match edit.and_then(|e| e.shape.as_ref()).filter(|s| s.text == text) {
         Some(shape) => {
             let k = l.height_mm / shape.height_mm;
             let mut parts = shape.parts.clone();
             for q in &mut parts {
                 q.transform(&Transform::scale(k, k));
             }
-            parts
+            (parts, false, Vec::new())
         }
         None => {
             let stitch = edit.and_then(|e| e.stitch).unwrap_or(l.stitch);
@@ -179,10 +185,17 @@ fn letter_parts(
             for q in &mut parts {
                 q.transform(&Transform::scale(scale, scale));
             }
-            if l.mitre_corners {
+            // A letter that a person put in order keeps its joins.
+            let fixed = src.fixed(letter);
+            let mut tuning = src.tuning(letter);
+            if l.mitre_corners && !fixed {
                 emb_model::mitre::join_parts(&mut parts);
             }
-            parts
+            // The settings are for the parts as the font has them.
+            if tuning.len() != parts.len() || tuning.iter().all(PartTuning::is_empty) {
+                tuning.clear();
+            }
+            (parts, fixed, tuning)
         }
     };
     if l.bold {
@@ -197,7 +210,7 @@ fn letter_parts(
             q.transform(&t);
         }
     }
-    parts
+    (parts, fixed, tuning)
 }
 
 /// The space between stacked letters, as a factor of the capital height.
@@ -261,7 +274,7 @@ fn stacked(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> Vec<Letter> {
         for (i, c, g, advance, base) in column {
             let edit = l.edit(i);
             let text = c.to_string();
-            let mut parts = letter_parts(l, src, g, &text, edit, scale);
+            let (mut parts, fixed, tuning) = letter_parts(l, src, g, &text, edit, scale);
             if parts.is_empty() {
                 continue;
             }
@@ -284,6 +297,8 @@ fn stacked(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> Vec<Letter> {
                 frame,
                 center,
                 parts,
+                fixed,
+                tuning,
             });
         }
     }

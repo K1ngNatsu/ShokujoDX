@@ -48,6 +48,24 @@ selección.
 una fuente TrueType, con un nombre, un rango de tamaños y un tipo de
 puntada. Compruebe que la licencia de la fuente le permite cambiarla.
 
+## Hoja de prueba de fuente
+
+**Letras > Hoja de prueba de fuente** (o **Hoja de prueba** en la lista de
+fuentes) crea un diseño nuevo con las letras de una fuente, para bordarlo y
+verlo:
+
+- **Menor**, **Medio** y **Mayor**: los tamaños del rango de tamaños de la
+  fuente. Desactive un tamaño que no quiera, o escriba otra altura.
+- **Caracteres**: las letras, cifras y signos, todos los caracteres de la
+  fuente, una parte de ellos, o **Mi texto**.
+- **Ancho de fila**: las filas de letras no son más anchas que esto.
+  Empieza con el ancho del bastidor.
+
+Cada tamaño tiene una etiqueta con el nombre de la fuente y el tamaño. La
+ventana muestra el tamaño de la hoja. Si la hoja es más grande que el
+bastidor, use menos tamaños o caracteres, o bórdela en más de una
+colocación (vea [Diseños más grandes que el bastidor](hooping)).
+
 ## Los ajustes de las letras
 
 Seleccione las letras. Propiedades del objeto tiene:
@@ -150,6 +168,33 @@ delante.
 **Importar** lee una fuente de bordado (.embfont) o una fuente de mapa de
 bits (.bdf, .fon). **Exportar** escribe el alfabeto. **Renombrar** y
 **Eliminar** lo cambian.
+
+## Corregir una letra de una fuente
+
+Puede cambiar una letra de una fuente de bordado, también de una fuente que
+viene con el programa. En **Letras > Alfabetos**, bajo **Correcciones de
+letras**:
+
+1. Seleccione la **Fuente** y escriba el **Carácter**.
+2. Haga clic en **Colocar letra**. Los objetos de la letra están en el
+   diseño, entre guías, en su orden de bordado.
+3. Cambie los objetos: el orden (el panel Secuencia), la dirección
+   (**Invertir dirección**), la forma, la base o la compensación de tiro.
+4. Seleccione los objetos y haga clic en **Guardar corrección**.
+
+Las letras nuevas usan la letra corregida. Las letras que ya están en un
+diseño cambian cuando cambia su texto o su fuente. **Quitar corrección**
+devuelve la letra de la fuente.
+
+- **Mantener el orden de bordado**: la letra borda sus objetos en su orden,
+  cada columna de su inicio a su final. Si está desactivado, el programa
+  busca el orden.
+- **Mantener los ajustes**: la letra conserva la base, la compensación de
+  tiro y el ángulo de relleno de cada objeto.
+
+Las correcciones de una fuente son un archivo en la carpeta `corrections`
+de su carpeta de fuentes (**Mostrar archivo**). Una versión nueva del
+programa las conserva.
 
 ## Monogramas
 

@@ -29,7 +29,7 @@ fn reversed_column(g: &SatinGeometry) -> SatinGeometry {
 
 /// Reverses the paths of `kind` that have a direction. Returns `false` for
 /// kinds with no direction.
-fn reverse_kind(kind: &mut ObjectKind) -> bool {
+pub fn reverse_kind(kind: &mut ObjectKind) -> bool {
     match kind {
         ObjectKind::Running { path, .. } | ObjectKind::Vector { path, .. } => {
             *path = path.reversed();
