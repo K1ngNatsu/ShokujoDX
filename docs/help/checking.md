@@ -104,7 +104,11 @@ has a soft shadow on it. **Add a design…** shows one more design (a
 project or a machine file) on the product, for example a name on a
 sleeve with this design at the left chest: set its place in the list
 of **Other designs on the product**. It shows on the canvas and in the
-picture, and it does not sew.
+picture, and it does not sew. A garment has a front and a back:
+**Side** in the Product window (or **Turn Product**, Ctrl+Shift+T)
+shows the other side, and the design goes to the same place on it.
+Each other design is on a side. With **Both sides in the picture**,
+the saved picture shows the front and the back next to each other.
 
 ## Repeats
 

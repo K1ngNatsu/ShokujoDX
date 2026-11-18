@@ -59,8 +59,8 @@ pub const PRODUCT_COLORS: [(&str, Rgb); 8] = [
 pub fn fabric_of(kind: ProductKind) -> &'static str {
     match kind {
         ProductKind::TShirt | ProductKind::TShirtBack => "knit",
-        ProductKind::Polo => "pique",
-        ProductKind::Sweatshirt => "fleece",
+        ProductKind::Polo | ProductKind::PoloBack => "pique",
+        ProductKind::Sweatshirt | ProductKind::SweatshirtBack => "fleece",
         ProductKind::Cap => "cap",
         ProductKind::Tote => "denim",
         ProductKind::Towel => "towel",

@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use eframe::egui::{self, Color32, Mesh, Pos2, Rect, TextureHandle, TextureOptions};
 use emb_geom::{BBox, Point};
-use emb_model::{MergeKey, ProductExtra, ProductKind, ProductPicture, ProductView, Rgb};
+use emb_model::{MergeKey, ProductExtra, ProductKind, ProductPicture, ProductView, Rgb, Side};
 use emb_render::Segment;
 use emb_stitch::{PlanOptions, StitchCache, build_plan};
 
@@ -26,6 +26,9 @@ const TEXTURE_PX_PER_MM: f64 = 2.0;
 /// large design, so its side is at most `EXTRA_MAX_PX`).
 const EXTRA_PX_PER_MM: f64 = 8.0;
 const EXTRA_MAX_PX: f64 = 4096.0;
+/// Turn Product: show the other side of the garment.
+pub const TURN: egui::KeyboardShortcut =
+    egui::KeyboardShortcut::new(egui::Modifiers::COMMAND.plus(egui::Modifiers::SHIFT), egui::Key::T);
 /// The thread width (mm) of the pictures of the designs.
 const THREAD_MM: f64 = 0.4;
 
@@ -97,6 +100,21 @@ impl AppState {
         }
         self.doc.edit(tr("Product"), |d| d.product = Some(v));
         self.fit_product = true;
+    }
+
+    /// Shows the other side of the garment (Turn Product). The open design
+    /// goes to the same place on that side.
+    pub fn turn_product(&mut self) {
+        let Some(v) = self.doc.design().product.clone() else {
+            return;
+        };
+        let Some(other) = v.kind.turned().filter(|_| v.picture.is_none()) else {
+            self.message = tr("Only a garment has a front and a back.").into();
+            return;
+        };
+        let design = self.doc.design().clone();
+        self.edit_product("Turn product", None, |p| p.turn(&design));
+        self.message = crate::i18n::fill("The product shows: {}.", &[&tr(other.name())]);
     }
 
     /// Moves the product so the design is at the usual place `i`.
@@ -188,33 +206,41 @@ impl AppState {
             )
             .ok()
         });
-        let mut segments: Vec<emb_render::Segment> = self.plan_view().segments.iter().map(|(s, _)| *s).collect();
-        // The other designs: at their places, before the open design.
-        if v.visible {
-            let mut extra = Vec::new();
-            for e in v.extras.iter().filter(|e| e.visible) {
-                let to = v.origin + e.at;
-                extra.extend(self.extra_segments(e).iter().map(|s| Segment {
-                    a: s.a + to,
-                    b: s.b + to,
-                    ..*s
-                }));
-            }
-            segments.splice(0..0, extra);
-        }
+        let design: Vec<emb_render::Segment> = self.plan_view().segments.iter().map(|(s, _)| *s).collect();
         // The 3D look, with no fabric texture: the product is under the design.
         let look = emb_render::raster::Look {
             fabric: None,
             ..self.settings.look.picture_look(None)
         };
-        Some(emb_render::product::decoration(
-            &v,
-            photo.as_ref(),
-            &segments,
-            DECORATION_PX_PER_MM,
-            0.4,
-            &look,
-        ))
+        // One side of the product: the other designs of that side, then the
+        // open design if it is on that side.
+        let picture_of = |st: &mut AppState, side: Side| {
+            let mut segments = Vec::new();
+            for e in v.extras.iter().filter(|e| e.visible && e.side == side) {
+                let to = v.origin + e.at;
+                segments.extend(st.extra_segments(e).iter().map(|s| Segment {
+                    a: s.a + to,
+                    b: s.b + to,
+                    ..*s
+                }));
+            }
+            if side == v.side() {
+                segments.extend_from_slice(&design);
+            }
+            let view = ProductView {
+                kind: v.kind.on(side),
+                ..v.clone()
+            };
+            emb_render::product::decoration(&view, photo.as_ref(), &segments, DECORATION_PX_PER_MM, THREAD_MM, &look)
+        };
+        if v.both_sides && v.picture.is_none() && v.kind.turned().is_some() {
+            let front = picture_of(self, Side::Front);
+            let back = picture_of(self, Side::Back);
+            let gap = (40.0 * DECORATION_PX_PER_MM) as u32;
+            return Some(emb_render::product::side_by_side(&front, &back, gap));
+        }
+        let side = v.side();
+        Some(picture_of(self, side))
     }
 
     /// Writes the picture of the design on the product as PNG.
@@ -281,7 +307,8 @@ impl AppState {
             .file_name()
             .map_or_else(String::new, |n| n.to_string_lossy().into_owned());
         let at = v.free_place(self.doc.design());
-        let extra = ProductExtra::new(&name, design, at);
+        let mut extra = ProductExtra::new(&name, design, at);
+        extra.side = v.side();
         let place = v.placement_at(at).map(|p| p.name);
         self.edit_product("Add product design", None, |p| p.extras.push(extra));
         self.message = match place {
@@ -442,7 +469,7 @@ pub fn draw(painter: &egui::Painter, ctx: &egui::Context, rect: Rect, st: &mut A
     // The other designs, over the product and under the open design.
     let keys: Vec<u64> = v.extras.iter().map(|e| e.key).collect();
     st.product_extras.looks.retain(|k, _| keys.contains(k));
-    for e in v.extras.iter().filter(|e| e.visible) {
+    for e in v.extras.iter().filter(|e| e.visible && e.side == v.side()) {
         if let Some((t, b)) = st.extra_texture(ctx, e) {
             let to = v.origin + e.at;
             picture(painter, rect, st, &t, BBox::new(b.min + to, b.max + to));
@@ -498,8 +525,8 @@ fn contents(ui: &mut egui::Ui, st: &mut AppState) {
     let current = st.doc.design().product.clone();
     let name = match &current {
         Some(v) if v.picture.is_some() => tr("My picture").to_string(),
-        Some(v) => v.kind.name().to_string(),
-        None => "None".to_string(),
+        Some(v) => tr(v.kind.product_name()).to_string(),
+        None => tr("None").to_string(),
     };
     let mut pick: Option<Option<ProductKind>> = None;
     ui.horizontal(|ui| {
@@ -511,9 +538,11 @@ fn contents(ui: &mut egui::Ui, st: &mut AppState) {
                 if ui.selectable_label(current.is_none(), tr("None")).clicked() {
                     pick = Some(None);
                 }
-                for k in ProductKind::ALL {
-                    let on = current.as_ref().is_some_and(|v| v.picture.is_none() && v.kind == k);
-                    if ui.selectable_label(on, tr(k.name())).clicked() {
+                for k in ProductKind::PRODUCTS {
+                    let on = current
+                        .as_ref()
+                        .is_some_and(|v| v.picture.is_none() && v.kind.front() == k);
+                    if ui.selectable_label(on, tr(k.product_name())).clicked() {
                         pick = Some(Some(k));
                     }
                 }
@@ -536,6 +565,26 @@ fn contents(ui: &mut egui::Ui, st: &mut AppState) {
     let Some(v) = st.doc.design().product.clone() else {
         return;
     };
+    // The front and the back of a garment.
+    if v.picture.is_none() && v.kind.turned().is_some() {
+        let tip = crate::i18n::fill(
+            "Turn the product ({}). The design goes to the same place on the other side.",
+            &[&ui.ctx().format_shortcut(&TURN)],
+        );
+        ui.horizontal(|ui| {
+            ui.label(tr("Side"));
+            for (side, text) in [(Side::Front, tr("Front side")), (Side::Back, tr("Back side"))] {
+                if ui
+                    .selectable_label(v.side() == side, text)
+                    .on_hover_text(&tip)
+                    .clicked()
+                    && v.side() != side
+                {
+                    st.turn_product();
+                }
+            }
+        });
+    }
     let mut visible = v.visible;
     if ui.checkbox(&mut visible, tr("Show the product")).changed() {
         st.edit_product("Show Product", None, |p| p.visible = visible);
@@ -616,6 +665,16 @@ fn contents(ui: &mut egui::Ui, st: &mut AppState) {
     });
     extras(ui, st, &v);
     ui.add_space(4.0);
+    if v.picture.is_none() && v.kind.turned().is_some() {
+        let mut both = v.both_sides;
+        if ui
+            .checkbox(&mut both, tr("Both sides in the picture"))
+            .on_hover_text(tr("The saved picture shows the front and the back next to each other."))
+            .changed()
+        {
+            st.edit_product("Both sides", None, |p| p.both_sides = both);
+        }
+    }
     ui.horizontal(|ui| {
         if ui.button(tr("Zoom to product")).clicked() {
             st.fit_product = true;
@@ -629,6 +688,7 @@ fn contents(ui: &mut egui::Ui, st: &mut AppState) {
 /// What a row of the list of other designs changes.
 enum ExtraChange {
     Show(usize, bool),
+    Side(usize, Side),
     Place(usize, Point),
     Move(usize, Point),
     Remove(usize),
@@ -656,14 +716,30 @@ fn extras(ui: &mut egui::Ui, st: &mut AppState, v: &ProductView) {
         });
         ui.horizontal(|ui| {
             ui.add_space(20.0);
-            let here = v.placement_at(e.at);
+            let here = v.placement_of_extra(e);
+            if v.picture.is_none() && v.kind.turned().is_some() {
+                let name = |s: Side| match s {
+                    Side::Front => tr("Front side"),
+                    Side::Back => tr("Back side"),
+                };
+                egui::ComboBox::from_id_salt(("product_extra_side", i))
+                    .selected_text(name(e.side))
+                    .width(60.0)
+                    .show_ui(ui, |ui| {
+                        for s in [Side::Front, Side::Back] {
+                            if ui.selectable_label(e.side == s, name(s)).clicked() && e.side != s {
+                                change = Some(ExtraChange::Side(i, s));
+                            }
+                        }
+                    });
+            }
             if v.picture.is_none() {
                 let text = here.map_or_else(|| tr("Free place").to_string(), |p| tr(p.name).to_string());
                 egui::ComboBox::from_id_salt(("product_extra_place", i))
                     .selected_text(text)
                     .width(110.0)
                     .show_ui(ui, |ui| {
-                        for p in v.kind.placements() {
+                        for p in v.kind.on(e.side).placements() {
                             if ui
                                 .selectable_label(here.is_some_and(|h| h.name == p.name), tr(p.name))
                                 .clicked()
@@ -680,7 +756,7 @@ fn extras(ui: &mut egui::Ui, st: &mut AppState, v: &ProductView) {
                 change = Some(ExtraChange::Move(i, Point::new(x, y)));
             }
         });
-        if let (Some(p), Some((w, h))) = (v.placement_at(e.at), e.size())
+        if let (Some(p), Some((w, h))) = (v.placement_of_extra(e), e.size())
             && (w > p.max.0 + 0.5 || h > p.max.1 + 0.5)
         {
             ui.colored_label(
@@ -710,6 +786,10 @@ fn extras(ui: &mut egui::Ui, st: &mut AppState, v: &ProductView) {
     }
     match change {
         Some(ExtraChange::Show(i, on)) => st.edit_extra("Show product design", None, i, |e| e.visible = on),
+        Some(ExtraChange::Side(i, side)) => {
+            let design = st.doc.design().clone();
+            st.edit_product("Product design side", None, |p| p.set_extra_side(i, side, &design));
+        }
         Some(ExtraChange::Place(i, at)) | Some(ExtraChange::Move(i, at)) => {
             st.edit_extra("Move product design", Some("extra"), i, |e| e.at = at);
         }
@@ -829,6 +909,55 @@ mod tests {
     }
 
     #[test]
+    fn a_garment_turns_and_its_picture_shows_both_sides() {
+        let mut h = Harness::new();
+        h.st.set_product(ProductKind::TShirt);
+        // A back print, added while the back shows.
+        assert!(h.st.can(crate::ribbon::Cmd::TurnProduct, &crate::ribbon::SelInfo::of(&h.st)));
+        h.st.turn_product();
+        let v = h.st.doc.design().product.clone().unwrap();
+        assert_eq!(v.kind, ProductKind::TShirtBack);
+        assert_eq!(
+            v.placement_of(h.st.doc.design()).map(|p| p.name),
+            Some("Below the collar")
+        );
+        let path = small_project("back", Rgb(0, 0, 220));
+        h.st.add_product_design(&path).unwrap();
+        let v = h.st.doc.design().product.clone().unwrap();
+        assert_eq!(v.extras[0].side, Side::Back);
+        assert_eq!(v.placement_of_extra(&v.extras[0]).map(|p| p.name), Some("Upper back"));
+        // Turn again: the open design is at the left chest, the print is on the back.
+        h.st.turn_product();
+        let v = h.st.doc.design().product.clone().unwrap();
+        assert_eq!(v.kind, ProductKind::TShirt);
+        assert_eq!(v.placement_of(h.st.doc.design()).map(|p| p.name), Some("Left chest"));
+        let blue = |p: &emb_render::raster::Picture| {
+            p.rgba
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .filter(|c| c[2] > 150 && c[0] < 80 && c[1] < 80)
+                .count()
+        };
+        let front = h.st.decoration_picture().unwrap();
+        assert_eq!(blue(&front), 0, "the back print is not on the front");
+        h.st.edit_product("Both sides", None, |p| p.both_sides = true);
+        let both = h.st.decoration_picture().unwrap();
+        assert!(blue(&both) > 1000);
+        assert!(both.width > 2 * front.width && both.height == front.height);
+        // A cap has one side.
+        h.st.set_product(ProductKind::Cap);
+        assert!(
+            !h.st
+                .can(crate::ribbon::Cmd::TurnProduct, &crate::ribbon::SelInfo::of(&h.st))
+        );
+        let before = h.st.doc.state_id();
+        h.st.turn_product();
+        assert_eq!(h.st.doc.state_id(), before);
+        std::fs::remove_dir_all(path.parent().unwrap()).ok();
+    }
+
+    #[test]
     fn a_file_with_no_design_is_not_added() {
         let mut h = Harness::new();
         let path = small_project("none", Rgb(0, 0, 0));
@@ -921,5 +1050,18 @@ mod tests {
             h.st.edit_product("Color", None, |v| v.color = c);
             h.st.save_decoration(&dir.join(format!("{kind:?}.png"))).unwrap();
         }
+        // A T-shirt with the design at the left chest and a print on the
+        // back, both sides in one picture (P16 Milestone 3).
+        h.st.doc.edit("None", |d| d.product = None);
+        h.st.set_product(ProductKind::TShirt);
+        let print = small_project("back-print", Rgb(20, 90, 200));
+        h.st.turn_product();
+        h.st.add_product_design(&print).unwrap();
+        h.st.turn_product();
+        h.st.edit_product("Both sides", None, |p| {
+            p.both_sides = true;
+            p.color = Rgb(30, 40, 70);
+        });
+        h.st.save_decoration(&dir.join("TShirtBothSides.png")).unwrap();
     }
 }

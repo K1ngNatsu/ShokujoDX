@@ -107,7 +107,11 @@ hilo; en la imagen, el bordado tiene una sombra suave sobre él.
 de máquina) en el producto, por ejemplo un nombre en una manga con este
 diseño en el pecho izquierdo: defina su lugar en la lista **Otros
 diseños en el producto**. Se muestra en el lienzo y en la imagen, y no
-se borda.
+se borda. Una prenda tiene delantera y espalda: **Lado** en la ventana
+Producto (o **Girar producto**, Ctrl+Mayús+T) muestra el otro lado, y
+el diseño va al mismo lugar en él. Cada otro diseño está en un lado.
+Con **Ambos lados en la imagen**, la imagen guardada muestra la
+delantera y la espalda una al lado de la otra.
 
 ## Repeticiones
 

@@ -527,6 +527,8 @@ pub enum Cmd {
     ProductWindow,
     /// Save the picture of the design on the product.
     SaveDecoration,
+    /// Show the other side of the garment under the design.
+    TurnProduct,
     /// The Repeats window.
     RepeatsWindow,
     /// The About window: version, build, folders.
@@ -1642,6 +1644,13 @@ impl Cmd {
                 tr("Picture on Product"),
                 tr("Save a picture (PNG) of the design with the thread look on the product."),
             ),
+            Cmd::TurnProduct => (
+                g(ph::ARROW_U_DOWN_RIGHT),
+                tr("Turn Product"),
+                tr(
+                    "Show the other side of the garment (front or back). The design goes to the same place on that side.",
+                ),
+            ),
             Cmd::SendToUsb => (
                 g(ph::USB),
                 tr("Send to USB"),
@@ -2176,6 +2185,7 @@ impl Cmd {
             Cmd::ForwardOne => a::SEQ_FORWARD,
             Cmd::ToEnd => a::SEQ_END,
             Cmd::ZoomExtents => a::ZOOM_EXTENTS,
+            Cmd::TurnProduct => crate::product::TURN,
             Cmd::Cut => return Some(ctrl(egui::Key::X)),
             Cmd::Copy => return Some(ctrl(egui::Key::C)),
             Cmd::Paste => return Some(ctrl(egui::Key::V)),

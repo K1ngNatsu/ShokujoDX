@@ -113,7 +113,12 @@ zeigt ein weiteres Design (ein Projekt oder eine Maschinendatei) auf
 dem Produkt, zum Beispiel einen Namen auf einem Ärmel mit diesem Design
 auf der linken Brust: Legen Sie seine Stelle in der Liste **Andere
 Designs auf dem Produkt** fest. Es erscheint auf der Arbeitsfläche und
-im Bild und wird nicht gestickt.
+im Bild und wird nicht gestickt. Ein Kleidungsstück hat eine
+Vorder- und eine Rückseite: **Seite** im Fenster Produkt (oder
+**Produkt drehen**, Strg+Umschalt+T) zeigt die andere Seite, und das
+Design kommt an dieselbe Stelle darauf. Jedes andere Design ist auf
+einer Seite. Mit **Beide Seiten im Bild** zeigt das gespeicherte Bild
+Vorder- und Rückseite nebeneinander.
 
 ## Wiederholungen
 

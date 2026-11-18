@@ -39,8 +39,8 @@ const SHADOW_OFFSET_MM: f64 = 0.5;
 /// The width (mm) and the height (mm) of the round edge of a product.
 fn roundness(kind: ProductKind) -> (f64, f64) {
     match kind {
-        ProductKind::TShirt | ProductKind::TShirtBack | ProductKind::Polo => (40.0, 6.0),
-        ProductKind::Sweatshirt => (45.0, 8.0),
+        ProductKind::TShirt | ProductKind::TShirtBack | ProductKind::Polo | ProductKind::PoloBack => (40.0, 6.0),
+        ProductKind::Sweatshirt | ProductKind::SweatshirtBack => (45.0, 8.0),
         ProductKind::Cap => (90.0, 30.0),
         ProductKind::Tote => (20.0, 3.0),
         ProductKind::Towel => (15.0, 3.0),
@@ -52,8 +52,8 @@ fn roundness(kind: ProductKind) -> (f64, f64) {
 pub fn weave(kind: ProductKind) -> Weave {
     match kind {
         ProductKind::TShirt | ProductKind::TShirtBack => Weave::Knit,
-        ProductKind::Polo => Weave::Pique,
-        ProductKind::Sweatshirt => Weave::Felt,
+        ProductKind::Polo | ProductKind::PoloBack => Weave::Pique,
+        ProductKind::Sweatshirt | ProductKind::SweatshirtBack => Weave::Felt,
         ProductKind::Cap | ProductKind::Tote => Weave::Twill,
         ProductKind::Towel => Weave::Terry,
         ProductKind::Cushion => Weave::Plain,
@@ -488,6 +488,22 @@ pub fn decoration(
     embroidery_shadow(&mut pic, b, segments, px_per_mm, thread_mm, &lighting);
     stitches_onto_look(&mut pic, b, segments, px_per_mm, thread_mm, look.lighting.as_ref());
     pic
+}
+
+/// The pictures `a` and `b` next to each other (`a` on the left) with a
+/// gap of `gap` pixels. The tops align; the rest is white.
+pub fn side_by_side(a: &Picture, b: &Picture, gap: u32) -> Picture {
+    let width = a.width + gap + b.width;
+    let height = a.height.max(b.height);
+    let mut rgba = vec![255u8; width as usize * height as usize * 4];
+    for (pic, x0) in [(a, 0), (b, a.width + gap)] {
+        let row = pic.width as usize * 4;
+        for y in 0..pic.height as usize {
+            let at = (y * width as usize + x0 as usize) * 4;
+            rgba[at..at + row].copy_from_slice(&pic.rgba[y * row..(y + 1) * row]);
+        }
+    }
+    Picture { width, height, rgba }
 }
 
 /// Draws `img` over `pic` (which shows `b`) with its top left corner at

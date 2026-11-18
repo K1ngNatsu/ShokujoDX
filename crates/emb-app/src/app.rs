@@ -1173,6 +1173,9 @@ impl AppState {
         if ctx.input_mut(|i| i.consume_shortcut(&commands::HIDE)) {
             self.hide_selection();
         }
+        if ctx.input_mut(|i| i.consume_shortcut(&crate::product::TURN)) {
+            self.turn_product();
+        }
         // Draw tools take Enter, Backspace and Esc first; Reshape also takes
         // Delete and B (Break at Node) while a node is selected.
         if self.tool != Tool::Select {
