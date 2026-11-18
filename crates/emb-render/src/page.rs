@@ -61,6 +61,12 @@ pub enum Op {
     /// A filled area (appliqué fabric): rings in page mm, filled by the
     /// even-odd rule, so the inner rings are holes.
     Area { rings: Vec<Vec<Point>>, fill: Rgb },
+    /// A picture (the design on the product) that fills `rect` (page mm).
+    /// Transparent pixels print white.
+    Image {
+        rect: BBox,
+        picture: std::sync::Arc<crate::raster::Picture>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]

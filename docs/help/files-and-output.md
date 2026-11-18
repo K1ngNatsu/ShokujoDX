@@ -91,6 +91,12 @@ The worksheet has the size, the stitches, the sew time, the hoop and the
 place of the design, each color and stop, the fabric, backing and topping,
 a picture, and the order of work for rhinestones.
 
+If the design has a product (**Design > Product**), the approval sheet
+has a second page with the design on the product: one side, or the
+front over the back if **Both sides in the picture** is set. To make the
+approval sheet with no product page, clear **With the product** in
+Output design.
+
 ## Batch output
 
 **Design > Batch Output** makes the files of Output design for many

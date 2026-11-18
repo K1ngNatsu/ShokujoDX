@@ -197,50 +197,15 @@ impl AppState {
 
     /// The picture of the design on the product (the virtual decoration).
     pub fn decoration_picture(&mut self) -> Option<emb_render::raster::Picture> {
+        self.decoration_picture_at(DECORATION_PX_PER_MM)
+    }
+
+    /// As [`AppState::decoration_picture`], at `px_per_mm`.
+    pub fn decoration_picture_at(&mut self, px_per_mm: f64) -> Option<emb_render::raster::Picture> {
         let v = self.doc.design().product.clone()?;
-        let photo = v.picture.as_ref().and_then(|p| {
-            emb_art::decode_fit(
-                &p.data,
-                crate::backdrop::MAX_TEXTURE_SIDE,
-                crate::resources::decode_budget(),
-            )
-            .ok()
-        });
-        let design: Vec<emb_render::Segment> = self.plan_view().segments.iter().map(|(s, _)| *s).collect();
-        // The 3D look, with no fabric texture: the product is under the design.
-        let look = emb_render::raster::Look {
-            fabric: None,
-            ..self.settings.look.picture_look(None)
-        };
-        // One side of the product: the other designs of that side, then the
-        // open design if it is on that side.
-        let picture_of = |st: &mut AppState, side: Side| {
-            let mut segments = Vec::new();
-            for e in v.extras.iter().filter(|e| e.visible && e.side == side) {
-                let to = v.origin + e.at;
-                segments.extend(st.extra_segments(e).iter().map(|s| Segment {
-                    a: s.a + to,
-                    b: s.b + to,
-                    ..*s
-                }));
-            }
-            if side == v.side() {
-                segments.extend_from_slice(&design);
-            }
-            let view = ProductView {
-                kind: v.kind.on(side),
-                ..v.clone()
-            };
-            emb_render::product::decoration(&view, photo.as_ref(), &segments, DECORATION_PX_PER_MM, THREAD_MM, &look)
-        };
-        if v.both_sides && v.picture.is_none() && v.kind.turned().is_some() {
-            let front = picture_of(self, Side::Front);
-            let back = picture_of(self, Side::Back);
-            let gap = (40.0 * DECORATION_PX_PER_MM) as u32;
-            return Some(emb_render::product::side_by_side(&front, &back, gap));
-        }
-        let side = v.side();
-        Some(picture_of(self, side))
+        let design: Vec<Segment> = self.plan_view().segments.iter().map(|(s, _)| *s).collect();
+        let look = picture_look(&self.settings.look);
+        Some(compose(&v, &design, &mut |e| self.extra_segments(e), &look, px_per_mm))
     }
 
     /// Writes the picture of the design on the product as PNG.
@@ -340,6 +305,11 @@ impl AppState {
         }
     }
 
+    #[cfg(test)]
+    pub fn edit_product_for_test(&mut self, f: impl FnOnce(&mut ProductView)) {
+        self.edit_product("Test", None, f);
+    }
+
     /// Changes the other design `i` of the product as one undo step.
     fn edit_extra(&mut self, label: &str, merge: Option<&str>, i: usize, f: impl FnOnce(&mut ProductExtra)) {
         self.edit_product(label, merge, |v| {
@@ -355,25 +325,7 @@ impl AppState {
         if let Some(l) = self.product_extras.looks.get(&e.key) {
             return l.segments.clone();
         }
-        let opts = e
-            .design
-            .machine
-            .as_deref()
-            .and_then(|id| self.machines.get(id))
-            .map_or_else(PlanOptions::default, PlanOptions::for_machine);
-        let plan = build_plan(&e.design, &opts, &mut StitchCache::default());
-        let back = e.design.from_hoop_transform();
-        let c = e.center();
-        let segments: Arc<Vec<Segment>> = Arc::new(
-            emb_render::segments(&plan.stitches)
-                .into_iter()
-                .map(|s| Segment {
-                    a: back.apply(s.a) - c,
-                    b: back.apply(s.b) - c,
-                    ..s
-                })
-                .collect(),
-        );
+        let segments = Arc::new(stitch_extra(e, &self.machines));
         self.product_extras.looks.insert(
             e.key,
             ExtraLook {
@@ -387,10 +339,7 @@ impl AppState {
     /// The canvas picture of the other design `e` and the area that it
     /// shows (view mm, its center at (0, 0)).
     fn extra_texture(&mut self, ctx: &egui::Context, e: &ProductExtra) -> Option<(TextureHandle, BBox)> {
-        let look = emb_render::raster::Look {
-            fabric: None,
-            ..self.settings.look.picture_look(None)
-        };
+        let look = picture_look(&self.settings.look);
         let segments = self.extra_segments(e);
         let l = self.product_extras.looks.get_mut(&e.key)?;
         if let Some((t, b, made)) = &l.texture
@@ -475,6 +424,130 @@ pub fn draw(painter: &egui::Painter, ctx: &egui::Context, rect: Rect, st: &mut A
             picture(painter, rect, st, &t, BBox::new(b.min + to, b.max + to));
         }
     }
+}
+
+/// The look of the pictures of the product: the 3D look of the settings,
+/// with no fabric texture (the product is under the design).
+fn picture_look(settings: &crate::viewtools::LookSettings) -> emb_render::raster::Look {
+    emb_render::raster::Look {
+        fabric: None,
+        ..settings.picture_look(None)
+    }
+}
+
+/// The stitches of the other design `e` (view mm, its center at (0, 0)).
+fn stitch_extra(e: &ProductExtra, machines: &emb_model::MachineCatalog) -> Vec<Segment> {
+    let opts = e
+        .design
+        .machine
+        .as_deref()
+        .and_then(|id| machines.get(id))
+        .map_or_else(PlanOptions::default, PlanOptions::for_machine);
+    let plan = build_plan(&e.design, &opts, &mut StitchCache::default());
+    let back = e.design.from_hoop_transform();
+    let c = e.center();
+    emb_render::segments(&plan.stitches)
+        .into_iter()
+        .map(|s| Segment {
+            a: back.apply(s.a) - c,
+            b: back.apply(s.b) - c,
+            ..s
+        })
+        .collect()
+}
+
+/// The picture of the design (`design`: its stitches in view mm) on the
+/// product `v` with its other designs (`extra` gives their stitches): the
+/// side that shows, or both sides next to each other.
+fn compose(
+    v: &ProductView,
+    design: &[Segment],
+    extra: &mut dyn FnMut(&ProductExtra) -> Arc<Vec<Segment>>,
+    look: &emb_render::raster::Look,
+    px_per_mm: f64,
+) -> emb_render::raster::Picture {
+    let mut sides: Vec<emb_render::raster::Picture> = compose_sides(v, design, extra, look, px_per_mm)
+        .into_iter()
+        .map(|(_, p)| p)
+        .collect();
+    if sides.len() == 2 {
+        let gap = (40.0 * px_per_mm) as u32;
+        return emb_render::product::side_by_side(&sides[0], &sides[1], gap);
+    }
+    sides.swap_remove(0)
+}
+
+/// As [`compose`], one picture for each side: the side that shows, or the
+/// front and the back.
+fn compose_sides(
+    v: &ProductView,
+    design: &[Segment],
+    extra: &mut dyn FnMut(&ProductExtra) -> Arc<Vec<Segment>>,
+    look: &emb_render::raster::Look,
+    px_per_mm: f64,
+) -> Vec<(Side, emb_render::raster::Picture)> {
+    let photo = v.picture.as_ref().and_then(|p| {
+        emb_art::decode_fit(
+            &p.data,
+            crate::backdrop::MAX_TEXTURE_SIDE,
+            crate::resources::decode_budget(),
+        )
+        .ok()
+    });
+    // One side of the product: the other designs of that side, then the
+    // open design if it is on that side.
+    let mut picture_of = |side: Side| {
+        let mut segments = Vec::new();
+        for e in v.extras.iter().filter(|e| e.visible && e.side == side) {
+            let to = v.origin + e.at;
+            segments.extend(extra(e).iter().map(|s| Segment {
+                a: s.a + to,
+                b: s.b + to,
+                ..*s
+            }));
+        }
+        if side == v.side() {
+            segments.extend_from_slice(design);
+        }
+        let view = ProductView {
+            kind: v.kind.on(side),
+            ..v.clone()
+        };
+        emb_render::product::decoration(&view, photo.as_ref(), &segments, px_per_mm, THREAD_MM, look)
+    };
+    if v.both_sides && v.picture.is_none() && v.kind.turned().is_some() {
+        return vec![
+            (Side::Front, picture_of(Side::Front)),
+            (Side::Back, picture_of(Side::Back)),
+        ];
+    }
+    vec![(v.side(), picture_of(v.side()))]
+}
+
+/// The pictures of `design` on its product (one for each side that the
+/// picture shows), with no app state (the approval sheet): `plan` is the
+/// stitch plan of the design.
+pub fn pictures_of_design(
+    design: &emb_model::Design,
+    plan: &emb_stitch::StitchPlan,
+    machines: &emb_model::MachineCatalog,
+    look: &crate::viewtools::LookSettings,
+    px_per_mm: f64,
+) -> Vec<(Side, emb_render::raster::Picture)> {
+    let Some(v) = design.product.as_ref() else {
+        return Vec::new();
+    };
+    let back = design.from_hoop_transform();
+    let segments: Vec<Segment> = emb_render::segments(&plan.stitches)
+        .into_iter()
+        .map(|s| Segment {
+            a: back.apply(s.a),
+            b: back.apply(s.b),
+            ..s
+        })
+        .collect();
+    let mut extra = |e: &ProductExtra| Arc::new(stitch_extra(e, machines));
+    compose_sides(v, &segments, &mut extra, &picture_look(look), px_per_mm)
 }
 
 /// Draws the texture `tex` on the area `b` (view mm) of the canvas.

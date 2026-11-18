@@ -1,6 +1,7 @@
 //! A small PDF writer for pages (`page::Page`): text in the standard
 //! Helvetica fonts (no embedded fonts), lines, rectangles and stitches as
-//! vector lines. Our own code, written from the PDF 1.4 reference.
+//! vector lines, and pictures as JPEG images. Our own code, written from
+//! the PDF 1.4 reference.
 //!
 //! The text encoding is WinAnsi: Latin-1 letters print, other characters
 //! print as `?`. The content streams are not compressed.
@@ -58,14 +59,51 @@ fn pdf_string(text: &str) -> String {
     out
 }
 
-/// The content stream of one page.
+/// The JPEG quality of the pictures.
+const JPEG_QUALITY: u8 = 90;
+
+/// A picture as JPEG bytes (transparent pixels on white), its width and
+/// its height. `None` if the encoder fails.
+fn jpeg(pic: &crate::raster::Picture) -> Option<(Vec<u8>, u32, u32)> {
+    let rgb: Vec<u8> = pic
+        .rgba
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .flat_map(|p| {
+            let a = u32::from(p[3]);
+            let over = |c: u8| ((u32::from(c) * a + 255 * (255 - a)) / 255) as u8;
+            [over(p[0]), over(p[1]), over(p[2])]
+        })
+        .collect();
+    let mut out = Vec::new();
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, JPEG_QUALITY)
+        .encode(&rgb, pic.width, pic.height, image::ExtendedColorType::Rgb8)
+        .ok()?;
+    Some((out, pic.width, pic.height))
+}
+
+/// The content stream of one page. The pictures are `/Im0`, `/Im1`, … in
+/// the order of the page.
 fn content(page: &Page) -> String {
     let h = page.height_mm;
     let x = |v: f64| num(v * PT_PER_MM);
     let y = |v: f64| num((h - v) * PT_PER_MM);
     let mut s = String::new();
+    let mut image = 0usize;
     for op in &page.ops {
         match op {
+            Op::Image { rect, .. } => {
+                let _ = writeln!(
+                    s,
+                    "q {} 0 0 {} {} {} cm /Im{image} Do Q",
+                    num(rect.width() * PT_PER_MM),
+                    num(rect.height() * PT_PER_MM),
+                    x(rect.min.x),
+                    y(rect.max.y)
+                );
+                image += 1;
+            }
             Op::Text {
                 at,
                 size_pt,
@@ -154,11 +192,51 @@ fn content(page: &Page) -> String {
     s
 }
 
+/// The `/XObject` resources of a page with the pictures `ids` (object
+/// numbers), or nothing.
+fn xobjects(ids: &[usize]) -> String {
+    if ids.is_empty() {
+        return String::new();
+    }
+    let list: Vec<String> = ids
+        .iter()
+        .enumerate()
+        .map(|(k, id)| format!("/Im{k} {id} 0 R"))
+        .collect();
+    format!(" /XObject << {} >>", list.join(" "))
+}
+
 /// Writes the pages as one PDF file.
 pub fn write(pages: &[Page], title: &str) -> Vec<u8> {
     // Objects: 1 catalog, 2 page tree, 3 and 4 fonts, 5 info, then a page
-    // and its content for each page.
+    // and its content for each page, then the pictures.
     let page_id = |i: usize| 6 + 2 * i;
+    let mut pictures: Vec<Vec<u8>> = Vec::new();
+    let mut page_images: Vec<Vec<usize>> = Vec::new();
+    for p in pages {
+        let mut ids = Vec::new();
+        for op in &p.ops {
+            if let Op::Image { picture, .. } = op {
+                let body = match jpeg(picture) {
+                    Some((bytes, w, h)) => {
+                        let mut b = format!(
+                            "<< /Type /XObject /Subtype /Image /Width {w} /Height {h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {} >>\nstream\n",
+                            bytes.len()
+                        )
+                        .into_bytes();
+                        b.extend(bytes);
+                        b.extend(b"\nendstream");
+                        b
+                    }
+                    // A white pixel, if the picture cannot be encoded.
+                    None => b"<< /Type /XObject /Subtype /Image /Width 1 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8 /Length 1 >>\nstream\n\xff\nendstream".to_vec(),
+                };
+                ids.push(page_id(pages.len()) + pictures.len());
+                pictures.push(body);
+            }
+        }
+        page_images.push(ids);
+    }
     let mut objects: Vec<Vec<u8>> = Vec::new();
     objects.push(b"<< /Type /Catalog /Pages 2 0 R >>".to_vec());
     let kids: Vec<String> = (0..pages.len()).map(|i| format!("{} 0 R", page_id(i))).collect();
@@ -172,9 +250,10 @@ pub fn write(pages: &[Page], title: &str) -> Vec<u8> {
     for (i, p) in pages.iter().enumerate() {
         objects.push(
             format!(
-                "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {} {}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents {} 0 R >>",
+                "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {} {}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >>{} >> /Contents {} 0 R >>",
                 num(p.width_mm * PT_PER_MM),
                 num(p.height_mm * PT_PER_MM),
+                xobjects(&page_images[i]),
                 page_id(i) + 1
             )
             .into_bytes(),
@@ -185,6 +264,7 @@ pub fn write(pages: &[Page], title: &str) -> Vec<u8> {
         stream.extend(b"\nendstream");
         objects.push(stream);
     }
+    objects.extend(pictures);
 
     let mut out: Vec<u8> = b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n".to_vec();
     let mut offsets = Vec::with_capacity(objects.len());
@@ -241,9 +321,57 @@ mod tests {
         p
     }
 
+    /// A page with a picture: red at the top, transparent at the bottom.
+    fn with_picture() -> Page {
+        let mut p = sample();
+        let mut rgba = vec![0u8; 40 * 20 * 4];
+        for px in rgba[..40 * 10 * 4].as_chunks_mut::<4>().0 {
+            *px = [255, 0, 0, 255];
+        }
+        p.ops.push(Op::Image {
+            rect: BBox::new(Point::new(20.0, 100.0), Point::new(100.0, 140.0)),
+            picture: std::sync::Arc::new(crate::raster::Picture {
+                width: 40,
+                height: 20,
+                rgba,
+            }),
+        });
+        p
+    }
+
+    #[test]
+    fn a_picture_is_a_jpeg_image_of_its_page() {
+        let pdf = write(&[sample(), with_picture()], "Test");
+        let text: String = pdf.iter().map(|&b| if b < 128 { b as char } else { '?' }).collect();
+        assert_eq!(text.matches("/Subtype /Image").count(), 1);
+        assert!(text.contains("/Width 40 /Height 20 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode"));
+        // The first page has no pictures; the second has /Im0 (object 10).
+        assert_eq!(text.matches("/XObject << /Im0 10 0 R >>").count(), 1);
+        let c = content(&with_picture());
+        let (w, h) = (num(80.0 * PT_PER_MM), num(40.0 * PT_PER_MM));
+        assert!(
+            c.contains(&format!(
+                "q {w} 0 0 {h} {} {} cm /Im0 Do Q",
+                num(20.0 * PT_PER_MM),
+                num(157.0 * PT_PER_MM)
+            )),
+            "{c}"
+        );
+        // The JPEG decodes: red at the top, white (not black) at the bottom.
+        let (bytes, ..) = jpeg(match &with_picture().ops.last().unwrap() {
+            Op::Image { picture, .. } => picture,
+            _ => unreachable!(),
+        })
+        .unwrap();
+        let img = image::load_from_memory(&bytes).unwrap().to_rgb8();
+        let (top, bottom) = (img.get_pixel(20, 2).0, img.get_pixel(20, 17).0);
+        assert!(top[0] > 220 && top[1] < 40, "{top:?}");
+        assert!(bottom.iter().all(|&c| c > 230), "{bottom:?}");
+    }
+
     #[test]
     fn structure_and_offsets() {
-        let pdf = write(&[sample(), sample()], "Test");
+        let pdf = write(&[sample(), with_picture()], "Test");
         // One character per byte, so text positions are byte offsets.
         let text: String = pdf.iter().map(|&b| if b < 128 { b as char } else { '?' }).collect();
         assert!(text.starts_with("%PDF-1.4"));
@@ -266,7 +394,7 @@ mod tests {
             .take_while(|l| !l.starts_with("trailer"))
             .map(|l| l[..10].parse().unwrap())
             .collect();
-        assert_eq!(entries.len(), 9);
+        assert_eq!(entries.len(), 10);
         for (i, off) in entries.iter().enumerate() {
             assert!(
                 text[*off..].starts_with(&format!("{} 0 obj", i + 1)),

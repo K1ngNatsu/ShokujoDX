@@ -99,6 +99,12 @@ die Stelle des Designs, jede Farbe und jeden Stopp, den Stoff, das
 Stickvlies und das Deckvlies, ein Bild und die Arbeitsreihenfolge für
 Strasssteine.
 
+Wenn das Design ein Produkt hat (**Design > Produkt**), hat das
+Freigabeblatt eine zweite Seite mit dem Design auf dem Produkt: eine
+Seite, oder die Vorderseite über der Rückseite, wenn **Beide Seiten im
+Bild** gesetzt ist. Für ein Freigabeblatt ohne Produktseite schalten Sie
+**Mit dem Produkt** in der Designausgabe aus.
+
 ## Stapelausgabe
 
 **Design > Stapelausgabe** macht die Dateien von Design ausgeben für

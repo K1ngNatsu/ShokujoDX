@@ -1055,6 +1055,40 @@ pub fn approval(d: &SheetData, paper: Paper) -> Page {
     p
 }
 
+/// The page of the approval sheet with the design on the product (P16
+/// Milestone 4): the pictures (a side of the product each, with its
+/// caption) one under the other, at one scale, as large as the page lets
+/// them be.
+pub fn product_page(
+    d: &SheetData,
+    pictures: &[(std::sync::Arc<crate::raster::Picture>, String)],
+    paper: Paper,
+) -> Page {
+    const CAPTION: f64 = 9.0;
+    let mut p = Page::new(paper);
+    let (w, h) = (p.width_mm, p.height_mm);
+    let top = header(&mut p, d, text::tr("Design on the product"));
+    let area = BBox::new(Point::new(MARGIN, top), Point::new(w - MARGIN, h - MARGIN));
+    let size = |pic: &crate::raster::Picture| (f64::from(pic.width.max(1)), f64::from(pic.height.max(1)));
+    let widest = pictures.iter().map(|(pic, _)| size(pic).0).fold(1.0, f64::max);
+    let tall: f64 = pictures.iter().map(|(pic, _)| size(pic).1).sum();
+    let room = area.height() - CAPTION * pictures.len() as f64;
+    let scale = (area.width() / widest).min(room / tall.max(1.0));
+    let mut y = area.min.y;
+    for (picture, caption) in pictures {
+        let (pw, ph) = size(picture);
+        let min = Point::new(area.center().x - pw * scale / 2.0, y);
+        let rect = BBox::new(min, min + Point::new(pw * scale, ph * scale));
+        p.ops.push(Op::Image {
+            rect,
+            picture: picture.clone(),
+        });
+        p.gray_text(rect.min.x, rect.max.y + 5.0, 10.0, caption.clone());
+        y = rect.max.y + CAPTION;
+    }
+    p
+}
+
 /// The quote sheet: one page with the picture, the lines of the quote
 /// `q` (money with the currency text `currency`) and lines to sign.
 pub fn quote_sheet(d: &SheetData, q: &emb_model::quote::Quote, currency: &str, paper: Paper) -> Page {

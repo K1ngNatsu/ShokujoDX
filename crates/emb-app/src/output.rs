@@ -30,6 +30,9 @@ pub struct OutputProfile {
     pub formats: Vec<String>,
     pub worksheet: bool,
     pub approval: bool,
+    /// The approval sheet has a page with the design on the product, if
+    /// the design has a product (P16 Milestone 4).
+    pub approval_product: bool,
     pub picture: bool,
     /// The design picture as SVG (lines in mm, for vector programs).
     pub picture_svg: bool,
@@ -60,6 +63,7 @@ impl Default for OutputProfile {
             formats: Vec::new(),
             worksheet: true,
             approval: false,
+            approval_product: true,
             picture: true,
             picture_svg: false,
             csv: false,
@@ -76,6 +80,47 @@ impl Default for OutputProfile {
 
 /// Pixels per mm of the design picture.
 const PICTURE_PX_PER_MM: f64 = 10.0;
+/// Pixels per mm of the picture of the design on the product, on the
+/// approval sheet (about 250 dpi on the page for one side).
+const SHEET_PX_PER_MM: f64 = 2.5;
+
+/// The page of the approval sheet with the design on its product, if the
+/// design has a product.
+fn product_page(
+    design: &Design,
+    plan: &emb_stitch::StitchPlan,
+    machines: &MachineCatalog,
+    data: &SheetData,
+    paper: Paper,
+) -> Option<Page> {
+    let v = design.product.as_ref()?;
+    let pictures = sheet_pictures(design, plan, machines, v);
+    (!pictures.is_empty()).then(|| sheet::product_page(data, &pictures, paper))
+}
+
+/// The pictures of the product for the approval sheet, each with its caption.
+pub type SheetPictures = Vec<(std::sync::Arc<emb_render::raster::Picture>, String)>;
+
+/// The pictures of the design on its product `v` for the approval sheet,
+/// each with its caption (the product and the side).
+fn sheet_pictures(
+    design: &Design,
+    plan: &emb_stitch::StitchPlan,
+    machines: &MachineCatalog,
+    v: &emb_model::ProductView,
+) -> SheetPictures {
+    crate::product::pictures_of_design(design, plan, machines, &Default::default(), SHEET_PX_PER_MM)
+        .into_iter()
+        .map(|(side, pic)| {
+            let caption = if v.picture.is_some() {
+                tr("My picture").to_string()
+            } else {
+                tr(v.kind.on(side).name()).to_string()
+            };
+            (std::sync::Arc::new(pic), caption)
+        })
+        .collect()
+}
 
 /// The open Output design dialog.
 #[derive(Debug, Clone)]
@@ -420,7 +465,13 @@ pub fn write_files(
         write(folder.join(format!("{name} worksheet.pdf")), &pdf, &mut written)?;
     }
     if profile.approval {
-        let pdf = emb_render::pdf::write(&[sheet::approval(&data, profile.paper)], &design.name);
+        let mut pages = vec![sheet::approval(&data, profile.paper)];
+        if profile.approval_product
+            && let Some(page) = product_page(design, plan, c.machines, &data, profile.paper)
+        {
+            pages.push(page);
+        }
+        let pdf = emb_render::pdf::write(&pages, &design.name);
         write(folder.join(format!("{name} approval.pdf")), &pdf, &mut written)?;
     }
     if profile.picture {
@@ -598,11 +649,48 @@ impl AppState {
         let data = self.current_sheet_data();
         let paper = self.settings.output.paper;
         if approval {
-            vec![sheet::approval(&data, paper)]
+            let mut pages = vec![sheet::approval(&data, paper)];
+            if self.settings.output.approval_product
+                && let Some(v) = self.doc.design().product.clone()
+            {
+                let state = self.doc.state_id();
+                if self.sheet_product.as_ref().is_none_or(|(s, _)| *s != state) {
+                    let plan = self.plan_view().plan.clone();
+                    let pictures = sheet_pictures(self.doc.design(), &plan, &self.machines, &v);
+                    self.sheet_product = Some((state, pictures));
+                }
+                if let Some((_, pictures)) = &self.sheet_product
+                    && !pictures.is_empty()
+                {
+                    pages.push(sheet::product_page(&data, pictures, paper));
+                }
+            }
+            pages
         } else {
             sheet::production(&data, paper)
         }
     }
+}
+
+/// The texture of the picture `k` of a page. The texture stays while the
+/// picture is the same (the same `Arc`).
+fn page_texture(
+    ctx: &egui::Context,
+    k: usize,
+    picture: &std::sync::Arc<emb_render::raster::Picture>,
+) -> egui::TextureHandle {
+    let id = egui::Id::new(("page-picture", k));
+    let ptr = std::sync::Arc::as_ptr(picture) as usize;
+    if let Some((p, t)) = ctx.data(|d| d.get_temp::<(usize, egui::TextureHandle)>(id))
+        && p == ptr
+    {
+        return t;
+    }
+    let image =
+        egui::ColorImage::from_rgba_unmultiplied([picture.width as usize, picture.height as usize], &picture.rgba);
+    let t = crate::resources::load_texture(ctx, format!("page-picture-{k}"), image, egui::TextureOptions::LINEAR);
+    ctx.data_mut(|d| d.insert_temp(id, (ptr, t.clone())));
+    t
 }
 
 /// Draws a page in `rect` (white paper with a shadow).
@@ -615,8 +703,17 @@ pub fn paint_page(painter: &egui::Painter, rect: Rect, page: &Page) {
     painter.rect_filled(paper, 0.0, Color32::WHITE);
     let at = |p: emb_geom::Point| origin + Vec2::new(p.x as f32 * s, p.y as f32 * s);
     let painter = painter.with_clip_rect(paper);
-    for op in &page.ops {
+    for (k, op) in page.ops.iter().enumerate() {
         match op {
+            Op::Image { rect: r, picture } => {
+                let tex = page_texture(painter.ctx(), k, picture);
+                painter.image(
+                    tex.id(),
+                    Rect::from_two_pos(at(r.min), at(r.max)),
+                    Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                    Color32::WHITE,
+                );
+            }
             Op::Text {
                 at: p,
                 size_pt,
@@ -726,7 +823,16 @@ fn profile_ui(ui: &mut egui::Ui, st: &mut AppState) {
     });
     ui.add_enabled(false, egui::Checkbox::new(&mut true, tr("Project file (always)")));
     ui.checkbox(&mut p.worksheet, tr("Production worksheet (PDF)"));
-    ui.checkbox(&mut p.approval, tr("Approval sheet (PDF)"));
+    ui.horizontal(|ui| {
+        ui.checkbox(&mut p.approval, tr("Approval sheet (PDF)"));
+        ui.add_enabled(
+            p.approval,
+            egui::Checkbox::new(&mut p.approval_product, tr("With the product")),
+        )
+        .on_hover_text(tr(
+            "A second page shows the design on its product (Design > Product), if the design has a product.",
+        ));
+    });
     ui.horizontal(|ui| {
         ui.checkbox(&mut p.picture, tr("Design picture (PNG)"));
         ui.add_enabled_ui(p.picture, |ui| {
@@ -1000,6 +1106,89 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("emb-output-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         dir
+    }
+
+    #[test]
+    fn the_approval_sheet_has_the_product_page() {
+        let mut st = state();
+        st.set_product(emb_model::ProductKind::TShirt);
+        st.edit_product_for_test(|v| v.both_sides = true);
+        let pages = |pdf: &[u8]| {
+            let text: String = pdf.iter().map(|&b| if b < 128 { b as char } else { '?' }).collect();
+            (
+                text.matches("/Type /Page ").count(),
+                text.matches("/Subtype /Image").count(),
+            )
+        };
+        for paper in [Paper::A4, Paper::Letter] {
+            for with in [true, false] {
+                st.settings.output = OutputProfile {
+                    worksheet: false,
+                    approval: true,
+                    approval_product: with,
+                    picture: false,
+                    paper,
+                    ..OutputProfile::default()
+                };
+                let dir = temp(&format!("approval-{with}-{paper:?}"));
+                output(&mut st, &dir, "shirt").unwrap();
+                let pdf = std::fs::read(dir.join("shirt approval.pdf")).unwrap();
+                // Both sides: two pictures on the product page.
+                assert_eq!(pages(&pdf), if with { (2, 2) } else { (1, 0) }, "{paper:?}");
+                std::fs::remove_dir_all(&dir).ok();
+            }
+        }
+        // The preview shows the same pages and keeps the picture.
+        st.settings.output.approval_product = true;
+        let first = st.preview_pages(true);
+        assert_eq!(first.len(), 2);
+        let pictures = |p: &Page| -> Vec<(emb_geom::BBox, *const emb_render::raster::Picture)> {
+            p.ops
+                .iter()
+                .filter_map(|o| match o {
+                    Op::Image { rect, picture } => Some((*rect, std::sync::Arc::as_ptr(picture))),
+                    _ => None,
+                })
+                .collect()
+        };
+        let shown = pictures(&first[1]);
+        assert_eq!(shown.len(), 2);
+        assert_eq!(pictures(&st.preview_pages(true)[1])[0].1, shown[0].1);
+        // The front is over the back, both in the margins of the page.
+        let (front, back) = (shown[0].0, shown[1].0);
+        assert!(back.min.y > front.max.y);
+        for r in [front, back] {
+            assert!(r.min.x >= 14.9 && r.max.x <= first[1].width_mm - 14.9, "{r:?}");
+            assert!(r.max.y < first[1].height_mm - 15.0, "{r:?}");
+        }
+        // No product: no product page.
+        st.doc.edit("None", |d| d.product = None);
+        assert_eq!(st.preview_pages(true).len(), 1);
+    }
+
+    /// Writes approval sheets with the product page on A4 and Letter:
+    /// `EMB_PRODUCT_OUT=<folder> cargo test -p emb-app -- --ignored write_approval_sheets`.
+    #[test]
+    #[ignore]
+    fn write_approval_sheets() {
+        let dir = PathBuf::from(std::env::var("EMB_PRODUCT_OUT").expect("set EMB_PRODUCT_OUT"));
+        let mut st = state();
+        st.set_product(emb_model::ProductKind::Polo);
+        st.edit_product_for_test(|v| {
+            v.both_sides = true;
+            v.color = emb_model::Rgb(30, 40, 75);
+        });
+        for paper in [Paper::A4, Paper::Letter] {
+            st.settings.output = OutputProfile {
+                worksheet: false,
+                approval: true,
+                picture: false,
+                paper,
+                ..OutputProfile::default()
+            };
+            let out = dir.join(format!("{paper:?}"));
+            output(&mut st, &out, "approval").unwrap();
+        }
     }
 
     #[test]

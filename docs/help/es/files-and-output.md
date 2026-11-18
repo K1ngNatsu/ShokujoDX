@@ -98,6 +98,12 @@ bastidor y el lugar del diseño, cada color y parada, la tela, la
 entretela y el recubrimiento, una imagen, y el orden de trabajo de los
 strass.
 
+Si el diseño tiene un producto (**Diseño > Producto**), la hoja de
+aprobación tiene una segunda página con el diseño en el producto: un
+lado, o la delantera sobre la espalda si **Ambos lados en la imagen**
+está activo. Para hacer la hoja de aprobación sin la página del
+producto, desactive **Con el producto** en la salida del diseño.
+
 ## Producción por lotes
 
 **Diseño > Producción por lotes** crea los archivos de Producir diseño

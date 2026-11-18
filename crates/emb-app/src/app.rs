@@ -257,6 +257,9 @@ pub struct AppState {
     pub product_tex: Option<crate::product::ProductTexture>,
     /// The stitches and the canvas pictures of the other designs on the product.
     pub product_extras: crate::product::Extras,
+    /// The picture of the design on the product for the approval sheet, and
+    /// the design state that it shows.
+    pub sheet_product: Option<(u64, crate::output::SheetPictures)>,
     /// The next frame shows all of the product.
     pub fit_product: bool,
     /// The Repeats window is open.
@@ -718,6 +721,7 @@ impl AppState {
             product_window: false,
             product_tex: None,
             product_extras: Default::default(),
+            sheet_product: None,
             fit_product: false,
             repeats_window: false,
             about_window: false,
