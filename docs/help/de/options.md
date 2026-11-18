@@ -2,7 +2,7 @@
 id: options
 title: Optionen
 group: reference
-keywords: optionen, einstellungen, voreinstellungen, darstellung, dunkel, hell, hoher kontrast, textgröße, sprache, einheiten, mm, zoll, raster, lineale, hilfslinien, einrasten, verschieben, pfeiltasten, sicherung, rahmenrand, sicherheitsabstand, einfügen, versatz beim duplizieren, zoomschritt, anzeigefarben, dichtegrenze, garnpreis, spule, unterfaden, währung, bildschirmkalibrierung, zurücksetzen
+keywords: optionen, einstellungen, voreinstellungen, darstellung, dunkel, hell, hoher kontrast, textgröße, sprache, einheiten, mm, zoll, raster, lineale, hilfslinien, einrasten, verschieben, pfeiltasten, sicherung, rahmenrand, sicherheitsabstand, einfügen, versatz beim duplizieren, zoomschritt, anzeigefarben, dichtegrenze, garnpreis, spule, unterfaden, währung, bildschirmkalibrierung, zurücksetzen, neue version, update, nach updates suchen, netzwerk, datenschutz, new version, check for updates
 ---
 # Optionen
 
@@ -72,6 +72,24 @@ Halten Sie ein Lineal an den Bildschirm. Ändern Sie **Skalieren**, bis die
 Linie 100 mm lang ist, oder tippen Sie die gemessene Länge in **Gemessen**
 ein und klicken Sie auf **Anwenden**. Dann zeigt **Zoom 100 %** die echte
 Größe. **Zurücksetzen** setzt wieder den Wert des Betriebssystems.
+
+## Neue Versionen
+
+Das Programm kann beim Start nach einer neuen Version suchen.
+
+- **Beim Start prüfen**: Beim Start, und höchstens einmal am Tag, fragt
+  das Programm GitHub nach der neuesten Version. Wenn es eine neuere
+  Version gibt, zeigt ein Fenster ihre Version und ihre Änderungen.
+- **Jetzt prüfen** (auch **Hilfe > Nach Updates suchen**) sucht sofort.
+- Die Prüfung sendet keine Daten über Sie oder Ihre Designs. Das
+  Programm lädt keine neue Version herunter und installiert keine:
+  **Download-Seite öffnen** öffnet die Seite der Version in Ihrem
+  Browser, und Sie installieren sie wie zuvor. Ihre Einstellungen und
+  Ihre Designs bleiben.
+- **Diese Version überspringen** beendet den Hinweis für diese Version.
+- Das Windows-Installationsprogramm und der erste Start fragen, ob Sie
+  die Prüfung möchten. Ohne die Prüfung verwendet das Programm das
+  Netzwerk nicht.
 
 ## Einstellungen an anderen Stellen
 

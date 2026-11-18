@@ -535,6 +535,8 @@ pub enum Cmd {
     RepeatsWindow,
     /// The About window: version, build, folders.
     About,
+    /// Looks for a new version of the program now (`update.rs`).
+    CheckUpdates,
     /// The Library tab (the design library).
     Library,
     /// The Clipart tab.
@@ -1531,6 +1533,11 @@ impl Cmd {
                         tr("Questions and Problems"),
                         tr("Answers to common problems: puckers, gaps, trims, small text, files."),
                     ),
+                    "whats-new" => (
+                        ph::SPARKLE,
+                        tr("What Is New"),
+                        tr("The changes of each version of the program."),
+                    ),
                     _ => (ph::BOOK_OPEN, tr("Help topic"), tr("Open this help topic.")),
                 };
                 (g(icon), label, tip)
@@ -1702,6 +1709,13 @@ impl Cmd {
                 g(ph::INFO),
                 tr("About"),
                 tr("The version and build of the program, and the folder of the settings, backups and crash reports."),
+            ),
+            Cmd::CheckUpdates => (
+                g(ph::ARROW_CIRCLE_UP),
+                tr("Check for Updates"),
+                tr(
+                    "Look for a new version of the program now. The program shows the new version and its download page; it does not download or install anything.",
+                ),
             ),
             Cmd::RepeatsWindow => (
                 g(ph::DOTS_THREE_OUTLINE),

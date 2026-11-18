@@ -98,11 +98,22 @@ en.RemoveFailed=The older version of {#AppName} (%1) could not be removed. Remov
 de.RemoveFailed=Die ältere Version von {#AppName} (%1) konnte nicht entfernt werden. Entfernen Sie sie unter Einstellungen > Apps und starten Sie dieses Installationsprogramm dann erneut.
 es.RemoveFailed=No se pudo quitar la versión anterior de {#AppName} (%1). Quítela en Configuración > Aplicaciones y vuelva a iniciar este instalador.
 ja.RemoveFailed=古いバージョンの {#AppName} (%1) を削除できませんでした。[設定] > [アプリ] で削除してから、このインストーラーをもう一度起動してください。
+; The check for a new version (ADR 0109): the program reads the choice from
+; install.ini next to it.
+en.Updates=New versions:
+de.Updates=Neue Versionen:
+es.Updates=Versiones nuevas:
+ja.Updates=新しいバージョン:
+en.UpdateCheck=Look for a new version when {#AppName} starts (it asks GitHub for the newest version; it sends no data about you or your designs, and it installs nothing)
+de.UpdateCheck=Beim Start von {#AppName} nach einer neuen Version suchen (fragt GitHub nach der neuesten Version; sendet keine Daten über Sie oder Ihre Designs und installiert nichts)
+es.UpdateCheck=Buscar una versión nueva al iniciar {#AppName} (pregunta a GitHub por la versión más reciente; no envía datos sobre usted ni sobre sus diseños y no instala nada)
+ja.UpdateCheck={#AppName} の起動時に新しいバージョンを確認する（GitHub に最新バージョンを問い合わせます。お客様やデザインのデータは送信せず、何もインストールしません）
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 Name: "machinefiles"; Description: "{cm:MachineFiles}"; GroupDescription: "{cm:FileTypes}"
 Name: "thumbnails"; Description: "{cm:Thumbnails}"; GroupDescription: "{cm:FileTypes}"
+Name: "updatecheck"; Description: "{cm:UpdateCheck}"; GroupDescription: "{cm:Updates}"
 
 [Files]
 Source: "{#Source}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -110,6 +121,15 @@ Source: "{#Source}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs cre
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
+
+[INI]
+; The choice of the user for the check for a new version. The program
+; applies it at its next start (update.rs).
+Filename: "{app}\install.ini"; Section: "install"; Key: "update_check"; String: "yes"; Tasks: updatecheck
+Filename: "{app}\install.ini"; Section: "install"; Key: "update_check"; String: "no"; Tasks: not updatecheck
+
+[UninstallDelete]
+Type: files; Name: "{app}\install.ini"
 
 [Registry]
 ; The project files of the program open with it.

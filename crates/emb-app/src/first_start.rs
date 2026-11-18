@@ -1,7 +1,9 @@
 //! The first start (v0.3 plan, Stage 2): the program asks for the user's
 //! machine and hoop. Until the user picks one, new designs use the
 //! Generic machine. The choice goes in `Settings::machine` and
-//! `Settings::hoop`; Design > Machine and Hoop changes it later.
+//! `Settings::hoop`; Design > Machine and Hoop changes it later. The step
+//! also asks if the program looks for new versions at the start, when no
+//! installer asked (`update.rs`, ADR 0109).
 
 use eframe::egui;
 
@@ -13,6 +15,8 @@ use crate::i18n::tr;
 pub struct MachineStep {
     pub machine: String,
     pub hoop: Option<String>,
+    /// Look for new versions at the start (the tick box of the step).
+    pub updates: bool,
 }
 
 impl MachineStep {
@@ -21,6 +25,7 @@ impl MachineStep {
         let mut step = MachineStep {
             machine: GENERIC_MACHINE.into(),
             hoop: None,
+            updates: true,
         };
         step.first_hoop(st);
         step
@@ -39,6 +44,9 @@ impl AppState {
         let mut s = self.settings.clone();
         s.machine = Some(step.machine.clone());
         s.hoop = step.hoop.clone();
+        if s.updates.auto.is_none() {
+            s.updates.auto = Some(step.updates);
+        }
         self.set_settings(s);
         if self.doc.design().objects().is_empty() && self.doc.undo_label().is_none() {
             self.start_on_machine(&step.machine, step.hoop.as_deref());
@@ -116,6 +124,11 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
             {
                 add_own = true;
             }
+            if st.settings.updates.auto.is_none() {
+                ui.separator();
+                ui.checkbox(&mut step.updates, tr("Look for new versions at the start"));
+                ui.weak(crate::update::what_it_does());
+            }
             ui.add_space(8.0);
             ui.horizontal(|ui| {
                 done = ui.button(tr("Use This Machine")).clicked();
@@ -134,7 +147,9 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
     if done {
         st.finish_machine_step(&step);
     } else if skip {
-        let generic = MachineStep::new(st);
+        // Skip is for the machine; the tick box counts as it shows.
+        let mut generic = MachineStep::new(st);
+        generic.updates = step.updates;
         st.finish_machine_step(&generic);
     } else {
         st.ask_machine = Some(step);
@@ -177,8 +192,10 @@ mod tests {
         let step = MachineStep {
             machine: "husqvarna_topaz20".into(),
             hoop: Some("square_200x200".into()),
+            updates: false,
         };
         st.finish_machine_step(&step);
+        assert_eq!(st.settings.updates.auto, Some(false), "the tick box of the step");
         assert!(st.ask_machine.is_none());
         assert_eq!(st.settings.machine.as_deref(), Some("husqvarna_topaz20"));
         assert_eq!(st.settings.hoop.as_deref(), Some("square_200x200"));
@@ -197,7 +214,10 @@ mod tests {
         // A design with objects does not change.
         let mut busy = state();
         busy.add_sample_objects();
+        // The choice of an installer stays.
+        busy.settings.updates.auto = Some(true);
         busy.finish_machine_step(&step);
+        assert_eq!(busy.settings.updates.auto, Some(true));
         assert_eq!(busy.doc.design().machine.as_deref(), Some(GENERIC_MACHINE));
         assert_eq!(busy.settings.machine.as_deref(), Some("husqvarna_topaz20"));
     }

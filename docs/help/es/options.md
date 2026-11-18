@@ -2,7 +2,7 @@
 id: options
 title: Opciones
 group: reference
-keywords: opciones, ajustes, preferencias, apariencia, oscuro, claro, alto contraste, tamaño del texto, idioma, unidades, mm, pulgadas, cuadrícula, reglas, guías, ajustar, desplazar, teclas de flecha, copia de seguridad, margen del bastidor, margen de seguridad, pegar, desplazamiento del duplicado, paso de zoom, colores de pantalla, límite de densidad, precio del hilo, carrete, bobina, moneda, calibración de pantalla, restablecer
+keywords: opciones, ajustes, preferencias, apariencia, oscuro, claro, alto contraste, tamaño del texto, idioma, unidades, mm, pulgadas, cuadrícula, reglas, guías, ajustar, desplazar, teclas de flecha, copia de seguridad, margen del bastidor, margen de seguridad, pegar, desplazamiento del duplicado, paso de zoom, colores de pantalla, límite de densidad, precio del hilo, carrete, bobina, moneda, calibración de pantalla, restablecer, versión nueva, actualización, buscar actualizaciones, red, privacidad, new version, check for updates
 ---
 # Opciones
 
@@ -70,6 +70,23 @@ Ponga una regla contra la pantalla. Cambie la **Escala** hasta que la
 línea mida 100 mm, o escriba la longitud que mide en **Medido** y haga
 clic en **Aplicar**. Entonces **Zoom 100 %** muestra el tamaño real.
 **Restablecer** vuelve a poner el valor del sistema operativo.
+
+## Versiones nuevas
+
+El programa puede buscar una versión nueva al iniciar.
+
+- **Comprobar al iniciar**: al iniciar, y como máximo una vez al día,
+  el programa pregunta a GitHub por la versión más reciente. Si hay una
+  versión más nueva, una ventana muestra su versión y sus cambios.
+- **Comprobar ahora** (también **Ayuda > Buscar actualizaciones**) busca
+  de inmediato.
+- La comprobación no envía datos sobre usted ni sobre sus diseños. El
+  programa no descarga ni instala una versión nueva: **Abrir la página
+  de descarga** abre la página de la versión en su navegador, y usted
+  la instala como antes. Su configuración y sus diseños se conservan.
+- **Omitir esta versión** detiene el aviso de esa versión.
+- El instalador de Windows y el primer inicio preguntan si quiere la
+  comprobación. Sin la comprobación, el programa no usa la red.
 
 ## Ajustes en otros lugares
 

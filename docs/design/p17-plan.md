@@ -1,6 +1,6 @@
 # Plan: polish and lettering (phase P17)
 
-Date: 2026-11-18 · Status: Accepted (owner, 2026-11-18). Not started.
+Date: 2026-11-18 · Status: Accepted (owner, 2026-11-18). Milestone 1 done (ADR 0109); the owner checks its exit test with the next release.
 
 ## Goal
 
@@ -50,9 +50,19 @@ A user of an old version learns that a new version exists.
 4. **What is new.** After the first start of a new version, the start
    page shows a short list of the changes.
 
-The check is the first use of the network in the program. It needs a
-library for HTTPS in the app crate; an ADR records the choice (rule 9).
-The engine crates get no network code.
+The check is the first use of the network in the program. The engine
+crates get no network code.
+
+**Done (2026-11-18), ADR 0109.** `emb-app/src/update.rs`. The `curl`
+program of the system makes the request, so the program gets no network
+library and `Cargo.lock` does not change. The installer writes the
+choice to `install.ini` next to the program; a choice of "no" always
+applies, and "yes" does not turn on checks that the user turned off.
+A user of an earlier version gets one question at the next start. The
+list of changes is the help topic **What is new**, with a link on the
+start page at the first start of a new version. The installer script
+was not compiled on the development PC (no Inno Setup there): the
+release build in CI compiles it.
 
 **Exit test:** a build with an older version number shows the notice;
 with automatic checks off, the program makes no request (a test checks

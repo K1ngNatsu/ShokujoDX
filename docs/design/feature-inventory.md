@@ -360,6 +360,7 @@ Phase P11 (`docs/design/p11-plan.md`) plans them.
 | Puff (3D foam) | Commercial programs | Satin settings for sewing over foam | ✅ Puff on satin columns and lettering: dense satin, no underlay across, closed ends, a stop for the foam (ADR 0050) | P11 (7) |
 | Cap sequencing | Commercial programs | Sew order from the center out and from the bottom up for caps | ✅ Arrange > Sew order > Cap order; cap frame hint in Design info (ADR 0050) | P11 (7) |
 | Cutwork needles | The programs of machine makers, others | Lines that cutting needles cut, with the needle angle | ◐ Specialty > Cutwork: cut lines by needle angle, a color for each needle (ADR 0051); files not tried on a machine | P11 (8) |
+| Update check | All | The program tells the user that a new version exists | ✅ Help > Check for Updates, and at the start if the user permits it (the installer and the first start ask): the version, its notes and the download page; no download and no install; the help topic What is new (ADR 0109) | P17 (1) |
 
 ## 10. Shop tools
 

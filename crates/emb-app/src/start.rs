@@ -213,6 +213,14 @@ pub fn page(ui: &mut egui::Ui, st: &mut AppState) {
             ui.vertical(|ui| {
                 ui.label(RichText::new(tr("ShokujoDX")).size(24.0).strong());
                 ui.weak(crate::i18n::fill("Version {}", &[&(crate::about::VERSION)]));
+                if st.updates.whats_new
+                    && ui
+                        .link(tr("See what is new in this version"))
+                        .on_hover_text(tr("The changes since the version that you had before."))
+                        .clicked()
+                {
+                    st.open_help("whats-new", None);
+                }
                 ui.add_space(12.0);
                 ui.columns(2, |cols| {
                     let ui = &mut cols[0];

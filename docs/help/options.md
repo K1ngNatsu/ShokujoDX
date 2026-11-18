@@ -2,7 +2,7 @@
 id: options
 title: Options
 group: reference
-keywords: options, settings, preferences, appearance, dark, light, high contrast, text size, language, units, mm, inches, grid, rulers, guides, snap, nudge, arrow keys, backup, hoop margin, safety margin, paste, duplicate offset, zoom step, display colors, density limit, thread price, spool, bobbin, currency, screen calibration, reset
+keywords: options, settings, preferences, appearance, dark, light, high contrast, text size, language, units, mm, inches, grid, rulers, guides, snap, nudge, arrow keys, backup, hoop margin, safety margin, paste, duplicate offset, zoom step, display colors, density limit, thread price, spool, bobbin, currency, screen calibration, reset, new version, update, check for updates, network, privacy
 ---
 # Options
 
@@ -68,6 +68,22 @@ Hold a ruler to the screen. Change the **Scale** until the line is
 100 mm long, or type the length you measure in **Measured** and click
 **Apply**. Then **Zoom 100 %** shows the real size. **Reset** sets the
 value of the operating system again.
+
+## New versions
+
+The program can look for a new version when it starts.
+
+- **Check at the start**: at the start, and not more than one time each
+  day, the program asks GitHub for the newest version. If a newer
+  version exists, a window shows its version and its changes.
+- **Check Now** (also **Help > Check for Updates**) looks at once.
+- The check sends no data about you or your designs. The program does
+  not download and does not install a new version: **Open Download
+  Page** opens the page of the version in your browser, and you install
+  it as before. Your settings and your designs stay.
+- **Skip This Version** stops the notice for that version.
+- The Windows installer and the first start ask if you want the check.
+  With the check off, the program does not use the network.
 
 ## Settings in other places
 

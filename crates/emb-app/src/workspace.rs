@@ -436,6 +436,8 @@ pub struct Settings {
     /// Endless pan: during a pan drag, the pointer goes to the other side
     /// of the canvas at an edge (v0.3 plan, Stage 3).
     pub endless_pan: bool,
+    /// The check for a new version (ADR 0109).
+    pub updates: crate::update::UpdateSettings,
     /// The start page shows when the program starts.
     pub start_page: bool,
     /// Simple mode: fewer tools and larger buttons (P10 Milestone 5).
@@ -502,6 +504,7 @@ impl Default for Settings {
             machine: None,
             hoop: None,
             endless_pan: true,
+            updates: Default::default(),
             start_page: true,
             simple_mode: false,
             trims: Default::default(),
@@ -1297,6 +1300,7 @@ pub fn options_window(ctx: &egui::Context, st: &mut AppState) {
     }
     let mut s = st.settings.clone();
     let mut open = true;
+    let mut check_updates = false;
     egui::Window::new(tr("Options")).id(egui::Id::new("Options"))
         .open(&mut open)
         .collapsible(false)
@@ -1377,6 +1381,22 @@ pub fn options_window(ctx: &egui::Context, st: &mut AppState) {
                             "During a pan with the middle or right button, the pointer goes to the other side of the canvas at an edge, so the pan does not stop.",
                         ));
                     ui.end_row();
+                    ui.label(tr("New versions"));
+                    ui.horizontal(|ui| {
+                        let mut auto = s.updates.auto == Some(true);
+                        if ui
+                            .checkbox(&mut auto, tr("Check at the start"))
+                            .on_hover_text(crate::update::what_it_does())
+                            .changed()
+                        {
+                            s.updates.auto = Some(auto);
+                        }
+                        check_updates = ui
+                            .button(tr("Check Now"))
+                            .on_hover_text(tr("Look for a new version now."))
+                            .clicked();
+                    });
+                    ui.end_row();
                     ui.label(tr("Snap distance"));
                     ui.add(egui::DragValue::new(&mut s.snap_px).range(2.0..=30.0).clamp_existing_to_range(false).suffix(" px"));
                     ui.end_row();
@@ -1437,6 +1457,9 @@ pub fn options_window(ctx: &egui::Context, st: &mut AppState) {
         st.lang_override = None;
     }
     st.set_settings(s);
+    if check_updates {
+        st.check_updates_now(ctx);
+    }
     if !open {
         st.show_options = false;
     }

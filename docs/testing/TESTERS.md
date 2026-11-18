@@ -27,6 +27,11 @@ To remove the program, use **Settings > Apps** (installer) or delete the
 folder (zip). The installer of a new version removes the older version
 first; your settings and your designs stay.
 
+The installer (or the first start) asks if the program looks for a new
+version when it starts. The check asks GitHub for the newest version,
+sends no data about you or your designs, and installs nothing. **Help >
+Check for Updates** looks at once.
+
 **macOS 10.15 or later** (Apple silicon or Intel). Open the disk image
 (`…-macos.dmg`) and drag **ShokujoDX** to **Applications**.
 The first time, macOS can say that it cannot check the program. Open

@@ -1,0 +1,47 @@
+---
+id: whats-new
+title: Novedades
+group: start
+keywords: nuevo, novedades, cambios, versión, actualización, noticias, más reciente, buscar actualizaciones, versión nueva, new, changes, release, upgrade
+---
+# Novedades
+
+Este tema enumera los cambios de cada versión, la más reciente primero.
+**Ayuda > Novedades** lo abre. Después de una actualización, la página
+de inicio tiene un enlace a él.
+
+## Después de la versión 0.3.0
+
+**La vista de producto.** **Diseño > Producto** muestra el diseño sobre
+un producto que parece tela.
+
+- Los productos tienen luz, pliegues y la textura de su tela, y el
+  bordado tiene una sombra suave.
+- Productos nuevos: una gorra de seis paneles, una camiseta de manga
+  larga, una sudadera con capucha, un delantal, un gorro y una bandolera.
+- Una prenda tiene un frente y una espalda. Puede poner más diseños en un
+  producto, cada uno en su lugar.
+- Productos de dos tonos: un segundo color para el cuello, los puños y
+  otras partes de ribete, y una lista de colores de prenda.
+- Sus propias fotos de producto: marque la tela de la foto, y la foto
+  muestra el producto en cada color. Marque los lugares para un diseño, y
+  guarde la foto en **Mis productos**.
+- **Diseño > Plato giratorio** gira el producto por pasos. Puede guardar
+  el giro como imagen animada o como cuatro vistas.
+- La hoja de aprobación puede mostrar el diseño sobre el producto.
+
+**Versiones nuevas.** El programa puede avisarle cuando hay una versión
+nueva disponible. Consulte [Opciones](options).
+
+## Versión 0.3.0
+
+- El primer inicio pregunta por su máquina y su bastidor. La biblioteca
+  de máquinas tiene unas treinta máquinas, y **Diseño > Mis máquinas**
+  guarda las suyas.
+- Las opciones de Vista se conservan para el siguiente inicio.
+- Desplazamiento sin fin: un desplazamiento con el ratón no se detiene en
+  el borde del lienzo.
+- Las letras tienen negrita, cursiva, subrayado y texto apilado.
+- El modo de boceto tiene un origen fijo, y un boceto y sus objetos se
+  mueven juntos.
+- El instalador de Windows quita primero la versión anterior.

@@ -117,7 +117,24 @@ fn the_windows_installer_agrees() {
         .filter_map(|l| l.strip_prefix("en."))
         .filter_map(|l| l.split('=').next())
         .collect();
-    assert_eq!(keys.len(), 10);
+    assert_eq!(keys.len(), 12);
+    // The check for a new version (ADR 0109): a tick box, and the choice
+    // as yes or no in the file that the program reads.
+    assert!(iss.contains("Name: \"updatecheck\"; Description: \"{cm:UpdateCheck}\""));
+    for (value, tasks) in [("yes", "Tasks: updatecheck"), ("no", "Tasks: not updatecheck")] {
+        let line = format!(
+            "Filename: \"{{app}}\\{}\"; Section: \"install\"; Key: \"{}\"; String: \"{value}\"; {tasks}",
+            crate::update::INSTALL_FILE,
+            crate::update::INSTALL_KEY
+        );
+        assert!(iss.lines().any(|l| l == line), "{line}");
+        let text = format!("[install]\r\n{}={value}\r\n", crate::update::INSTALL_KEY);
+        assert_eq!(crate::update::parse_install_file(&text), Some(value == "yes"));
+    }
+    assert!(iss.contains(&format!(
+        "Type: files; Name: \"{{app}}\\{}\"",
+        crate::update::INSTALL_FILE
+    )));
     // The thumbnail handler: its class id, and the file types that it
     // knows from their first bytes (ADR 0046).
     let lib = read("crates/emb-thumbnail/src/lib.rs");

@@ -150,6 +150,8 @@ pub struct AppState {
     pub cursor: Option<usize>,
     /// The first start asks for the user's machine (`first_start.rs`).
     pub ask_machine: Option<crate::first_start::MachineStep>,
+    /// The check for a new version (`update.rs`).
+    pub updates: crate::update::Updates,
     pub show_needle_points: bool,
     pub show_functions: bool,
     /// Thread charts: the built-in ones and the ones the user imported.
@@ -573,6 +575,7 @@ impl EmbApp {
         } else if let Some(arg) = arg {
             state.open_any(std::path::Path::new(&arg));
         }
+        state.start_updates(&cc.egui_ctx);
         Self {
             state,
             dock,
@@ -659,6 +662,7 @@ impl AppState {
             settings: crate::workspace::Settings::default(),
             pan_jump: None,
             ask_machine: None,
+            updates: Default::default(),
             save_settings: false,
             show_options: false,
             measure: None,
@@ -1750,6 +1754,7 @@ impl eframe::App for EmbApp {
         crate::repeats::window(&ctx, st);
         crate::about::window(&ctx, st);
         crate::first_start::window(&ctx, st);
+        crate::update::window(&ctx, st);
         crate::my_machines::window(&ctx, st);
         crate::styles::windows(&ctx, st);
         crate::setup::sew_time_window(&ctx, st);

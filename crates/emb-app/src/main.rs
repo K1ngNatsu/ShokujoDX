@@ -102,6 +102,7 @@ mod teamnames;
 mod test_util;
 mod threads;
 mod turntable;
+mod update;
 mod vectors;
 mod viewing;
 mod views;

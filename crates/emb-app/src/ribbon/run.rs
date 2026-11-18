@@ -536,6 +536,7 @@ impl AppState {
             Cmd::Turntable => self.turntable.open = true,
             Cmd::RepeatsWindow => self.open_repeats(),
             Cmd::About => self.about_window = true,
+            Cmd::CheckUpdates => self.check_updates_now(ctx),
             Cmd::Library => self.focus_library = true,
             Cmd::ClipartPanel => self.focus_clipart = true,
             Cmd::CutterFile => self.cutter_file_dialog(),

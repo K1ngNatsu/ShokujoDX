@@ -34,7 +34,10 @@ ShokujoDX makes the stitches and writes the file for your machine.
   tutorials, in English, German, Spanish and Japanese.
 - **Tested on real fabric.** The test designs of all 14 roadmap phases sew
   correctly on a Husqvarna Viking Topaz 20.
-- **Your files stay yours.** No account, no subscription, no network. The
+- **Your files stay yours.** No account and no subscription. The program
+  uses the network for one thing only, and only if you permit it: it can
+  ask GitHub if a new version is available (no data about you or your
+  designs is sent, and nothing is downloaded or installed). The
   project file keeps every object editable, and the program writes the
   formats of all the large machine brands.
 
@@ -140,6 +143,11 @@ first.
 - **Upgrade:** install the new version over the old one. The Windows
   installer removes the older version first; your settings and designs
   stay.
+- **New versions:** the installer (or the first start) asks if the
+  program looks for a new version when it starts. **Help > Check for
+  Updates** looks at once, and **Options** changes the choice. The
+  program shows the new version and its download page; you install it
+  yourself.
 - **Uninstall:** Windows: **Settings > Apps** (or delete the folder of the
   zip). macOS: drag the app to the Trash. Linux: `sudo apt remove
   shokujodx`, or delete the AppImage. The settings stay in

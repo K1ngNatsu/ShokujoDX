@@ -1,0 +1,47 @@
+---
+id: whats-new
+title: What is new
+group: start
+keywords: new, changes, version, update, release, upgrade, news, latest, check for updates, new version
+---
+# What is new
+
+This topic lists the changes of each version, the newest first.
+**Help > What Is New** opens it. After an update, the start page has a
+link to it.
+
+## After version 0.3.0
+
+**The product view.** **Design > Product** shows the design on a product
+that looks like cloth.
+
+- The products have light, folds and the texture of their fabric, and the
+  embroidery has a soft shadow.
+- New products: a six-panel cap, a long-sleeve T-shirt, a hoodie, an
+  apron, a beanie and a messenger bag.
+- A garment has a front and a back. You can put more designs on one
+  product, each at its own place.
+- Two-tone products: a second color for the collar, the cuffs and other
+  trim parts, and a list of garment colors.
+- Your own product photos: mark the cloth of the photo, and the photo
+  shows the product in each color. Mark the places for a design, and
+  keep the photo in **My Products**.
+- **Design > Turntable** turns the product in steps. You can save the
+  turn as an animated picture or as four views.
+- The approval sheet can show the design on the product.
+
+**New versions.** The program can tell you when a new version is
+available. See [Options](options).
+
+## Version 0.3.0
+
+- The first start asks for your machine and your hoop. The machine
+  library has about thirty machines, and **Design > My Machines** keeps
+  your own.
+- The View options stay for the next start.
+- Endless pan: a pan with the mouse does not stop at the edge of the
+  canvas.
+- Lettering has bold, italic, underline and stacked text.
+- Sketch mode has a fixed origin, and a sketch and its objects move
+  together.
+- The Windows installer removes the older version first.

@@ -804,6 +804,7 @@ pub(super) const HELP: &[Panel] = &[
             Large(Cmd::FindCommand),
             Large(Cmd::StartPage),
             Small(&[Cmd::KeyboardShortcuts, Cmd::HelpTopic("troubleshooting"), Cmd::About]),
+            Small(&[Cmd::HelpTopic("whats-new"), Cmd::CheckUpdates]),
         ],
     },
     Panel {
