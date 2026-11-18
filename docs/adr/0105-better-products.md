@@ -27,8 +27,9 @@ the cap again and adds new products.
   - a long-sleeve T-shirt, front and back (sleeves at 48°, a hemmed
     cuff; upper and lower sleeve placements);
   - a hoodie, front and back (the sweatshirt body; the hood with its
-    lining and drawstrings at the front, the hood on the back, and a
-    pocket across the front; the hood is a placement on the back);
+    lining and drawstrings at the front, and a pocket across the front;
+    from the back, the hood stands behind the head as at the front, so
+    the back is free for a print (owner, 2026-11-18));
   - a bib apron (neck strap, waist ties, a pocket in two halves; bib,
     center and pocket placements);
   - a knitted beanie with a cuff (knit ribs as small folds; cuff and

@@ -666,37 +666,34 @@ fn hood_front() -> Vec<ProductPart> {
     v
 }
 
-/// The hood of a hoodie seen from the back: it lies on the back.
+/// The hood of a hoodie seen from the back: it stands behind the head, as
+/// at the front, and its lower edge is sewn to the back neck. The back
+/// stays free for a back print.
 fn hood_back() -> Vec<ProductPart> {
     use ProductPart::{Area, Line};
     let p = Point::new;
     let hood = Path::new()
         .move_to(p(-120.0, 9.5))
-        .cubic_to(p(-152.0, 80.0), p(-150.0, 225.0), p(-62.0, 300.0))
-        .cubic_to(p(-32.0, 326.0), p(32.0, 326.0), p(62.0, 300.0))
-        .cubic_to(p(150.0, 225.0), p(152.0, 80.0), p(120.0, 9.5))
-        .line_to(p(95.0, 0.0))
-        .cubic_to(p(60.0, -6.0), p(-60.0, -6.0), p(-95.0, 0.0))
+        .cubic_to(p(-132.0, -45.0), p(-80.0, -88.0), p(0.0, -88.0))
+        .cubic_to(p(80.0, -88.0), p(132.0, -45.0), p(120.0, 9.5))
+        .cubic_to(p(100.0, 26.0), p(52.0, 32.0), p(0.0, 32.0))
+        .cubic_to(p(-52.0, 32.0), p(-100.0, 26.0), p(-120.0, 9.5))
         .close();
+    let neck_seam = Path::new()
+        .move_to(p(-120.0, 9.5))
+        .cubic_to(p(-100.0, 26.0), p(-52.0, 32.0), p(0.0, 32.0))
+        .cubic_to(p(52.0, 32.0), p(100.0, 26.0), p(120.0, 9.5));
     vec![
         Area(hood.clone(), Shade::Body),
-        Line(hood, 2.0),
+        Line(hood, 1.5),
+        Line(neck_seam, 2.0),
         // The seam down the middle of the hood.
-        Line(line(&[(0.0, -4.0), (0.0, 318.0)]), 1.5),
-        fold(&[(-120.0, 40.0), (-128.0, 160.0), (-70.0, 280.0)], 26.0, 1.6),
-        fold(&[(120.0, 40.0), (128.0, 160.0), (70.0, 280.0)], 26.0, 1.6),
-        // The hood throws a shadow on the back under its edge.
-        fold(
-            &[
-                (-140.0, 230.0),
-                (-70.0, 318.0),
-                (0.0, 334.0),
-                (70.0, 318.0),
-                (140.0, 230.0),
-            ],
-            12.0,
-            -1.6,
-        ),
+        Line(line(&[(0.0, -86.0), (0.0, 31.0)]), 1.5),
+        // The two halves of the hood are round, and the hood throws a
+        // soft shadow on the back under its edge.
+        fold(&[(-52.0, -66.0), (-66.0, -25.0), (-60.0, 18.0)], 48.0, 1.8),
+        fold(&[(52.0, -66.0), (66.0, -25.0), (60.0, 18.0)], 48.0, 1.8),
+        fold(&[(-110.0, 22.0), (0.0, 40.0), (110.0, 22.0)], 10.0, -1.2),
     ]
 }
 
@@ -1351,8 +1348,9 @@ impl ProductKind {
             pl("Sleeve", 325.0, 250.0, 40.0, 40.0),
         ];
         const HOODIE_BACK: &[Placement] = &[
-            pl("Hood", 0.0, 150.0, 150.0, 120.0),
-            pl("Below the hood", 0.0, 450.0, 300.0, 160.0),
+            pl("Below the hood", 0.0, 90.0, 100.0, 50.0),
+            pl("Upper back", 0.0, 180.0, 300.0, 120.0),
+            pl("Full back", 0.0, 340.0, 330.0, 380.0),
         ];
         const APRON: &[Placement] = &[
             pl("Bib", 0.0, 130.0, 200.0, 110.0),
