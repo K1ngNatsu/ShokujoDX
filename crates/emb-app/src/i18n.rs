@@ -418,7 +418,16 @@ pub(crate) mod tests {
         out.extend(crate::kiosk::PRODUCT_COLORS.iter().map(|(name, _)| *name));
         out.extend(crate::viewtools::PANELS.iter().map(|(_, name)| *name));
         out.extend(crate::library::LIST_COLUMNS.iter().map(|(name, _, _)| *name));
-        out.into_iter().map(str::to_string).collect()
+        let mut out: BTreeSet<String> = out.into_iter().map(str::to_string).collect();
+        // The fabrics of the program (`data/fabrics.toml`) and "no fabric".
+        let base = emb_model::Fabric::base();
+        for f in emb_model::FabricCatalog::builtin().fabrics.iter().chain([&base]) {
+            out.insert(f.name.clone());
+            if !f.description.is_empty() {
+                out.insert(f.description.clone());
+            }
+        }
+        out
     }
 
     fn template_text(texts: &BTreeSet<String>) -> String {

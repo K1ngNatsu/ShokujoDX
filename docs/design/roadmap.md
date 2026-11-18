@@ -43,7 +43,7 @@ Sizes are relative effort: S (days), M (one to two weeks), L (a month), XL (seve
 | 13. Shop tools | Done in software (owner request, 2026-10-27): Milestones 1 (quotes and run time on machines with more heads, ADR 0064), 2 (order details on the sheets, ADR 0065), 3 (thread stock and threads to buy, ADR 0066) and 4 (scripts, ADR 0067). Open: the exit tests with a shop tester (real orders, a printed sheet and its barcode, the spools to buy). See `docs/design/p13-plan.md`. |
 | 14. Sketch mode | Done (owner request, 2026-10-27): Milestones 1 (sketch model and constraint solver, ADR 0068), 2 (sketch mode in the app, ADR 0069), 3 (drawing help and sketch edits, ADR 0070), 4 (regions to embroidery, ADR 0075), 5 (objects that follow their sketch, ADR 0076) and 6 (parameters, splines and drawings to sketches, ADR 0078 and 0079). The owner's test in the app and the badge sew-outs on the Topaz 20 passed (owner, 2026-11-16). See `docs/design/p14-plan.md`. |
 | 16. Product view | Done in software (owner request, 2026-11-17): Milestones 1 (a realistic look, ADR 0101), 2 (other designs on the product, ADR 0102), 3 (front and back, ADR 0103), 4 (the product on the approval sheet, ADR 0104), 5 (better products, ADR 0105), 6 (two-tone products and swatches, ADR 0106), 7 (photos of the user's products, ADR 0107) and 8 (turntable view, ADR 0108); audit in "Audit of P16". Open: the exit tests of the eight milestones (owner, at the end of the phase). See `docs/design/product-plan.md`. |
-| 17. Polish and lettering | Accepted (owner, 2026-11-18); Milestone 1 (update check, ADR 0109) done in software: eight milestones (update check, pictures of the windows, tests on an industrial machine, font test sheet and letter corrections, ten tuned fonts, text shaping, more fonts with a quality score, content families). See `docs/design/p17-plan.md`. |
+| 17. Polish and lettering | Accepted (owner, 2026-11-18); Milestones 1 (update check, ADR 0109) and 2 (pictures of the windows, ADR 0110) done in software: eight milestones (update check, pictures of the windows, tests on an industrial machine, font test sheet and letter corrections, ten tuned fonts, text shaping, more fonts with a quality score, content families). See `docs/design/p17-plan.md`. |
 | 18. Designs from other programs | Accepted (owner, 2026-11-18), not started; after P17: eight milestones (the parts of a stitch file, runs and satin columns, fills, Recognize Objects, read Ink/Stitch files, write them and read its fonts, outlines with a stitch file, import helpers). See `docs/design/p18-plan.md`. |
 | 19. Help and tutorials | Proposed (2026-11-18): nine milestones (pictures in the help, Show Me, guided lessons, the sew-out doctor, samples, ways to start, the help on the web, moving pictures, better answers); the owner selects them. See `docs/design/p19-plan.md`. |
 | 15. Browser version | Later (owner decision, 2026-11-16): not started. Start after the first feedback of users on the desktop program (about v0.4). See "P15. Browser version" below. |
@@ -1067,7 +1067,7 @@ and templates for the user's own product photos, and a turntable view
 
 **Exit:** the exit tests of the eight milestones in the plan.
 
-### P17. Polish and lettering (L) — Milestone 1 done in software (`docs/design/p17-plan.md`)
+### P17. Polish and lettering (L) — Milestones 1 and 2 done in software (`docs/design/p17-plan.md`)
 
 The features that the program has become better before it gets new ones
 (owner, 2026-11-18), in eight milestones: an update check that the user

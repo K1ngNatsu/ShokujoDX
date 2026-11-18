@@ -2222,7 +2222,7 @@ impl Cmd {
 
     /// Commands that open a file dialog or a new design (tests do not run them).
     #[cfg(test)]
-    pub(super) fn opens_dialog(self) -> bool {
+    pub(crate) fn opens_dialog(self) -> bool {
         matches!(
             self,
             Cmd::New

@@ -194,7 +194,7 @@ impl AppState {
         let name = path
             .and_then(Path::file_name)
             .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_else(|| doc.design().name.clone());
+            .unwrap_or_else(|| crate::file::shown_name(&doc.design().name));
         (name, doc.is_modified() && !doc.design().objects().is_empty())
     }
 

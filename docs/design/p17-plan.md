@@ -1,6 +1,6 @@
 # Plan: polish and lettering (phase P17)
 
-Date: 2026-11-18 · Status: Accepted (owner, 2026-11-18). Milestone 1 done (ADR 0109); the owner checks its exit test with the next release.
+Date: 2026-11-18 · Status: Accepted (owner, 2026-11-18). Milestones 1 (ADR 0109) and 2 (ADR 0110) done; the owner checks the exit test of Milestone 1 with the next release.
 
 ## Goal
 
@@ -86,6 +86,49 @@ pictures are not in the repository.
 **Exit test:** the pictures of all windows in four languages are made in
 less than five minutes; a text that does not fit its button is found and
 corrected.
+
+**Done (2026-11-18), ADR 0110.** `emb-app/src/pictures.rs` (test code
+only). A small software renderer makes the pictures from the triangles
+of egui, so the test has no new dependency and needs no graphics card.
+The run makes 520 pictures of 378 scenes (264 screens, 64 windows in
+four languages) in about 90 seconds:
+
+```text
+cargo test --release -p emb-app -- --ignored write_window_pictures --nocapture
+```
+
+`EMB_PICTURES_ONLY=word` and `EMB_PICTURES_LANGS=en,ja` make a part of
+them. Open `target/window-pictures/index.html`, and read `report.txt`.
+
+Found and corrected with the first pictures:
+
+- The Options window was 994 points high and had no scroll bar: on a
+  laptop screen (768 points) the last rows and **Reset to defaults**
+  were out of reach, in each language. It now has the height of the
+  screen and scrolls.
+- English texts in the other languages: "(mixed)" in Object Properties,
+  "1 object" and "2 objects" in the Threads panel, "lines" in Options,
+  "Untitled" on the design tab and in the window title, a notice title,
+  and the names and descriptions of the fabrics ("Not set", "Towel
+  (terry)" and the others) in the Styles panel, Design info and the
+  Fabric window.
+- Rows that were cut at the edge of a narrow panel now go on in a new
+  line: Mirror and Center in Hoop (Object Properties), the colorway row
+  (Threads), the current properties (Styles).
+
+Found and left open:
+
+- At 1366 points, the titles of the docked panels do not all fit in
+  Spanish, German and Japanese; the dock shows a scroll bar for them.
+- Japanese: the characters of the font of the computer sit higher than
+  the Latin letters and digits in the same line. A correction needs the
+  eye of a native reader, for the fonts of each system.
+- Japanese: two lines of the worksheet (Print Preview) are longer than
+  their column.
+- The Options window is 230 to 270 points wider in German and Spanish
+  (it fits the screen).
+- Windows with no scene yet: the Lettering window, Picture to design
+  with a picture, the Turntable and Product Photo with a product.
 
 ## Milestone 3: tests on an industrial machine (M)
 

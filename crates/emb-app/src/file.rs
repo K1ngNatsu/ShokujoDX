@@ -39,6 +39,16 @@ pub struct Notice {
     pub lines: Vec<String>,
 }
 
+/// The name of a design as the program shows it: a new design with no
+/// name of its own ("Untitled") shows in the language of the program.
+pub fn shown_name(name: &str) -> String {
+    if name == "Untitled" {
+        crate::i18n::tr("Untitled").to_string()
+    } else {
+        name.to_string()
+    }
+}
+
 impl AppState {
     /// Window title: file name, a mark if changed, and the app name.
     pub fn window_title(&self) -> String {
@@ -47,7 +57,7 @@ impl AppState {
             .as_deref()
             .and_then(Path::file_name)
             .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_else(|| crate::i18n::fill("{} (not saved)", &[&self.doc.design().name]));
+            .unwrap_or_else(|| crate::i18n::fill("{} (not saved)", &[&shown_name(&self.doc.design().name)]));
         let mark = if self.doc.is_modified() { "● " } else { "" };
         format!("{mark}{name} — ShokujoDX {}", crate::about::VERSION)
     }
@@ -521,7 +531,7 @@ impl AppState {
         }
         if !lines.is_empty() {
             self.notice = Some(Notice {
-                title: format!("Imported {n} object(s)"),
+                title: crate::i18n::fill("Imported {} object(s)", &[&n]),
                 lines,
             });
         }

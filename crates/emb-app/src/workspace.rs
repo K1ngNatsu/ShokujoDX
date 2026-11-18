@@ -1305,6 +1305,10 @@ pub fn options_window(ctx: &egui::Context, st: &mut AppState) {
         .open(&mut open)
         .collapsible(false)
         .resizable(false)
+        // The window has many rows: on a small screen it scrolls.
+        .vscroll(true)
+        .default_height((ctx.input(|i| i.content_rect().height()) - 90.0).max(200.0))
+        .max_height((ctx.input(|i| i.content_rect().height()) - 90.0).max(200.0))
         .show(ctx, |ui| {
             egui::Grid::new("options")
                 .num_columns(2)
@@ -1367,7 +1371,7 @@ pub fn options_window(ctx: &egui::Context, st: &mut AppState) {
                     length_value(ui, &mut s.grid_mm, s.units, 0.5, 100.0);
                     ui.end_row();
                     ui.label(tr("Major line every"));
-                    ui.add(egui::DragValue::new(&mut s.grid_major).range(1..=20).clamp_existing_to_range(false).suffix(" lines"));
+                    ui.add(egui::DragValue::new(&mut s.grid_major).range(1..=20).clamp_existing_to_range(false).suffix(format!(" {}", tr("lines"))));
                     ui.end_row();
                     ui.label(tr("Rulers and guides"));
                     ui.horizontal(|ui| {

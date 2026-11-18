@@ -469,6 +469,26 @@ pub fn default_dock() -> DockState<Tab> {
     dock
 }
 
+#[cfg(test)]
+impl EmbApp {
+    /// The program with `state` and the panels of a new install, for tests
+    /// that draw the whole window.
+    pub(crate) fn for_test(state: AppState) -> Self {
+        Self {
+            state,
+            dock: default_dock(),
+            last_title: String::new(),
+            started: true,
+            frames: 2,
+            last_size: egui::Vec2::ZERO,
+        }
+    }
+
+    pub(crate) fn state(&mut self) -> &mut AppState {
+        &mut self.state
+    }
+}
+
 impl EmbApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         crate::icons::install(&cc.egui_ctx);
@@ -1650,6 +1670,29 @@ impl TabViewer for AppState {
 impl eframe::App for EmbApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        if self.frames < 2 {
+            self.frames += 1;
+            // The first frame is on the screen: the renderer works.
+            if self.frames == 2 {
+                crate::startup::first_frame();
+            }
+        }
+        if !self.started {
+            // The ribbon needs the width of a full screen to show all panels.
+            // (`ViewportBuilder::with_maximized` keeps the small size on Windows.)
+            self.started = true;
+            ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(true));
+        }
+        self.draw(ui);
+    }
+}
+
+impl EmbApp {
+    /// One frame of the program: the keys, the panels and all windows. The
+    /// steps that need the window of the system are in `ui`, so a test can
+    /// draw the whole program with no window (`pictures.rs`).
+    pub(crate) fn draw(&mut self, ui: &mut egui::Ui) {
+        let ctx = ui.ctx().clone();
         // Ctrl+Plus, Ctrl+Minus and Ctrl+0: the text size of the settings
         // (egui's own keyboard zoom is off, so the setting keeps it).
         ctx.options_mut(|o| o.zoom_with_keyboard = false);
@@ -1676,21 +1719,8 @@ impl eframe::App for EmbApp {
             .as_deref()
             .unwrap_or(&self.state.settings.language);
         crate::workspace::apply_theme_in(&ctx, &self.state.settings, language);
-        if self.frames < 2 {
-            self.frames += 1;
-            // The first frame is on the screen: the renderer works.
-            if self.frames == 2 {
-                crate::startup::first_frame();
-            }
-        }
         // A change of a View option stays for the next session.
         self.state.keep_view_options();
-        if !self.started {
-            // The ribbon needs the width of a full screen to show all panels.
-            // (`ViewportBuilder::with_maximized` keeps the small size on Windows.)
-            self.started = true;
-            ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(true));
-        }
         // Zoom to extents again when the window gets its full size at the start.
         let (size, time) = ctx.input(|i| (i.content_rect().size(), i.time));
         if size != self.last_size {

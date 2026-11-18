@@ -67,6 +67,8 @@ mod packaging;
 mod palette;
 mod panels;
 mod picture;
+#[cfg(test)]
+mod pictures;
 mod player;
 mod preview;
 mod product;

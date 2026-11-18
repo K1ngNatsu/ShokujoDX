@@ -264,7 +264,7 @@ fn colorway_section(ui: &mut egui::Ui, st: &mut AppState) {
     let names: Vec<String> = d.colorways.iter().map(|c| c.name.clone()).collect();
     let current = d.colorway;
     let background = d.background;
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         ui.strong(tr("Colorway"));
         if names.is_empty() {
             ui.weak(tr("one (the design colors)"));
@@ -387,9 +387,9 @@ fn threads_section(ui: &mut egui::Ui, st: &mut AppState) {
             };
             in_stock_mark(ui, &stock, &ThreadLook::of(t), &detail);
             let use_text = match n {
-                0 => "unused".to_string(),
-                1 => "1 object".to_string(),
-                n => format!("{n} objects"),
+                0 => tr("unused").to_string(),
+                1 => tr("1 object").to_string(),
+                n => crate::i18n::fill("{} objects", &[&n]),
             };
             let r = ui
                 .selectable_label(current == Some(t.id), use_text)

@@ -90,7 +90,7 @@ fn thread_picker(ui: &mut egui::Ui, st: &mut AppState, ids: &[ObjectId]) {
             ui.painter().rect_filled(r, 2.0, color32(t.color));
         }
         egui::ComboBox::from_id_salt("thread")
-            .selected_text(current.map(|t| t.name.clone()).unwrap_or_else(|| "(mixed)".into()))
+            .selected_text(current.map(|t| t.name.clone()).unwrap_or_else(|| tr("(mixed)").into()))
             .show_ui(ui, |ui| {
                 for t in &threads {
                     if ui
@@ -1145,7 +1145,8 @@ fn transform_section(ui: &mut egui::Ui, st: &mut AppState, ids: &[ObjectId]) {
             }
         }
     });
-    ui.horizontal(|ui| {
+    // The row can be wider than a narrow panel: it goes on in a new line.
+    ui.horizontal_wrapped(|ui| {
         ui.label(tr("Mirror"));
         if ui.small_button(tr("↔ Left-right")).clicked() {
             st.mirror_selection(true);

@@ -304,7 +304,10 @@ fn details(ui: &mut egui::Ui, st: &mut AppState) {
         let n = st.use_font_for_selection(&sel);
         st.message = crate::i18n::fill(
             "{} uses {}.",
-            &[&(if n == 1 { "1 object" } else { "The objects" }), &(sel.label())],
+            &[
+                &(if n == 1 { tr("1 object") } else { tr("The objects") }),
+                &(sel.label()),
+            ],
         );
     }
     if sel.kind == FontKind::TrueType {

@@ -125,7 +125,7 @@ impl AppState {
 
     /// The name of the fabric of the design, or "Not set".
     pub fn fabric_name(&self) -> String {
-        self.fabrics.of(self.doc.design()).name
+        tr(&self.fabrics.of(self.doc.design()).name).to_string()
     }
 
     /// Sets the fabric as one undo step. With `objects`, the satin and fill
@@ -366,7 +366,8 @@ impl AppState {
 
 /// One line of the current properties.
 fn current_line(ui: &mut egui::Ui, kind: &str, text: String) {
-    ui.horizontal(|ui| {
+    // A long line goes on in a new line in a narrow panel.
+    ui.horizontal_wrapped(|ui| {
         ui.label(egui::RichText::new(kind).strong());
         ui.label(text);
     });
@@ -688,16 +689,16 @@ fn fabric_window(ctx: &egui::Context, st: &mut AppState) {
             .unwrap_or_else(Fabric::base);
         egui::ComboBox::from_label(tr("Fabric"))
             .width(260.0)
-            .selected_text(&to.name)
+            .selected_text(tr(&to.name))
             .show_ui(ui, |ui| {
                 ui.selectable_value(&mut dlg.choice, None, tr("Not set (base settings)"));
                 for f in &st.fabrics.fabrics {
-                    ui.selectable_value(&mut dlg.choice, Some(f.id.clone()), &f.name)
-                        .on_hover_text(&f.description);
+                    ui.selectable_value(&mut dlg.choice, Some(f.id.clone()), tr(&f.name))
+                        .on_hover_text(tr(&f.description));
                 }
             });
         if !to.description.is_empty() {
-            ui.label(&to.description);
+            ui.label(tr(&to.description));
         }
         egui::Grid::new("fabric_grid")
             .num_columns(2)
