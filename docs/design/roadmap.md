@@ -42,6 +42,7 @@ Sizes are relative effort: S (days), M (one to two weeks), L (a month), XL (seve
 | 12. Picture to design: robust and better results | Done in software: Milestones 1 (photo orientation, previews in the background, true width for Auto, the picture bench; ADR 0052), 2 (details on top, fill angles, small areas, checks before Finish; ADR 0053) and 3 (line art, edge-preserving smoothing, colors from the thread chart; ADR 0054). The exit tests passed (a phone photo, a logo and a drawing sewn on the Topaz 20; owner, 2026-11-16); audit in "Audit of P11 and P12". See `docs/design/p12-plan.md`. |
 | 13. Shop tools | Done in software (owner request, 2026-10-27): Milestones 1 (quotes and run time on machines with more heads, ADR 0064), 2 (order details on the sheets, ADR 0065), 3 (thread stock and threads to buy, ADR 0066) and 4 (scripts, ADR 0067). Open: the exit tests with a shop tester (real orders, a printed sheet and its barcode, the spools to buy). See `docs/design/p13-plan.md`. |
 | 14. Sketch mode | Done (owner request, 2026-10-27): Milestones 1 (sketch model and constraint solver, ADR 0068), 2 (sketch mode in the app, ADR 0069), 3 (drawing help and sketch edits, ADR 0070), 4 (regions to embroidery, ADR 0075), 5 (objects that follow their sketch, ADR 0076) and 6 (parameters, splines and drawings to sketches, ADR 0078 and 0079). The owner's test in the app and the badge sew-outs on the Topaz 20 passed (owner, 2026-11-16). See `docs/design/p14-plan.md`. |
+| 16. Product view | Done in software (owner request, 2026-11-17): Milestones 1 (a realistic look, ADR 0101), 2 (other designs on the product, ADR 0102), 3 (front and back, ADR 0103), 4 (the product on the approval sheet, ADR 0104), 5 (better products, ADR 0105), 6 (two-tone products and swatches, ADR 0106), 7 (photos of the user's products, ADR 0107) and 8 (turntable view, ADR 0108); audit in "Audit of P16". Open: the exit tests of the eight milestones (owner, at the end of the phase). See `docs/design/product-plan.md`. |
 | 15. Browser version | Later (owner decision, 2026-11-16): not started. Start after the first feedback of users on the desktop program (about v0.4). See "P15. Browser version" below. |
 
 ## Sew-out tests of 2026-11-16
@@ -68,6 +69,91 @@ The audit of Stages 1 to 6 and the IP review of the release (the rules of the re
 - Docs: the README has the v0.3 features, the upgrade and start notes and a repaired install table; the spec has the machine library and a roadmap row for this work.
 - Open: the start test on the PC of the owner's friends. Passed (owner, 2026-11-16): endless pan with a real mouse, the My Machines window. The installer removes the older version before it asks to close a running ShokujoDX, so a Cancel at that question leaves no version installed (install again to fix).
 
+
+## Audit of P16 (2026-11-18)
+
+After Milestones 1 to 8 of the product view, a check of the code and the
+documents of the phase: a probe with wrong values in the product of a
+project file, a review of the code, the rules of the spec, the
+translations, the licenses and the help.
+
+**Fixed.**
+
+- **Wrong values in the product of a project made pictures of
+  gigabytes.** A probe (`product_probe.rs`) set each number of the
+  product of two projects in turn to wrong values (decimals 0, −5, 10⁻⁹
+  and 10⁹; whole numbers 0, 100 000 and 10⁹), opened the project and
+  made the product pictures, the approval sheet pictures and the
+  turntable body in a thread with a time limit. The project check did
+  not look at the product at all. A photo width of 10⁹ mm made a
+  picture of 268 million pixels (1 GB); a mask of 10⁹ rows took more
+  than 20 s and a mask of 10⁹ columns 15.6 s (a grid of a billion
+  cells). Now `project::validate` checks the product: its place, the
+  real width of a photo (1 mm to 10 m), the mask (at most 1024 cells on
+  a side), the places on the photo, and the place and the contents of
+  each other design. After the change: 252 cases, 64 refused as wrong
+  files, no crash, no hang and no picture of more than 60 million
+  pixels.
+- **A design far from the product made a huge picture.** The picture of
+  the design on the product took in all the stitches, so another design
+  placed far away (allowed up to 1 km) made the picture as large as the
+  pixel limit (16 384 pixels a side, 1 GB). Now stitches more than 1 m
+  from the product do not make the picture larger
+  (`product::decoration_area`), and the sides of the turntable show the
+  product only (`product::turn_area`).
+- **The turntable made the stitch plan at each step of a drag.** With the
+  Turntable window open, each change of the design (each frame of a drag)
+  made the exact stitch plan on the window thread and started a new job.
+  Now the views are made again when the design stays the same for
+  0.3 s; the old views show until then.
+- The back of the hoodie showed the hood flat on the back, over the place
+  of a back print (owner, 2026-11-18); the hood now stands as at the
+  front, and the back has the usual places.
+
+**Left as it is.**
+
+- At an angle, the cloth at the far edge of a part of the turntable body
+  is stretched (the soft body has a steep side); a beanie shows it most
+  (ADR 0108).
+- The turntable shows in its own window; the canvas stays flat, as for
+  the curve of a cap (ADR 0105, 0108).
+- A photo of a product cannot turn, and a photo of a dark product does
+  not take a light color well (ADR 0107).
+- A color drag on a masked photo makes the canvas picture again (25 ms
+  for a photo of 2048 × 1536 pixels, then the texture).
+- **Save in My Products** replaces a template of the same name with no
+  question.
+
+**Checked, no change.**
+
+- Rules 3 and 9: the products are drawn in code and the photos are the
+  user's; no names of closed-source programs in the changes of the phase;
+  no `unsafe` code, no new dependency (`Cargo.lock` did not change); the
+  trig functions of the engine code go through `emb_geom::math`.
+- Translations: the 3906 texts of the template are in German, Spanish
+  and Japanese, none missing and none extra. The help topic
+  `checking.md` and its three translations describe each milestone, and
+  F1 opens it from the Product, Product Photo and Turntable windows.
+- ADRs 0101 to 0108; the plan, the inventory, the spec and `CLAUDE.md`
+  name each part of the phase.
+- Two-tone products add at most 3 ms to the canvas picture of a product;
+  the 24 views show one by one as the background job makes them.
+
+**Exit tests that are open.** The owner checks them at the end of the
+phase; the software parts passed (each milestone has its tests, and the
+pictures of `write_products`, `write_photo_colors` and
+`write_turntables` were checked).
+
+| Milestone | Exit test | State |
+| --- | --- | --- |
+| 1 | The products look like cloth in light and dark colors; a color drag on the canvas stays smooth | Open (owner) |
+| 2 | A polo with a left chest logo and a sleeve name, saved as one picture | Open (owner) |
+| 3 | A T-shirt with a chest logo and a back print in one picture | Open (owner) |
+| 4 | An approval PDF with the product page opens in a PDF reader and prints on A4 and Letter | Open (owner; the PDF structure test passes) |
+| 5 | Each product looks right; a test design at each placement is on the product | Open (owner; the placement test passes for the 17 sides) |
+| 6 | A navy cap with a white front and a gray polo with a black collar | Open (owner; the pictures were made) |
+| 7 | A photo of a real shirt of the owner, saved as a template, shows a design at its left chest in three colors | Open (owner) |
+| 8 | A T-shirt with a chest logo and a back print turns in steps on a PC with the software renderer and saves as a GIF | Open (owner) |
 
 ## Owner requests of 2026-10-22
 
@@ -920,7 +1006,7 @@ browser sews on the Topaz 20; the page works offline after the first
 visit. With step 3: a name on a towel is made on a tablet from start to
 machine file.
 
-### P16. Product view (M) — Milestones 1 to 8 done (exit tests: owner) (`docs/design/product-plan.md`)
+### P16. Product view (M) — done in software, exit tests open (audit: "Audit of P16") (`docs/design/product-plan.md`)
 
 The product under the design (P7 Milestone 5) good enough to show to a
 customer (owner, 2026-11-17), in eight milestones: a realistic look

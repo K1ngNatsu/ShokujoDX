@@ -36,8 +36,9 @@ garments of other companies go in the repository.
   light from the top left in front shades the turned surfaces; a surface
   that faces the viewer is as bright as in its flat picture. A view is
   made at twice its size and made smaller, for smooth edges.
-- **Steps made before.** When the design or the product changes, a
-  background job (`emb-app/src/turntable.rs`) makes the 24 views (15°
+- **Steps made before.** When the design or the product changes (and
+  then stays the same for 0.3 s, so a drag does not start a job at each
+  step), a background job (`emb-app/src/turntable.rs`) makes the 24 views (15°
   apart), the front first. A turn shows a finished view only, so it is
   fast with the software renderer too. The views show in the
   **Turntable** window (Design > Turntable); the canvas stays flat,

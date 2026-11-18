@@ -143,6 +143,9 @@ fn validate(design: &Design) -> Result<(), ModelError> {
             return Err(invalid(text::fill("object {} is out of range", &[&o.id.0])));
         }
     }
+    if let Some(v) = &design.product {
+        validate_product(v).map_err(invalid)?;
+    }
     if !design.colorways.is_empty() && design.colorway >= design.colorways.len() {
         return Err(invalid(text::fill(
             "colorway {} does not exist (the design has {})",
@@ -151,6 +154,49 @@ fn validate(design: &Design) -> Result<(), ModelError> {
     }
     Ok(())
 }
+
+/// Checks the product of a design (P16): the places in range, a photo of
+/// a real width with a mask of at most `PhotoMask::MAX_SIDE` cells on a
+/// side, and each other design.
+fn validate_product(v: &crate::ProductView) -> Result<(), String> {
+    let far = |p: emb_geom::Point| {
+        !p.x.is_finite() || !p.y.is_finite() || p.x.abs() > MAX_COORD_MM || p.y.abs() > MAX_COORD_MM
+    };
+    let size = |s: (f64, f64)| {
+        s.0.is_finite() && s.1.is_finite() && s.0 >= 0.0 && s.1 >= 0.0 && s.0.max(s.1) <= MAX_PRODUCT_MM
+    };
+    if far(v.origin) {
+        return Err(text::tr("the product is out of range").into());
+    }
+    if let Some(p) = &v.picture {
+        if !(p.width_mm.is_finite()
+            && p.width_mm >= 1.0
+            && p.width_mm <= MAX_PRODUCT_MM
+            && p.height_mm() <= MAX_PRODUCT_MM)
+        {
+            return Err(text::tr("the photo of the product has no real width").into());
+        }
+        if let Some(m) = &p.mask
+            && (!(1..=crate::PhotoMask::MAX_SIDE).contains(&m.width)
+                || !(1..=crate::PhotoMask::MAX_SIDE).contains(&m.height))
+        {
+            return Err(text::tr("the mask of the photo is too large").into());
+        }
+        if p.placements.iter().any(|q| far(q.at) || !size(q.max)) {
+            return Err(text::tr("a place on the photo is out of range").into());
+        }
+    }
+    for e in &v.extras {
+        if far(e.at) {
+            return Err(text::fill("the design {} on the product is out of range", &[&e.name]));
+        }
+        validate(&e.design).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// The largest product or photo of a product (mm).
+const MAX_PRODUCT_MM: f64 = 10_000.0;
 
 #[cfg(test)]
 mod tests {
@@ -334,6 +380,48 @@ mod tests {
         let s = to_string(&d);
         assert!(s.contains("\"type\": \"stitches\""), "{s}");
         assert!(from_str(&s).unwrap().same_content(&d));
+    }
+
+    #[test]
+    fn a_product_with_wrong_values_is_refused() {
+        // From the probe of the P16 audit: each of these made a picture of
+        // gigabytes or a mask of a billion cells.
+        let photo = |d: &mut Design, f: &dyn Fn(&mut crate::ProductPicture)| {
+            let mut v = crate::ProductView::new(crate::ProductKind::TShirt, Rgb(250, 250, 250));
+            let mut p = crate::ProductPicture {
+                name: "shirt.png".into(),
+                data: std::sync::Arc::new(vec![1, 2, 3]),
+                pixels: (400, 300),
+                width_mm: 500.0,
+                mask: Some(crate::PhotoMask::from_cells(4, 3, &[true; 12])),
+                placements: Vec::new(),
+            };
+            f(&mut p);
+            v.picture = Some(p);
+            d.product = Some(v);
+        };
+        let mut d = Design::new("p");
+        photo(&mut d, &|_| {});
+        assert!(from_str(&to_string(&d)).is_ok());
+        for bad in [
+            &(|p: &mut crate::ProductPicture| p.width_mm = 1e9) as &dyn Fn(&mut crate::ProductPicture),
+            &|p| p.width_mm = 0.0,
+            &|p| p.mask = Some(crate::PhotoMask::from_cells(100_000, 1, &[])),
+            &|p| {
+                p.placements.push(crate::PhotoPlacement {
+                    name: "x".into(),
+                    at: Point::new(0.0, 0.0),
+                    max: (-1.0, 5.0),
+                })
+            },
+        ] {
+            photo(&mut d, bad);
+            assert!(from_str(&to_string(&d)).is_err());
+        }
+        let mut v = crate::ProductView::new(crate::ProductKind::TShirt, Rgb(250, 250, 250));
+        v.origin = Point::new(f64::NAN, 0.0);
+        d.product = Some(v);
+        assert!(from_str(&to_string(&d).replace("NaN", "1e300")).is_err());
     }
 
     #[test]

@@ -639,14 +639,14 @@ impl AppState {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use emb_model::Rgb;
 
     use super::*;
     use crate::test_util::Harness;
 
     /// A PNG of a white shirt (with a darker fold) on a blue background.
-    fn shirt_png() -> Vec<u8> {
+    pub(crate) fn shirt_png() -> Vec<u8> {
         let img = image::RgbaImage::from_fn(80, 60, |x, y| {
             if (16..64).contains(&x) && (10..50).contains(&y) {
                 let v = if x == 40 { 170 } else { 235 };

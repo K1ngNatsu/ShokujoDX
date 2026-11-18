@@ -49,3 +49,6 @@ the photo a product of its own.
   little light and shade); the help says that one photo of a white
   product shows the product in each color.
 - Older projects open with no mask and no places.
+- The project check refuses a photo with no real width (1 mm to 10 m), a
+  mask of more than 1024 cells on a side, and places out of range (audit
+  of P16).

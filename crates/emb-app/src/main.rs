@@ -71,6 +71,8 @@ mod player;
 mod preview;
 mod product;
 mod product_photo;
+#[cfg(test)]
+mod product_probe;
 mod quilting;
 mod quote;
 mod repeats;

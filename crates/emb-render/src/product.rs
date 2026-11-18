@@ -528,10 +528,21 @@ fn embroidery_shadow(
     }
 }
 
+/// Stitches farther than this from the product do not make the picture
+/// of the design on the product larger (mm): a design far away (a wrong
+/// value in a file) must not make a picture of gigabytes.
+const DECORATION_REACH_MM: f64 = 1000.0;
+
 /// The area (view mm) that [`decoration`] shows: the product and the
-/// stitches, with 10 mm round them.
+/// stitches (to [`DECORATION_REACH_MM`] round the product), with 10 mm
+/// round them.
 pub fn decoration_area(view: &ProductView, segments: &[Segment]) -> BBox {
-    let stitches = BBox::from_points(segments.iter().flat_map(|s| [s.a, s.b]));
+    let reach = view.bbox().expand(DECORATION_REACH_MM);
+    let stitches = BBox::from_points(segments.iter().flat_map(|s| [s.a, s.b])).and_then(|s| {
+        let min = Point::new(s.min.x.max(reach.min.x), s.min.y.max(reach.min.y));
+        let max = Point::new(s.max.x.min(reach.max.x), s.max.y.min(reach.max.y));
+        (min.x <= max.x && min.y <= max.y).then(|| BBox::new(min, max))
+    });
     [Some(view.bbox()), stitches]
         .into_iter()
         .flatten()
@@ -558,8 +569,17 @@ pub fn decoration(
 /// As [`decoration`] for a side of the turntable view (P16 Milestone 8):
 /// the edges of the product are not round and not darker, and the picture
 /// is clear (not white) round the product.
+///
+/// The picture shows [`turn_area`] only: stitches out of the product are
+/// not on the body.
 pub fn turn_side(view: &ProductView, segments: &[Segment], px_per_mm: f64, thread_mm: f64, look: &Look) -> Picture {
     decoration_with(view, None, segments, px_per_mm, thread_mm, look, false)
+}
+
+/// The area (view mm) of a picture of [`turn_side`]: the product with
+/// 10 mm round it.
+pub fn turn_area(view: &ProductView) -> BBox {
+    view.bbox().expand(10.0)
 }
 
 fn decoration_with(
@@ -571,7 +591,11 @@ fn decoration_with(
     look: &Look,
     round: bool,
 ) -> Picture {
-    let b = decoration_area(view, segments);
+    let b = if round {
+        decoration_area(view, segments)
+    } else {
+        turn_area(view)
+    };
     let white = Some(Rgb(255, 255, 255));
     let lighting = look.lighting.unwrap_or_default();
     let mut pic = match (&view.picture, photo) {
@@ -776,6 +800,19 @@ mod tests {
                 assert!(areas(&two).len() > areas(&plain).len(), "{kind:?} shows no trim");
             }
         }
+    }
+
+    #[test]
+    fn a_design_far_away_does_not_make_a_huge_picture() {
+        let v = ProductView::new(ProductKind::Tote, Rgb(240, 230, 200));
+        let far = Segment {
+            a: Point::new(900_000.0, 0.0),
+            b: Point::new(900_010.0, 0.0),
+            color: Rgb(0, 0, 200),
+            kind: SegmentKind::Stitch,
+        };
+        let b = decoration_area(&v, &[far]);
+        assert!(b.width() <= v.bbox().width() + 2020.0, "{b:?}");
     }
 
     #[test]

@@ -31,11 +31,14 @@ const VIEW_SIDE: f64 = 720.0;
 const MAX_PX_PER_MM: f64 = 2.5;
 /// The time between two views when the turn plays, and in the GIF (ms).
 const PLAY_MS: u64 = 150;
+/// After a change, the views are made again when the design stays the
+/// same for this long (a drag makes many changes).
+const SETTLE: std::time::Duration = std::time::Duration::from_millis(300);
 /// The views of the strip: front, a quarter turn, the back quarter, back.
 const STRIP: [usize; 4] = [0, 3, 9, 12];
 
 /// A message of the job that makes the views.
-enum Msg {
+pub(crate) enum Msg {
     View(usize, Picture),
 }
 
@@ -60,6 +63,9 @@ pub struct TurntableUi {
     last_tick: f64,
     /// The design state that the views show.
     state: Option<u64>,
+    /// A newer design state and when it came (the views wait for it to
+    /// settle).
+    changed: Option<(u64, std::time::Instant)>,
     views: Vec<Option<Arc<Picture>>>,
     job: Option<Job>,
     texture: Option<(usize, TextureHandle)>,
@@ -96,7 +102,7 @@ fn view_px(kind: ProductKind) -> f64 {
 
 /// Makes the views of the product of `design` (with the stitches of `plan`)
 /// and sends each one when it is finished. It stops when `stop` is set.
-fn make_views(
+pub(crate) fn make_views(
     design: &Design,
     plan: &emb_stitch::StitchPlan,
     machines: &emb_model::MachineCatalog,
@@ -140,7 +146,7 @@ fn make_views(
             kind: front_kind.on(side),
             ..v.clone()
         };
-        let area = emb_render::product::decoration_area(&view, &segments);
+        let area = emb_render::product::turn_area(&view);
         let pic = emb_render::product::turn_side(&view, &segments, fine, crate::product::THREAD_MM, look);
         (pic, area)
     };
@@ -205,7 +211,18 @@ impl AppState {
     /// changed.
     fn poll_turntable(&mut self) {
         let state = self.doc.state_id();
-        if self.turntable.state != Some(state) {
+        let first = self.turntable.state.is_none();
+        let settled = self
+            .turntable
+            .changed
+            .is_some_and(|(s, t)| s == state && t.elapsed() >= SETTLE);
+        if self.turntable.state != Some(state) && !first && !settled {
+            // The old views show until the design stays the same.
+            if self.turntable.changed.is_none_or(|(s, _)| s != state) {
+                self.turntable.changed = Some((state, std::time::Instant::now()));
+            }
+        } else if self.turntable.state != Some(state) {
+            self.turntable.changed = None;
             self.turntable.job = None;
             self.turntable.views = vec![None; STEPS];
             self.turntable.texture = None;
@@ -322,10 +339,15 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         // No job runs while the window is closed.
         st.turntable.job = None;
         st.turntable.state = None;
+        st.turntable.changed = None;
         return;
     }
     st.poll_turntable();
-    if st.turntable.job.is_some() || st.turntable.playing || st.turntable.saving.is_some() {
+    if st.turntable.job.is_some()
+        || st.turntable.changed.is_some()
+        || st.turntable.playing
+        || st.turntable.saving.is_some()
+    {
         ctx.request_repaint_after(std::time::Duration::from_millis(50));
     }
     let mut open = true;
@@ -559,10 +581,20 @@ mod tests {
         }
         assert_eq!(h.st.turntable.ready(), STEPS);
         assert_eq!(h.st.doc.state_id(), state);
-        // A change of the design makes the views again.
+        // A change of the design makes the views again when it settles;
+        // the old views show until then.
         h.st.edit_product("Color", None, |v| v.color = Rgb(200, 30, 40));
+        let new = h.st.doc.state_id();
         let mut out = ctx.run_ui(Default::default(), |ui| window(ui.ctx(), &mut h.st));
         out.textures_delta.clear();
+        assert_eq!(h.st.turntable.ready(), STEPS);
+        let start = std::time::Instant::now();
+        while h.st.turntable.state != Some(new) && start.elapsed().as_secs() < 5 {
+            let mut out = ctx.run_ui(Default::default(), |ui| window(ui.ctx(), &mut h.st));
+            out.textures_delta.clear();
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        assert_eq!(h.st.turntable.state, Some(new));
         assert!(h.st.turntable.ready() < STEPS);
     }
 }
