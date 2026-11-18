@@ -32,6 +32,13 @@ pub enum ProductKind {
     Cushion,
     PoloBack,
     SweatshirtBack,
+    LongSleeve,
+    LongSleeveBack,
+    Hoodie,
+    HoodieBack,
+    Apron,
+    Beanie,
+    Messenger,
 }
 
 /// A side of a product: a garment has a front and a back (P16 Milestone 3).
@@ -416,28 +423,504 @@ fn armholes(s: (f64, f64), u: (f64, f64)) -> [Path; 2] {
     [seam(1.0), seam(-1.0)]
 }
 
+/// The point at `k` (0 to 1) of the way from `a` to `z`.
+fn at(a: (f64, f64), z: (f64, f64), k: f64) -> (f64, f64) {
+    (a.0 + (z.0 - a.0) * k, a.1 + (z.1 - a.1) * k)
+}
+
+/// Creases across a long sleeve and their mirrors: the sleeve has the
+/// shoulder point `s`, the cuff points `t` (outside) and `b` (inside) and
+/// the underarm point `u`; each crease is at `k` of the sleeve length.
+fn sleeve_creases(
+    s: (f64, f64),
+    t: (f64, f64),
+    b: (f64, f64),
+    u: (f64, f64),
+    creases: &[(f64, f64)],
+) -> Vec<ProductPart> {
+    let mut v = Vec::new();
+    for &(k, h) in creases {
+        let (top, under) = (at(s, t, k), at(u, b, k));
+        v.extend(folds_both(&[at(under, top, 0.08), at(top, under, 0.08)], 12.0, h));
+    }
+    v
+}
+
+/// A long-sleeve fleece top with rib cuffs and a waist rib (sweatshirt,
+/// hoodie), adult M laid flat: the sleeves go down at 48°, 140 mm wide at
+/// the arm and 100 mm at the rib cuff; the waist rib pulls the hem in. A
+/// hoodie has a hood in place of the neck rib.
+fn fleece_top(back: bool, hood: bool) -> Vec<ProductPart> {
+    use ProductPart::{Area, Line};
+    use Seg::*;
+    let rib = 2.0;
+    let neck = if back { 22.0 } else { 90.0 };
+    let (s, t, b, u) = ((240.0, 55.0), (635.0, 493.0), (561.0, 560.0), (272.0, 300.0));
+    let body = symmetric(
+        (0.0, neck),
+        &[
+            C(50.0, neck, 95.0, neck * 0.5, 95.0, 0.0),
+            L(s.0, s.1),
+            L(t.0, t.1),
+            L(b.0, b.1),
+            L(u.0, u.1),
+            L(266.0, 660.0),
+            L(254.0, 722.0),
+            C(170.0, 725.0, 90.0, 726.0, 0.0, 726.0),
+        ],
+    );
+    let mut v = vec![Area(body, Shade::Body)];
+    match (back, hood) {
+        (false, false) => {
+            v.push(Area(inside_neck(95.0, 90.0, 22.0), Shade::Dark));
+            v.push(Line(neck_line(117.0, 112.0), rib));
+        }
+        (true, false) => v.push(Line(neck_line(117.0, 44.0), rib)),
+        (false, true) => v.extend(hood_front()),
+        (true, true) => v.extend(hood_back()),
+    }
+    // The cuff ribs (60 mm), the armhole seams and the waist rib.
+    for p in both(&[(599.0, 445.0), (517.0, 518.0)]) {
+        v.push(Line(p, rib));
+    }
+    for p in armholes(s, u) {
+        v.push(Line(p, 1.5));
+    }
+    v.push(Line(line(&[(-280.0, 660.0), (280.0, 660.0)]), rib));
+    // A pocket across the front of a hoodie.
+    if hood && !back {
+        let pocket = symmetric(
+            (0.0, 430.0),
+            &[L(140.0, 430.0), L(205.0, 525.0), L(205.0, 630.0), L(0.0, 630.0)],
+        );
+        v.push(Area(pocket.clone(), Shade::Body));
+        v.push(Line(pocket, rib));
+        // The openings of the pocket have a shadow.
+        v.extend(folds_both(
+            &[(146.0, 440.0), (172.0, 478.0), (198.0, 516.0)],
+            10.0,
+            -1.4,
+        ));
+        v.push(fold(&[(-180.0, 600.0), (0.0, 612.0), (180.0, 600.0)], 18.0, -0.7));
+    }
+    // Drape from the arms, creases across the sleeves at the elbows and
+    // above the cuffs, and soft folds above the waist rib.
+    v.extend(folds_both(
+        &[(266.0, 310.0), (226.0, 385.0), (198.0, 470.0)],
+        22.0,
+        -1.6,
+    ));
+    v.extend(folds_both(
+        &[(245.0, 480.0), (242.0, 560.0), (250.0, 640.0)],
+        22.0,
+        -1.0,
+    ));
+    v.extend(sleeve_creases(
+        s,
+        t,
+        b,
+        u,
+        &[(0.42, -1.2), (0.48, 1.0), (0.54, -1.0), (0.8, -0.9), (0.85, 0.8)],
+    ));
+    v.push(fold(&[(-200.0, 615.0), (-80.0, 632.0), (60.0, 625.0)], 24.0, 1.0));
+    v.push(fold(&[(90.0, 640.0), (200.0, 630.0)], 16.0, -0.8));
+    v
+}
+
+/// The hood of a hoodie seen from the front: it lies behind the neck and
+/// shows its lining, and its drawstrings hang down.
+fn hood_front() -> Vec<ProductPart> {
+    use ProductPart::{Area, Line};
+    use Seg::*;
+    let p = Point::new;
+    // The hood behind the neck, and in the neck opening.
+    let hood = Path::new()
+        .move_to(p(-120.0, 9.5))
+        .cubic_to(p(-132.0, -45.0), p(-80.0, -88.0), p(0.0, -88.0))
+        .cubic_to(p(80.0, -88.0), p(132.0, -45.0), p(120.0, 9.5))
+        .line_to(p(95.0, 0.0))
+        .cubic_to(p(95.0, 45.0), p(50.0, 90.0), p(0.0, 90.0))
+        .cubic_to(p(-50.0, 90.0), p(-95.0, 45.0), p(-95.0, 0.0))
+        .close();
+    let lining = symmetric(
+        (0.0, -62.0),
+        &[
+            C(55.0, -62.0, 88.0, -30.0, 82.0, 20.0),
+            C(72.0, 50.0, 26.0, 74.0, 0.0, 82.0),
+        ],
+    );
+    let mut v = vec![
+        Area(hood.clone(), Shade::Body),
+        Line(hood, 1.5),
+        Area(lining.clone(), Shade::Dark),
+        Line(lining, 2.0),
+    ];
+    // The hood edge rolls a little.
+    v.push(fold(
+        &[(-86.0, 10.0), (-70.0, -45.0), (0.0, -68.0), (70.0, -45.0), (86.0, 10.0)],
+        14.0,
+        1.4,
+    ));
+    // The drawstrings, with their ends.
+    for m in [-1.0, 1.0] {
+        let string =
+            Path::new()
+                .move_to(p(m * 22.0, 76.0))
+                .cubic_to(p(m * 24.0, 130.0), p(m * 30.0, 190.0), p(m * 28.0, 245.0));
+        v.push(Line(string, 3.0));
+        v.push(Area(
+            Path::rect(BBox::new(p(m * 28.0 - 2.5, 240.0), p(m * 28.0 + 2.5, 258.0))),
+            Shade::Dark,
+        ));
+        v.push(Area(circle(m * 22.0, 76.0, 3.5), Shade::Dark));
+    }
+    v
+}
+
+/// The hood of a hoodie seen from the back: it lies on the back.
+fn hood_back() -> Vec<ProductPart> {
+    use ProductPart::{Area, Line};
+    let p = Point::new;
+    let hood = Path::new()
+        .move_to(p(-120.0, 9.5))
+        .cubic_to(p(-152.0, 80.0), p(-150.0, 225.0), p(-62.0, 300.0))
+        .cubic_to(p(-32.0, 326.0), p(32.0, 326.0), p(62.0, 300.0))
+        .cubic_to(p(150.0, 225.0), p(152.0, 80.0), p(120.0, 9.5))
+        .line_to(p(95.0, 0.0))
+        .cubic_to(p(60.0, -6.0), p(-60.0, -6.0), p(-95.0, 0.0))
+        .close();
+    vec![
+        Area(hood.clone(), Shade::Body),
+        Line(hood, 2.0),
+        // The seam down the middle of the hood.
+        Line(line(&[(0.0, -4.0), (0.0, 318.0)]), 1.5),
+        fold(&[(-120.0, 40.0), (-128.0, 160.0), (-70.0, 280.0)], 26.0, 1.6),
+        fold(&[(120.0, 40.0), (128.0, 160.0), (70.0, 280.0)], 26.0, 1.6),
+        // The hood throws a shadow on the back under its edge.
+        fold(
+            &[
+                (-140.0, 230.0),
+                (-70.0, 318.0),
+                (0.0, 334.0),
+                (70.0, 318.0),
+                (140.0, 230.0),
+            ],
+            12.0,
+            -1.6,
+        ),
+    ]
+}
+
+/// A long-sleeve T-shirt (front or back), adult M laid flat: the body of
+/// the T-shirt, sleeves at 48° that narrow to 90 mm, and a hem at the cuff.
+fn long_tee(back: bool) -> Vec<ProductPart> {
+    use ProductPart::{Area, Line};
+    use Seg::*;
+    let rib = 2.0;
+    let neck = if back { 22.0 } else { 95.0 };
+    let w = 95.0;
+    let (s, t, b, u) = (SHOULDER, (631.0, 494.0), (564.0, 554.0), UNDERARM);
+    let body = symmetric(
+        (0.0, neck),
+        &[
+            C(w * 0.53, neck, w, neck * 0.5, w, 0.0),
+            L(s.0, s.1),
+            L(t.0, t.1),
+            L(b.0, b.1),
+            L(u.0, u.1),
+            C(259.0, 400.0, 257.0, 560.0, 264.0, 715.0),
+            C(180.0, 722.0, 90.0, 725.0, 0.0, 725.0),
+        ],
+    );
+    let mut v = vec![Area(body, Shade::Body)];
+    if back {
+        v.push(Line(neck_line(113.0, 42.0), rib));
+    } else {
+        v.push(Area(inside_neck(95.0, 95.0, 22.0), Shade::Dark));
+        v.push(Line(neck_line(113.0, 113.0), rib));
+    }
+    // The cuff hems (25 mm), the armhole seams and the hem.
+    for p in both(&[(618.0, 471.0), (543.0, 539.0)]) {
+        v.push(Line(p, rib));
+    }
+    for p in armholes(s, u) {
+        v.push(Line(p, 1.5));
+    }
+    v.push(Line(line(&[(-280.0, 690.0), (280.0, 690.0)]), rib));
+    v.extend(folds_both(
+        &[(256.0, 268.0), (222.0, 345.0), (192.0, 445.0)],
+        22.0,
+        -1.6,
+    ));
+    v.extend(folds_both(
+        &[(245.0, 470.0), (240.0, 580.0), (248.0, 680.0)],
+        24.0,
+        -1.0,
+    ));
+    v.extend(sleeve_creases(
+        s,
+        t,
+        b,
+        u,
+        &[(0.4, -1.0), (0.46, 0.9), (0.52, -1.0), (0.84, -0.8), (0.89, 0.7)],
+    ));
+    v.push(fold(&[(-210.0, 575.0), (-90.0, 598.0), (40.0, 588.0)], 30.0, 1.2));
+    v.push(fold(&[(70.0, 630.0), (160.0, 618.0), (225.0, 600.0)], 22.0, -1.0));
+    v
+}
+
+/// A six-panel cap from the front, a little from above: the crown with the
+/// two front panels and the side seams up to the button, the eyelets, and
+/// the curved brim with its rows of stitches. The origin is the middle of
+/// the line where the brim meets the crown.
+fn cap() -> Vec<ProductPart> {
+    use ProductPart::{Area, Line};
+    use Seg::*;
+    let p = Point::new;
+    let crown = symmetric(
+        (0.0, -128.0),
+        &[
+            C(55.0, -128.0, 98.0, -102.0, 104.0, -48.0),
+            C(106.0, -28.0, 106.0, -10.0, 104.0, 10.0),
+            L(0.0, 10.0),
+        ],
+    );
+    let brim = symmetric(
+        (0.0, 4.0),
+        &[
+            C(50.0, 4.0, 90.0, 0.0, 102.0, -2.0),
+            C(111.0, 2.0, 115.0, 10.0, 113.0, 20.0),
+            C(104.0, 44.0, 64.0, 58.0, 0.0, 60.0),
+        ],
+    );
+    let mut v = vec![
+        Area(crown, Shade::Body),
+        // The front seam and the side seams from the button to the brim.
+        Line(line(&[(0.0, -126.0), (0.0, 4.0)]), 1.5),
+    ];
+    for m in [-1.0, 1.0] {
+        let seam =
+            Path::new()
+                .move_to(p(0.0, -126.0))
+                .cubic_to(p(m * 42.0, -118.0), p(m * 68.0, -72.0), p(m * 74.0, 3.0));
+        v.push(Line(seam, 1.5));
+        v.push(Area(circle(m * 40.0, -100.0, 3.5), Shade::Dark));
+        // The panels are a little round between the seams.
+        v.push(fold(
+            &[(m * 26.0, -100.0), (m * 36.0, -55.0), (m * 38.0, -10.0)],
+            40.0,
+            1.2,
+        ));
+        v.push(fold(
+            &[(m * 88.0, -80.0), (m * 94.0, -35.0), (m * 94.0, -5.0)],
+            24.0,
+            1.0,
+        ));
+    }
+    v.push(Area(brim.clone(), Shade::Body));
+    v.push(Line(brim, 1.5));
+    // Rows of stitches along the front edge of the brim: the edge moved in
+    // by 6 to 24 mm, square to it.
+    let edge = |t: f64| {
+        let (p0, p1, p2, p3) = ((113.0, 20.0), (104.0, 44.0), (64.0, 58.0), (0.0, 60.0));
+        let u = 1.0 - t;
+        let pt =
+            |a: f64, b: f64, c: f64, d: f64| u * u * u * a + 3.0 * u * u * t * b + 3.0 * u * t * t * c + t * t * t * d;
+        let dt = |a: f64, b: f64, c: f64, d: f64| 3.0 * (u * u * (b - a) + 2.0 * u * t * (c - b) + t * t * (d - c));
+        let (x, y) = (pt(p0.0, p1.0, p2.0, p3.0), pt(p0.1, p1.1, p2.1, p3.1));
+        let (dx, dy) = (dt(p0.0, p1.0, p2.0, p3.0), dt(p0.1, p1.1, p2.1, p3.1));
+        let len = (dx * dx + dy * dy).sqrt().max(1e-9);
+        // The edge goes to the left: inside is to its right (up).
+        ((x, y), (dy / len, -dx / len))
+    };
+    for d in [6.0, 12.0, 18.0, 24.0] {
+        // From a little in from the tip (where the edge turns) to the middle.
+        let half: Vec<(f64, f64)> = (0..=16)
+            .map(|i| {
+                let ((x, y), (nx, ny)) = edge(0.18 + 0.82 * f64::from(i) / 16.0);
+                (x - nx * d, y - ny * d)
+            })
+            .collect();
+        // From the left tip to the middle, then to the right tip.
+        let mut row: Vec<(f64, f64)> = half.iter().map(|&(x, y)| (-x, y)).collect();
+        row.extend(half.iter().rev().skip(1));
+        if row.len() > 1 {
+            v.push(Line(line(&row), 0.8));
+        }
+    }
+    // The brim is curved: lighter in the middle.
+    v.push(fold(&[(-95.0, 22.0), (0.0, 34.0), (95.0, 22.0)], 30.0, 2.0));
+    v.push(Area(circle(0.0, -127.0, 8.0), Shade::Dark));
+    v
+}
+
+/// A bib apron: the bib with its neck strap, the skirt with the ties at
+/// the waist and a pocket in two halves. The origin is the middle of the
+/// top edge of the bib.
+fn apron() -> Vec<ProductPart> {
+    use ProductPart::{Area, Line};
+    use Seg::*;
+    let p = Point::new;
+    let rib = 2.0;
+    let body = symmetric(
+        (0.0, 0.0),
+        &[
+            L(140.0, 0.0),
+            C(145.0, 90.0, 190.0, 190.0, 300.0, 250.0),
+            L(300.0, 860.0),
+            L(0.0, 860.0),
+        ],
+    );
+    let strap = Path::new()
+        .move_to(p(-122.0, 0.0))
+        .cubic_to(p(-122.0, -235.0), p(122.0, -235.0), p(122.0, 0.0));
+    let pocket = Path::rect(BBox::new(p(-230.0, 470.0), p(230.0, 650.0)));
+    let mut v = vec![
+        Area(body, Shade::Body),
+        Line(strap, 22.0),
+        Line(line(&[(-150.0, 18.0), (150.0, 18.0)]), rib),
+        Line(line(&[(-310.0, 262.0), (310.0, 262.0)]), rib),
+        Line(line(&[(-310.0, 840.0), (310.0, 840.0)]), rib),
+        Area(pocket.clone(), Shade::Body),
+        Line(pocket, rib),
+        Line(line(&[(0.0, 470.0), (0.0, 650.0)]), rib),
+    ];
+    for m in [-1.0, 1.0] {
+        let tie = Path::new().move_to(p(m * 296.0, 262.0)).cubic_to(
+            p(m * 360.0, 270.0),
+            p(m * 400.0, 300.0),
+            p(m * 410.0, 420.0),
+        );
+        v.push(Line(tie, 20.0));
+        // Soft folds down the skirt.
+        v.push(fold(
+            &[(m * 215.0, 300.0), (m * 222.0, 560.0), (m * 210.0, 830.0)],
+            40.0,
+            1.6,
+        ));
+        v.push(fold(
+            &[(m * 120.0, 680.0), (m * 128.0, 760.0), (m * 118.0, 835.0)],
+            26.0,
+            -1.2,
+        ));
+    }
+    // The pocket bulges a little.
+    v.push(fold(&[(-200.0, 645.0), (0.0, 655.0), (200.0, 645.0)], 14.0, -1.0));
+    v
+}
+
+/// A knitted beanie with a cuff, from the front. The origin is the middle
+/// of its top.
+fn beanie() -> Vec<ProductPart> {
+    use ProductPart::{Area, Line};
+    use Seg::*;
+    let body = symmetric(
+        (0.0, 0.0),
+        &[C(75.0, 0.0, 112.0, 45.0, 112.0, 120.0), L(115.0, 240.0), L(0.0, 240.0)],
+    );
+    let mut v = vec![
+        Area(body, Shade::Body),
+        Line(line(&[(-120.0, 160.0), (120.0, 160.0)]), 2.5),
+    ];
+    // The cuff folds over: a soft roll at its top.
+    v.push(fold(&[(-112.0, 167.0), (0.0, 167.0), (112.0, 167.0)], 12.0, 2.0));
+    // The knit ribs, on the cuff and up to the crown.
+    for i in -14i32..=14 {
+        let x = f64::from(i) * 8.0;
+        v.push(fold(&[(x, 172.0), (x, 238.0)], 4.0, 0.35));
+        if i.abs() <= 13 {
+            v.push(fold(&[(x * 0.4, 14.0), (x * 0.85, 70.0), (x, 154.0)], 4.0, 0.3));
+        }
+    }
+    v
+}
+
+/// A messenger bag from the front: the body, the flap with a row of
+/// stitches, the strap and two closing straps with buckles. The origin is
+/// the middle of the top edge of the body.
+fn messenger() -> Vec<ProductPart> {
+    use ProductPart::{Area, Line};
+    use Seg::*;
+    let p = Point::new;
+    let body = Path::rect(BBox::new(p(-180.0, 0.0), p(180.0, 300.0)));
+    let flap = symmetric(
+        (0.0, -5.0),
+        &[
+            L(185.0, -5.0),
+            L(185.0, 175.0),
+            C(185.0, 198.0, 172.0, 208.0, 150.0, 208.0),
+            L(0.0, 208.0),
+        ],
+    );
+    let stitches = symmetric(
+        (0.0, 2.0),
+        &[
+            L(177.0, 2.0),
+            L(177.0, 174.0),
+            C(177.0, 192.0, 168.0, 200.0, 150.0, 200.0),
+            L(0.0, 200.0),
+        ],
+    );
+    let strap = Path::new()
+        .move_to(p(-165.0, 0.0))
+        .cubic_to(p(-165.0, -320.0), p(165.0, -320.0), p(165.0, 0.0));
+    let mut v = vec![
+        Area(body, Shade::Body),
+        Line(strap, 32.0),
+        // The bottom of the bag sags a little.
+        fold(&[(-160.0, 285.0), (0.0, 292.0), (160.0, 285.0)], 20.0, -1.0),
+        Area(flap.clone(), Shade::Body),
+        Line(flap, 2.0),
+        Line(stitches, 0.8),
+        // The flap throws a shadow on the bag under its edge.
+        fold(&[(-178.0, 214.0), (0.0, 214.0), (178.0, 214.0)], 10.0, -1.6),
+    ];
+    for m in [-1.0, 1.0] {
+        let band = Path::rect(BBox::new(p(m * 135.0 - 10.0, 150.0), p(m * 135.0 + 10.0, 250.0)));
+        v.push(Area(band.clone(), Shade::Body));
+        v.push(Line(band, 1.5));
+        v.push(Area(
+            Path::rect(BBox::new(p(m * 135.0 - 13.0, 195.0), p(m * 135.0 + 13.0, 220.0))),
+            Shade::Dark,
+        ));
+    }
+    v
+}
+
 impl ProductKind {
     /// Each side of each product.
-    pub const ALL: [ProductKind; 10] = [
+    pub const ALL: [ProductKind; 17] = [
         ProductKind::TShirt,
         ProductKind::TShirtBack,
+        ProductKind::LongSleeve,
+        ProductKind::LongSleeveBack,
         ProductKind::Polo,
         ProductKind::PoloBack,
         ProductKind::Sweatshirt,
         ProductKind::SweatshirtBack,
+        ProductKind::Hoodie,
+        ProductKind::HoodieBack,
         ProductKind::Cap,
+        ProductKind::Beanie,
+        ProductKind::Apron,
         ProductKind::Tote,
+        ProductKind::Messenger,
         ProductKind::Towel,
         ProductKind::Cushion,
     ];
 
     /// The products, each at its front: the list that the user chooses from.
-    pub const PRODUCTS: [ProductKind; 7] = [
+    pub const PRODUCTS: [ProductKind; 12] = [
         ProductKind::TShirt,
+        ProductKind::LongSleeve,
         ProductKind::Polo,
         ProductKind::Sweatshirt,
+        ProductKind::Hoodie,
         ProductKind::Cap,
+        ProductKind::Beanie,
+        ProductKind::Apron,
         ProductKind::Tote,
+        ProductKind::Messenger,
         ProductKind::Towel,
         ProductKind::Cushion,
     ];
@@ -451,6 +934,13 @@ impl ProductKind {
             ProductKind::PoloBack => "Polo shirt, back",
             ProductKind::Sweatshirt => "Sweatshirt",
             ProductKind::SweatshirtBack => "Sweatshirt, back",
+            ProductKind::LongSleeve => "Long-sleeve T-shirt",
+            ProductKind::LongSleeveBack => "Long-sleeve T-shirt, back",
+            ProductKind::Hoodie => "Hoodie",
+            ProductKind::HoodieBack => "Hoodie, back",
+            ProductKind::Apron => "Apron",
+            ProductKind::Beanie => "Beanie",
+            ProductKind::Messenger => "Messenger bag",
             ProductKind::Cap => "Cap",
             ProductKind::Tote => "Tote bag",
             ProductKind::Towel => "Bath towel",
@@ -469,7 +959,11 @@ impl ProductKind {
     /// The side of the product that this kind shows.
     pub fn side(self) -> Side {
         match self {
-            ProductKind::TShirtBack | ProductKind::PoloBack | ProductKind::SweatshirtBack => Side::Back,
+            ProductKind::TShirtBack
+            | ProductKind::PoloBack
+            | ProductKind::SweatshirtBack
+            | ProductKind::LongSleeveBack
+            | ProductKind::HoodieBack => Side::Back,
             _ => Side::Front,
         }
     }
@@ -483,6 +977,10 @@ impl ProductKind {
             ProductKind::PoloBack => ProductKind::Polo,
             ProductKind::Sweatshirt => ProductKind::SweatshirtBack,
             ProductKind::SweatshirtBack => ProductKind::Sweatshirt,
+            ProductKind::LongSleeve => ProductKind::LongSleeveBack,
+            ProductKind::LongSleeveBack => ProductKind::LongSleeve,
+            ProductKind::Hoodie => ProductKind::HoodieBack,
+            ProductKind::HoodieBack => ProductKind::Hoodie,
             _ => return None,
         })
     }
@@ -506,7 +1004,6 @@ impl ProductKind {
     /// The drawing of the product: the first part is the outline (the body).
     pub fn parts(self) -> Vec<ProductPart> {
         use ProductPart::{Area, Line};
-        use Seg::*;
         let rib = 2.0;
         match self {
             ProductKind::TShirt => {
@@ -600,86 +1097,16 @@ impl ProductKind {
                 v.extend(shirt_folds());
                 v
             }
-            ProductKind::Sweatshirt | ProductKind::SweatshirtBack => {
-                let back = self == ProductKind::SweatshirtBack;
-                let neck = if back { 22.0 } else { 90.0 };
-                // Adult M laid flat: the sleeves go down at 48°, 140 mm wide
-                // at the arm and 100 mm at the rib cuff; the waist rib pulls
-                // the hem in.
-                let (s, t, b, u) = ((240.0, 55.0), (635.0, 493.0), (561.0, 560.0), (272.0, 300.0));
-                let body = symmetric(
-                    (0.0, neck),
-                    &[
-                        C(50.0, neck, 95.0, neck * 0.5, 95.0, 0.0),
-                        L(s.0, s.1),
-                        L(t.0, t.1),
-                        L(b.0, b.1),
-                        L(u.0, u.1),
-                        L(266.0, 660.0),
-                        L(254.0, 722.0),
-                        C(170.0, 725.0, 90.0, 726.0, 0.0, 726.0),
-                    ],
-                );
-                let mut v = vec![Area(body, Shade::Body)];
-                if back {
-                    v.push(Line(neck_line(117.0, 44.0), rib));
-                } else {
-                    v.push(Area(inside_neck(95.0, 90.0, 22.0), Shade::Dark));
-                    v.push(Line(neck_line(117.0, 112.0), rib));
-                }
-                // The cuff ribs (60 mm), the armhole seams and the waist rib.
-                for p in both(&[(599.0, 445.0), (517.0, 518.0)]) {
-                    v.push(Line(p, rib));
-                }
-                for p in armholes(s, u) {
-                    v.push(Line(p, 1.5));
-                }
-                v.push(Line(line(&[(-280.0, 660.0), (280.0, 660.0)]), rib));
-                // Drape from the arms, creases across the sleeves at the
-                // elbows and above the cuffs, and soft folds above the waist rib.
-                v.extend(folds_both(
-                    &[(266.0, 310.0), (226.0, 385.0), (198.0, 470.0)],
-                    22.0,
-                    -1.6,
-                ));
-                v.extend(folds_both(
-                    &[(245.0, 480.0), (242.0, 560.0), (250.0, 640.0)],
-                    22.0,
-                    -1.0,
-                ));
-                let at = |a: (f64, f64), z: (f64, f64), k: f64| (a.0 + (z.0 - a.0) * k, a.1 + (z.1 - a.1) * k);
-                for (k, h) in [(0.42, -1.2), (0.48, 1.0), (0.54, -1.0), (0.8, -0.9), (0.85, 0.8)] {
-                    let (top, under) = (at(s, t, k), at(u, b, k));
-                    v.extend(folds_both(&[at(under, top, 0.08), at(top, under, 0.08)], 12.0, h));
-                }
-                v.push(fold(&[(-200.0, 615.0), (-80.0, 632.0), (60.0, 625.0)], 24.0, 1.0));
-                v.push(fold(&[(90.0, 640.0), (200.0, 630.0)], 16.0, -0.8));
-                v
-            }
-            ProductKind::Cap => {
-                let crown = symmetric((0.0, -130.0), &[C(70.0, -130.0, 115.0, -70.0, 115.0, 0.0), L(0.0, 0.0)]);
-                let brim = symmetric(
-                    (0.0, -8.0),
-                    &[
-                        C(60.0, -8.0, 118.0, -6.0, 135.0, 8.0),
-                        C(110.0, 42.0, 50.0, 52.0, 0.0, 52.0),
-                    ],
-                );
-                vec![
-                    Area(crown.clone(), Shade::Body),
-                    Area(brim, Shade::Dark),
-                    Line(line(&[(0.0, -130.0), (0.0, -4.0)]), 1.5),
-                    Line(
-                        Path::new().move_to(Point::new(-112.0, -4.0)).cubic_to(
-                            Point::new(-60.0, -10.0),
-                            Point::new(60.0, -10.0),
-                            Point::new(112.0, -4.0),
-                        ),
-                        rib,
-                    ),
-                    Area(circle(0.0, -128.0, 7.0), Shade::Dark),
-                ]
-            }
+            ProductKind::Sweatshirt => fleece_top(false, false),
+            ProductKind::SweatshirtBack => fleece_top(true, false),
+            ProductKind::Hoodie => fleece_top(false, true),
+            ProductKind::HoodieBack => fleece_top(true, true),
+            ProductKind::LongSleeve => long_tee(false),
+            ProductKind::LongSleeveBack => long_tee(true),
+            ProductKind::Apron => apron(),
+            ProductKind::Beanie => beanie(),
+            ProductKind::Messenger => messenger(),
+            ProductKind::Cap => cap(),
             ProductKind::Tote => {
                 let body = Path::rect(BBox::new(Point::new(-190.0, 0.0), Point::new(190.0, 420.0)));
                 let handle = Path::new().move_to(Point::new(-100.0, 0.0)).cubic_to(
@@ -770,7 +1197,33 @@ impl ProductKind {
             pl("Full front", 0.0, 350.0, 320.0, 350.0),
             pl("Sleeve", 325.0, 250.0, 40.0, 40.0),
         ];
-        const CAP: &[Placement] = &[pl("Front", 0.0, -55.0, 110.0, 55.0)];
+        const CAP: &[Placement] = &[pl("Front", 0.0, -60.0, 110.0, 55.0)];
+        const LONG: &[Placement] = &[
+            pl("Left chest", 110.0, 190.0, 100.0, 100.0),
+            pl("Center chest", 0.0, 190.0, 250.0, 150.0),
+            pl("Full front", 0.0, 330.0, 300.0, 350.0),
+            pl("Upper sleeve", 305.0, 215.0, 40.0, 40.0),
+            pl("Lower sleeve", 490.0, 413.0, 50.0, 50.0),
+        ];
+        const HOODIE: &[Placement] = &[
+            pl("Left chest", 115.0, 200.0, 100.0, 100.0),
+            pl("Center chest", 0.0, 250.0, 250.0, 140.0),
+            pl("Sleeve", 325.0, 250.0, 40.0, 40.0),
+        ];
+        const HOODIE_BACK: &[Placement] = &[
+            pl("Hood", 0.0, 150.0, 150.0, 120.0),
+            pl("Below the hood", 0.0, 450.0, 300.0, 160.0),
+        ];
+        const APRON: &[Placement] = &[
+            pl("Bib", 0.0, 130.0, 200.0, 110.0),
+            pl("Center", 0.0, 370.0, 300.0, 160.0),
+            pl("Pocket", 115.0, 560.0, 140.0, 120.0),
+        ];
+        const BEANIE: &[Placement] = &[
+            pl("Cuff", 0.0, 200.0, 110.0, 50.0),
+            pl("Above the cuff", 0.0, 105.0, 90.0, 60.0),
+        ];
+        const MESSENGER: &[Placement] = &[pl("Flap", 0.0, 95.0, 240.0, 110.0)];
         const TOTE: &[Placement] = &[pl("Center", 0.0, 230.0, 280.0, 280.0)];
         const TOWEL: &[Placement] = &[
             pl("On the border", 0.0, 795.0, 420.0, 60.0),
@@ -779,7 +1232,13 @@ impl ProductKind {
         const CUSHION: &[Placement] = &[pl("Center", 0.0, 225.0, 320.0, 320.0)];
         match self {
             ProductKind::TShirt => SHIRT,
-            ProductKind::TShirtBack | ProductKind::SweatshirtBack => BACK,
+            ProductKind::TShirtBack | ProductKind::SweatshirtBack | ProductKind::LongSleeveBack => BACK,
+            ProductKind::LongSleeve => LONG,
+            ProductKind::Hoodie => HOODIE,
+            ProductKind::HoodieBack => HOODIE_BACK,
+            ProductKind::Apron => APRON,
+            ProductKind::Beanie => BEANIE,
+            ProductKind::Messenger => MESSENGER,
             ProductKind::PoloBack => POLO_BACK,
             ProductKind::Polo => POLO,
             ProductKind::Sweatshirt => SWEAT,
@@ -788,6 +1247,20 @@ impl ProductKind {
             ProductKind::Towel => TOWEL,
             ProductKind::Cushion => CUSHION,
         }
+    }
+
+    /// Where a point of a flat design (product coordinates) shows on the
+    /// product. A cap curves the design round its crown: it is a little
+    /// narrower at its sides, and its sides are a little lower. The other
+    /// products are flat.
+    pub fn warp(self, p: Point) -> Point {
+        if self != ProductKind::Cap {
+            return p;
+        }
+        const R: f64 = 115.0;
+        let x = p.x.clamp(-R, R);
+        let dip = R - (R * R - x * x).sqrt();
+        Point::new(R * emb_geom::math::sin(x / R), p.y + 0.12 * dip)
     }
 
     /// The box of the drawing, in product coordinates.
@@ -1109,6 +1582,19 @@ mod tests {
         // A project of an earlier version (no extras) opens.
         let old = crate::project::to_string(&square(0.0, 0.0, 40.0));
         assert!(crate::project::from_str(&old).is_ok());
+    }
+
+    #[test]
+    fn a_cap_curves_the_design_and_the_rest_are_flat() {
+        let c = ProductKind::Cap;
+        assert_eq!(c.warp(Point::new(0.0, -60.0)), Point::new(0.0, -60.0));
+        let side = c.warp(Point::new(55.0, -60.0));
+        // A little narrower and a little lower at the side.
+        assert!(side.x < 54.0 && side.x > 50.0, "{side:?}");
+        assert!(side.y > -60.0 && side.y < -57.0, "{side:?}");
+        for kind in ProductKind::ALL.into_iter().filter(|k| *k != c) {
+            assert_eq!(kind.warp(Point::new(55.0, 30.0)), Point::new(55.0, 30.0));
+        }
     }
 
     #[test]

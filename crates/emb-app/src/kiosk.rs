@@ -58,9 +58,16 @@ pub const PRODUCT_COLORS: [(&str, Rgb); 8] = [
 /// The fabric (an id of `data/fabrics.toml`) of a product.
 pub fn fabric_of(kind: ProductKind) -> &'static str {
     match kind {
-        ProductKind::TShirt | ProductKind::TShirtBack => "knit",
+        ProductKind::TShirt
+        | ProductKind::TShirtBack
+        | ProductKind::LongSleeve
+        | ProductKind::LongSleeveBack
+        | ProductKind::Beanie => "knit",
         ProductKind::Polo | ProductKind::PoloBack => "pique",
-        ProductKind::Sweatshirt | ProductKind::SweatshirtBack => "fleece",
+        ProductKind::Sweatshirt | ProductKind::SweatshirtBack | ProductKind::Hoodie | ProductKind::HoodieBack => {
+            "fleece"
+        }
+        ProductKind::Apron | ProductKind::Messenger => "denim",
         ProductKind::Cap => "cap",
         ProductKind::Tote => "denim",
         ProductKind::Towel => "towel",

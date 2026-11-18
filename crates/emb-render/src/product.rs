@@ -39,9 +39,19 @@ const SHADOW_OFFSET_MM: f64 = 0.5;
 /// The width (mm) and the height (mm) of the round edge of a product.
 fn roundness(kind: ProductKind) -> (f64, f64) {
     match kind {
-        ProductKind::TShirt | ProductKind::TShirtBack | ProductKind::Polo | ProductKind::PoloBack => (40.0, 6.0),
-        ProductKind::Sweatshirt | ProductKind::SweatshirtBack => (45.0, 8.0),
-        ProductKind::Cap => (90.0, 30.0),
+        ProductKind::TShirt
+        | ProductKind::TShirtBack
+        | ProductKind::LongSleeve
+        | ProductKind::LongSleeveBack
+        | ProductKind::Polo
+        | ProductKind::PoloBack => (40.0, 6.0),
+        ProductKind::Sweatshirt | ProductKind::SweatshirtBack | ProductKind::Hoodie | ProductKind::HoodieBack => {
+            (45.0, 8.0)
+        }
+        ProductKind::Apron => (20.0, 3.0),
+        ProductKind::Beanie => (70.0, 25.0),
+        ProductKind::Messenger => (25.0, 6.0),
+        ProductKind::Cap => (70.0, 20.0),
         ProductKind::Tote => (20.0, 3.0),
         ProductKind::Towel => (15.0, 3.0),
         ProductKind::Cushion => (110.0, 30.0),
@@ -51,10 +61,16 @@ fn roundness(kind: ProductKind) -> (f64, f64) {
 /// The fabric of a product.
 pub fn weave(kind: ProductKind) -> Weave {
     match kind {
-        ProductKind::TShirt | ProductKind::TShirtBack => Weave::Knit,
+        ProductKind::TShirt
+        | ProductKind::TShirtBack
+        | ProductKind::LongSleeve
+        | ProductKind::LongSleeveBack
+        | ProductKind::Beanie => Weave::Knit,
         ProductKind::Polo | ProductKind::PoloBack => Weave::Pique,
-        ProductKind::Sweatshirt | ProductKind::SweatshirtBack => Weave::Felt,
-        ProductKind::Cap | ProductKind::Tote => Weave::Twill,
+        ProductKind::Sweatshirt | ProductKind::SweatshirtBack | ProductKind::Hoodie | ProductKind::HoodieBack => {
+            Weave::Felt
+        }
+        ProductKind::Cap | ProductKind::Tote | ProductKind::Apron | ProductKind::Messenger => Weave::Twill,
         ProductKind::Towel => Weave::Terry,
         ProductKind::Cushion => Weave::Plain,
     }

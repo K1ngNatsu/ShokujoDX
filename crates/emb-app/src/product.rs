@@ -509,10 +509,15 @@ fn compose_sides(
         if side == v.side() {
             segments.extend_from_slice(design);
         }
-        let view = ProductView {
-            kind: v.kind.on(side),
-            ..v.clone()
-        };
+        let kind = v.kind.on(side);
+        // A cap curves the designs round its crown (not a photo).
+        if v.picture.is_none() && kind == ProductKind::Cap {
+            let warp = |q: Point| v.origin + kind.warp(q - v.origin);
+            for s in &mut segments {
+                (s.a, s.b) = (warp(s.a), warp(s.b));
+            }
+        }
+        let view = ProductView { kind, ..v.clone() };
         emb_render::product::decoration(&view, photo.as_ref(), &segments, px_per_mm, THREAD_MM, look)
     };
     if v.both_sides && v.picture.is_none() && v.kind.turned().is_some() {

@@ -92,15 +92,16 @@ trim and color change).
 
 ## The product
 
-**Design > Product** shows the design at its real size on a T-shirt,
-polo, sweatshirt, cap, bag, towel or cushion, or on a picture of your own
-product (**My picture…**, at its real width). Set the **Color** and where
+**Design > Product** shows the design at its real size on a T-shirt
+(short or long sleeves), polo, sweatshirt, hoodie, cap, beanie, apron,
+bag, towel or cushion, or on a picture of your own product (**My picture…**, at its real width). Set the **Color** and where
 the design goes (**Put the design at**). **Show Product** shows or hides
 it. **Picture on Product** saves a PNG picture of the design with the
 thread look on the product, for a customer. The product does not sew.
 A drawn product has light and shade, folds and the texture of its
 fabric, in the light of the thread look; in the picture, the embroidery
-has a soft shadow on it. **Add a design…** shows one more design (a
+has a soft shadow on it; on a cap, the picture shows the design a little
+curved round the crown. **Add a design…** shows one more design (a
 project or a machine file) on the product, for example a name on a
 sleeve with this design at the left chest: set its place in the list
 of **Other designs on the product**. It shows on the canvas and in the

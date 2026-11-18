@@ -1635,8 +1635,8 @@ impl Cmd {
                 g(ph::T_SHIRT),
                 tr("Product"),
                 tr(
-                    "See the design at its real size on a T-shirt, polo, sweatshirt, cap, bag, towel or \
-                 cushion, or on a picture of your own product. The product does not sew.",
+                    "See the design at its real size on a T-shirt, polo, sweatshirt, hoodie, cap, beanie, \
+                 apron, bag, towel or cushion, or on a picture of your own product. The product does not sew.",
                 ),
             ),
             Cmd::SaveDecoration => (

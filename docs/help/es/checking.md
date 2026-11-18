@@ -94,15 +94,18 @@ predeterminada** los restablece.
 
 ## El producto
 
-**Diseño > Producto** muestra el diseño a su tamaño real en una camiseta,
-un polo, una sudadera, una gorra, una bolsa, una toalla o un cojín, o en
+**Diseño > Producto** muestra el diseño a su tamaño real en una camiseta
+(de manga corta o larga), un polo, una sudadera, una sudadera con
+capucha, una gorra, un gorro, un delantal, una bolsa, una toalla o un
+cojín, o en
 una imagen de su propio producto (**Mi imagen…**, a su ancho real). Defina
 el **Color** y dónde va el diseño (**Poner el diseño en**). **Mostrar
 producto** lo muestra u oculta. **Imagen en el producto** guarda una
 imagen PNG del diseño con el aspecto de hilo sobre el producto, para un
 cliente. El producto no se borda. Un producto dibujado tiene luz y
 sombra, pliegues y la textura de su tejido, con la luz del aspecto de
-hilo; en la imagen, el bordado tiene una sombra suave sobre él.
+hilo; en la imagen, el bordado tiene una sombra suave sobre él; en una
+gorra, la imagen muestra el diseño un poco curvado alrededor de la copa.
 **Añadir un diseño…** muestra un diseño más (un proyecto o un archivo
 de máquina) en el producto, por ejemplo un nombre en una manga con este
 diseño en el pecho izquierdo: defina su lugar en la lista **Otros

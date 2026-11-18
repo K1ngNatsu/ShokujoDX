@@ -100,15 +100,16 @@ Farben** (ein Symbol an jedem Fadenschnitt und Farbwechsel).
 ## Das Produkt
 
 **Design > Produkt** zeigt das Design in seiner echten Größe auf einem
-T-Shirt, Polo, Sweatshirt, einer Kappe, Tasche, einem Handtuch oder
-Kissen, oder auf einem Bild Ihres eigenen Produkts (**Mein Bild…**, in
+T-Shirt (kurz- oder langarm), Polo, Sweatshirt, Kapuzenpullover, einer
+Kappe, Mütze, Schürze, Tasche, einem Handtuch oder Kissen, oder auf einem Bild Ihres eigenen Produkts (**Mein Bild…**, in
 seiner echten Breite). Legen Sie die **Farbe** fest und wohin das Design
 kommt (**Das Design setzen auf**). **Produkt zeigen** zeigt oder verbirgt
 es. **Bild auf Produkt** speichert ein PNG-Bild des Designs mit der
 Garnansicht auf dem Produkt, für einen Kunden. Das Produkt wird nicht
 gestickt. Ein gezeichnetes Produkt hat Licht und Schatten, Falten und
 die Struktur seines Stoffs, im Licht der Garnansicht; im Bild wirft die
-Stickerei einen weichen Schatten darauf. **Ein Design hinzufügen…**
+Stickerei einen weichen Schatten darauf; auf einer Kappe zeigt das Bild
+das Design ein wenig um die Krone gebogen. **Ein Design hinzufügen…**
 zeigt ein weiteres Design (ein Projekt oder eine Maschinendatei) auf
 dem Produkt, zum Beispiel einen Namen auf einem Ärmel mit diesem Design
 auf der linken Brust: Legen Sie seine Stelle in der Liste **Andere
