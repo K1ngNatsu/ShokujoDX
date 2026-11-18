@@ -28,7 +28,7 @@ Sizes are relative effort: S (days), M (one to two weeks), L (a month), XL (seve
 | Phase | State |
 | --- | --- |
 | 0. Foundation | Done: workspace, model with undo/redo, project files, egui app, Sequence panel, canvas editing, draw tools, SVG import |
-| 1. Stitch engine and core formats | Done in software: running, tatami fill, satin with underlay, VP3, DST, PES, `emb-cli`, golden tests. The exit test (corpus sew-outs) is covered by the later kits (owner decision, 2026-10-23). CI for three systems is in `.github/workflows` (it runs when the repository is on GitHub). Open: the Ink/Stitch comparison. See `docs/design/export-plan.md`. |
+| 1. Stitch engine and core formats | Done in software: running, tatami fill, satin with underlay, VP3, DST, PES, `emb-cli`, golden tests. The exit test (corpus sew-outs) is covered by the later kits (owner decision, 2026-10-23). CI for three systems is in `.github/workflows` (it runs when the repository is on GitHub). The Ink/Stitch comparison is closed (owner, 2026-11-18: testers who used Ink/Stitch before report better results from this program, and their files sewed well). See `docs/design/export-plan.md`. |
 | 2. Digitizing toolset | Done in software: all seven milestones (tracing, workspace, input methods, stitch angles and holes, split/join/select, arrange, viewing and travel). Open: the exit test with users. See `docs/design/p2-plan.md`. |
 | 3. Production, color and quality | Done in software: Milestones 1 (thread charts, Threads panel, colorways), 2 (machine functions, split at needle, stitch list) 3 (machine files: open as stitch objects; EXP, JEF, XXX, SEW, HUS, SHV) 4 (stitch player, thread look, design info, warnings, overview), 5 (worksheets, PDF, picture, Output design, batch output), 6 (fabrics, styles, templates, plain-language labels), 7 (appliqué) and 8 (design tabs, split view, backups and recovery, calibration, sew time, P2 carry-overs) done in software; the exit test with users is open. See `docs/design/p3-plan.md`. |
 | 4. Lettering | Done: Milestones 1 (TrueType lettering: satin letters from glyph strokes, fill letters, lines, spacing, kerning, alignment, bundled OFL fonts and the fonts of the computer) 2 (embroidery fonts: `.embfont` format, converter, four starter fonts, Fonts window with previews, size ranges and warnings) 3 (arc, circle and line baselines; kerning, move, scale, turn and reshape of single letters) 4 (envelopes and lettering art; stitch type and underlay for each letter; sew order with optimized connections) 5 (monograms: styles, borders, ornaments, templates), 6 (team names and keyboard design collections) and 7 (custom alphabets, bitmap fonts) done: all seven milestones, and the exit test (sew-outs on towel and cap, 2026-10-23). See `docs/design/p4-plan.md`. |
@@ -43,7 +43,56 @@ Sizes are relative effort: S (days), M (one to two weeks), L (a month), XL (seve
 | 13. Shop tools | Done in software (owner request, 2026-10-27): Milestones 1 (quotes and run time on machines with more heads, ADR 0064), 2 (order details on the sheets, ADR 0065), 3 (thread stock and threads to buy, ADR 0066) and 4 (scripts, ADR 0067). Open: the exit tests with a shop tester (real orders, a printed sheet and its barcode, the spools to buy). See `docs/design/p13-plan.md`. |
 | 14. Sketch mode | Done (owner request, 2026-10-27): Milestones 1 (sketch model and constraint solver, ADR 0068), 2 (sketch mode in the app, ADR 0069), 3 (drawing help and sketch edits, ADR 0070), 4 (regions to embroidery, ADR 0075), 5 (objects that follow their sketch, ADR 0076) and 6 (parameters, splines and drawings to sketches, ADR 0078 and 0079). The owner's test in the app and the badge sew-outs on the Topaz 20 passed (owner, 2026-11-16). See `docs/design/p14-plan.md`. |
 | 16. Product view | Done in software (owner request, 2026-11-17): Milestones 1 (a realistic look, ADR 0101), 2 (other designs on the product, ADR 0102), 3 (front and back, ADR 0103), 4 (the product on the approval sheet, ADR 0104), 5 (better products, ADR 0105), 6 (two-tone products and swatches, ADR 0106), 7 (photos of the user's products, ADR 0107) and 8 (turntable view, ADR 0108); audit in "Audit of P16". Open: the exit tests of the eight milestones (owner, at the end of the phase). See `docs/design/product-plan.md`. |
+| 17. Polish and lettering | Accepted (owner, 2026-11-18), not started: eight milestones (update check, pictures of the windows, tests on an industrial machine, font test sheet and letter corrections, ten tuned fonts, text shaping, more fonts with a quality score, content families). See `docs/design/p17-plan.md`. |
+| 18. Designs from other programs | Accepted (owner, 2026-11-18), not started; after P17: eight milestones (the parts of a stitch file, runs and satin columns, fills, Recognize Objects, read Ink/Stitch files, write them and read its fonts, outlines with a stitch file, import helpers). See `docs/design/p18-plan.md`. |
+| 19. Help and tutorials | Proposed (2026-11-18): nine milestones (pictures in the help, Show Me, guided lessons, the sew-out doctor, samples, ways to start, the help on the web, moving pictures, better answers); the owner selects them. See `docs/design/p19-plan.md`. |
 | 15. Browser version | Later (owner decision, 2026-11-16): not started. Start after the first feedback of users on the desktop program (about v0.4). See "P15. Browser version" below. |
+
+## Review of 2026-11-18 and the next phases
+
+After the audit of P16, a review of the project against the reference
+product (the documents, the code, and the numbers of the public
+repository). The inventory shows nearly all features as done; the gaps
+are in depth and in proof. The owner decided the same day to make the
+features that the program has better before it gets new ones.
+
+**What the owner reported.**
+
+- About five users tried the program; two sent files to their machines,
+  and the files sewed well. Testers who used Ink/Stitch before report
+  better results and an easier program, so the comparison with Ink/Stitch
+  (open since P1) is closed.
+- The owner has an industrial multi-needle machine for tests (a Tajima
+  with 12 needles, all its hoops and a cap frame).
+- Professional users will do their daily work in the program in place of
+  a consumer embroidery product, and report where they cannot continue.
+- The translations are for the comfort of users that the owner knows;
+  their review by native speakers stays open.
+
+**The gaps, from most to least important, and what is planned.**
+
+| Gap | Planned |
+| --- | --- |
+| The stitches are proven on one home machine only | P17 Milestone 3: a test kit for the industrial machine, reports of professional testers |
+| A machine file of another program becomes one plain fill; the native formats of closed-source programs cannot be read | P18: recognize runs, satin columns and fills; read and write Ink/Stitch files; outlines with a stitch file. Not planned: the native formats of closed-source programs (rule 3) |
+| Thirty fonts, all converted by the program; small libraries of motifs, split patterns, stamps, borders and clipart; no text shaping | P17 Milestones 4 to 8 |
+| A user of an old version does not learn of a new one; the packages have no signature | P17 Milestone 1 (update check); code signing continues (ADR 0062) |
+| No window is checked automatically; texts in German and Japanese are longer | P17 Milestone 2 (pictures of the windows, development only) |
+| The help is text with no pictures; seven tutorials; no videos | P19 (proposed) |
+| EPS and CDR artwork cannot be read | P18 Milestone 8 (import helpers) |
+
+**Decided, no work.**
+
+- More formats to write: no. All machines of the machine library have a
+  format that the program writes, and DST is the format that users asked
+  for most. A format is added when a tester has a machine that needs it.
+- Sequins, beads, chenille, Schiffli and sending over a network wait for
+  testers and public protocols, as before.
+- The rule about the names of closed-source programs stays.
+
+**Checked and good:** undo with shared snapshots (ADR 0004), the stitch
+cache for each object, the engine crates with no UI, the same stitches on
+all systems (ADR 0003).
 
 ## Sew-out tests of 2026-11-16
 
@@ -54,7 +103,7 @@ Still open, because they need other people, machines or systems:
 - Tests with users: P2 (a new user digitizes a patch in 15 minutes), P3 (five test users), P10 (the patch test on Windows, macOS and Linux, F1 and the help search with a new user, a screen reader, a review of the German, Spanish and Japanese texts by native speakers).
 - Other machines: cap order on a cap frame and cutwork on a cutwork machine (P11); sequins, beads, chenille and Schiffli (P9 Milestones 6 and 7).
 - Other systems and tools: the thumbnails after an install on macOS and Linux (P11); a phone app reads the barcode of a worksheet, and a cutter program opens a cutter file at real size (P8 Milestone 7, P13).
-- Measurements and shop tests: the thread use against weighed spools (P11); the quotes and run times of real orders with a shop tester (P13); the comparison with Ink/Stitch (P1).
+- Measurements and shop tests: the thread use against weighed spools (P11); the quotes and run times of real orders with a shop tester (P13). The comparison with Ink/Stitch (P1) was closed on 2026-11-18 ("Review of 2026-11-18").
 
 ## Owner list of 2026-11-16 (v0.2.1 and v0.3.0)
 
@@ -412,7 +461,7 @@ and Linux, a new user with F1 and the help search (Milestone 4), a name
 on a towel in the kiosk (Milestone 5), a screen reader (Milestone 7), a
 review of the German, Spanish and Japanese texts by a native speaker, and
 the first release (push the repository to GitHub, then a tag `v0.1.0`).
-Also open: the comparison with Ink/Stitch (P1).
+Also open: the comparison with Ink/Stitch (P1). *Closed on 2026-11-18 (owner; "Review of 2026-11-18").*
 
 ## Audit of 2026-10-23
 
@@ -1018,6 +1067,38 @@ and templates for the user's own product photos, and a turntable view
 
 **Exit:** the exit tests of the eight milestones in the plan.
 
+### P17. Polish and lettering (L) — accepted, not started (`docs/design/p17-plan.md`)
+
+The features that the program has become better before it gets new ones
+(owner, 2026-11-18), in eight milestones: an update check that the user
+can turn off at the install, pictures of all windows in each language
+(development only), tests on an industrial machine with the reports of
+professional testers, a font test sheet and letter corrections that stay,
+ten tuned fonts, text shaping, more fonts with a quality score, and
+larger libraries of motifs, patterns, stamps, borders and clipart.
+
+**Exit:** the exit tests of the eight milestones in the plan.
+
+### P18. Designs from other programs (L) — accepted, not started (`docs/design/p18-plan.md`)
+
+A machine file of another program becomes objects with stitch types
+(runs, satin columns, fills) that scale with their density; the program
+reads and writes Ink/Stitch files and reads its fonts; outlines with a
+stitch file become objects; artwork formats that the program cannot read
+open through a helper program of the user (Inkscape for CDR and EPS).
+The native formats of closed-source programs stay out of scope.
+
+**Exit:** the exit tests of the eight milestones in the plan.
+
+### P19. Help and tutorials (L) — proposed (`docs/design/p19-plan.md`)
+
+The help becomes a part of the work: pictures made from the program,
+Show Me on the ribbon, guided lessons that check each step, a doctor for
+sew-out problems, samples, ways to start for different users, the help
+on the web and as a manual, moving pictures, better answers.
+
+**Exit:** the exit tests of the milestones that the owner selects.
+
 ## Dependencies
 
 ```text
@@ -1031,6 +1112,10 @@ P6 + P11 ─► P12 Picture to design: robust and better results
 P3 + P8 + P11 ─► P13 shop tools (sew time, sheets, thread use)
 P6 ─► P14 sketch mode (vector objects, linked shapes)
 P1–P14 + user feedback (about v0.4) ─► P15 browser version (later)
+P7 ─► P16 product view
+P4 + P11 + tester reports ─► P17 polish and lettering
+P6 + P17 ─► P18 designs from other programs (recognize outlines, vector import)
+P10 + P13 + P17 ─► P19 help and tutorials (help, scripts, pictures of the windows)
 ```
 
 P5 engine work can run in parallel with P2–P4 app work, because the engine crates

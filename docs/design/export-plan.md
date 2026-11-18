@@ -61,7 +61,7 @@ does not load on the machine.
 | 3 | Done; sew-out covered (P4 to P14 sew-outs on the Topaz 20) | `emb_stitch::{fill, travel}`: tatami rows, sections, travel inside the shape, staggered needle points, pull compensation, tatami and edge-walk underlay. |
 | 4 | Done; sew-out covered (P4 to P14 sew-outs on the Topaz 20) | `emb_stitch::satin`: rails and rungs, spacing, pull compensation, short stitches, auto split, center-walk, edge-walk and zigzag underlay. Column C (`SatinGeometry::from_centerline`) and the Column C draw tool. |
 | 5 | Software done; Brother test open | `emb_formats::pes`: PES version 1 with the PEC part. For all corpus designs the bytes are the same as pyembroidery writes (with the same rounding). |
-| 6 | Done, except CI and the Ink/Stitch comparison | `emb-cli` (`convert`, `stitch`, `corpus`), the corpus in code (`emb_cli::corpus`), golden tests in `crates/emb-cli/tests/golden.rs`. CI on three platforms was deferred by the owner; it is now in `.github/workflows/ci.yml` (and the release builds, ADR 0043). The comparison with Ink/Stitch needs an Ink/Stitch install; it is open. |
+| 6 | Done, except CI and the Ink/Stitch comparison | `emb-cli` (`convert`, `stitch`, `corpus`), the corpus in code (`emb_cli::corpus`), golden tests in `crates/emb-cli/tests/golden.rs`. CI on three platforms was deferred by the owner; it is now in `.github/workflows/ci.yml` (and the release builds, ADR 0043). The comparison with Ink/Stitch needs an Ink/Stitch install; it was closed on 2026-11-18 (owner: testers who used Ink/Stitch before report better results from this program). |
 
 To write all corpus designs as project, VP3, DST and PES files for a sew-out:
 
