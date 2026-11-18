@@ -1,6 +1,6 @@
 # Plan: a better product view (phase P16)
 
-Date: 2026-11-17 · Status: Accepted (owner, 2026-11-17). Milestone 1 in work.
+Date: 2026-11-17 · Status: Accepted (owner, 2026-11-17). Milestones 1 and 2 done (ADR 0101, 0102); Milestone 3 next.
 
 ## Goal
 
@@ -13,7 +13,7 @@ to three layers, the user's own product templates, and approval sheets
 with the design on the product.
 
 This plan makes the product view good enough to show to a customer. It
-has seven milestones. Each milestone is small, can be released alone, and
+has eight milestones. Each milestone is small, can be released alone, and
 keeps the projects of earlier versions (new fields have defaults).
 
 What stays:
@@ -45,6 +45,11 @@ The drawn product looks like cloth.
    the cloth.
 4. **Speed.** The app keeps the shading of a product kind, so a change of
    the product color does not make it again.
+
+5. **Shapes and lines** (owner, 2026-11-18). The garments have the
+   proportions of an adult M laid flat (shoulders, chest, sleeve angle
+   and opening, armhole seams; the polo collar lies on the chest), and a
+   seam (a line of 3 mm or less) stops at the edge of the product.
 
 Later in this milestone, if the canvas needs it: the soft shadow on the
 canvas too.
@@ -127,8 +132,33 @@ collar.
 **Exit:** a photo of a real shirt of the owner, saved as a template,
 shows a design at its left chest in three colors.
 
+## Milestone 8: a turntable view (M)
+
+The product turns in steps, so the customer sees it from more sides. It
+needs Milestone 3 (a front and a back).
+
+- **A 3D shape from the drawing.** The outline of the front and of the
+  back of each drawn product gets a soft round body (the round edges of
+  Milestone 1, in 3D): a "pillow" of the product at its real size. A cap
+  gets its own shape (a crown and a brim). No model files.
+- **The design is exactly on it.** The front of the shape has the same
+  flat coordinates as the canvas, so the placements, the sizes and the
+  3D thread look do not change.
+- **Steps made before.** When the design or the product changes, a
+  background job draws the product at 24 angles (15° apart) in the
+  engine (`emb-render`, no graphics card). A turn only shows another
+  finished picture, so it is fast on a slow PC too.
+- **Save.** An animated picture (GIF) of the turn, or a strip of three
+  or four angles.
+
+Not in this milestone: a garment on a body or a mannequin (it needs
+real 3D models).
+
+**Exit:** a T-shirt with a chest logo and a back print turns in steps on
+the canvas of a PC with the software renderer, and saves as a GIF.
+
 ## Not in this plan
 
 - Fabric that bends under the design (a design that follows a fold).
-- 3D products that turn.
+- 3D products that turn freely (Milestone 8 turns in steps).
 - Pictures of brand garments.

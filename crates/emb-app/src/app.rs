@@ -255,6 +255,8 @@ pub struct AppState {
     pub product_window: bool,
     /// The texture of the product under the design.
     pub product_tex: Option<crate::product::ProductTexture>,
+    /// The stitches and the canvas pictures of the other designs on the product.
+    pub product_extras: crate::product::Extras,
     /// The next frame shows all of the product.
     pub fit_product: bool,
     /// The Repeats window is open.
@@ -715,6 +717,7 @@ impl AppState {
             hoopings_ui: Default::default(),
             product_window: false,
             product_tex: None,
+            product_extras: Default::default(),
             fit_product: false,
             repeats_window: false,
             about_window: false,

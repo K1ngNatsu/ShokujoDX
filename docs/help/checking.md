@@ -100,7 +100,11 @@ it. **Picture on Product** saves a PNG picture of the design with the
 thread look on the product, for a customer. The product does not sew.
 A drawn product has light and shade, folds and the texture of its
 fabric, in the light of the thread look; in the picture, the embroidery
-has a soft shadow on it.
+has a soft shadow on it. **Add a design…** shows one more design (a
+project or a machine file) on the product, for example a name on a
+sleeve with this design at the left chest: set its place in the list
+of **Other designs on the product**. It shows on the canvas and in the
+picture, and it does not sew.
 
 ## Repeats
 

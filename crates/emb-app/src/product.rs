@@ -1,13 +1,20 @@
 //! Product backdrops and the virtual decoration picture (P7 Milestone 5):
 //! the Product window, the product under the design on the canvas, and
 //! Save picture on product. The product does not sew.
+//!
+//! Other designs on the product (P16 Milestone 2): each `ProductExtra` is
+//! stitched once (by its key) and drawn on the canvas as a picture over
+//! the product; the saved picture has their stitches with the design.
 
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
 use eframe::egui::{self, Color32, Mesh, Pos2, Rect, TextureHandle, TextureOptions};
 use emb_geom::{BBox, Point};
-use emb_model::{MergeKey, ProductKind, ProductPicture, ProductView, Rgb};
+use emb_model::{MergeKey, ProductExtra, ProductKind, ProductPicture, ProductView, Rgb};
+use emb_render::Segment;
+use emb_stitch::{PlanOptions, StitchCache, build_plan};
 
 use crate::app::AppState;
 use crate::file::Notice;
@@ -15,6 +22,27 @@ use crate::i18n::tr;
 
 /// Pixels for each mm of the product texture on the canvas.
 const TEXTURE_PX_PER_MM: f64 = 2.0;
+/// Pixels for each mm of the canvas picture of another design (fewer for a
+/// large design, so its side is at most `EXTRA_MAX_PX`).
+const EXTRA_PX_PER_MM: f64 = 8.0;
+const EXTRA_MAX_PX: f64 = 4096.0;
+/// The thread width (mm) of the pictures of the designs.
+const THREAD_MM: f64 = 0.4;
+
+/// The stitches and the canvas pictures of the other designs on the
+/// product, by the key of each design.
+#[derive(Default)]
+pub struct Extras {
+    looks: HashMap<u64, ExtraLook>,
+}
+
+struct ExtraLook {
+    /// The stitches (view mm) with the center of the design at (0, 0).
+    segments: Arc<Vec<Segment>>,
+    /// The canvas picture, the area that it shows (same coordinates as the
+    /// segments), and the look that it has.
+    texture: Option<(TextureHandle, BBox, emb_render::raster::Look)>,
+}
 /// Pixels for each mm of the saved picture.
 pub const DECORATION_PX_PER_MM: f64 = 4.0;
 /// The default product color: white.
@@ -53,10 +81,17 @@ impl AppState {
     }
 
     /// Puts a drawn product under the design, with the design at the first
-    /// usual place of the product.
+    /// usual place of the product. The other designs stay (each at the
+    /// place of the same name, if the product has it).
     pub fn set_product(&mut self, kind: ProductKind) {
-        let color = self.doc.design().product.as_ref().map_or(WHITE, |v| v.color);
+        let old = self.doc.design().product.clone();
+        let color = old.as_ref().map_or(WHITE, |v| v.color);
         let mut v = ProductView::new(kind, color);
+        if let Some(old) = old {
+            let mut moved = old;
+            moved.change_kind(kind);
+            v.extras = moved.extras;
+        }
         if let Some(p) = kind.placements().first() {
             v.put_design_at(self.doc.design(), p.at);
         }
@@ -108,6 +143,9 @@ impl AppState {
         let mut v = ProductView::new(kind, WHITE);
         v.origin = c - size * 0.5;
         v.picture = Some(picture);
+        if let Some(old) = &self.doc.design().product {
+            v.extras = old.extras.clone();
+        }
         self.doc.edit(tr("Product picture"), |d| d.product = Some(v));
         self.fit_product = true;
         Ok(())
@@ -150,7 +188,20 @@ impl AppState {
             )
             .ok()
         });
-        let segments: Vec<emb_render::Segment> = self.plan_view().segments.iter().map(|(s, _)| *s).collect();
+        let mut segments: Vec<emb_render::Segment> = self.plan_view().segments.iter().map(|(s, _)| *s).collect();
+        // The other designs: at their places, before the open design.
+        if v.visible {
+            let mut extra = Vec::new();
+            for e in v.extras.iter().filter(|e| e.visible) {
+                let to = v.origin + e.at;
+                extra.extend(self.extra_segments(e).iter().map(|s| Segment {
+                    a: s.a + to,
+                    b: s.b + to,
+                    ..*s
+                }));
+            }
+            segments.splice(0..0, extra);
+        }
         // The 3D look, with no fabric texture: the product is under the design.
         let look = emb_render::raster::Look {
             fabric: None,
@@ -197,6 +248,136 @@ impl AppState {
                 })
             }
         }
+    }
+
+    /// Shows the design of the file `path` (a project or a machine file) on
+    /// the product, at a free place.
+    pub fn add_product_design(&mut self, path: &Path) -> Result<(), String> {
+        let Some(v) = self.doc.design().product.clone() else {
+            return Err(tr("Choose a product first (Design > Product).").into());
+        };
+        let design = match crate::file::machine_ext(path) {
+            Some(ext) => {
+                let s = emb_library::read_machine_file(path).map_err(|e| format!("{}: {e}", path.display()))?;
+                if s.stitch_count() == 0 {
+                    return Err(format!("{}: {}", path.display(), tr("The file has no stitches.")));
+                }
+                let stem = path
+                    .file_stem()
+                    .map_or_else(String::new, |s| s.to_string_lossy().into_owned());
+                let mut d = emb_model::design_from_stitches(&s, &stem);
+                let needles = std::fs::read(path)
+                    .map(|b| emb_formats::read_needles(&ext, &b))
+                    .unwrap_or_default();
+                d.pin_block_needles(&needles);
+                d
+            }
+            None => emb_model::project::load(path).map_err(|e| format!("{}: {e}", path.display()))?,
+        };
+        if design.view_extents().is_none() {
+            return Err(format!("{}: {}", path.display(), tr("The design has no stitches.")));
+        }
+        let name = path
+            .file_name()
+            .map_or_else(String::new, |n| n.to_string_lossy().into_owned());
+        let at = v.free_place(self.doc.design());
+        let extra = ProductExtra::new(&name, design, at);
+        let place = v.placement_at(at).map(|p| p.name);
+        self.edit_product("Add product design", None, |p| p.extras.push(extra));
+        self.message = match place {
+            Some(p) => crate::i18n::fill(
+                "{} is at {} of the {}.",
+                &[&name, &tr(p).to_lowercase(), &tr(v.kind.name())],
+            ),
+            None => crate::i18n::fill("{} is on the product.", &[&name]),
+        };
+        Ok(())
+    }
+
+    pub fn add_product_design_dialog(&mut self) {
+        let mut exts: Vec<&str> = vec![emb_model::project::FILE_EXTENSION];
+        exts.extend(emb_formats::READ_EXTENSIONS);
+        let Some(p) = rfd::FileDialog::new()
+            .set_title(tr("Design to show on the product"))
+            .add_filter(tr("Designs (projects and machine files)"), &exts)
+            .set_directory(self.dialog_dir())
+            .pick_file()
+        else {
+            return;
+        };
+        if let Err(e) = self.add_product_design(&p) {
+            self.notice = Some(Notice {
+                title: "Cannot use the design".into(),
+                lines: vec![e],
+            });
+        }
+    }
+
+    /// Changes the other design `i` of the product as one undo step.
+    fn edit_extra(&mut self, label: &str, merge: Option<&str>, i: usize, f: impl FnOnce(&mut ProductExtra)) {
+        self.edit_product(label, merge, |v| {
+            if let Some(e) = v.extras.get_mut(i) {
+                f(e);
+            }
+        });
+    }
+
+    /// The stitches of the other design `e` (view mm, its center at (0, 0)),
+    /// made once for each design.
+    fn extra_segments(&mut self, e: &ProductExtra) -> Arc<Vec<Segment>> {
+        if let Some(l) = self.product_extras.looks.get(&e.key) {
+            return l.segments.clone();
+        }
+        let opts = e
+            .design
+            .machine
+            .as_deref()
+            .and_then(|id| self.machines.get(id))
+            .map_or_else(PlanOptions::default, PlanOptions::for_machine);
+        let plan = build_plan(&e.design, &opts, &mut StitchCache::default());
+        let back = e.design.from_hoop_transform();
+        let c = e.center();
+        let segments: Arc<Vec<Segment>> = Arc::new(
+            emb_render::segments(&plan.stitches)
+                .into_iter()
+                .map(|s| Segment {
+                    a: back.apply(s.a) - c,
+                    b: back.apply(s.b) - c,
+                    ..s
+                })
+                .collect(),
+        );
+        self.product_extras.looks.insert(
+            e.key,
+            ExtraLook {
+                segments: segments.clone(),
+                texture: None,
+            },
+        );
+        segments
+    }
+
+    /// The canvas picture of the other design `e` and the area that it
+    /// shows (view mm, its center at (0, 0)).
+    fn extra_texture(&mut self, ctx: &egui::Context, e: &ProductExtra) -> Option<(TextureHandle, BBox)> {
+        let look = emb_render::raster::Look {
+            fabric: None,
+            ..self.settings.look.picture_look(None)
+        };
+        let segments = self.extra_segments(e);
+        let l = self.product_extras.looks.get_mut(&e.key)?;
+        if let Some((t, b, made)) = &l.texture
+            && *made == look
+        {
+            return Some((t.clone(), *b));
+        }
+        let b = BBox::from_points(segments.iter().flat_map(|s| [s.a, s.b]))?.expand(1.0);
+        let px = EXTRA_PX_PER_MM.min(EXTRA_MAX_PX / b.width().max(b.height()).max(1.0));
+        let pic = emb_render::raster::picture_at_look(&segments, &[], b, px, THREAD_MM, None, &look);
+        let image = egui::ColorImage::from_rgba_unmultiplied([pic.width as usize, pic.height as usize], &pic.rgba);
+        let t = crate::resources::load_texture(ctx, format!("product-extra-{}", e.key), image, TextureOptions::LINEAR);
+        l.texture = Some((t.clone(), b, look));
+        Some((t, b))
     }
 
     fn product_texture(&mut self, ctx: &egui::Context) -> Option<TextureHandle> {
@@ -257,6 +438,20 @@ pub fn draw(painter: &egui::Painter, ctx: &egui::Context, rect: Rect, st: &mut A
     } else {
         v.bbox().expand(2.0)
     };
+    picture(painter, rect, st, &tex, b);
+    // The other designs, over the product and under the open design.
+    let keys: Vec<u64> = v.extras.iter().map(|e| e.key).collect();
+    st.product_extras.looks.retain(|k, _| keys.contains(k));
+    for e in v.extras.iter().filter(|e| e.visible) {
+        if let Some((t, b)) = st.extra_texture(ctx, e) {
+            let to = v.origin + e.at;
+            picture(painter, rect, st, &t, BBox::new(b.min + to, b.max + to));
+        }
+    }
+}
+
+/// Draws the texture `tex` on the area `b` (view mm) of the canvas.
+fn picture(painter: &egui::Painter, rect: Rect, st: &AppState, tex: &TextureHandle, b: BBox) {
     let to = |p: Point| st.view.to_screen(rect, p);
     let corners = [b.min, Point::new(b.max.x, b.min.y), b.max, Point::new(b.min.x, b.max.y)];
     let uvs = [
@@ -419,6 +614,7 @@ fn contents(ui: &mut egui::Ui, st: &mut AppState) {
             st.edit_product("Move product", Some("origin"), |p| p.origin = Point::new(x, y));
         }
     });
+    extras(ui, st, &v);
     ui.add_space(4.0);
     ui.horizontal(|ui| {
         if ui.button(tr("Zoom to product")).clicked() {
@@ -428,6 +624,102 @@ fn contents(ui: &mut egui::Ui, st: &mut AppState) {
             st.save_decoration_dialog();
         }
     });
+}
+
+/// What a row of the list of other designs changes.
+enum ExtraChange {
+    Show(usize, bool),
+    Place(usize, Point),
+    Move(usize, Point),
+    Remove(usize),
+}
+
+/// The list of the other designs on the product.
+fn extras(ui: &mut egui::Ui, st: &mut AppState, v: &ProductView) {
+    ui.separator();
+    ui.label(tr("Other designs on the product:"));
+    let units = st.settings.units;
+    let mut change = None;
+    for (i, e) in v.extras.iter().enumerate() {
+        ui.horizontal(|ui| {
+            let mut show = e.visible;
+            if ui
+                .checkbox(&mut show, &e.name)
+                .on_hover_text(tr("Show this design"))
+                .changed()
+            {
+                change = Some(ExtraChange::Show(i, show));
+            }
+            if ui.button(tr("Remove")).clicked() {
+                change = Some(ExtraChange::Remove(i));
+            }
+        });
+        ui.horizontal(|ui| {
+            ui.add_space(20.0);
+            let here = v.placement_at(e.at);
+            if v.picture.is_none() {
+                let text = here.map_or_else(|| tr("Free place").to_string(), |p| tr(p.name).to_string());
+                egui::ComboBox::from_id_salt(("product_extra_place", i))
+                    .selected_text(text)
+                    .width(110.0)
+                    .show_ui(ui, |ui| {
+                        for p in v.kind.placements() {
+                            if ui
+                                .selectable_label(here.is_some_and(|h| h.name == p.name), tr(p.name))
+                                .clicked()
+                            {
+                                change = Some(ExtraChange::Place(i, p.at));
+                            }
+                        }
+                    });
+            }
+            let (mut x, mut y) = (e.at.x, e.at.y);
+            let rx = crate::workspace::length_value(ui, &mut x, units, -5000.0, 5000.0);
+            let ry = crate::workspace::length_value(ui, &mut y, units, -5000.0, 5000.0);
+            if rx.changed() || ry.changed() {
+                change = Some(ExtraChange::Move(i, Point::new(x, y)));
+            }
+        });
+        if let (Some(p), Some((w, h))) = (v.placement_at(e.at), e.size())
+            && (w > p.max.0 + 0.5 || h > p.max.1 + 0.5)
+        {
+            ui.colored_label(
+                ui.visuals().warn_fg_color,
+                crate::i18n::fill(
+                    "{} ({} × {} mm) is larger than the usual size for {} ({} × {} mm).",
+                    &[
+                        &e.name,
+                        &format!("{w:.0}"),
+                        &format!("{h:.0}"),
+                        &tr(p.name).to_lowercase(),
+                        &format!("{:.0}", p.max.0),
+                        &format!("{:.0}", p.max.1),
+                    ],
+                ),
+            );
+        }
+    }
+    if ui
+        .button(tr("Add a design…"))
+        .on_hover_text(tr(
+            "Show one more design on the product, for example a name on a sleeve. It does not sew and does not change this design.",
+        ))
+        .clicked()
+    {
+        st.add_product_design_dialog();
+    }
+    match change {
+        Some(ExtraChange::Show(i, on)) => st.edit_extra("Show product design", None, i, |e| e.visible = on),
+        Some(ExtraChange::Place(i, at)) | Some(ExtraChange::Move(i, at)) => {
+            st.edit_extra("Move product design", Some("extra"), i, |e| e.at = at);
+        }
+        Some(ExtraChange::Remove(i)) => st.edit_product("Remove product design", None, |p| {
+            if i < p.extras.len() {
+                p.extras.remove(i);
+            }
+        }),
+        None => {}
+    }
 }
 
 /// The box that shows the product, for Zoom.
@@ -468,6 +760,88 @@ mod tests {
         assert_eq!(h.st.plan_view().plan.stitches.records, with.records);
     }
 
+    /// A project file with a small square of `color`, in a new folder.
+    fn small_project(name: &str, color: Rgb) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("emb-product-extra-{name}-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut d = emb_model::Design::new(name);
+        let t = d.add_thread("Thread", color);
+        d.add_object(
+            t,
+            emb_model::ObjectKind::Fill {
+                outer: emb_geom::Path::rect(BBox::from_center_size(Point::new(40.0, -20.0), 30.0, 20.0)),
+                holes: Vec::new(),
+                params: Default::default(),
+            },
+        );
+        let p = dir.join(format!("{name}.embproj"));
+        emb_model::project::save(&d, &p).unwrap();
+        p
+    }
+
+    #[test]
+    fn other_designs_show_on_the_product_and_in_its_picture() {
+        let mut h = Harness::new();
+        h.st.set_product(ProductKind::Polo);
+        let path = small_project("sleeve", Rgb(0, 0, 220));
+        let objects = h.st.doc.design().objects().len();
+        h.st.add_product_design(&path).unwrap();
+        let v = h.st.doc.design().product.clone().unwrap();
+        // The open design is at the left chest: the next place is free.
+        assert_eq!(v.extras.len(), 1);
+        assert_eq!(v.placement_at(v.extras[0].at).map(|p| p.name), Some("Right chest"));
+        assert_eq!(v.extras[0].size(), Some((30.0, 20.0)));
+        // Its stitches are centered on the place, in the picture on the product.
+        let segs = h.st.extra_segments(&v.extras[0]);
+        let b = BBox::from_points(segs.iter().flat_map(|s| [s.a, s.b])).unwrap();
+        assert!(b.center().distance(Point::ZERO) < 1.0, "{b:?}");
+        let with = h.st.decoration_picture().unwrap();
+        h.st.edit_extra("Show product design", None, 0, |e| e.visible = false);
+        let without = h.st.decoration_picture().unwrap();
+        let blue = |p: &emb_render::raster::Picture| {
+            p.rgba
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .filter(|c| c[2] > 150 && c[0] < 80 && c[1] < 80)
+                .count()
+        };
+        assert!(
+            blue(&with) > 1000 && blue(&without) == 0,
+            "{} {}",
+            blue(&with),
+            blue(&without)
+        );
+        // The open design does not change.
+        assert_eq!(h.st.doc.design().objects().len(), objects);
+        // Another kind keeps the design; undo takes it off.
+        h.st.edit_extra("Move product design", None, 0, |e| {
+            e.at = ProductKind::Polo.placements()[2].at
+        });
+        h.st.set_product(ProductKind::TShirt);
+        let v = h.st.doc.design().product.clone().unwrap();
+        assert_eq!(v.placement_at(v.extras[0].at).map(|p| p.name), Some("Sleeve"));
+        for _ in 0..4 {
+            h.st.doc.undo();
+        }
+        assert!(h.st.doc.design().product.as_ref().unwrap().extras.is_empty());
+        std::fs::remove_dir_all(path.parent().unwrap()).ok();
+    }
+
+    #[test]
+    fn a_file_with_no_design_is_not_added() {
+        let mut h = Harness::new();
+        let path = small_project("none", Rgb(0, 0, 0));
+        assert!(h.st.add_product_design(&path).is_err(), "no product yet");
+        h.st.set_product(ProductKind::Tote);
+        let empty = path.with_file_name("empty.embproj");
+        emb_model::project::save(&emb_model::Design::new("empty"), &empty).unwrap();
+        assert!(h.st.add_product_design(&empty).is_err());
+        assert!(h.st.add_product_design(&path.with_file_name("missing.dst")).is_err());
+        assert!(h.st.doc.design().product.as_ref().unwrap().extras.is_empty());
+        std::fs::remove_dir_all(path.parent().unwrap()).ok();
+    }
+
     #[test]
     fn the_picture_on_the_product_is_saved_as_png() {
         let mut h = Harness::new();
@@ -503,6 +877,8 @@ mod tests {
     fn the_window_and_the_canvas_draw_with_no_change() {
         let mut h = Harness::new();
         h.st.set_product(ProductKind::Cap);
+        let path = small_project("window", Rgb(0, 120, 0));
+        h.st.add_product_design(&path).unwrap();
         h.st.product_window = true;
         let state = h.st.doc.state_id();
         let ctx = egui::Context::default();
@@ -513,6 +889,10 @@ mod tests {
         }
         assert_eq!(h.st.doc.state_id(), state);
         assert!(h.st.product_tex.is_some());
+        // The other design has its canvas picture.
+        assert!(h.st.product_extras.looks.values().all(|l| l.texture.is_some()));
+        assert_eq!(h.st.product_extras.looks.len(), 1);
+        std::fs::remove_dir_all(path.parent().unwrap()).ok();
     }
 
     /// Writes a picture of the sample design on each product:
@@ -523,8 +903,15 @@ mod tests {
         let dir = std::path::PathBuf::from(std::env::var("EMB_PRODUCT_OUT").expect("set EMB_PRODUCT_OUT"));
         std::fs::create_dir_all(&dir).unwrap();
         let mut h = Harness::new();
+        let sleeve = small_project("sleeve-name", Rgb(20, 90, 200));
         for (k, kind) in ProductKind::ALL.into_iter().enumerate() {
+            h.st.doc.edit("None", |d| d.product = None);
             h.st.set_product(kind);
+            // A design on the sleeve too (P16 Milestone 2).
+            if let Some(i) = kind.placements().iter().position(|p| p.name == "Sleeve") {
+                h.st.add_product_design(&sleeve).unwrap();
+                h.st.edit_extra("Move", None, 0, |e| e.at = kind.placements()[i].at);
+            }
             let c = [
                 Rgb(250, 250, 250),
                 Rgb(30, 40, 70),

@@ -103,6 +103,11 @@ imagen PNG del diseño con el aspecto de hilo sobre el producto, para un
 cliente. El producto no se borda. Un producto dibujado tiene luz y
 sombra, pliegues y la textura de su tejido, con la luz del aspecto de
 hilo; en la imagen, el bordado tiene una sombra suave sobre él.
+**Añadir un diseño…** muestra un diseño más (un proyecto o un archivo
+de máquina) en el producto, por ejemplo un nombre en una manga con este
+diseño en el pecho izquierdo: defina su lugar en la lista **Otros
+diseños en el producto**. Se muestra en el lienzo y en la imagen, y no
+se borda.
 
 ## Repeticiones
 

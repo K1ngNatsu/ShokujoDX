@@ -74,10 +74,75 @@ pub struct ProductView {
     /// A picture of the user's own product, in place of the drawn product.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub picture: Option<ProductPicture>,
+    /// Other designs on the product (P16 Milestone 2), for example a name
+    /// on a sleeve with the open design at the left chest.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub extras: Vec<ProductExtra>,
 }
 
 fn yes() -> bool {
     true
+}
+
+/// Another design on the product. It shows on the canvas and in the
+/// picture on the product; it does not sew and does not change the open
+/// design. The project keeps a copy of the design, so it shows also when
+/// its file is not there.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProductExtra {
+    /// The name of the file of the design.
+    pub name: String,
+    /// The center of the design, in product coordinates.
+    pub at: Point,
+    #[serde(default = "yes")]
+    pub visible: bool,
+    /// A number from the contents of the design: the same design has the
+    /// same key, so the app makes its stitches once.
+    pub key: u64,
+    /// The design (with no product, backdrop or picture data of its own).
+    pub design: Design,
+}
+
+impl PartialEq for ProductExtra {
+    fn eq(&self, o: &Self) -> bool {
+        self.name == o.name && self.at == o.at && self.visible == o.visible && self.key == o.key
+    }
+}
+
+impl ProductExtra {
+    /// `design` (from the file `name`) at `at` (product coordinates).
+    pub fn new(name: &str, mut design: Design, at: Point) -> Self {
+        design.product = None;
+        design.backdrop = None;
+        let text = crate::project::to_string(&design);
+        ProductExtra {
+            name: name.to_string(),
+            at,
+            visible: true,
+            key: fnv(text.as_bytes()),
+            design,
+        }
+    }
+
+    /// The size of the design (mm), if it has stitch objects.
+    pub fn size(&self) -> Option<(f64, f64)> {
+        self.design.view_extents().map(|b| (b.width(), b.height()))
+    }
+
+    /// The center of the design in its own view coordinates. The stitches
+    /// move by `at - center` (and the product origin) onto the product.
+    pub fn center(&self) -> Point {
+        self.design
+            .view_extents()
+            .map_or(self.design.hoop.center, |b| b.center())
+    }
+}
+
+/// The FNV-1a hash of `bytes` (the same on each run and each computer).
+fn fnv(bytes: &[u8]) -> u64 {
+    bytes.iter().fold(0xcbf2_9ce4_8422_2325, |h, &b| {
+        (h ^ u64::from(b)).wrapping_mul(0x0000_0100_0000_01b3)
+    })
 }
 
 /// A picture of the user's own product. Its top left corner is at the
@@ -112,6 +177,7 @@ impl PartialEq for ProductView {
             && self.origin == o.origin
             && self.visible == o.visible
             && self.picture == o.picture
+            && self.extras == o.extras
     }
 }
 
@@ -228,13 +294,18 @@ fn folds_both(points: &[(f64, f64)], width: f64, height: f64) -> [ProductPart; 2
 fn shirt_folds() -> Vec<ProductPart> {
     let mut v = Vec::new();
     v.extend(folds_both(
-        &[(258.0, 240.0), (215.0, 320.0), (180.0, 430.0)],
+        &[(256.0, 268.0), (222.0, 345.0), (192.0, 445.0)],
         22.0,
         -1.6,
     ));
-    v.extend(folds_both(&[(250.0, 270.0), (222.0, 360.0), (205.0, 450.0)], 12.0, 0.9));
-    v.extend(folds_both(&[(250.0, 70.0), (282.0, 115.0), (318.0, 160.0)], 16.0, -1.0));
-    v.extend(folds_both(&[(272.0, 205.0), (300.0, 190.0), (326.0, 172.0)], 10.0, 0.7));
+    v.extend(folds_both(&[(250.0, 295.0), (226.0, 375.0), (210.0, 455.0)], 12.0, 0.9));
+    // Along the sleeve, and a soft ridge above the sleeve hem.
+    v.extend(folds_both(
+        &[(252.0, 100.0), (300.0, 148.0), (352.0, 186.0)],
+        16.0,
+        -1.0,
+    ));
+    v.extend(folds_both(&[(282.0, 232.0), (318.0, 206.0), (356.0, 182.0)], 10.0, 0.7));
     v.extend(folds_both(
         &[(245.0, 470.0), (240.0, 580.0), (248.0, 680.0)],
         24.0,
@@ -263,7 +334,9 @@ fn circle(x: f64, y: f64, r: f64) -> Path {
 }
 
 /// The short-sleeve garment body (T-shirt, polo) with a front neck of
-/// depth `neck` (a back has a shallow neck).
+/// depth `neck` (a back has a shallow neck). Adult M laid flat: neck 190,
+/// shoulders 460, chest 524, sleeves of 216 mm at 30° with an opening of
+/// 175 mm, length 725 mm from the neck point.
 fn short_sleeves(neck: f64) -> Path {
     use Seg::*;
     let w = 95.0;
@@ -271,14 +344,48 @@ fn short_sleeves(neck: f64) -> Path {
         (0.0, neck),
         &[
             C(w * 0.53, neck, w, neck * 0.5, w, 0.0),
-            L(235.0, 35.0),
-            L(345.0, 205.0),
-            L(285.0, 262.0),
-            L(262.0, 225.0),
-            L(270.0, 715.0),
+            L(SHOULDER.0, SHOULDER.1),
+            L(419.0, 153.0),
+            L(331.0, 305.0),
+            L(UNDERARM.0, UNDERARM.1),
+            C(259.0, 400.0, 257.0, 560.0, 264.0, 715.0),
             C(180.0, 722.0, 90.0, 725.0, 0.0, 725.0),
         ],
     )
+}
+
+/// The shoulder point and the underarm point of a short-sleeve garment.
+const SHOULDER: (f64, f64) = (230.0, 48.0);
+const UNDERARM: (f64, f64) = (262.0, 265.0);
+
+/// The lines of a short-sleeve garment: the sleeve hems, the armhole
+/// seams and the hem. `rib` is the line width.
+fn short_sleeve_lines(rib: f64) -> Vec<ProductPart> {
+    let mut v = Vec::new();
+    // 25 mm in from the sleeve opening, a little long: the lines stop at
+    // the edge of the product.
+    for p in both(&[(400.0, 136.0), (307.0, 297.0)]) {
+        v.push(ProductPart::Line(p, rib));
+    }
+    for p in armholes(SHOULDER, UNDERARM) {
+        v.push(ProductPart::Line(p, 1.5));
+    }
+    v.push(ProductPart::Line(line(&[(-280.0, 690.0), (280.0, 690.0)]), rib));
+    v
+}
+
+/// The armhole seams from the shoulder point `s` to the underarm point `u`:
+/// curves that bend out to the sleeve.
+fn armholes(s: (f64, f64), u: (f64, f64)) -> [Path; 2] {
+    let p = Point::new;
+    let seam = |m: f64| {
+        Path::new().move_to(p(m * s.0, s.1)).cubic_to(
+            p(m * (s.0 + 14.0), s.1 + (u.1 - s.1) * 0.35),
+            p(m * (u.0 - 6.0), s.1 + (u.1 - s.1) * 0.75),
+            p(m * u.0, u.1),
+        )
+    };
+    [seam(1.0), seam(-1.0)]
 }
 
 impl ProductKind {
@@ -313,88 +420,102 @@ impl ProductKind {
         let rib = 2.0;
         match self {
             ProductKind::TShirt => {
-                let [s1, s2] = both(&[(333.0, 191.0), (273.0, 248.0)]);
                 let mut v = vec![
                     Area(short_sleeves(95.0), Shade::Body),
                     Area(inside_neck(95.0, 95.0, 22.0), Shade::Dark),
                     Line(neck_line(113.0, 113.0), rib),
-                    Line(s1, rib),
-                    Line(s2, rib),
-                    Line(line(&[(-269.0, 690.0), (269.0, 690.0)]), rib),
                 ];
+                v.extend(short_sleeve_lines(rib));
                 v.extend(shirt_folds());
                 v
             }
             ProductKind::TShirtBack => {
-                let [s1, s2] = both(&[(333.0, 191.0), (273.0, 248.0)]);
                 let mut v = vec![
                     Area(short_sleeves(22.0), Shade::Body),
-                    Line(neck_line(95.0, 40.0), rib),
-                    Line(s1, rib),
-                    Line(s2, rib),
-                    Line(line(&[(-269.0, 690.0), (269.0, 690.0)]), rib),
+                    Line(neck_line(113.0, 42.0), rib),
                 ];
+                v.extend(short_sleeve_lines(rib));
                 v.extend(shirt_folds());
                 v
             }
             ProductKind::Polo => {
-                let [s1, s2] = both(&[(333.0, 191.0), (273.0, 248.0)]);
+                // A collar point lies on the chest: its fold goes round the
+                // neck from the shoulder to the top of the placket, and its
+                // outer edge goes back to the shoulder.
                 let wing = |s: f64| {
                     let p = |x: f64, y: f64| Point::new(s * x, y);
                     Path::new()
-                        .move_to(p(8.0, 100.0))
-                        .line_to(p(98.0, -6.0))
-                        .line_to(p(122.0, 6.0))
-                        .line_to(p(72.0, 142.0))
+                        .move_to(p(96.0, -4.0))
+                        .cubic_to(p(72.0, 14.0), p(28.0, 58.0), p(6.0, 94.0))
+                        .line_to(p(74.0, 132.0))
+                        .cubic_to(p(96.0, 92.0), p(114.0, 44.0), p(121.0, 10.0))
+                        .cubic_to(p(114.0, 3.0), p(105.0, -2.0), p(96.0, -4.0))
                         .close()
                 };
+                // The collar stands round the back of the neck.
+                let p = Point::new;
+                let back = Path::new()
+                    .move_to(p(-121.0, 10.0))
+                    .cubic_to(p(-80.0, -14.0), p(80.0, -14.0), p(121.0, 10.0))
+                    .line_to(p(96.0, -4.0))
+                    .cubic_to(p(55.0, 34.0), p(-55.0, 34.0), p(-96.0, -4.0))
+                    .close();
+                let placket = Path::rect(BBox::new(p(-16.0, 90.0), p(16.0, 250.0)));
                 let mut v = vec![
                     Area(short_sleeves(95.0), Shade::Body),
+                    Area(back.clone(), Shade::Body),
+                    Line(back, 1.5),
                     Area(inside_neck(95.0, 95.0, 22.0), Shade::Dark),
-                    Line(
-                        Path::rect(BBox::new(Point::new(-16.0, 95.0), Point::new(16.0, 250.0))),
-                        rib,
-                    ),
-                    Area(wing(1.0), Shade::Light),
-                    Area(wing(-1.0), Shade::Light),
-                    Line(wing(1.0), rib),
-                    Line(wing(-1.0), rib),
-                    Line(s1, rib),
-                    Line(s2, rib),
-                    Line(line(&[(-269.0, 690.0), (269.0, 690.0)]), rib),
+                    Area(placket.clone(), Shade::Body),
+                    Line(placket, rib),
+                    Area(wing(1.0), Shade::Body),
+                    Area(wing(-1.0), Shade::Body),
+                    Line(wing(1.0), 1.5),
+                    Line(wing(-1.0), 1.5),
                 ];
-                for y in [130.0, 180.0, 230.0] {
+                v.extend(short_sleeve_lines(rib));
+                for y in [125.0, 175.0, 225.0] {
                     v.push(Area(circle(0.0, y, 5.0), Shade::Dark));
                 }
+                // The collar points roll a little over the chest.
+                v.extend(folds_both(&[(104.0, 8.0), (72.0, 60.0), (44.0, 104.0)], 30.0, 1.4));
                 v.extend(shirt_folds());
                 v
             }
             ProductKind::Sweatshirt => {
+                // Adult M laid flat: the sleeves hang at 68° and narrow to a
+                // rib cuff of 100 mm; the waist rib pulls the hem in.
+                let (s, t, b, u) = ((235.0, 50.0), (460.0, 606.0), (367.0, 643.0), (265.0, 275.0));
                 let body = symmetric(
                     (0.0, 90.0),
                     &[
                         C(50.0, 90.0, 95.0, 45.0, 95.0, 0.0),
-                        L(240.0, 40.0),
-                        L(430.0, 590.0),
-                        L(370.0, 615.0),
-                        L(262.0, 240.0),
-                        L(268.0, 720.0),
-                        C(180.0, 724.0, 90.0, 725.0, 0.0, 725.0),
+                        L(s.0, s.1),
+                        L(t.0, t.1),
+                        L(b.0, b.1),
+                        L(u.0, u.1),
+                        L(266.0, 660.0),
+                        L(254.0, 722.0),
+                        C(170.0, 725.0, 90.0, 726.0, 0.0, 726.0),
                     ],
                 );
-                let [c1, c2] = both(&[(410.0, 532.0), (352.0, 557.0)]);
                 let mut v = vec![
                     Area(body, Shade::Body),
                     Area(inside_neck(95.0, 90.0, 22.0), Shade::Dark),
-                    Line(neck_line(115.0, 112.0), rib),
-                    Line(c1, rib),
-                    Line(c2, rib),
-                    Line(line(&[(-266.0, 660.0), (266.0, 660.0)]), rib),
+                    Line(neck_line(117.0, 112.0), rib),
                 ];
-                // Drape from the arms, creases at the elbows and above the
-                // cuffs, and soft folds above the waist rib.
+                // The cuff ribs (60 mm), the armhole seams and the waist rib.
+                for p in both(&[(442.0, 548.0), (340.0, 590.0)]) {
+                    v.push(Line(p, rib));
+                }
+                for p in armholes(s, u) {
+                    v.push(Line(p, 1.5));
+                }
+                v.push(Line(line(&[(-280.0, 660.0), (280.0, 660.0)]), rib));
+                // Drape from the arms, creases across the sleeves at the
+                // elbows and above the cuffs, and soft folds above the waist rib.
                 v.extend(folds_both(
-                    &[(258.0, 255.0), (218.0, 340.0), (190.0, 450.0)],
+                    &[(260.0, 285.0), (222.0, 360.0), (195.0, 455.0)],
                     22.0,
                     -1.6,
                 ));
@@ -403,9 +524,10 @@ impl ProductKind {
                     22.0,
                     -1.0,
                 ));
-                for (y, h) in [(318.0, -1.2), (352.0, 1.0), (388.0, -1.0), (498.0, -0.9), (528.0, 0.8)] {
-                    let (xo, xi) = (240.0 + (y - 40.0) / 550.0 * 190.0, 262.0 + (y - 240.0) / 375.0 * 108.0);
-                    v.extend(folds_both(&[(xi + 4.0, y + 6.0), (xo - 4.0, y - 4.0)], 12.0, h));
+                let at = |a: (f64, f64), z: (f64, f64), k: f64| (a.0 + (z.0 - a.0) * k, a.1 + (z.1 - a.1) * k);
+                for (k, h) in [(0.42, -1.2), (0.48, 1.0), (0.54, -1.0), (0.8, -0.9), (0.85, 0.8)] {
+                    let (top, under) = (at(s, t, k), at(u, b, k));
+                    v.extend(folds_both(&[at(under, top, 0.08), at(top, under, 0.08)], 12.0, h));
                 }
                 v.push(fold(&[(-200.0, 615.0), (-80.0, 632.0), (60.0, 625.0)], 24.0, 1.0));
                 v.push(fold(&[(90.0, 640.0), (200.0, 630.0)], 16.0, -0.8));
@@ -502,6 +624,7 @@ impl ProductKind {
             pl("Left chest", 110.0, 190.0, 100.0, 100.0),
             pl("Center chest", 0.0, 190.0, 250.0, 150.0),
             pl("Full front", 0.0, 330.0, 300.0, 350.0),
+            pl("Sleeve", 310.0, 190.0, 40.0, 40.0),
         ];
         const BACK: &[Placement] = &[
             pl("Below the collar", 0.0, 80.0, 100.0, 50.0),
@@ -511,12 +634,13 @@ impl ProductKind {
         const POLO: &[Placement] = &[
             pl("Left chest", 115.0, 200.0, 100.0, 90.0),
             pl("Right chest", -115.0, 200.0, 100.0, 90.0),
-            pl("Sleeve", 295.0, 200.0, 40.0, 40.0),
+            pl("Sleeve", 310.0, 190.0, 40.0, 40.0),
         ];
         const SWEAT: &[Placement] = &[
             pl("Left chest", 115.0, 200.0, 100.0, 100.0),
             pl("Center chest", 0.0, 200.0, 280.0, 160.0),
             pl("Full front", 0.0, 350.0, 320.0, 350.0),
+            pl("Sleeve", 292.0, 270.0, 40.0, 40.0),
         ];
         const CAP: &[Placement] = &[pl("Front", 0.0, -55.0, 110.0, 55.0)];
         const TOTE: &[Placement] = &[pl("Center", 0.0, 230.0, 280.0, 280.0)];
@@ -558,7 +682,52 @@ impl ProductView {
             origin: Point::ZERO,
             visible: true,
             picture: None,
+            extras: Vec::new(),
         }
+    }
+
+    /// The placement at `at` (product coordinates, within 1 mm), if any.
+    pub fn placement_at(&self, at: Point) -> Option<&'static Placement> {
+        if self.picture.is_some() {
+            return None;
+        }
+        self.kind.placements().iter().find(|p| p.at.distance(at) < 1.0)
+    }
+
+    /// A place for one more design: the first placement that has no design
+    /// (the open design or an extra), else the middle of the product.
+    pub fn free_place(&self, design: &Design) -> Point {
+        let main = self.placement_of(design).map(|p| p.name);
+        let free = self.picture.is_none().then(|| {
+            self.kind
+                .placements()
+                .iter()
+                .find(|p| Some(p.name) != main && !self.extras.iter().any(|e| e.at.distance(p.at) < 1.0))
+        });
+        match free.flatten() {
+            Some(p) => p.at,
+            None => {
+                let b = self.bbox();
+                b.center() - self.origin
+            }
+        }
+    }
+
+    /// Changes the kind of the product. Each extra at a placement goes to
+    /// the placement of the same name on the new kind, if it has one.
+    pub fn change_kind(&mut self, kind: ProductKind) {
+        for e in &mut self.extras {
+            let name = self
+                .kind
+                .placements()
+                .iter()
+                .find(|p| p.at.distance(e.at) < 1.0)
+                .map(|p| p.name);
+            if let Some(p) = name.and_then(|n| kind.placements().iter().find(|p| p.name == n)) {
+                e.at = p.at;
+            }
+        }
+        self.kind = kind;
     }
 
     /// The box of the product on the canvas (view coordinates).
@@ -630,7 +799,7 @@ mod tests {
     fn garments_are_about_the_size_of_an_adult_m() {
         let b = ProductKind::TShirt.bbox();
         // Sleeve to sleeve and the length from the neck point.
-        assert!((b.width() - 690.0).abs() < 1.0, "{b:?}");
+        assert!((b.width() - 838.0).abs() < 1.0, "{b:?}");
         assert!((b.max.y - 725.0).abs() < 1.0);
         // The outline of a symmetric product is symmetric.
         assert!((b.min.x + b.max.x).abs() < 1e-9);
@@ -654,6 +823,67 @@ mod tests {
         assert_eq!(v.placement_of(&d).map(|p| p.name), Some("Left chest"));
         // The product box moves with the origin.
         assert_eq!(v.bbox().min, ProductKind::TShirt.bbox().min + v.origin);
+    }
+
+    fn square(x: f64, y: f64, side: f64) -> Design {
+        let mut d = Design::new("logo");
+        let t = d.add_thread("Red", Rgb(200, 0, 0));
+        d.add_object(
+            t,
+            ObjectKind::Fill {
+                outer: Path::rect(BBox::from_center_size(Point::new(x, y), side, side)),
+                holes: Vec::new(),
+                params: Default::default(),
+            },
+        );
+        d
+    }
+
+    #[test]
+    fn extras_go_to_free_places_and_keep_them_on_another_kind() {
+        let main = square(30.0, 10.0, 60.0);
+        let mut v = ProductView::new(ProductKind::Polo, Rgb(255, 255, 255));
+        v.put_design_at(&main, ProductKind::Polo.placements()[0].at);
+        // The left chest has the open design: the next place is the right chest.
+        let at = v.free_place(&main);
+        assert_eq!(v.placement_at(at).map(|p| p.name), Some("Right chest"));
+        v.extras
+            .push(ProductExtra::new("name.dst", square(500.0, 500.0, 30.0), at));
+        let at = v.free_place(&main);
+        assert_eq!(v.placement_at(at).map(|p| p.name), Some("Sleeve"));
+        v.extras
+            .push(ProductExtra::new("sleeve.dst", square(0.0, 0.0, 30.0), at));
+        // The extra is centered on its place, whatever its own position.
+        let e = &v.extras[0];
+        assert_eq!(e.center(), Point::new(500.0, 500.0));
+        assert_eq!(e.size(), Some((30.0, 30.0)));
+        // A T-shirt has a sleeve too, but no right chest.
+        let right = v.extras[0].at;
+        v.change_kind(ProductKind::TShirt);
+        assert_eq!(v.placement_at(v.extras[1].at).map(|p| p.name), Some("Sleeve"));
+        assert_eq!(v.extras[0].at, right);
+    }
+
+    #[test]
+    fn an_extra_is_saved_with_the_project_and_keeps_its_key() {
+        let mut d = square(0.0, 0.0, 40.0);
+        let mut v = ProductView::new(ProductKind::TShirt, Rgb(255, 255, 255));
+        let mut logo = square(5.0, 5.0, 20.0);
+        logo.product = Some(ProductView::new(ProductKind::Cap, Rgb(0, 0, 0)));
+        let e = ProductExtra::new("logo.embproj", logo, Point::new(310.0, 190.0));
+        assert!(e.design.product.is_none(), "the copy has no product of its own");
+        assert_eq!(
+            e.key,
+            ProductExtra::new("other name", e.design.clone(), Point::ZERO).key
+        );
+        v.extras.push(e);
+        d.product = Some(v);
+        let back = crate::project::from_str(&crate::project::to_string(&d)).unwrap();
+        assert_eq!(back.product, d.product);
+        assert_eq!(back.product.unwrap().extras[0].size(), Some((20.0, 20.0)));
+        // A project of an earlier version (no extras) opens.
+        let old = crate::project::to_string(&square(0.0, 0.0, 40.0));
+        assert!(crate::project::from_str(&old).is_ok());
     }
 
     #[test]

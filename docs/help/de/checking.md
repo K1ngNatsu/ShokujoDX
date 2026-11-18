@@ -108,7 +108,12 @@ es. **Bild auf Produkt** speichert ein PNG-Bild des Designs mit der
 Garnansicht auf dem Produkt, für einen Kunden. Das Produkt wird nicht
 gestickt. Ein gezeichnetes Produkt hat Licht und Schatten, Falten und
 die Struktur seines Stoffs, im Licht der Garnansicht; im Bild wirft die
-Stickerei einen weichen Schatten darauf.
+Stickerei einen weichen Schatten darauf. **Ein Design hinzufügen…**
+zeigt ein weiteres Design (ein Projekt oder eine Maschinendatei) auf
+dem Produkt, zum Beispiel einen Namen auf einem Ärmel mit diesem Design
+auf der linken Brust: Legen Sie seine Stelle in der Liste **Andere
+Designs auf dem Produkt** fest. Es erscheint auf der Arbeitsfläche und
+im Bild und wird nicht gestickt.
 
 ## Wiederholungen
 

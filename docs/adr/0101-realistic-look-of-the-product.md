@@ -24,7 +24,15 @@ go in the repository, and a product can have any color.
 - **Folds.** `ProductPart::Fold { path, width, height }` is a soft ridge
   or valley (cos² across, low at the two ends), part of the drawing of
   each product. Folds stay out of the usual places of large designs.
-- **Seams.** A seam line (3 mm wide or less) is also a small groove.
+- **Seams.** A seam line (3 mm wide or less) is also a small groove,
+  and it stays in the areas of the product: its ends stop at the edge.
+  A wider line (a tote handle, the piping of a cushion) is a part and
+  can go out of the areas.
+- **Shapes.** The garments have the proportions of an adult M laid flat
+  (a neck of 190 mm, shoulders of 460 mm, a chest of 524 mm, short
+  sleeves at 30° with an opening of 175 mm, long sleeves at 68° with a
+  rib cuff), with armhole seams (owner, 2026-11-18: the first shapes
+  looked boxy).
 - **Light.** The light of the 3D thread look (`thread3d::Lighting`, the
   user's light) shades the height field (ambient and diffuse), with a
   little shadow at the edges. Light colors are a little darker on flat

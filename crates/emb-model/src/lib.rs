@@ -106,7 +106,7 @@ pub use object::{
     LineBorder, MeanderTile, ObjectId, ObjectKind, Ripple, RunPass, RunStyle, RunningParams, SatinGeometry,
     SatinParams, TrimMode, Underlay, UnderlayLayer,
 };
-pub use product::{Placement, ProductKind, ProductPart, ProductPicture, ProductView, Shade};
+pub use product::{Placement, ProductExtra, ProductKind, ProductPart, ProductPicture, ProductView, Shade};
 pub use repeat::RepeatSpec;
 pub use sequence::Step;
 pub use shaping::{ShapeError, ShapeOp, ShapeOptions};

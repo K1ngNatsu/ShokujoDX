@@ -28,6 +28,8 @@ const EDGE_DARK: f64 = 0.10;
 const EDGE_MM: f64 = 6.0;
 /// A seam is a groove of this depth (mm), three times as wide as its line.
 const SEAM_DEPTH: f64 = 0.5;
+/// A line of this width (mm) or less is a seam.
+const SEAM_MAX_MM: f64 = 3.0;
 /// The soft shadow of the embroidery: its darkness, its blur and how far
 /// it falls (mm).
 const SHADOW_DARK: f64 = 0.32;
@@ -59,12 +61,25 @@ pub fn weave(kind: ProductKind) -> Weave {
 }
 
 /// The areas of a drawn product in view coordinates, in drawing order:
-/// rings (even-odd) and a color. Lines become thin areas.
+/// rings (even-odd) and a color. Lines become thin areas; a seam (a line
+/// of `SEAM_MAX_MM` or less) stays in the areas of the product, so no seam
+/// end goes past the edge. Wider lines (a handle, a piping) are parts.
 pub fn areas(view: &ProductView) -> Vec<(Vec<Vec<Point>>, Rgb)> {
     let o = view.origin;
     let mv = |pts: Vec<Point>| pts.into_iter().map(|p| p + o).collect::<Vec<_>>();
-    view.kind
-        .parts()
+    let parts = view.kind.parts();
+    let mut silhouette: Vec<region::Region> = Vec::new();
+    for part in &parts {
+        if let ProductPart::Area(path, _) = part {
+            let rings: Vec<region::Region> = path
+                .flatten(FLATTEN_MM)
+                .into_iter()
+                .map(|pl| region::Region::new(pl.points, Vec::new()))
+                .collect();
+            silhouette = region::union(&silhouette, &rings);
+        }
+    }
+    parts
         .into_iter()
         .map(|part| match part {
             ProductPart::Area(path, s) => (
@@ -73,6 +88,11 @@ pub fn areas(view: &ProductView) -> Vec<(Vec<Vec<Point>>, Rgb)> {
             ),
             ProductPart::Line(path, width) => {
                 let band = region::offset_lines(&path.flatten(FLATTEN_MM), width / 2.0, Join::Round);
+                let band = if width <= SEAM_MAX_MM {
+                    region::intersection(&band, &silhouette)
+                } else {
+                    band
+                };
                 let rings = band
                     .into_iter()
                     .flat_map(|r| std::iter::once(r.outer).chain(r.holes))
@@ -302,7 +322,7 @@ fn light_factors(view: &ProductView, flat: &Picture, b: BBox, px_per_mm: f64, li
     for part in view.kind.parts() {
         let (path, width, height, taper) = match part {
             ProductPart::Fold { path, width, height } => (path, width, height, true),
-            ProductPart::Line(path, width) if width <= 3.0 => (path, 3.0 * width, -SEAM_DEPTH, false),
+            ProductPart::Line(path, width) if width <= SEAM_MAX_MM => (path, 3.0 * width, -SEAM_DEPTH, false),
             _ => continue,
         };
         for pl in path.flatten(FLATTEN_MM * 5.0) {
@@ -530,6 +550,32 @@ mod tests {
         assert!(neck[0] < 200 && neck[3] == 255, "{neck:?}");
         // Outside the shirt is clear.
         assert_eq!(pixel(&pic, b, 1.0, v.origin + Point::new(320.0, 600.0))[3], 0);
+    }
+
+    #[test]
+    fn no_seam_goes_past_the_edge_of_the_product() {
+        for kind in ProductKind::ALL {
+            let v = ProductView::new(kind, Rgb(128, 128, 128));
+            let mut body: Vec<region::Region> = Vec::new();
+            let mut drawn: Vec<region::Region> = Vec::new();
+            for (part, (rings, _)) in kind
+                .parts()
+                .iter()
+                .filter(|p| !matches!(p, ProductPart::Fold { .. }))
+                .zip(areas(&v))
+            {
+                let regions: Vec<region::Region> =
+                    rings.into_iter().map(|r| region::Region::new(r, Vec::new())).collect();
+                match part {
+                    ProductPart::Line(_, w) if *w > SEAM_MAX_MM => body = region::union(&body, &regions),
+                    ProductPart::Area(..) => body = region::union(&body, &regions),
+                    _ => {}
+                }
+                drawn = region::union(&drawn, &regions);
+            }
+            let outside: f64 = region::difference(&drawn, &body).iter().map(region::Region::area).sum();
+            assert!(outside < 1.0, "{kind:?}: {outside} mm² of seams outside");
+        }
     }
 
     #[test]

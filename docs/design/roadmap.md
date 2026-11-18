@@ -920,16 +920,17 @@ browser sews on the Topaz 20; the page works offline after the first
 visit. With step 3: a name on a towel is made on a tablet from start to
 machine file.
 
-### P16. Product view (M) — Milestone 1 in work (`docs/design/product-plan.md`)
+### P16. Product view (M) — Milestones 1 and 2 done (`docs/design/product-plan.md`)
 
 The product under the design (P7 Milestone 5) good enough to show to a
-customer (owner, 2026-11-17), in seven milestones: a realistic look
+customer (owner, 2026-11-17), in eight milestones: a realistic look
 (light, folds, fabric, the shadow of the embroidery), several placements,
 front and back, the product on the approval sheet, better products (the
-cap again, new garments), two-tone products and color swatches, and
-masks and templates for the user's own product photos.
+cap again, new garments), two-tone products and color swatches, masks
+and templates for the user's own product photos, and a turntable view
+(the product turns in steps; owner, 2026-11-18).
 
-**Exit:** the exit tests of the seven milestones in the plan.
+**Exit:** the exit tests of the eight milestones in the plan.
 
 ## Dependencies
 
