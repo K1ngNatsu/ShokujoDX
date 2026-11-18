@@ -80,28 +80,64 @@ pub fn weave(kind: ProductKind) -> Weave {
 /// rings (even-odd) and a color. Lines become thin areas; a seam (a line
 /// of `SEAM_MAX_MM` or less) stays in the areas of the product, so no seam
 /// end goes past the edge. Wider lines (a handle, a piping) are parts.
+///
+/// A trim part (P16 Milestone 6) is cut at the edge of the product. On a
+/// product with a trim color, each piece of a line is darker than the
+/// color of the area under it, so a seam on a white cap front is light.
 pub fn areas(view: &ProductView) -> Vec<(Vec<Vec<Point>>, Rgb)> {
     let o = view.origin;
     let mv = |pts: Vec<Point>| pts.into_iter().map(|p| p + o).collect::<Vec<_>>();
+    let rings_of = |regions: Vec<region::Region>| -> Vec<Vec<Point>> {
+        regions
+            .into_iter()
+            .flat_map(|r| std::iter::once(r.outer).chain(r.holes))
+            .map(mv)
+            .collect()
+    };
+    let regions_of = |path: &emb_geom::Path| -> Vec<region::Region> {
+        path.flatten(FLATTEN_MM)
+            .into_iter()
+            .map(|pl| region::Region::new(pl.points, Vec::new()))
+            .fold(Vec::new(), |a, r| region::union(&a, &[r]))
+    };
     let parts = view.kind.parts();
     let mut silhouette: Vec<region::Region> = Vec::new();
     for part in &parts {
-        if let ProductPart::Area(path, _) = part {
-            let rings: Vec<region::Region> = path
-                .flatten(FLATTEN_MM)
-                .into_iter()
-                .map(|pl| region::Region::new(pl.points, Vec::new()))
-                .collect();
-            silhouette = region::union(&silhouette, &rings);
+        if let ProductPart::Area(path, s) = part
+            && !matches!(s, Shade::Trim { .. })
+        {
+            silhouette = region::union(&silhouette, &regions_of(path));
         }
     }
-    parts
-        .into_iter()
-        .map(|part| match part {
-            ProductPart::Area(path, s) => (
-                path.flatten(FLATTEN_MM).into_iter().map(|pl| mv(pl.points)).collect(),
-                shade(view.color, s),
-            ),
+    let two_tone = view.trim.is_some();
+    let dark = shade(view.color, Shade::Dark);
+    // On a two-tone product: the areas drawn so far, their box and the
+    // color of a line on them.
+    let mut painted: Vec<(Vec<region::Region>, Option<BBox>, Rgb)> = Vec::new();
+    let mut out = Vec::new();
+    for part in parts {
+        match part {
+            ProductPart::Area(path, s) => {
+                let Some(color) = view.part_color(s) else {
+                    continue;
+                };
+                let trim = view.trim.as_ref().filter(|_| matches!(s, Shade::Trim { .. }));
+                if !two_tone {
+                    out.push((
+                        path.flatten(FLATTEN_MM).into_iter().map(|pl| mv(pl.points)).collect(),
+                        color,
+                    ));
+                    continue;
+                }
+                let mut regions = regions_of(&path);
+                if trim.is_some() {
+                    regions = region::intersection(&regions, &silhouette);
+                }
+                let line = trim.map_or(dark, |t| shade(t.color, Shade::Dark));
+                let b = regions.iter().filter_map(region::Region::bbox).reduce(BBox::union);
+                painted.push((regions.clone(), b, line));
+                out.push((rings_of(regions), color));
+            }
             ProductPart::Line(path, width) => {
                 let band = region::offset_lines(&path.flatten(FLATTEN_MM), width / 2.0, Join::Round);
                 let band = if width <= SEAM_MAX_MM {
@@ -109,18 +145,33 @@ pub fn areas(view: &ProductView) -> Vec<(Vec<Vec<Point>>, Rgb)> {
                 } else {
                     band
                 };
-                let rings = band
-                    .into_iter()
-                    .flat_map(|r| std::iter::once(r.outer).chain(r.holes))
-                    .map(mv)
-                    .collect();
-                (rings, shade(view.color, Shade::Dark))
+                if !two_tone {
+                    out.push((rings_of(band), dark));
+                    continue;
+                }
+                // The top area under each piece of the line gives its color.
+                let mut rest = band;
+                for (regions, b, line) in painted.iter().rev() {
+                    let Some(rb) = rest.iter().filter_map(region::Region::bbox).reduce(BBox::union) else {
+                        break;
+                    };
+                    if !b.is_some_and(|b| rb.intersects(&b)) {
+                        continue;
+                    }
+                    let piece = region::intersection(&rest, regions);
+                    if !piece.is_empty() {
+                        rest = region::difference(&rest, regions);
+                        out.push((rings_of(piece), *line));
+                    }
+                }
+                out.push((rings_of(rest), dark));
             }
             // A fold has no color (see `light_factors`).
-            ProductPart::Fold { .. } => (Vec::new(), view.color),
-        })
-        .filter(|(rings, _)| !rings.is_empty())
-        .collect()
+            ProductPart::Fold { .. } => {}
+        }
+    }
+    out.retain(|(rings, _): &(Vec<Vec<Point>>, Rgb)| !rings.is_empty());
+    out
 }
 
 /// The light of a drawn product at a size: a brightness factor for each
@@ -593,7 +644,7 @@ mod tests {
             for (part, (rings, _)) in kind
                 .parts()
                 .iter()
-                .filter(|p| !matches!(p, ProductPart::Fold { .. }))
+                .filter(|p| !matches!(p, ProductPart::Fold { .. } | ProductPart::Area(_, Shade::Trim { .. })))
                 .zip(areas(&v))
             {
                 let regions: Vec<region::Region> =
@@ -607,6 +658,69 @@ mod tests {
             }
             let outside: f64 = region::difference(&drawn, &body).iter().map(region::Region::area).sum();
             assert!(outside < 1.0, "{kind:?}: {outside} mm² of seams outside");
+        }
+    }
+
+    #[test]
+    fn a_trim_color_goes_on_the_trim_parts_only() {
+        // A navy cap with a white front, and a gray polo with a black collar.
+        let px = 2.0;
+        let mut cap = ProductView::new(ProductKind::Cap, Rgb(30, 38, 66));
+        cap.trim = Some(emb_model::Trim {
+            color: Rgb(250, 250, 250),
+            off: vec!["Brim".into(), "Button".into()],
+        });
+        let (pic, b) = product_picture(&cap, px);
+        let front = pixel(&pic, b, px, cap.origin + Point::new(30.0, -40.0));
+        let side = pixel(&pic, b, px, cap.origin + Point::new(95.0, -40.0));
+        let brim = pixel(&pic, b, px, cap.origin + Point::new(0.0, 40.0));
+        assert!(front[0] > 200 && front[2] > 200, "{front:?}");
+        assert!(side[0] < 60 && brim[0] < 60, "{side:?} {brim:?}");
+        // The front seam on the white front is light, not navy.
+        let seam = pixel(&pic, b, px, cap.origin + Point::new(0.0, -60.0));
+        assert!(seam[0] > 130, "{seam:?}");
+
+        let mut polo = ProductView::new(ProductKind::Polo, Rgb(170, 170, 172));
+        polo.trim = Some(emb_model::Trim {
+            color: Rgb(24, 24, 26),
+            off: vec!["Sleeve cuffs".into()],
+        });
+        let (pic, b) = product_picture(&polo, px);
+        let collar = pixel(&pic, b, px, polo.origin + Point::new(60.0, 60.0));
+        let chest = pixel(&pic, b, px, polo.origin + Point::new(110.0, 300.0));
+        let cuff = pixel(&pic, b, px, polo.origin + Point::new(395.0, 175.0));
+        assert!(collar[0] < 70, "{collar:?}");
+        assert!(chest[0] > 120 && cuff[0] > 120, "{chest:?} {cuff:?}");
+        // With the cuffs on, the cuffs are black too.
+        polo.set_trim_on("Sleeve cuffs", true);
+        let (pic, b) = product_picture(&polo, px);
+        assert!(pixel(&pic, b, px, polo.origin + Point::new(395.0, 175.0))[0] < 70);
+    }
+
+    #[test]
+    fn no_trim_part_goes_past_the_edge_of_the_product() {
+        for kind in ProductKind::ALL {
+            let plain = ProductView::new(kind, Rgb(128, 128, 128));
+            let mut two = plain.clone();
+            two.trim = Some(emb_model::Trim {
+                color: Rgb(20, 20, 20),
+                off: Vec::new(),
+            });
+            let union = |v: &ProductView| {
+                areas(v).into_iter().fold(Vec::new(), |a, (rings, _)| {
+                    let r: Vec<region::Region> =
+                        rings.into_iter().map(|r| region::Region::new(r, Vec::new())).collect();
+                    region::union(&a, &r)
+                })
+            };
+            let outside: f64 = region::difference(&union(&two), &union(&plain))
+                .iter()
+                .map(region::Region::area)
+                .sum();
+            assert!(outside < 1.0, "{kind:?}: {outside} mm² of trim outside");
+            if !kind.trims().is_empty() {
+                assert!(areas(&two).len() > areas(&plain).len(), "{kind:?} shows no trim");
+            }
         }
     }
 

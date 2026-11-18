@@ -110,6 +110,11 @@ picture, and it does not sew. A garment has a front and a back:
 shows the other side, and the design goes to the same place on it.
 Each other design is on a side. With **Both sides in the picture**,
 the saved picture shows the front and the back next to each other.
+The swatches under **Color** are the usual colors of blank garments.
+With **Trim color**, the trim parts of the product (for example the
+collar of a polo, the front panels or the brim of a cap, the cuffs of a
+sweatshirt) get a second color; clear a part in **Trim parts** to give
+it the product color.
 
 ## Repeats
 

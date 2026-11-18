@@ -114,7 +114,12 @@ se borda. Una prenda tiene delantera y espalda: **Lado** en la ventana
 Producto (o **Girar producto**, Ctrl+Mayús+T) muestra el otro lado, y
 el diseño va al mismo lugar en él. Cada otro diseño está en un lado.
 Con **Ambos lados en la imagen**, la imagen guardada muestra la
-delantera y la espalda una al lado de la otra.
+delantera y la espalda una al lado de la otra. Las muestras bajo
+**Color** son los colores habituales de las prendas lisas. Con **Color
+del ribete**, las partes de ribete del producto (por ejemplo el cuello
+de un polo, los paneles delanteros o la visera de una gorra, los puños
+de una sudadera) reciben un segundo color; desmarque una parte en
+**Partes del ribete** para darle el color del producto.
 
 ## Repeticiones
 

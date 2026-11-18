@@ -12,13 +12,96 @@ use std::sync::Arc;
 
 use eframe::egui::{self, Color32, Mesh, Pos2, Rect, TextureHandle, TextureOptions};
 use emb_geom::{BBox, Point};
-use emb_model::{MergeKey, ProductExtra, ProductKind, ProductPicture, ProductView, Rgb, Side};
+use emb_model::product::SWATCHES;
+use emb_model::{MergeKey, ProductExtra, ProductKind, ProductPicture, ProductView, Rgb, Side, Trim};
 use emb_render::Segment;
 use emb_stitch::{PlanOptions, StitchCache, build_plan};
 
 use crate::app::AppState;
 use crate::file::Notice;
 use crate::i18n::tr;
+
+/// The trim color of the product and its trim parts (P16 Milestone 6).
+fn trim_ui(ui: &mut egui::Ui, st: &mut AppState, v: &ProductView) {
+    let names = v.kind.trims();
+    if names.is_empty() {
+        return;
+    }
+    let mut two = v.trim.is_some();
+    if ui
+        .checkbox(&mut two, tr("Trim color"))
+        .on_hover_text(tr(
+            "Give the trim parts of the product a second color, for example the collar of a polo or the front of a cap.",
+        ))
+        .changed()
+    {
+        // Black trim on a light product, white trim on a dark product.
+        let luma = 0.299 * f64::from(v.color.0) + 0.587 * f64::from(v.color.1) + 0.114 * f64::from(v.color.2);
+        let color = if luma < 128.0 { SWATCHES[0].1 } else { SWATCHES[5].1 };
+        st.edit_product("Trim color", None, |p| {
+            p.trim = two.then(|| Trim {
+                color,
+                off: Vec::new(),
+            });
+        });
+    }
+    let Some(t) = &v.trim else {
+        return;
+    };
+    ui.horizontal(|ui| {
+        ui.label(tr("Trim parts"));
+        let mut c = [t.color.0, t.color.1, t.color.2];
+        if ui.color_edit_button_srgb(&mut c).changed() {
+            st.edit_product("Trim color", Some("trim"), |p| {
+                if let Some(t) = p.trim.as_mut() {
+                    t.color = Rgb(c[0], c[1], c[2]);
+                }
+            });
+        }
+    });
+    if let Some(c) = color_swatches(ui, t.color) {
+        st.edit_product("Trim color", None, |p| {
+            if let Some(t) = p.trim.as_mut() {
+                t.color = c;
+            }
+        });
+    }
+    ui.horizontal_wrapped(|ui| {
+        for name in names {
+            let mut on = v.trim_on(name);
+            if ui.checkbox(&mut on, tr(name)).changed() {
+                st.edit_product("Trim parts", None, |p| p.set_trim_on(name, on));
+            }
+        }
+    });
+}
+
+/// A row of small swatches of the usual garment colors (`now` has a
+/// ring). Returns the color that was clicked.
+fn color_swatches(ui: &mut egui::Ui, now: Rgb) -> Option<Rgb> {
+    let mut pick = None;
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing = egui::vec2(3.0, 3.0);
+        for (name, c) in SWATCHES {
+            let (rect, resp) = ui.allocate_exact_size(egui::Vec2::splat(18.0), egui::Sense::click());
+            ui.painter().rect_filled(rect, 3.0, Color32::from_rgb(c.0, c.1, c.2));
+            let ring = if c == now {
+                egui::Stroke::new(2.0, ui.visuals().selection.stroke.color)
+            } else {
+                egui::Stroke::new(1.0, ui.visuals().weak_text_color())
+            };
+            ui.painter().rect_stroke(rect, 3.0, ring, egui::StrokeKind::Outside);
+            let name = tr(name);
+            if crate::a11y::named_toggle(resp, name, c == now)
+                .on_hover_text(name)
+                .clicked()
+            {
+                pick = Some(c);
+            }
+        }
+    });
+    pick
+}
 
 /// Pixels for each mm of the product texture on the canvas.
 const TEXTURE_PX_PER_MM: f64 = 2.0;
@@ -54,17 +137,20 @@ const WHITE: Rgb = Rgb(250, 250, 250);
 /// The texture of the product, and what it shows. The shading of the
 /// drawn product stays while only the color changes (P16 Milestone 1).
 pub struct ProductTexture {
-    key: (ProductKind, Rgb, usize, usize),
+    key: TextureKey,
     texture: TextureHandle,
     shading: Option<Arc<emb_render::product::Shading>>,
 }
 
-fn key(v: &ProductView) -> (ProductKind, Rgb, usize, usize) {
+/// What the texture of the product shows: the kind, the colors and the photo.
+type TextureKey = (ProductKind, Rgb, Option<Trim>, usize, usize);
+
+fn key(v: &ProductView) -> TextureKey {
     let (ptr, len) = v
         .picture
         .as_ref()
         .map_or((0, 0), |p| (Arc::as_ptr(&p.data) as usize, p.data.len()));
-    (v.kind, v.color, ptr, len)
+    (v.kind, v.color, v.trim.clone(), ptr, len)
 }
 
 impl AppState {
@@ -94,6 +180,7 @@ impl AppState {
             let mut moved = old;
             moved.change_kind(kind);
             v.extras = moved.extras;
+            v.trim = moved.trim;
         }
         if let Some(p) = kind.placements().first() {
             v.put_design_at(self.doc.design(), p.at);
@@ -675,6 +762,10 @@ fn contents(ui: &mut egui::Ui, st: &mut AppState) {
                 st.edit_product("Product color", Some("color"), |p| p.color = Rgb(c[0], c[1], c[2]));
             }
         });
+        if let Some(c) = color_swatches(ui, v.color) {
+            st.edit_product("Product color", None, |p| p.color = c);
+        }
+        trim_ui(ui, st, &v);
         ui.add_space(4.0);
         ui.label(tr("Put the design at:"));
         let design = st.doc.design().clone();
@@ -1141,5 +1232,71 @@ mod tests {
             p.color = Rgb(30, 40, 70);
         });
         h.st.save_decoration(&dir.join("TShirtBothSides.png")).unwrap();
+        // Two-tone products (P16 Milestone 6): each product with all its
+        // trim parts on, then the exit test: a navy cap with a white front
+        // and a gray polo with a black collar.
+        let two_tone = |h: &mut Harness, kind: ProductKind, color: Rgb, trim: Rgb, off: &[&str]| {
+            h.st.doc.edit("None", |d| d.product = None);
+            h.st.set_product(kind);
+            h.st.edit_product("Colors", None, |p| {
+                p.color = color;
+                p.trim = Some(Trim {
+                    color: trim,
+                    off: off.iter().map(|s| s.to_string()).collect(),
+                });
+            });
+        };
+        for kind in ProductKind::ALL.into_iter().filter(|k| !k.trims().is_empty()) {
+            two_tone(&mut h, kind, Rgb(200, 30, 40), Rgb(250, 250, 250), &[]);
+            h.st.save_decoration(&dir.join(format!("{kind:?}Trim.png"))).unwrap();
+        }
+        two_tone(
+            &mut h,
+            ProductKind::Cap,
+            Rgb(30, 38, 66),
+            Rgb(250, 250, 250),
+            &["Brim", "Button"],
+        );
+        h.st.save_decoration(&dir.join("CapWhiteFront.png")).unwrap();
+        two_tone(
+            &mut h,
+            ProductKind::Polo,
+            Rgb(170, 170, 172),
+            Rgb(24, 24, 26),
+            &["Sleeve cuffs"],
+        );
+        h.st.save_decoration(&dir.join("PoloBlackCollar.png")).unwrap();
+    }
+
+    #[test]
+    fn a_trim_color_stays_with_another_product() {
+        let mut h = Harness::new();
+        h.st.set_product(ProductKind::Polo);
+        h.st.edit_product("Trim color", None, |p| {
+            p.trim = Some(Trim {
+                color: Rgb(24, 24, 26),
+                off: Vec::new(),
+            });
+        });
+        h.st.edit_product("Trim parts", None, |p| p.set_trim_on("Sleeve cuffs", false));
+        let v = h.st.doc.design().product.clone().unwrap();
+        assert!(v.trim_on("Collar") && !v.trim_on("Sleeve cuffs"));
+        // Another product keeps the trim color; its parts have it.
+        h.st.set_product(ProductKind::Cap);
+        let v = h.st.doc.design().product.clone().unwrap();
+        assert_eq!(v.trim.as_ref().map(|t| t.color), Some(Rgb(24, 24, 26)));
+        assert!(v.trim_on("Front panels"));
+        // Each change is one undo step.
+        h.st.doc.undo();
+        h.st.doc.undo();
+        let v = h.st.doc.design().product.clone().unwrap();
+        assert!(v.trim_on("Sleeve cuffs"));
+        // The window draws a two-tone product with no change.
+        h.st.product_window = true;
+        let state = h.st.doc.state_id();
+        let ctx = egui::Context::default();
+        let mut out = ctx.run_ui(Default::default(), |ui| window(ui.ctx(), &mut h.st));
+        out.textures_delta.clear();
+        assert_eq!(h.st.doc.state_id(), state);
     }
 }

@@ -119,7 +119,12 @@ Vorder- und eine Rückseite: **Seite** im Fenster Produkt (oder
 **Produkt drehen**, Strg+Umschalt+T) zeigt die andere Seite, und das
 Design kommt an dieselbe Stelle darauf. Jedes andere Design ist auf
 einer Seite. Mit **Beide Seiten im Bild** zeigt das gespeicherte Bild
-Vorder- und Rückseite nebeneinander.
+Vorder- und Rückseite nebeneinander. Die Farbfelder unter **Farbe**
+sind die üblichen Farben von Rohlingen. Mit **Besatzfarbe** bekommen
+die Besatzteile des Produkts (zum Beispiel der Kragen eines Polos, die
+Vorderteile oder der Schirm einer Kappe, die Bündchen eines
+Sweatshirts) eine zweite Farbe; entfernen Sie ein Teil in
+**Besatzteile**, damit es die Produktfarbe hat.
 
 ## Wiederholungen
 

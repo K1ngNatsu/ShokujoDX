@@ -375,6 +375,12 @@ pub(crate) mod tests {
         out.extend(
             emb_model::ProductKind::ALL
                 .iter()
+                .flat_map(|p| p.trims().iter().copied()),
+        );
+        out.extend(emb_model::product::SWATCHES.iter().map(|(n, _)| *n));
+        out.extend(
+            emb_model::ProductKind::ALL
+                .iter()
                 .flat_map(|p| p.placements().iter().map(|pl| pl.name)),
         );
         out.extend(emb_library::SortKey::ALL.iter().map(|k| k.label()));

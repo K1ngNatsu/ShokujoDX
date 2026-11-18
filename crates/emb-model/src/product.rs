@@ -50,12 +50,20 @@ pub enum Side {
     Back,
 }
 
-/// How a part of a product is colored: the product color, darker, or lighter.
+/// How a part of a product is colored: the product color, darker, or
+/// lighter, or the trim color (P16 Milestone 6).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Shade {
     Body,
     Dark,
     Light,
+    /// A trim part: the part `group` of [`ProductKind::trims`] in the trim
+    /// color (darker with `dark`). It shows only when the product has a
+    /// trim color for it; it lies on the parts in the product color.
+    Trim {
+        group: u8,
+        dark: bool,
+    },
 }
 
 /// One part of the drawing of a product, in product coordinates.
@@ -100,7 +108,44 @@ pub struct ProductView {
     /// to each other (P16 Milestone 3).
     #[serde(default, skip_serializing_if = "is_false")]
     pub both_sides: bool,
+    /// A second color for the trim parts (P16 Milestone 6), for example
+    /// the collar of a polo or the front of a cap.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trim: Option<Trim>,
 }
+
+/// The trim color of a product, and the trim parts that do not take it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Trim {
+    pub color: Rgb,
+    /// The names (of [`ProductKind::trims`]) of the trim parts in the
+    /// product color. The names stay when the product changes, so a part
+    /// of the same name on the new product stays off too.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub off: Vec<String>,
+}
+
+/// The usual colors of blank garments, with generic names (P16 Milestone 6).
+pub const SWATCHES: [(&str, Rgb); 18] = [
+    ("White", Rgb(250, 250, 250)),
+    ("Natural", Rgb(238, 230, 211)),
+    ("Ash", Rgb(214, 214, 210)),
+    ("Heather gray", Rgb(170, 170, 172)),
+    ("Charcoal", Rgb(70, 72, 76)),
+    ("Black", Rgb(24, 24, 26)),
+    ("Navy", Rgb(30, 38, 66)),
+    ("Royal blue", Rgb(32, 72, 160)),
+    ("Light blue", Rgb(150, 190, 225)),
+    ("Kelly green", Rgb(20, 135, 75)),
+    ("Forest green", Rgb(32, 70, 48)),
+    ("Military green", Rgb(92, 96, 64)),
+    ("Red", Rgb(200, 30, 40)),
+    ("Maroon", Rgb(100, 28, 40)),
+    ("Orange", Rgb(240, 110, 30)),
+    ("Gold", Rgb(245, 180, 30)),
+    ("Light pink", Rgb(244, 196, 208)),
+    ("Purple", Rgb(80, 45, 125)),
+];
 
 fn is_false(b: &bool) -> bool {
     !*b
@@ -213,6 +258,7 @@ impl PartialEq for ProductView {
             && self.picture == o.picture
             && self.extras == o.extras
             && self.both_sides == o.both_sides
+            && self.trim == o.trim
     }
 }
 
@@ -238,7 +284,8 @@ pub fn shade(color: Rgb, s: Shade) -> Rgb {
         Rgb(c(color.0), c(color.1), c(color.2))
     };
     match s {
-        Shade::Body => color,
+        Shade::Body | Shade::Trim { dark: false, .. } => color,
+        Shade::Trim { dark: true, .. } => shade(color, Shade::Dark),
         Shade::Dark if luma < 70.0 => lift(0.22),
         Shade::Dark => scale(0.72),
         Shade::Light => lift(0.25),
@@ -352,6 +399,30 @@ fn shirt_folds() -> Vec<ProductPart> {
     v
 }
 
+/// A trim part `group` (see [`ProductKind::trims`]) of the shape `path`.
+/// It can go a little past the edge of the product: the drawing cuts it
+/// at the edge.
+fn trim(path: Path, group: u8) -> ProductPart {
+    ProductPart::Area(path, Shade::Trim { group, dark: false })
+}
+
+/// The rib band round a neck: from the neck line (±`out_w`, depth
+/// `out_depth`) in to the neck edge (±`w`, depth `neck`).
+fn neck_band(w: f64, neck: f64, out_w: f64, out_depth: f64) -> Path {
+    let p = Point::new;
+    neck_line(out_w, out_depth)
+        .line_to(p(w, 0.0))
+        .cubic_to(p(w, neck * 0.5), p(w * 0.53, neck), p(0.0, neck))
+        .cubic_to(p(-w * 0.53, neck), p(-w, neck * 0.5), p(-w, 0.0))
+        .close()
+}
+
+/// A band of a sleeve (a hem, a cuff) as two trim parts: the quadrangle
+/// `quad` (a hem line and two points past the opening) and its mirror.
+fn sleeve_bands(quad: [(f64, f64); 4], group: u8) -> [ProductPart; 2] {
+    both(&quad).map(|p| trim(p.close(), group))
+}
+
 /// The area that shows the inside of the back neck through a front neck.
 fn inside_neck(w: f64, front: f64, back: f64) -> Path {
     let p = Point::new;
@@ -396,7 +467,11 @@ const UNDERARM: (f64, f64) = (262.0, 265.0);
 /// The lines of a short-sleeve garment: the sleeve hems, the armhole
 /// seams and the hem. `rib` is the line width.
 fn short_sleeve_lines(rib: f64) -> Vec<ProductPart> {
-    let mut v = Vec::new();
+    // The sleeve hems are trim part 1 (T-shirt: sleeve hems, polo: cuffs).
+    let mut v = Vec::from(sleeve_bands(
+        [(400.0, 136.0), (307.0, 297.0), (345.0, 318.0), (440.0, 150.0)],
+        1,
+    ));
     // 25 mm in from the sleeve opening, a little long: the lines stop at
     // the edge of the product.
     for p in both(&[(400.0, 136.0), (307.0, 297.0)]) {
@@ -473,13 +548,26 @@ fn fleece_top(back: bool, hood: bool) -> Vec<ProductPart> {
     match (back, hood) {
         (false, false) => {
             v.push(Area(inside_neck(95.0, 90.0, 22.0), Shade::Dark));
+            v.push(trim(neck_band(95.0, 90.0, 117.0, 112.0), 0));
             v.push(Line(neck_line(117.0, 112.0), rib));
         }
-        (true, false) => v.push(Line(neck_line(117.0, 44.0), rib)),
+        (true, false) => {
+            v.push(trim(neck_band(95.0, 22.0, 117.0, 44.0), 0));
+            v.push(Line(neck_line(117.0, 44.0), rib));
+        }
         (false, true) => v.extend(hood_front()),
         (true, true) => v.extend(hood_back()),
     }
-    // The cuff ribs (60 mm), the armhole seams and the waist rib.
+    // The cuff ribs (60 mm) and the waist rib are trim part 1.
+    v.extend(sleeve_bands(
+        [(599.0, 445.0), (517.0, 518.0), (575.0, 590.0), (665.0, 505.0)],
+        1,
+    ));
+    v.push(trim(
+        Path::rect(BBox::new(Point::new(-300.0, 660.0), Point::new(300.0, 740.0))),
+        1,
+    ));
+    // The cuff ribs, the armhole seams and the waist rib.
     for p in both(&[(599.0, 445.0), (517.0, 518.0)]) {
         v.push(Line(p, rib));
     }
@@ -553,6 +641,7 @@ fn hood_front() -> Vec<ProductPart> {
         Area(hood.clone(), Shade::Body),
         Line(hood, 1.5),
         Area(lining.clone(), Shade::Dark),
+        Area(lining.clone(), Shade::Trim { group: 0, dark: true }),
         Line(lining, 2.0),
     ];
     // The hood edge rolls a little.
@@ -634,11 +723,17 @@ fn long_tee(back: bool) -> Vec<ProductPart> {
     );
     let mut v = vec![Area(body, Shade::Body)];
     if back {
+        v.push(trim(neck_band(95.0, 22.0, 113.0, 42.0), 0));
         v.push(Line(neck_line(113.0, 42.0), rib));
     } else {
         v.push(Area(inside_neck(95.0, 95.0, 22.0), Shade::Dark));
+        v.push(trim(neck_band(95.0, 95.0, 113.0, 113.0), 0));
         v.push(Line(neck_line(113.0, 113.0), rib));
     }
+    v.extend(sleeve_bands(
+        [(618.0, 471.0), (543.0, 539.0), (580.0, 575.0), (650.0, 505.0)],
+        1,
+    ));
     // The cuff hems (25 mm), the armhole seams and the hem.
     for p in both(&[(618.0, 471.0), (543.0, 539.0)]) {
         v.push(Line(p, rib));
@@ -693,8 +788,18 @@ fn cap() -> Vec<ProductPart> {
             C(104.0, 44.0, 64.0, 58.0, 0.0, 60.0),
         ],
     );
+    // The two front panels between the side seams (trim part 0).
+    let front = Path::new()
+        .move_to(p(0.0, -126.0))
+        .cubic_to(p(42.0, -118.0), p(68.0, -72.0), p(74.0, 3.0))
+        .line_to(p(74.0, 12.0))
+        .line_to(p(-74.0, 12.0))
+        .line_to(p(-74.0, 3.0))
+        .cubic_to(p(-68.0, -72.0), p(-42.0, -118.0), p(0.0, -126.0))
+        .close();
     let mut v = vec![
         Area(crown, Shade::Body),
+        trim(front, 0),
         // The front seam and the side seams from the button to the brim.
         Line(line(&[(0.0, -126.0), (0.0, 4.0)]), 1.5),
     ];
@@ -718,6 +823,7 @@ fn cap() -> Vec<ProductPart> {
         ));
     }
     v.push(Area(brim.clone(), Shade::Body));
+    v.push(trim(brim.clone(), 1));
     v.push(Line(brim, 1.5));
     // Rows of stitches along the front edge of the brim: the edge moved in
     // by 6 to 24 mm, square to it.
@@ -751,6 +857,7 @@ fn cap() -> Vec<ProductPart> {
     // The brim is curved: lighter in the middle.
     v.push(fold(&[(-95.0, 22.0), (0.0, 34.0), (95.0, 22.0)], 30.0, 2.0));
     v.push(Area(circle(0.0, -127.0, 8.0), Shade::Dark));
+    v.push(trim(circle(0.0, -127.0, 8.0), 2));
     v
 }
 
@@ -782,6 +889,7 @@ fn apron() -> Vec<ProductPart> {
         Line(line(&[(-310.0, 262.0), (310.0, 262.0)]), rib),
         Line(line(&[(-310.0, 840.0), (310.0, 840.0)]), rib),
         Area(pocket.clone(), Shade::Body),
+        trim(pocket.clone(), 0),
         Line(pocket, rib),
         Line(line(&[(0.0, 470.0), (0.0, 650.0)]), rib),
     ];
@@ -820,6 +928,10 @@ fn beanie() -> Vec<ProductPart> {
     );
     let mut v = vec![
         Area(body, Shade::Body),
+        trim(
+            Path::rect(BBox::new(Point::new(-130.0, 160.0), Point::new(130.0, 250.0))),
+            0,
+        ),
         Line(line(&[(-120.0, 160.0), (120.0, 160.0)]), 2.5),
     ];
     // The cuff folds over: a soft roll at its top.
@@ -870,6 +982,7 @@ fn messenger() -> Vec<ProductPart> {
         // The bottom of the bag sags a little.
         fold(&[(-160.0, 285.0), (0.0, 292.0), (160.0, 285.0)], 20.0, -1.0),
         Area(flap.clone(), Shade::Body),
+        trim(flap.clone(), 0),
         Line(flap, 2.0),
         Line(stitches, 0.8),
         // The flap throws a shadow on the bag under its edge.
@@ -878,6 +991,7 @@ fn messenger() -> Vec<ProductPart> {
     for m in [-1.0, 1.0] {
         let band = Path::rect(BBox::new(p(m * 135.0 - 10.0, 150.0), p(m * 135.0 + 10.0, 250.0)));
         v.push(Area(band.clone(), Shade::Body));
+        v.push(trim(band.clone(), 1));
         v.push(Line(band, 1.5));
         v.push(Area(
             Path::rect(BBox::new(p(m * 135.0 - 13.0, 195.0), p(m * 135.0 + 13.0, 220.0))),
@@ -956,6 +1070,25 @@ impl ProductKind {
         }
     }
 
+    /// The names of the trim parts of the product (the same on both
+    /// sides): `Shade::Trim { group, .. }` is the part `group`. The trim
+    /// color goes on them (P16 Milestone 6).
+    pub fn trims(self) -> &'static [&'static str] {
+        match self.front() {
+            ProductKind::TShirt => &["Neck rib", "Sleeve hems"],
+            ProductKind::LongSleeve => &["Neck rib", "Cuffs"],
+            ProductKind::Polo => &["Collar", "Sleeve cuffs"],
+            ProductKind::Sweatshirt => &["Neck rib", "Cuffs and waist rib"],
+            ProductKind::Hoodie => &["Hood lining", "Cuffs and waist rib"],
+            ProductKind::Cap => &["Front panels", "Brim", "Button"],
+            ProductKind::Beanie => &["Cuff"],
+            ProductKind::Apron => &["Pocket"],
+            ProductKind::Messenger => &["Flap", "Closing straps"],
+            ProductKind::Towel => &["Border"],
+            _ => &[],
+        }
+    }
+
     /// The side of the product that this kind shows.
     pub fn side(self) -> Side {
         match self {
@@ -1010,6 +1143,7 @@ impl ProductKind {
                 let mut v = vec![
                     Area(short_sleeves(95.0), Shade::Body),
                     Area(inside_neck(95.0, 95.0, 22.0), Shade::Dark),
+                    trim(neck_band(95.0, 95.0, 113.0, 113.0), 0),
                     Line(neck_line(113.0, 113.0), rib),
                 ];
                 v.extend(short_sleeve_lines(rib));
@@ -1019,6 +1153,7 @@ impl ProductKind {
             ProductKind::TShirtBack => {
                 let mut v = vec![
                     Area(short_sleeves(22.0), Shade::Body),
+                    trim(neck_band(95.0, 22.0, 113.0, 42.0), 0),
                     Line(neck_line(113.0, 42.0), rib),
                 ];
                 v.extend(short_sleeve_lines(rib));
@@ -1051,12 +1186,15 @@ impl ProductKind {
                 let mut v = vec![
                     Area(short_sleeves(95.0), Shade::Body),
                     Area(back.clone(), Shade::Body),
+                    trim(back.clone(), 0),
                     Line(back, 1.5),
                     Area(inside_neck(95.0, 95.0, 22.0), Shade::Dark),
                     Area(placket.clone(), Shade::Body),
                     Line(placket, rib),
                     Area(wing(1.0), Shade::Body),
                     Area(wing(-1.0), Shade::Body),
+                    trim(wing(1.0), 0),
+                    trim(wing(-1.0), 0),
                     Line(wing(1.0), 1.5),
                     Line(wing(-1.0), 1.5),
                 ];
@@ -1080,6 +1218,7 @@ impl ProductKind {
                 let mut v = vec![
                     Area(short_sleeves(22.0), Shade::Body),
                     Area(collar.clone(), Shade::Body),
+                    trim(collar.clone(), 0),
                     Line(collar, rib),
                 ];
                 v.extend(short_sleeve_lines(rib));
@@ -1129,7 +1268,8 @@ impl ProductKind {
                 let border = Path::rect(BBox::new(Point::new(-250.0, 760.0), Point::new(250.0, 830.0)));
                 let mut v = vec![
                     Area(body, Shade::Body),
-                    Area(border, Shade::Light),
+                    Area(border.clone(), Shade::Light),
+                    trim(border, 0),
                     Line(line(&[(-250.0, 760.0), (250.0, 760.0)]), rib),
                     Line(line(&[(-250.0, 830.0), (250.0, 830.0)]), rib),
                     Line(line(&[(-250.0, 885.0), (250.0, 885.0)]), rib),
@@ -1268,8 +1408,9 @@ impl ProductKind {
         self.parts()
             .iter()
             .filter_map(|p| match p {
+                // A trim part can go past the edge (the drawing cuts it).
+                ProductPart::Area(_, Shade::Trim { .. }) | ProductPart::Fold { .. } => None,
                 ProductPart::Area(path, _) | ProductPart::Line(path, _) => path.control_bbox(),
-                ProductPart::Fold { .. } => None,
             })
             .reduce(BBox::union)
             .unwrap_or_else(|| BBox::new(Point::ZERO, Point::ZERO))
@@ -1286,6 +1427,35 @@ impl ProductView {
             picture: None,
             extras: Vec::new(),
             both_sides: false,
+            trim: None,
+        }
+    }
+
+    /// The color of a part of the shade `s`, or `None` for a trim part
+    /// that shows not (no trim color, or the part is off).
+    pub fn part_color(&self, s: Shade) -> Option<Rgb> {
+        match s {
+            Shade::Trim { group, .. } => {
+                let t = self.trim.as_ref()?;
+                let name = self.kind.trims().get(usize::from(group))?;
+                (!t.off.iter().any(|o| o == name)).then(|| shade(t.color, s))
+            }
+            _ => Some(shade(self.color, s)),
+        }
+    }
+
+    /// True if the trim part `name` of the product has the trim color.
+    pub fn trim_on(&self, name: &str) -> bool {
+        self.trim.as_ref().is_some_and(|t| !t.off.iter().any(|o| o == name))
+    }
+
+    /// Gives the trim part `name` the trim color (`on`) or the product color.
+    pub fn set_trim_on(&mut self, name: &str, on: bool) {
+        if let Some(t) = self.trim.as_mut() {
+            t.off.retain(|o| o != name);
+            if !on {
+                t.off.push(name.to_string());
+            }
         }
     }
 
@@ -1437,6 +1607,46 @@ mod tests {
             ProductPart::Area(p, Shade::Body) => p.flatten(0.2).into_iter().flat_map(|pl| pl.points).collect(),
             other => panic!("{other:?}"),
         }
+    }
+
+    #[test]
+    fn each_trim_part_is_drawn_and_a_trim_color_is_saved() {
+        for kind in ProductKind::ALL {
+            let groups = |k: ProductKind| -> Vec<u8> {
+                k.parts()
+                    .iter()
+                    .filter_map(|p| match p {
+                        ProductPart::Area(_, Shade::Trim { group, .. }) => Some(*group),
+                        _ => None,
+                    })
+                    .collect()
+            };
+            let here = groups(kind);
+            assert!(here.iter().all(|&g| usize::from(g) < kind.trims().len()), "{kind:?}");
+            // Each name has a part on one side of the product at least.
+            let both: Vec<u8> = [kind, kind.turned().unwrap_or(kind)]
+                .into_iter()
+                .flat_map(groups)
+                .collect();
+            for g in 0..kind.trims().len() {
+                assert!(both.contains(&(g as u8)), "{kind:?}: no part {}", kind.trims()[g]);
+            }
+        }
+        let mut v = ProductView::new(ProductKind::Cap, Rgb(30, 38, 66));
+        let front = Shade::Trim { group: 0, dark: false };
+        assert_eq!(v.part_color(front), None);
+        v.trim = Some(Trim {
+            color: Rgb(250, 250, 250),
+            off: Vec::new(),
+        });
+        v.set_trim_on("Brim", false);
+        assert_eq!(v.part_color(front), Some(Rgb(250, 250, 250)));
+        assert_eq!(v.part_color(Shade::Trim { group: 1, dark: false }), None);
+        assert_eq!(v.part_color(Shade::Body), Some(Rgb(30, 38, 66)));
+        let mut d = Design::new("t");
+        d.product = Some(v.clone());
+        let back = crate::project::from_str(&crate::project::to_string(&d)).unwrap();
+        assert_eq!(back.product, Some(v));
     }
 
     #[test]
