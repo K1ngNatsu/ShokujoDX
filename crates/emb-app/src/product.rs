@@ -21,6 +21,105 @@ use crate::app::AppState;
 use crate::file::Notice;
 use crate::i18n::tr;
 
+/// The color, the places and the template of a photo of the user's
+/// product (P16 Milestone 7).
+fn photo_ui(ui: &mut egui::Ui, st: &mut AppState, v: &ProductView, p: &ProductPicture) {
+    if p.mask.is_some() {
+        ui.horizontal(|ui| {
+            ui.label(tr("Color"));
+            let mut c = [v.color.0, v.color.1, v.color.2];
+            if ui.color_edit_button_srgb(&mut c).changed() {
+                st.edit_product("Product color", Some("color"), |p| p.color = Rgb(c[0], c[1], c[2]));
+            }
+        });
+        if let Some(c) = color_swatches(ui, v.color) {
+            st.edit_product("Product color", None, |p| p.color = c);
+        }
+    }
+    if ui
+        .button(tr("Edit the Photo…"))
+        .on_hover_text(tr(
+            "Mark the part of the photo that takes the product color, and the usual places for a design.",
+        ))
+        .clicked()
+    {
+        st.photo_editor.open = true;
+    }
+    if !p.placements.is_empty() {
+        ui.label(tr("Put the design at:"));
+        let on = v.photo_placement_of(st.doc.design()).map(|q| q.name.clone());
+        let mut put = None;
+        ui.horizontal_wrapped(|ui| {
+            for q in &p.placements {
+                let tip = crate::i18n::fill(
+                    "Usual largest design here: {} × {} mm",
+                    &[&format!("{:.0}", q.max.0), &format!("{:.0}", q.max.1)],
+                );
+                if ui
+                    .selectable_label(on.as_deref() == Some(q.name.as_str()), &q.name)
+                    .on_hover_text(tip)
+                    .clicked()
+                {
+                    put = Some(q.at);
+                }
+            }
+        });
+        if let Some(at) = put {
+            st.put_design_at_photo(at);
+        }
+    }
+    ui.horizontal(|ui| {
+        let stem = p.name.rsplit_once('.').map_or(p.name.as_str(), |(s, _)| s).to_string();
+        if ui
+            .button(tr("Save in My Products"))
+            .on_hover_text(tr(
+                "Keep this photo with its real width, its mask and its places, to use it again for other designs.",
+            ))
+            .clicked()
+        {
+            st.save_product_template(&stem);
+        }
+        if ui
+            .button(tr("Export…"))
+            .on_hover_text(tr("Save this product as a file for another computer."))
+            .clicked()
+        {
+            st.export_product_template();
+        }
+    });
+}
+
+/// The user's product templates: choose one, or import one.
+fn templates_ui(ui: &mut egui::Ui, st: &mut AppState) {
+    let templates = st.product_templates();
+    let mut chosen = None;
+    ui.horizontal(|ui| {
+        ui.label(tr("My Products"));
+        ui.add_enabled_ui(!templates.is_empty(), |ui| {
+            egui::ComboBox::from_id_salt("product_templates")
+                .selected_text(tr("Choose…"))
+                .width(150.0)
+                .show_ui(ui, |ui| {
+                    for t in &templates {
+                        if ui.selectable_label(false, &t.name).clicked() {
+                            chosen = Some(t.clone());
+                        }
+                    }
+                });
+        });
+        if ui
+            .button(tr("Import…"))
+            .on_hover_text(tr("Add a product file from another computer to My Products."))
+            .clicked()
+        {
+            st.import_product_template();
+        }
+    });
+    if let Some(t) = chosen {
+        st.use_product_template(&t);
+    }
+}
+
 /// The trim color of the product and its trim parts (P16 Milestone 6).
 fn trim_ui(ui: &mut egui::Ui, st: &mut AppState, v: &ProductView) {
     let names = v.kind.trims();
@@ -140,22 +239,32 @@ pub struct ProductTexture {
     key: TextureKey,
     texture: TextureHandle,
     shading: Option<Arc<emb_render::product::Shading>>,
+    /// The decoded photo (by the address of its data), so a color change
+    /// on a masked photo does not decode it again.
+    photo: Option<(usize, Arc<image::RgbaImage>)>,
 }
 
-/// What the texture of the product shows: the kind, the colors and the photo.
-type TextureKey = (ProductKind, Rgb, Option<Trim>, usize, usize);
+/// What the texture of the product shows: the kind, the colors, the photo
+/// and its mask.
+type TextureKey = (ProductKind, Rgb, Option<Trim>, usize, usize, usize);
 
 fn key(v: &ProductView) -> TextureKey {
-    let (ptr, len) = v
-        .picture
-        .as_ref()
-        .map_or((0, 0), |p| (Arc::as_ptr(&p.data) as usize, p.data.len()));
-    (v.kind, v.color, v.trim.clone(), ptr, len)
+    let (ptr, len, mask) = v.picture.as_ref().map_or((0, 0, 0), |p| {
+        (
+            Arc::as_ptr(&p.data) as usize,
+            p.data.len(),
+            p.mask.as_ref().map_or(0, |m| Arc::as_ptr(&m.runs) as usize),
+        )
+    });
+    (v.kind, v.color, v.trim.clone(), ptr, len, mask)
 }
+
+/// The longest side (pixels) of the photo of the product on the canvas.
+const PHOTO_MAX_SIDE: u32 = 2048;
 
 impl AppState {
     /// Changes the product as one undo step. With `merge`, a drag is one step.
-    fn edit_product(&mut self, label: &str, merge: Option<&str>, f: impl FnOnce(&mut ProductView)) {
+    pub(crate) fn edit_product(&mut self, label: &str, merge: Option<&str>, f: impl FnOnce(&mut ProductView)) {
         let change = |d: &mut emb_model::Design| {
             if let Some(v) = d.product.as_mut() {
                 f(v);
@@ -232,8 +341,18 @@ impl AppState {
             data: Arc::new(bytes),
             pixels,
             width_mm,
+            mask: None,
+            placements: Vec::new(),
         };
-        let size = Point::new(width_mm, picture.height_mm());
+        self.put_product_picture(picture);
+        Ok(())
+    }
+
+    /// Puts the picture of the user's product `picture` under the design:
+    /// the design at the first place marked on it, else at its middle. The
+    /// product color and the other designs stay.
+    pub fn put_product_picture(&mut self, picture: ProductPicture) {
+        let size = Point::new(picture.width_mm, picture.height_mm());
         let c = self
             .doc
             .design()
@@ -245,15 +364,15 @@ impl AppState {
             .product
             .as_ref()
             .map_or(ProductKind::TShirt, |v| v.kind);
-        let mut v = ProductView::new(kind, WHITE);
-        v.origin = c - size * 0.5;
+        let color = self.doc.design().product.as_ref().map_or(WHITE, |v| v.color);
+        let mut v = ProductView::new(kind, color);
+        v.origin = picture.placements.first().map_or(c - size * 0.5, |p| c - p.at);
         v.picture = Some(picture);
         if let Some(old) = &self.doc.design().product {
             v.extras = old.extras.clone();
         }
         self.doc.edit(tr("Product picture"), |d| d.product = Some(v));
         self.fit_product = true;
-        Ok(())
     }
 
     pub fn product_picture_dialog(&mut self) {
@@ -461,8 +580,31 @@ impl AppState {
             .as_ref()
             .and_then(|t| t.shading.clone())
             .filter(|s| s.fits(v.kind, TEXTURE_PX_PER_MM, &light));
+        let mut photo = None;
         let image = match &v.picture {
-            Some(p) => crate::backdrop::decode(&p.data, crate::resources::max_texture_side(ctx)).ok()?,
+            Some(p) => {
+                let at = Arc::as_ptr(&p.data) as usize;
+                let img = match self
+                    .product_tex
+                    .as_ref()
+                    .and_then(|t| t.photo.clone())
+                    .filter(|(a, _)| *a == at)
+                {
+                    Some((_, img)) => img,
+                    None => {
+                        let side = PHOTO_MAX_SIDE
+                            .min(u32::try_from(crate::resources::max_texture_side(ctx)).unwrap_or(u32::MAX));
+                        Arc::new(emb_art::decode_fit(&p.data, side, crate::resources::decode_budget()).ok()?)
+                    }
+                };
+                photo = Some((at, img.clone()));
+                let (w, h) = img.dimensions();
+                let mut rgba = img.as_raw().clone();
+                if let Some(m) = &p.mask {
+                    emb_render::photo::recolor(&mut rgba, w, h, m, v.color);
+                }
+                egui::ColorImage::from_rgba_unmultiplied([w as usize, h as usize], &rgba)
+            }
             None => {
                 let s = shading
                     .get_or_insert_with(|| Arc::new(emb_render::product::Shading::new(&v, TEXTURE_PX_PER_MM, &light)));
@@ -475,6 +617,7 @@ impl AppState {
             key: k,
             texture: texture.clone(),
             shading,
+            photo,
         });
         Some(texture)
     }
@@ -720,6 +863,7 @@ fn contents(ui: &mut egui::Ui, st: &mut AppState) {
             st.product_picture_dialog();
         }
     });
+    templates_ui(ui, st);
     match pick {
         Some(Some(k)) => st.set_product(k),
         Some(None) => {
@@ -820,6 +964,7 @@ fn contents(ui: &mut egui::Ui, st: &mut AppState) {
             }
         });
         ui.weak(&p.name);
+        photo_ui(ui, st, &v, p);
     }
     // Move the product under the design.
     ui.horizontal(|ui| {

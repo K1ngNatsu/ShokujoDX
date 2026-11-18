@@ -227,6 +227,8 @@ mod tests {
             data: std::sync::Arc::new(vec![1, 2, 3, 250]),
             pixels: (2, 1),
             width_mm: 500.0,
+            mask: None,
+            placements: Vec::new(),
         });
         d.product = Some(v);
         d.repeat = Some(crate::RepeatSpec::side_by_side(&d, 2.0));

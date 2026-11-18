@@ -126,6 +126,20 @@ Vorderteile oder der Schirm einer Kappe, die Bündchen eines
 Sweatshirts) eine zweite Farbe; entfernen Sie ein Teil in
 **Besatzteile**, damit es die Produktfarbe hat.
 
+Für ein Foto Ihres eigenen Produkts öffnet **Foto bearbeiten…** das
+Fenster **Produktfoto**. **Farbe wählen** und ein Klick auf das Produkt
+markieren die Fläche dieser Farbe (auch Nähte und Stiche darin;
+**Toleranz** legt fest, wie nah eine Farbe sein muss); **Farbe
+entfernen**, **Pinsel** und **Radierer** ändern die Maske. Der markierte
+Teil bekommt die Produktfarbe mit dem Licht und dem Schatten des Fotos,
+so zeigt ein Foto eines weißen Produkts das Produkt in jeder Farbe.
+**Stelle markieren** und ein Klick markieren eine übliche Stelle für ein
+Design; geben Sie ihr einen Namen und die Größe ihres größten Designs.
+**In Meine Produkte speichern** behält das Foto mit seiner echten Breite,
+seiner Maske und seinen Stellen; wählen Sie es wieder in **Meine
+Produkte**. **Exportieren…** und **Importieren…** bringen ein Produkt auf
+einen anderen Computer.
+
 ## Wiederholungen
 
 **Design > Wiederholungen** zeigt das Design noch einmal in **Säulen**

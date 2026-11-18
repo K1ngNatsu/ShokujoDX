@@ -22,6 +22,7 @@ pub mod density;
 pub mod hooping_sheet;
 pub mod page;
 pub mod pdf;
+pub mod photo;
 pub mod product;
 pub mod raster;
 pub mod sheet;

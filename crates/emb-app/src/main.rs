@@ -70,6 +70,7 @@ mod picture;
 mod player;
 mod preview;
 mod product;
+mod product_photo;
 mod quilting;
 mod quote;
 mod repeats;

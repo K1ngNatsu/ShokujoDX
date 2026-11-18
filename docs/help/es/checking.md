@@ -121,6 +121,19 @@ de un polo, los paneles delanteros o la visera de una gorra, los puños
 de una sudadera) reciben un segundo color; desmarque una parte en
 **Partes del ribete** para darle el color del producto.
 
+Para una foto de su propio producto, **Editar la foto…** abre la ventana
+**Foto del producto**. **Elegir color** y un clic en el producto marcan la
+zona de ese color (también las costuras y puntadas en ella; **Tolerancia**
+define lo cerca que debe estar un color); **Quitar color**, **Pincel** y
+**Borrador** cambian la máscara. La parte marcada toma el color del
+producto con la luz y la sombra de la foto, así una foto de un producto
+blanco muestra el producto en cada color. **Marcar un lugar** y un clic
+marcan un lugar habitual para un diseño; dele un nombre y el tamaño de
+su diseño más grande. **Guardar en Mis productos** guarda la foto con su
+ancho real, su máscara y sus lugares; elíjala de nuevo en **Mis
+productos**. **Exportar…** e **Importar…** llevan un producto a otro
+ordenador.
+
 ## Repeticiones
 
 **Diseño > Repeticiones** muestra el diseño otra vez en **Columnas** y

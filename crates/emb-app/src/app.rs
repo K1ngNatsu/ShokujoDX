@@ -257,6 +257,10 @@ pub struct AppState {
     pub product_tex: Option<crate::product::ProductTexture>,
     /// The stitches and the canvas pictures of the other designs on the product.
     pub product_extras: crate::product::Extras,
+    /// The window of the photo of the user's product (mask and places).
+    pub photo_editor: crate::product_photo::PhotoEditor,
+    /// The user's product templates (`None`: read them again).
+    pub product_templates: Option<Vec<crate::product_photo::Template>>,
     /// The picture of the design on the product for the approval sheet, and
     /// the design state that it shows.
     pub sheet_product: Option<(u64, crate::output::SheetPictures)>,
@@ -721,6 +725,8 @@ impl AppState {
             product_window: false,
             product_tex: None,
             product_extras: Default::default(),
+            photo_editor: Default::default(),
+            product_templates: None,
             sheet_product: None,
             fit_product: false,
             repeats_window: false,
@@ -1736,6 +1742,7 @@ impl eframe::App for EmbApp {
         crate::hoops::windows(&ctx, st);
         crate::hooping::preview_window(&ctx, st);
         crate::product::window(&ctx, st);
+        crate::product_photo::window(&ctx, st);
         crate::repeats::window(&ctx, st);
         crate::about::window(&ctx, st);
         crate::first_start::window(&ctx, st);

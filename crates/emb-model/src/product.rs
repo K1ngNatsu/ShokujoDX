@@ -238,6 +238,12 @@ pub struct ProductPicture {
     pub pixels: (u32, u32),
     /// The real width of the product in the picture, in mm.
     pub width_mm: f64,
+    /// The part of the photo that takes the product color (P16 Milestone 7).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mask: Option<PhotoMask>,
+    /// The usual places for a design on the photo, which the user marks.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub placements: Vec<PhotoPlacement>,
 }
 
 impl PartialEq for ProductPicture {
@@ -246,7 +252,136 @@ impl PartialEq for ProductPicture {
             && (Arc::ptr_eq(&self.data, &o.data) || self.data == o.data)
             && self.pixels == o.pixels
             && self.width_mm == o.width_mm
+            && self.mask == o.mask
+            && self.placements == o.placements
     }
+}
+
+/// The part of a photo of a product that takes the product color (P16
+/// Milestone 7): a grid of `width` × `height` cells over the photo, each
+/// on or off. It is saved as the lengths of runs of cells, row by row.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhotoMask {
+    pub width: u32,
+    pub height: u32,
+    /// The lengths of the runs: off, on, off, and so on (the first run can
+    /// be 0).
+    #[serde(serialize_with = "ser_runs", deserialize_with = "de_runs")]
+    pub runs: Arc<Vec<u32>>,
+}
+
+fn ser_runs<S: serde::Serializer>(r: &Arc<Vec<u32>>, s: S) -> Result<S::Ok, S::Error> {
+    r.as_slice().serialize(s)
+}
+
+fn de_runs<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Arc<Vec<u32>>, D::Error> {
+    Vec::<u32>::deserialize(d).map(Arc::new)
+}
+
+impl PartialEq for PhotoMask {
+    fn eq(&self, o: &Self) -> bool {
+        self.width == o.width && self.height == o.height && (Arc::ptr_eq(&self.runs, &o.runs) || self.runs == o.runs)
+    }
+}
+
+impl PhotoMask {
+    /// The longest side of the grid of a mask, in cells.
+    pub const MAX_SIDE: u32 = 1024;
+
+    /// The size of the grid for a photo of `pixels`: the shape of the
+    /// photo, at most [`PhotoMask::MAX_SIDE`] cells on its long side.
+    pub fn grid_for(pixels: (u32, u32)) -> (u32, u32) {
+        let (w, h) = (pixels.0.max(1), pixels.1.max(1));
+        let long = w.max(h);
+        if long <= Self::MAX_SIDE {
+            return (w, h);
+        }
+        let k = f64::from(Self::MAX_SIDE) / f64::from(long);
+        let size = |v: u32| ((f64::from(v) * k).round() as u32).max(1);
+        (size(w), size(h))
+    }
+
+    /// A mask of `cells` (row by row, `width` × `height`).
+    pub fn from_cells(width: u32, height: u32, cells: &[bool]) -> Self {
+        let mut runs = Vec::new();
+        let (mut on, mut n) = (false, 0u32);
+        for &c in cells {
+            if c != on {
+                runs.push(n);
+                (on, n) = (c, 0);
+            }
+            n += 1;
+        }
+        runs.push(n);
+        PhotoMask {
+            width,
+            height,
+            runs: Arc::new(runs),
+        }
+    }
+
+    /// The cells of the mask, row by row. Runs that are too short or too
+    /// long (a damaged file) are cut or filled with off cells.
+    pub fn cells(&self) -> Vec<bool> {
+        let n = self.width as usize * self.height as usize;
+        let mut out = Vec::with_capacity(n);
+        for (i, &r) in self.runs.iter().enumerate() {
+            let take = (r as usize).min(n - out.len());
+            out.extend(std::iter::repeat_n(i % 2 == 1, take));
+        }
+        out.resize(n, false);
+        out
+    }
+
+    /// True if no cell is on.
+    pub fn is_empty(&self) -> bool {
+        self.runs.iter().skip(1).step_by(2).all(|&r| r == 0)
+    }
+}
+
+/// A usual place for a design on a photo of a product: the design center
+/// goes to `at` (mm from the top left corner of the photo); `max` is the
+/// usual largest design there.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PhotoPlacement {
+    pub name: String,
+    pub at: Point,
+    pub max: (f64, f64),
+}
+
+/// The text of a product template file (`.embproduct`, P16 Milestone 7):
+/// the photo of a product with its real width, its mask and its placements.
+pub fn template_to_string(p: &ProductPicture) -> String {
+    #[derive(Serialize)]
+    struct File<'a> {
+        format: &'static str,
+        product: &'a ProductPicture,
+    }
+    serde_json::to_string(&File {
+        format: TEMPLATE_FORMAT,
+        product: p,
+    })
+    .expect("a product picture always serializes")
+}
+
+/// The format name in a product template file.
+const TEMPLATE_FORMAT: &str = "shokujodx-product-1";
+
+/// Reads a product template file (see [`template_to_string`]).
+pub fn template_from_str(s: &str) -> Result<ProductPicture, String> {
+    #[derive(Deserialize)]
+    struct File {
+        format: String,
+        product: ProductPicture,
+    }
+    let f: File = serde_json::from_str(s).map_err(|e| e.to_string())?;
+    if f.format != TEMPLATE_FORMAT {
+        return Err(crate::text::fill("This is not a product template ({}).", &[&f.format]));
+    }
+    if !(f.product.width_mm > 0.0 && f.product.width_mm.is_finite()) {
+        return Err(crate::text::tr("The product template has no real width.").to_string());
+    }
+    Ok(f.product)
 }
 
 impl PartialEq for ProductView {
@@ -1509,8 +1644,15 @@ impl ProductView {
 
     /// As [`ProductView::free_place`], on the side `side`.
     pub fn free_place_on(&self, side: Side, design: &Design) -> Point {
-        if self.picture.is_some() {
-            return self.bbox().center() - self.origin;
+        if let Some(p) = &self.picture {
+            // The first place on the photo that has no design.
+            let main = self.photo_placement_of(design).map(|q| q.at);
+            return p
+                .placements
+                .iter()
+                .map(|q| q.at)
+                .find(|at| Some(*at) != main && !self.extras.iter().any(|e| e.at.distance(*at) < 1.0))
+                .unwrap_or_else(|| self.bbox().center() - self.origin);
         }
         let kind = self.kind.on(side);
         let main = if side == self.side() {
@@ -1578,6 +1720,17 @@ impl ProductView {
     pub fn put_design_at(&mut self, design: &Design, at: Point) {
         let c = design.view_extents().map_or(design.hoop.center, |b| b.center());
         self.origin = c - at;
+    }
+
+    /// The place on the photo that the design center is on (within 1 mm),
+    /// if any.
+    pub fn photo_placement_of(&self, design: &Design) -> Option<&PhotoPlacement> {
+        let c = design.view_extents()?.center();
+        self.picture
+            .as_ref()?
+            .placements
+            .iter()
+            .find(|p| (p.at + self.origin).distance(c) < 1.0)
     }
 
     /// The placement that the design center is on (within 1 mm), if any.

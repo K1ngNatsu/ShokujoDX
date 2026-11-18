@@ -536,6 +536,14 @@ pub fn decoration(
     let mut pic = match (&view.picture, photo) {
         (Some(p), Some(img)) => {
             let mut pic = picture_at(&[], &[] as &Areas, b, px_per_mm, 0.0, white);
+            // The product color on the masked part of the photo (P16 Milestone 7).
+            let colored = p.mask.as_ref().filter(|m| !m.is_empty()).map(|m| {
+                let mut c = img.clone();
+                let (w, h) = c.dimensions();
+                crate::photo::recolor(&mut c, w, h, m, view.color);
+                c
+            });
+            let img = colored.as_ref().unwrap_or(img);
             paint_photo(&mut pic, b, px_per_mm, img, view.origin, p.width_mm, p.height_mm());
             pic
         }
@@ -866,6 +874,8 @@ mod tests {
             data: std::sync::Arc::new(Vec::new()),
             pixels: (4, 2),
             width_mm: 200.0,
+            mask: None,
+            placements: Vec::new(),
         });
         let pic = decoration(&v, Some(&img), &[], 1.0, 0.4, &Look::default());
         let b = v.bbox().expand(10.0);

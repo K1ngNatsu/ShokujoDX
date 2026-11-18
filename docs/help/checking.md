@@ -116,6 +116,18 @@ collar of a polo, the front panels or the brim of a cap, the cuffs of a
 sweatshirt) get a second color; clear a part in **Trim parts** to give
 it the product color.
 
+For a photo of your own product, **Edit the Photo…** opens the
+**Product Photo** window. **Pick Color** and a click on the product mark
+the area of that color (seams and stitches in it too; **Tolerance** sets
+how near a color must be); **Remove Color**, **Brush** and **Eraser**
+change the mask. The marked part takes the product color with the light
+and the shade of the photo, so one photo of a white product shows the
+product in each color. **Mark a Place** and a click mark a usual place
+for a design; give it a name and the size of its largest design. **Save
+in My Products** keeps the photo with its real width, its mask and its
+places; choose it again in **My Products**. **Export…** and **Import…**
+move a product to another computer.
+
 ## Repeats
 
 **Design > Repeats** shows the design again in **Columns** and **Rows**,

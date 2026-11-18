@@ -1,6 +1,6 @@
 # Plan: a better product view (phase P16)
 
-Date: 2026-11-17 · Status: Accepted (owner, 2026-11-17). Milestones 1 to 6 done (ADR 0101 to 0106); Milestone 7 next.
+Date: 2026-11-17 · Status: Accepted (owner, 2026-11-17). Milestones 1 to 7 done (ADR 0101 to 0107); Milestone 8 next.
 
 ## Goal
 
