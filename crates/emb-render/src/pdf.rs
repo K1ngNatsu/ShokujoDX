@@ -3,8 +3,10 @@
 //! vector lines, and pictures as JPEG images. Our own code, written from
 //! the PDF 1.4 reference.
 //!
-//! The text encoding is WinAnsi: Latin-1 letters print, other characters
-//! print as `?`. The content streams are not compressed.
+//! The text encoding is WinAnsi: Latin-1 letters print. Chinese, Japanese
+//! and Korean characters print in a standard Japanese font of the PDF
+//! reader (not embedded; the reader uses a font of the computer). Other
+//! characters print as `?`. The content streams are not compressed.
 
 use std::fmt::Write as _;
 
@@ -42,6 +44,12 @@ fn pdf_string(text: &str) -> String {
             0x2013 => 0x96, // en dash
             0x2014 => 0x97, // em dash
             0x2026 => 0x85, // ellipsis
+            0x20ac => 0x80, // euro
+            0x201e => 0x84, // low double quote
+            0x2018 => 0x91, // quotes
+            0x2019 => 0x92,
+            0x201c => 0x93,
+            0x201d => 0x94,
             _ => b'?',
         };
         match b {
@@ -64,6 +72,57 @@ const JPEG_QUALITY: u8 = 90;
 
 /// A picture as JPEG bytes (transparent pixels on white), its width and
 /// its height. `None` if the encoder fails.
+/// The name of the Japanese font in the pages.
+const WIDE_FONT: &str = "F3";
+
+/// A PDF string of wide characters for the Japanese font: each character
+/// as four hexadecimal digits (UCS-2). A character outside that range
+/// prints as the mark 〓.
+fn wide_string(text: &str) -> String {
+    let mut out = String::from("<");
+    for ch in text.chars() {
+        let code = u16::try_from(ch as u32).unwrap_or(0x3013);
+        let _ = write!(out, "{code:04X}");
+    }
+    out.push('>');
+    out
+}
+
+/// The text as parts for the fonts: `true` for a part of wide characters.
+fn runs(text: &str) -> Vec<(bool, String)> {
+    let mut out: Vec<(bool, String)> = Vec::new();
+    for c in text.chars() {
+        let w = crate::page::wide(c);
+        match out.last_mut() {
+            Some((last, part)) if *last == w => part.push(c),
+            _ => out.push((w, c.to_string())),
+        }
+    }
+    out
+}
+
+/// True if a page has text for the Japanese font.
+fn has_wide(pages: &[Page]) -> bool {
+    pages.iter().flat_map(|p| &p.ops).any(|op| match op {
+        Op::Text { text, .. } => text.chars().any(crate::page::wide),
+        _ => false,
+    })
+}
+
+/// The title of the document: a WinAnsi string, or UTF-16 if the title has
+/// wide characters.
+fn title_string(title: &str) -> String {
+    if !title.chars().any(crate::page::wide) {
+        return pdf_string(title);
+    }
+    let mut out = String::from("<FEFF");
+    for unit in title.encode_utf16() {
+        let _ = write!(out, "{unit:04X}");
+    }
+    out.push('>');
+    out
+}
+
 fn jpeg(pic: &crate::raster::Picture) -> Option<(Vec<u8>, u32, u32)> {
     let rgb: Vec<u8> = pic
         .rgba
@@ -112,6 +171,22 @@ fn content(page: &Page) -> String {
                 text,
             } => {
                 let font = if *bold { "F2" } else { "F1" };
+                let runs = runs(text);
+                if runs.iter().any(|(wide, _)| *wide) {
+                    // Each part in its font; the reader puts a part after
+                    // the part before it.
+                    let _ = write!(s, "BT {} rg {} {} Td", rgb(*color), x(at.x), y(at.y));
+                    for (wide, part) in &runs {
+                        let (font, string) = if *wide {
+                            (WIDE_FONT, wide_string(part))
+                        } else {
+                            (font, pdf_string(part))
+                        };
+                        let _ = write!(s, " /{font} {} Tf {string} Tj", num(*size_pt));
+                    }
+                    let _ = writeln!(s, " ET");
+                    continue;
+                }
                 let _ = writeln!(
                     s,
                     "BT /{font} {} Tf {} rg {} {} Td {} Tj ET",
@@ -237,6 +312,14 @@ pub fn write(pages: &[Page], title: &str) -> Vec<u8> {
         }
         page_images.push(ids);
     }
+    // The Japanese font (three objects after the pictures), only in a
+    // document that has text for it.
+    let wide_id = page_id(pages.len()) + pictures.len();
+    let wide_font = if has_wide(pages) {
+        format!(" /{WIDE_FONT} {wide_id} 0 R")
+    } else {
+        String::new()
+    };
     let mut objects: Vec<Vec<u8>> = Vec::new();
     objects.push(b"<< /Type /Catalog /Pages 2 0 R >>".to_vec());
     let kids: Vec<String> = (0..pages.len()).map(|i| format!("{} 0 R", page_id(i))).collect();
@@ -246,11 +329,11 @@ pub fn write(pages: &[Page], title: &str) -> Vec<u8> {
             format!("<< /Type /Font /Subtype /Type1 /BaseFont /{font} /Encoding /WinAnsiEncoding >>").into_bytes(),
         );
     }
-    objects.push(format!("<< /Title {} /Producer (ShokujoDX) >>", pdf_string(title)).into_bytes());
+    objects.push(format!("<< /Title {} /Producer (ShokujoDX) >>", title_string(title)).into_bytes());
     for (i, p) in pages.iter().enumerate() {
         objects.push(
             format!(
-                "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {} {}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >>{} >> /Contents {} 0 R >>",
+                "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {} {}] /Resources << /Font << /F1 3 0 R /F2 4 0 R{wide_font} >>{} >> /Contents {} 0 R >>",
                 num(p.width_mm * PT_PER_MM),
                 num(p.height_mm * PT_PER_MM),
                 xobjects(&page_images[i]),
@@ -265,6 +348,31 @@ pub fn write(pages: &[Page], title: &str) -> Vec<u8> {
         objects.push(stream);
     }
     objects.extend(pictures);
+    if !wide_font.is_empty() {
+        // A standard font for Japanese (Adobe-Japan1), with its characters
+        // by their Unicode numbers. All characters are 1 em wide.
+        const NAME: &str = "HeiseiKakuGo-W5";
+        objects.push(
+            format!(
+                "<< /Type /Font /Subtype /Type0 /BaseFont /{NAME} /Encoding /UniJIS-UCS2-H /DescendantFonts [{} 0 R] >>",
+                wide_id + 1
+            )
+            .into_bytes(),
+        );
+        objects.push(
+            format!(
+                "<< /Type /Font /Subtype /CIDFontType0 /BaseFont /{NAME} /CIDSystemInfo << /Registry (Adobe) /Ordering (Japan1) /Supplement 2 >> /FontDescriptor {} 0 R /DW 1000 >>",
+                wide_id + 2
+            )
+            .into_bytes(),
+        );
+        objects.push(
+            format!(
+                "<< /Type /FontDescriptor /FontName /{NAME} /Flags 4 /FontBBox [-92 -250 1010 922] /ItalicAngle 0 /Ascent 752 /Descent -221 /CapHeight 737 /StemV 114 >>"
+            )
+            .into_bytes(),
+        );
+    }
 
     let mut out: Vec<u8> = b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n".to_vec();
     let mut offsets = Vec::with_capacity(objects.len());
@@ -409,6 +517,39 @@ mod tests {
             let body = rest.find("stream\n").unwrap() + 7;
             assert_eq!(&rest[body + len..body + len + 10], "\nendstream");
         }
+    }
+
+    /// Japanese text prints in the Japanese font, part by part, and a
+    /// document with no such text has no such font.
+    #[test]
+    fn japanese_text_has_its_font() {
+        let mut p = sample();
+        p.text(10.0, 10.0, 9.0, false, "枠: Crown 260 × 200 (€5)");
+        let pdf = String::from_utf8_lossy(&write(&[p], "作業シート")).into_owned();
+        // 枠 is U+67A0; the Latin part follows in Helvetica.
+        assert!(
+            pdf.contains(r"/F3 9 Tf <67A0> Tj /F1 9 Tf (: Crown 260 \327 200 \(\2005\)) Tj ET"),
+            "{pdf}"
+        );
+        assert!(pdf.contains("/F1 3 0 R /F2 4 0 R /F3 8 0 R >>"), "{pdf}");
+        assert!(pdf.contains(
+            "8 0 obj
+<< /Type /Font /Subtype /Type0 /BaseFont /HeiseiKakuGo-W5 /Encoding /UniJIS-UCS2-H /DescendantFonts [9 0 R] >>"
+        ));
+        assert!(pdf.contains(
+            "/CIDSystemInfo << /Registry (Adobe) /Ordering (Japan1) /Supplement 2 >> /FontDescriptor 10 0 R /DW 1000 >>"
+        ));
+        assert!(pdf.contains("/Title <FEFF4F5C696D30B730FC30C8>"), "the title in UTF-16");
+        let plain = String::from_utf8_lossy(&write(&[sample()], "Patch")).into_owned();
+        assert!(!plain.contains("F3") && !plain.contains("Heisei"));
+        assert_eq!(
+            runs("a枠b"),
+            [
+                (false, "a".to_string()),
+                (true, "枠".to_string()),
+                (false, "b".to_string())
+            ]
+        );
     }
 
     #[test]

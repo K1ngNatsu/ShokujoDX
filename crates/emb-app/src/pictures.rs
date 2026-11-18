@@ -519,7 +519,40 @@ fn scenes() -> Vec<Scene> {
             st.updates.status = status.clone();
         }));
     }
-    v.push(Scene::new("picture to design", View::Windows, |st, _| st.open_wizard()));
+    // The windows that need a picture, a product or a place on the canvas.
+    v.push(Scene::new("picture to design", View::Windows, |st, _| {
+        let data = crate::product_photo::tests::shirt_png();
+        let size = image::load_from_memory(&data).map_or((1, 1), |i| (i.width(), i.height()));
+        st.doc.edit("Add backdrop", |d| {
+            d.backdrop = Some(emb_model::Backdrop::new(
+                "picture",
+                data,
+                size,
+                emb_geom::Point::ZERO,
+                80.0,
+            ));
+        });
+        st.open_wizard();
+    }));
+    v.push(Scene::new("lettering window", View::Windows, |st, _| {
+        let font = st.letter_font.clone();
+        let dialog = crate::lettering::LetteringDialog::new(emb_geom::Point::ZERO, "Name", font, 12.0);
+        st.open_lettering_dialog(dialog);
+    }));
+    v.push(Scene::new("product window with a product", View::Windows, |st, ctx| {
+        st.set_product(emb_model::ProductKind::ALL[0]);
+        run_command(st, ctx, Cmd::ProductWindow);
+    }));
+    v.push(Scene::new("turntable with a product", View::Windows, |st, ctx| {
+        st.set_product(emb_model::ProductKind::ALL[0]);
+        run_command(st, ctx, Cmd::Turntable);
+    }));
+    v.push(Scene::new("product photo", View::Windows, |st, _| {
+        let data = crate::product_photo::tests::shirt_png();
+        if st.set_product_picture(data, "shirt.png", 500.0).is_ok() {
+            st.photo_editor.open = true;
+        }
+    }));
     let mut seen: Vec<Cmd> = Vec::new();
     for (cmd, tab, _) in crate::ribbon::all_commands() {
         if cmd.opens_dialog() || seen.contains(&cmd) {

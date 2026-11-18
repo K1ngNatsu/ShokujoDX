@@ -443,7 +443,7 @@ pub fn write_files(
             &mut written,
         )?;
         let spec = emb_render::stone_sheet::StoneSheetSpec {
-            name: design.name.clone(),
+            name: crate::file::shown_name(&design.name),
             paper: profile.paper,
             clearance_mm: profile.stone_clearance_mm,
         };
@@ -1321,5 +1321,46 @@ mod tests {
             out.textures_delta.clear();
         }
         assert!(st.output.is_some() && st.preview.is_some());
+    }
+}
+
+/// A worksheet in Japanese as a PDF, to look at in a PDF reader: the
+/// Japanese text is in a font of the reader (`emb_render::pdf`).
+#[cfg(test)]
+mod japanese_sheet {
+    use emb_model::{HoopCatalog, MachineCatalog};
+
+    use crate::app::AppState;
+
+    fn pdf() -> Vec<u8> {
+        crate::i18n::set_language("ja");
+        let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        st.start_on_machine("husqvarna_topaz20", None);
+        st.add_sample_objects();
+        let pages = st.preview_pages(false);
+        crate::i18n::set_language("en");
+        emb_render::pdf::write(&pages, "生産作業シート")
+    }
+
+    #[test]
+    fn the_japanese_worksheet_has_its_text_in_the_japanese_font() {
+        let pdf = String::from_utf8_lossy(&pdf()).into_owned();
+        assert!(pdf.contains("/UniJIS-UCS2-H"), "the Japanese font");
+        // ステッチ (stitches), as the numbers of its characters.
+        assert!(pdf.contains("30B930C630C330C1"), "a Japanese label");
+        // No line of text is all question marks.
+        assert!(!pdf.contains("(????"), "text that the PDF cannot show");
+    }
+
+    /// Run it by hand, then open `target/window-pictures/worksheet.ja.pdf`.
+    #[test]
+    #[ignore = "writes a PDF to look at"]
+    fn write_japanese_worksheet() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join("target")
+            .join("window-pictures");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("worksheet.ja.pdf"), pdf()).unwrap();
     }
 }

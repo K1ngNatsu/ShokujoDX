@@ -55,6 +55,6 @@ in the program that users get (Phase P17 Milestone 2,
   (colors, the shared edge, one screen and one window).
 - The Japanese pictures use the Japanese font of the computer, as the
   program does; a computer with no such font shows boxes.
-- A window that only a click on the canvas or a file opens (the Lettering
-  window, Picture to design with a picture, the Turntable with a product)
-  has no scene yet.
+- A window that only a click on the canvas, a file or a product opens
+  has a scene by hand (the Lettering window, Picture to design, the
+  Turntable, Product Photo).

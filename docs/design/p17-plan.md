@@ -90,7 +90,7 @@ corrected.
 **Done (2026-11-18), ADR 0110.** `emb-app/src/pictures.rs` (test code
 only). A small software renderer makes the pictures from the triangles
 of egui, so the test has no new dependency and needs no graphics card.
-The run makes 520 pictures of 378 scenes (264 screens, 64 windows in
+The run makes 540 pictures of 382 scenes (264 screens, 69 windows in
 four languages) in about 90 seconds:
 
 ```text
@@ -116,19 +116,33 @@ Found and corrected with the first pictures:
   line: Mirror and Center in Hoop (Object Properties), the colorway row
   (Threads), the current properties (Styles).
 
-Found and left open:
+Corrected after that (owner, 2026-11-18; ADR 0111):
 
-- At 1366 points, the titles of the docked panels do not all fit in
-  Spanish, German and Japanese; the dock shows a scroll bar for them.
-- Japanese: the characters of the font of the computer sit higher than
-  the Latin letters and digits in the same line. A correction needs the
-  eye of a native reader, for the fonts of each system.
-- Japanese: two lines of the worksheet (Print Preview) are longer than
-  their column.
+- **Japanese in the PDF pages.** The long lines of the Japanese
+  worksheet had a larger cause: the PDF writer printed each Japanese
+  character as `?` (worksheets, approval sheets, quotes, catalogs). A
+  page with Japanese text now has a standard Japanese font, the lines
+  break at the characters, and a wide character has its width. The euro
+  sign and the typographic quotation marks print too. A Japanese
+  worksheet was checked with the PDF engine of Windows.
+- **Japanese characters in a line.** The characters of Yu Gothic (the
+  Japanese font of Windows) were higher than the Latin letters and
+  digits; they now go down by 0.18 of the text size. The fonts of older
+  Windows, macOS and Linux have no value yet.
+- The name "Untitled" on the sheets is in the language of the program.
+- New scenes: the Lettering window, Picture to design with a picture,
+  the Product window and the Turntable with a product, Product Photo
+  (382 scenes, 540 pictures).
+
+Left as they are:
+
+- At 1366 points, the titles of the docked panels do not all fit (in
+  English too); the dock shows a scroll bar for them. This is how the
+  dock works; fewer or shorter titles would be a change of the layout.
 - The Options window is 230 to 270 points wider in German and Spanish
   (it fits the screen).
-- Windows with no scene yet: the Lettering window, Picture to design
-  with a picture, the Turntable and Product Photo with a product.
+- A reader of Japanese must still check the look of the Japanese windows
+  and sheets.
 
 ## Milestone 3: tests on an industrial machine (M)
 

@@ -74,13 +74,16 @@ pub fn install_with(ctx: &egui::Context, cjk: bool) -> bool {
     let mut fonts = egui::FontDefinitions::default();
     egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
     let mut found = !cjk;
-    if cjk && let Some((bytes, index)) = cjk_font() {
+    if cjk && let Some((bytes, index, lower)) = cjk_font() {
         fonts.font_data.insert(
             "cjk".into(),
             std::sync::Arc::new(egui::FontData {
                 font: std::borrow::Cow::Borrowed(bytes),
                 index,
-                tweak: Default::default(),
+                tweak: egui::FontTweak {
+                    y_offset_factor: lower,
+                    ..Default::default()
+                },
             }),
         );
         for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
@@ -92,36 +95,43 @@ pub fn install_with(ctx: &egui::Context, cjk: bool) -> bool {
     found
 }
 
+/// Yu Gothic (Windows): its characters go down by this part of the text size.
+const YU: f32 = 0.18;
+
 /// Fonts with Japanese characters that the systems have, in order: the
-/// file and the face in it.
-const CJK_FONTS: &[(&str, u32)] = &[
+/// file, the face in it, and how far down the characters go, as a part of
+/// the text size. Some fonts have much space above their characters, so
+/// their characters are higher than the Latin letters and digits of the
+/// program font in the same line. The values are from the pictures of the
+/// windows (`pictures.rs`); a font that was not checked has 0.
+const CJK_FONTS: &[(&str, u32, f32)] = &[
     // Windows (Yu Gothic since Windows 8.1, Meiryo since Vista).
-    ("%WINDIR%/Fonts/YuGothM.ttc", 0),
-    ("%WINDIR%/Fonts/YuGothR.ttc", 0),
-    ("%WINDIR%/Fonts/meiryo.ttc", 0),
-    ("%WINDIR%/Fonts/msgothic.ttc", 0),
+    ("%WINDIR%/Fonts/YuGothM.ttc", 0, YU),
+    ("%WINDIR%/Fonts/YuGothR.ttc", 0, YU),
+    ("%WINDIR%/Fonts/meiryo.ttc", 0, 0.0),
+    ("%WINDIR%/Fonts/msgothic.ttc", 0, 0.0),
     // macOS.
-    ("/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc", 0),
-    ("/System/Library/Fonts/Hiragino Sans GB.ttc", 0),
-    ("/Library/Fonts/Arial Unicode.ttf", 0),
+    ("/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc", 0, 0.0),
+    ("/System/Library/Fonts/Hiragino Sans GB.ttc", 0, 0.0),
+    ("/Library/Fonts/Arial Unicode.ttf", 0, 0.0),
     // Linux (Noto Sans CJK in most desktop systems).
-    ("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", 0),
-    ("/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc", 0),
-    ("/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc", 0),
-    ("/usr/share/fonts/opentype/noto/NotoSansCJKjp-Regular.otf", 0),
-    ("/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf", 0),
+    ("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", 0, 0.0),
+    ("/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc", 0, 0.0),
+    ("/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc", 0, 0.0),
+    ("/usr/share/fonts/opentype/noto/NotoSansCJKjp-Regular.otf", 0, 0.0),
+    ("/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf", 0, 0.0),
 ];
 
 /// The first font of [`CJK_FONTS`] that the computer has, read one time.
-fn cjk_font() -> Option<(&'static [u8], u32)> {
-    static FONT: std::sync::OnceLock<Option<(&'static [u8], u32)>> = std::sync::OnceLock::new();
+fn cjk_font() -> Option<(&'static [u8], u32, f32)> {
+    static FONT: std::sync::OnceLock<Option<(&'static [u8], u32, f32)>> = std::sync::OnceLock::new();
     *FONT.get_or_init(|| {
         let windir = std::env::var("WINDIR").unwrap_or_else(|_| "C:/Windows".into());
-        CJK_FONTS.iter().find_map(|(path, index)| {
+        CJK_FONTS.iter().find_map(|(path, index, lower)| {
             let path = path.replace("%WINDIR%", &windir);
             let bytes = std::fs::read(path).ok()?;
             let bytes: &'static [u8] = Box::leak(bytes.into_boxed_slice());
-            Some((bytes, *index))
+            Some((bytes, *index, *lower))
         })
     })
 }

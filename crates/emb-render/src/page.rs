@@ -111,10 +111,32 @@ impl Page {
     }
 }
 
+/// True for a character of Chinese, Japanese or Korean writing, and for
+/// the full-width forms: it is as wide as it is high, and a line can
+/// break before or after it. The PDF shows it in its own font.
+pub fn wide(c: char) -> bool {
+    matches!(
+        c as u32,
+        0x1100..=0x115F
+            | 0x2E80..=0xA4CF
+            | 0xAC00..=0xD7A3
+            | 0xF900..=0xFAFF
+            | 0xFE30..=0xFE4F
+            | 0xFF00..=0xFF60
+            | 0xFFE0..=0xFFE6
+    )
+}
+
+/// The width of text in characters of Latin text: a wide character
+/// counts as two.
+fn units(text: &str) -> usize {
+    text.chars().map(|c| if wide(c) { 2 } else { 1 }).sum()
+}
+
 /// Width of text in Helvetica, in mm, near enough for layout (the mean
-/// width of a character is about 0.52 em).
+/// width of a character is about 0.52 em; a wide character is 1 em).
 pub fn text_width_mm(text: &str, size_pt: f64) -> f64 {
-    text.chars().count() as f64 * size_pt * 0.52 * 25.4 / 72.0
+    units(text) as f64 * size_pt * 0.52 * 25.4 / 72.0
 }
 
 /// How design mm map to page mm: a scale about a center.
@@ -174,19 +196,50 @@ pub fn fit_segments(segments: &[Segment], area: BBox) -> (Vec<Segment>, Fit) {
     (out, fit)
 }
 
-/// Cuts text into lines of at most `max` characters, at spaces.
+/// The parts of a word that a line can break between: text with no wide
+/// characters is one part, and a line can break before and after each
+/// wide character (Japanese has no spaces), but not before a mark that
+/// closes a phrase.
+fn parts(word: &str) -> Vec<&str> {
+    const NO_START: &str = "、。，．）」』】！？：；ー…,.):;!?%";
+    let mut out = Vec::new();
+    let mut start = 0;
+    let mut before: Option<char> = None;
+    for (i, c) in word.char_indices() {
+        if let Some(b) = before
+            && (wide(c) || wide(b))
+            && !NO_START.contains(c)
+        {
+            out.push(&word[start..i]);
+            start = i;
+        }
+        before = Some(c);
+    }
+    out.push(&word[start..]);
+    out
+}
+
+/// Cuts text into lines of at most `max` characters, at spaces. A wide
+/// character counts as two, and a line can also break at it.
 pub fn wrap(text: &str, max: usize) -> Vec<String> {
     let mut lines = Vec::new();
     for para in text.lines() {
         let mut line = String::new();
+        let mut width = 0;
         for word in para.split_whitespace() {
-            if !line.is_empty() && line.chars().count() + 1 + word.chars().count() > max {
-                lines.push(std::mem::take(&mut line));
+            for (k, part) in parts(word).into_iter().enumerate() {
+                // A space comes before a new word, not inside a word.
+                let gap = usize::from(k == 0 && !line.is_empty());
+                if !line.is_empty() && width + gap + units(part) > max {
+                    lines.push(std::mem::take(&mut line));
+                    width = 0;
+                } else if gap == 1 {
+                    line.push(' ');
+                    width += 1;
+                }
+                line.push_str(part);
+                width += units(part);
             }
-            if !line.is_empty() {
-                line.push(' ');
-            }
-            line.push_str(word);
         }
         lines.push(line);
     }
@@ -217,6 +270,14 @@ mod tests {
     fn wrapping() {
         assert_eq!(wrap("one two three four", 9), ["one two", "three", "four"]);
         assert_eq!(wrap("a\n\nb", 9), ["a", "", "b"]);
+        // Japanese has no spaces: a line breaks at a character, a wide
+        // character counts as two, and no line starts with 。 or 、.
+        assert_eq!(
+            wrap("枠の中心から右へ30 mmです。", 12),
+            ["枠の中心から", "右へ30 mmで", "す。"]
+        );
+        assert_eq!(wrap("あいう、えお", 8), ["あいう、", "えお"]);
+        assert!((text_width_mm("あ", 10.0) - text_width_mm("ab", 10.0)).abs() < 1e-9);
         assert!(text_width_mm("abc", 10.0) > 5.0);
     }
 }
