@@ -529,6 +529,8 @@ pub enum Cmd {
     SaveDecoration,
     /// Show the other side of the garment under the design.
     TurnProduct,
+    /// The Turntable window: the product turns in steps.
+    Turntable,
     /// The Repeats window.
     RepeatsWindow,
     /// The About window: version, build, folders.
@@ -1643,6 +1645,11 @@ impl Cmd {
                 g(ph::IMAGE_SQUARE),
                 tr("Picture on Product"),
                 tr("Save a picture (PNG) of the design with the thread look on the product."),
+            ),
+            Cmd::Turntable => (
+                g(ph::CAMERA_ROTATE),
+                tr("Turntable"),
+                tr("See the product with its designs turn in steps, and save the turn as a GIF."),
             ),
             Cmd::TurnProduct => (
                 g(ph::ARROW_U_DOWN_RIGHT),

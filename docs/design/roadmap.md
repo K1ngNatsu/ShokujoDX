@@ -920,7 +920,7 @@ browser sews on the Topaz 20; the page works offline after the first
 visit. With step 3: a name on a towel is made on a tablet from start to
 machine file.
 
-### P16. Product view (M) — Milestones 1 to 7 done (`docs/design/product-plan.md`)
+### P16. Product view (M) — Milestones 1 to 8 done (exit tests: owner) (`docs/design/product-plan.md`)
 
 The product under the design (P7 Milestone 5) good enough to show to a
 customer (owner, 2026-11-17), in eight milestones: a realistic look

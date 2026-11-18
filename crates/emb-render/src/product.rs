@@ -368,10 +368,24 @@ fn add_ridge(hf: &mut [f32], w: usize, h: usize, pts: &[(f64, f64)], width: f64,
 /// clear picture of the area `b`): the light on the height field of the
 /// product, the shadow at its edges, its fabric and a soft mottle.
 fn light_factors(view: &ProductView, flat: &Picture, b: BBox, px_per_mm: f64, lighting: &Lighting) -> Vec<f32> {
+    light_factors_with(view, flat, b, px_per_mm, lighting, true)
+}
+
+/// As [`light_factors`]; with `round` false, the edges are not round and
+/// not darker (a body in 3D has its own shape, see `turntable`).
+fn light_factors_with(
+    view: &ProductView,
+    flat: &Picture,
+    b: BBox,
+    px_per_mm: f64,
+    lighting: &Lighting,
+    round: bool,
+) -> Vec<f32> {
     let (w, h) = (flat.width as usize, flat.height as usize);
     let mask: Vec<bool> = flat.rgba.as_chunks::<4>().0.iter().map(|p| p[3] > 127).collect();
     let dist = distance_in(&mask, w, h);
     let (round_mm, round_h) = roundness(view.kind);
+    let round_h = if round { round_h } else { 0.0 };
     let mut hf: Vec<f32> = dist
         .iter()
         .map(|&d| {
@@ -420,7 +434,9 @@ fn light_factors(view: &ProductView, flat: &Picture, b: BBox, px_per_mm: f64, li
             let ndl = ((-hx * l[0] - hy * l[1] + l[2]) / len).max(0.0);
             let mut f = 1.0 + ((AMBIENT + DIFFUSE * ndl) / flat_light - 1.0) * strength;
             let e = f64::from(dist[i]) / px_per_mm / EDGE_MM;
-            f *= 1.0 - EDGE_DARK / (1.0 + e * e);
+            if round {
+                f *= 1.0 - EDGE_DARK / (1.0 + e * e);
+            }
             // Fabric and mottle in product coordinates: they move with the product.
             let (mx, my) = (
                 b.min.x + (x as f64 + 0.5) / px_per_mm - view.origin.x,
@@ -512,6 +528,18 @@ fn embroidery_shadow(
     }
 }
 
+/// The area (view mm) that [`decoration`] shows: the product and the
+/// stitches, with 10 mm round them.
+pub fn decoration_area(view: &ProductView, segments: &[Segment]) -> BBox {
+    let stitches = BBox::from_points(segments.iter().flat_map(|s| [s.a, s.b]));
+    [Some(view.bbox()), stitches]
+        .into_iter()
+        .flatten()
+        .reduce(BBox::union)
+        .unwrap_or_else(|| view.bbox())
+        .expand(10.0)
+}
+
 /// The picture of the design on the product: the product (drawn, or the
 /// picture of the user's product decoded as `photo`), then the stitches
 /// (view coordinates) with the thread look. The picture shows the product
@@ -524,13 +552,26 @@ pub fn decoration(
     thread_mm: f64,
     look: &Look,
 ) -> Picture {
-    let stitches = BBox::from_points(segments.iter().flat_map(|s| [s.a, s.b]));
-    let b = [Some(view.bbox()), stitches]
-        .into_iter()
-        .flatten()
-        .reduce(BBox::union)
-        .unwrap_or_else(|| view.bbox())
-        .expand(10.0);
+    decoration_with(view, photo, segments, px_per_mm, thread_mm, look, true)
+}
+
+/// As [`decoration`] for a side of the turntable view (P16 Milestone 8):
+/// the edges of the product are not round and not darker, and the picture
+/// is clear (not white) round the product.
+pub fn turn_side(view: &ProductView, segments: &[Segment], px_per_mm: f64, thread_mm: f64, look: &Look) -> Picture {
+    decoration_with(view, None, segments, px_per_mm, thread_mm, look, false)
+}
+
+fn decoration_with(
+    view: &ProductView,
+    photo: Option<&image::RgbaImage>,
+    segments: &[Segment],
+    px_per_mm: f64,
+    thread_mm: f64,
+    look: &Look,
+    round: bool,
+) -> Picture {
+    let b = decoration_area(view, segments);
     let white = Some(Rgb(255, 255, 255));
     let lighting = look.lighting.unwrap_or_default();
     let mut pic = match (&view.picture, photo) {
@@ -549,8 +590,13 @@ pub fn decoration(
         }
         _ => {
             let mut pic = picture_at(&[], &areas(view), b, px_per_mm, 0.0, None);
-            let factors = light_factors(view, &pic, b, px_per_mm, &lighting);
+            let factors = light_factors_with(view, &pic, b, px_per_mm, &lighting, round);
             apply_factors(&mut pic, &factors);
+            if !round {
+                embroidery_shadow(&mut pic, b, segments, px_per_mm, thread_mm, &lighting);
+                stitches_onto_look(&mut pic, b, segments, px_per_mm, thread_mm, look.lighting.as_ref());
+                return pic;
+            }
             // White round the product.
             for px in pic.rgba.as_chunks_mut::<4>().0 {
                 if px[3] == 0 {

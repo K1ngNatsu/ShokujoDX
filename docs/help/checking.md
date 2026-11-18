@@ -128,6 +128,15 @@ in My Products** keeps the photo with its real width, its mask and its
 places; choose it again in **My Products**. **Export…** and **Import…**
 move a product to another computer.
 
+**Design > Turntable** shows a drawn product with its designs from more
+sides: it turns in steps of 15°. Use the arrows or the slider, drag the
+picture, or click **Play**. The program makes the 24 views in the
+background after each change, so a turn is fast on a slow computer too.
+The product has a soft round shape, made from its drawing; the canvas
+stays flat. **Save GIF…** saves the turn as an animated picture, and
+**Save Four Views…** saves the front, two quarter turns and the back next
+to each other. A photo of a product cannot turn.
+
 ## Repeats
 
 **Design > Repeats** shows the design again in **Columns** and **Rows**,

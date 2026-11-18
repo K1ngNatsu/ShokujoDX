@@ -175,6 +175,7 @@ impl AppState {
             Cmd::CrossChart => d.objects().iter().any(|o| matches!(o.kind, ObjectKind::CrossStitch(_))),
             Cmd::AutoHoop => !d.objects().is_empty(),
             Cmd::SaveDecoration => d.product.is_some(),
+            Cmd::Turntable => crate::turntable::can_turn(d),
             Cmd::TurnProduct => d
                 .product
                 .as_ref()
@@ -532,6 +533,7 @@ impl AppState {
             Cmd::ProductWindow => self.product_window = true,
             Cmd::SaveDecoration => self.save_decoration_dialog(),
             Cmd::TurnProduct => self.turn_product(),
+            Cmd::Turntable => self.turntable.open = true,
             Cmd::RepeatsWindow => self.open_repeats(),
             Cmd::About => self.about_window = true,
             Cmd::Library => self.focus_library = true,

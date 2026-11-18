@@ -30,6 +30,7 @@ pub mod stone_sheet;
 pub mod svg;
 pub mod template;
 pub mod thread3d;
+pub mod turntable;
 
 use emb_geom::{BBox, Point};
 use emb_model::{Rgb, StitchDesign, StitchKind};

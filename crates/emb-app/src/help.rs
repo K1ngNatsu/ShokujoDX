@@ -171,6 +171,7 @@ pub const WINDOW_HELP: &[(&str, &str)] = &[
     ("Preview Hoopings", "hooping"),
     ("Product", "checking"),
     ("Product Photo", "checking"),
+    ("Turntable", "checking"),
     ("Repeats", "checking"),
     ("Overview", "canvas"),
     ("Output Design", "files-and-output"),

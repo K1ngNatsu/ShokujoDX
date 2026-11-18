@@ -134,6 +134,16 @@ ancho real, su máscara y sus lugares; elíjala de nuevo en **Mis
 productos**. **Exportar…** e **Importar…** llevan un producto a otro
 ordenador.
 
+**Diseño > Plato giratorio** muestra un producto dibujado con sus diseños
+desde más lados: gira en pasos de 15°. Use las flechas o el control
+deslizante, arrastre la imagen o haga clic en **Reproducir**. El programa
+crea las 24 vistas en segundo plano después de cada cambio, así un giro
+es rápido también en un ordenador lento. El producto tiene una forma
+suave y redonda, hecha a partir de su dibujo; el lienzo queda plano.
+**Guardar GIF…** guarda el giro como imagen animada, y **Guardar cuatro
+vistas…** guarda la parte delantera, dos cuartos de giro y la espalda una
+al lado de la otra. Una foto de un producto no puede girar.
+
 ## Repeticiones
 
 **Diseño > Repeticiones** muestra el diseño otra vez en **Columnas** y

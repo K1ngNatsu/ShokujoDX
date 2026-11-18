@@ -140,6 +140,17 @@ seiner Maske und seinen Stellen; wählen Sie es wieder in **Meine
 Produkte**. **Exportieren…** und **Importieren…** bringen ein Produkt auf
 einen anderen Computer.
 
+**Design > Drehteller** zeigt ein gezeichnetes Produkt mit seinen
+Designs von mehr Seiten: Es dreht sich in Schritten von 15°. Verwenden
+Sie die Pfeile oder den Schieberegler, ziehen Sie das Bild, oder klicken
+Sie auf **Abspielen**. Das Programm erstellt die 24 Ansichten nach jeder
+Änderung im Hintergrund, so ist eine Drehung auch auf einem langsamen
+Computer schnell. Das Produkt hat eine weiche, runde Form aus seiner
+Zeichnung; die Arbeitsfläche bleibt flach. **GIF speichern…** speichert
+die Drehung als animiertes Bild, und **Vier Ansichten speichern…**
+speichert Vorderseite, zwei Vierteldrehungen und Rückseite nebeneinander.
+Ein Foto eines Produkts kann sich nicht drehen.
+
 ## Wiederholungen
 
 **Design > Wiederholungen** zeigt das Design noch einmal in **Säulen**

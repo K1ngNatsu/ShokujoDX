@@ -896,14 +896,10 @@ fn long_tee(back: bool) -> Vec<ProductPart> {
     v
 }
 
-/// A six-panel cap from the front, a little from above: the crown with the
-/// two front panels and the side seams up to the button, the eyelets, and
-/// the curved brim with its rows of stitches. The origin is the middle of
-/// the line where the brim meets the crown.
-fn cap() -> Vec<ProductPart> {
-    use ProductPart::{Area, Line};
+/// The outline of the crown of the cap (to the line where the brim
+/// meets it, and a little under the brim) and the outline of the brim.
+pub fn cap_crown_and_brim() -> (Path, Path) {
     use Seg::*;
-    let p = Point::new;
     let crown = symmetric(
         (0.0, -128.0),
         &[
@@ -920,6 +916,17 @@ fn cap() -> Vec<ProductPart> {
             C(104.0, 44.0, 64.0, 58.0, 0.0, 60.0),
         ],
     );
+    (crown, brim)
+}
+
+/// A six-panel cap from the front, a little from above: the crown with the
+/// two front panels and the side seams up to the button, the eyelets, and
+/// the curved brim with its rows of stitches. The origin is the middle of
+/// the line where the brim meets the crown.
+fn cap() -> Vec<ProductPart> {
+    use ProductPart::{Area, Line};
+    let p = Point::new;
+    let (crown, brim) = cap_crown_and_brim();
     // The two front panels between the side seams (trim part 0).
     let front = Path::new()
         .move_to(p(0.0, -126.0))

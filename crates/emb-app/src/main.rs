@@ -99,6 +99,7 @@ mod teamnames;
 #[cfg(test)]
 mod test_util;
 mod threads;
+mod turntable;
 mod vectors;
 mod viewing;
 mod views;

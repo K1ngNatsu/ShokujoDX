@@ -259,6 +259,8 @@ pub struct AppState {
     pub product_extras: crate::product::Extras,
     /// The window of the photo of the user's product (mask and places).
     pub photo_editor: crate::product_photo::PhotoEditor,
+    /// The Turntable window and its views.
+    pub turntable: crate::turntable::TurntableUi,
     /// The user's product templates (`None`: read them again).
     pub product_templates: Option<Vec<crate::product_photo::Template>>,
     /// The picture of the design on the product for the approval sheet, and
@@ -726,6 +728,7 @@ impl AppState {
             product_tex: None,
             product_extras: Default::default(),
             photo_editor: Default::default(),
+            turntable: Default::default(),
             product_templates: None,
             sheet_product: None,
             fit_product: false,
@@ -1743,6 +1746,7 @@ impl eframe::App for EmbApp {
         crate::hooping::preview_window(&ctx, st);
         crate::product::window(&ctx, st);
         crate::product_photo::window(&ctx, st);
+        crate::turntable::window(&ctx, st);
         crate::repeats::window(&ctx, st);
         crate::about::window(&ctx, st);
         crate::first_start::window(&ctx, st);

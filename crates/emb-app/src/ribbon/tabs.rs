@@ -658,6 +658,7 @@ pub(super) const DESIGN: &[Panel] = &[
         title: "Product",
         items: &[
             Large(Cmd::ProductWindow),
+            Large(Cmd::Turntable),
             Small(&[f(Flag::Product), Cmd::TurnProduct, Cmd::SaveDecoration]),
         ],
     },

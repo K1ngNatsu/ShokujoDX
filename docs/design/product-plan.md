@@ -1,6 +1,6 @@
 # Plan: a better product view (phase P16)
 
-Date: 2026-11-17 · Status: Accepted (owner, 2026-11-17). Milestones 1 to 7 done (ADR 0101 to 0107); Milestone 8 next.
+Date: 2026-11-17 · Status: Accepted (owner, 2026-11-17). Milestones 1 to 8 done (ADR 0101 to 0108); the owner checks the exit tests at the end of the phase.
 
 ## Goal
 
@@ -154,8 +154,9 @@ needs Milestone 3 (a front and a back).
 Not in this milestone: a garment on a body or a mannequin (it needs
 real 3D models).
 
-**Exit:** a T-shirt with a chest logo and a back print turns in steps on
-the canvas of a PC with the software renderer, and saves as a GIF.
+**Exit:** a T-shirt with a chest logo and a back print turns in steps in
+the Turntable window (the canvas stays flat, ADR 0108) on a PC with the
+software renderer, and saves as a GIF.
 
 ## Not in this plan
 

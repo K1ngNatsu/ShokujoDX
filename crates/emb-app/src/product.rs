@@ -212,7 +212,7 @@ const EXTRA_MAX_PX: f64 = 4096.0;
 pub const TURN: egui::KeyboardShortcut =
     egui::KeyboardShortcut::new(egui::Modifiers::COMMAND.plus(egui::Modifiers::SHIFT), egui::Key::T);
 /// The thread width (mm) of the pictures of the designs.
-const THREAD_MM: f64 = 0.4;
+pub(crate) const THREAD_MM: f64 = 0.4;
 
 /// The stitches and the canvas pictures of the other designs on the
 /// product, by the key of each design.
@@ -658,7 +658,7 @@ pub fn draw(painter: &egui::Painter, ctx: &egui::Context, rect: Rect, st: &mut A
 
 /// The look of the pictures of the product: the 3D look of the settings,
 /// with no fabric texture (the product is under the design).
-fn picture_look(settings: &crate::viewtools::LookSettings) -> emb_render::raster::Look {
+pub(crate) fn picture_look(settings: &crate::viewtools::LookSettings) -> emb_render::raster::Look {
     emb_render::raster::Look {
         fabric: None,
         ..settings.picture_look(None)
@@ -666,7 +666,7 @@ fn picture_look(settings: &crate::viewtools::LookSettings) -> emb_render::raster
 }
 
 /// The stitches of the other design `e` (view mm, its center at (0, 0)).
-fn stitch_extra(e: &ProductExtra, machines: &emb_model::MachineCatalog) -> Vec<Segment> {
+pub(crate) fn stitch_extra(e: &ProductExtra, machines: &emb_model::MachineCatalog) -> Vec<Segment> {
     let opts = e
         .design
         .machine
@@ -1127,7 +1127,7 @@ pub fn product_box(st: &AppState) -> Option<BBox> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::test_util::Harness;
 
@@ -1155,7 +1155,7 @@ mod tests {
     }
 
     /// A project file with a small square of `color`, in a new folder.
-    fn small_project(name: &str, color: Rgb) -> std::path::PathBuf {
+    pub(crate) fn small_project(name: &str, color: Rgb) -> std::path::PathBuf {
         let dir = std::env::temp_dir().join(format!("emb-product-extra-{name}-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let mut d = emb_model::Design::new(name);
