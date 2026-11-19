@@ -889,6 +889,48 @@ fn report(scenes: &[Scene], langs: &[&str], results: &[Vec<Found>]) -> String {
 }
 
 /// The folder for the pictures: `EMB_PICTURES_OUT`, or `target/window-pictures`.
+/// The file with the hash of each picture of the last runs.
+const HASHES: &str = "hashes.txt";
+
+/// A hash of the bytes of a file (FNV-1a, the same in each run and on
+/// each computer).
+fn hash(bytes: &[u8]) -> u64 {
+    bytes.iter().fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
+        (h ^ u64::from(*b)).wrapping_mul(0x0100_0000_01b3)
+    })
+}
+
+/// Compares the pictures `files` (paths from `out`) with the hashes of
+/// the runs before, and writes the new hashes (the hashes of pictures
+/// that this run did not draw stay). Returns the pictures that are new
+/// and the pictures that changed. So after a change of the program, only
+/// these pictures need a look (the review of P17, lane 2).
+fn changes(out: &Path, files: &[String]) -> (Vec<String>, Vec<String>) {
+    let mut known: std::collections::BTreeMap<String, u64> = std::fs::read_to_string(out.join(HASHES))
+        .unwrap_or_default()
+        .lines()
+        .filter_map(|l| {
+            let (path, h) = l.rsplit_once('\t')?;
+            Some((path.to_string(), u64::from_str_radix(h, 16).ok()?))
+        })
+        .collect();
+    let (mut new, mut changed) = (Vec::new(), Vec::new());
+    for path in files {
+        let Ok(bytes) = std::fs::read(out.join(path)) else {
+            continue;
+        };
+        let h = hash(&bytes);
+        match known.insert(path.clone(), h) {
+            None => new.push(path.clone()),
+            Some(old) if old != h => changed.push(path.clone()),
+            Some(_) => {}
+        }
+    }
+    let text: String = known.iter().map(|(path, h)| format!("{path}\t{h:016x}\n")).collect();
+    let _ = std::fs::write(out.join(HASHES), text);
+    (new, changed)
+}
+
 fn out_dir() -> PathBuf {
     std::env::var_os("EMB_PICTURES_OUT").map_or_else(
         || {
@@ -1108,6 +1150,31 @@ mod tests {
         picture.save(&dir.join("list-borders.png")).unwrap();
     }
 
+    #[test]
+    fn the_pictures_that_changed_are_found() {
+        let dir = std::env::temp_dir().join(format!("emb-picture-hashes-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("windows")).unwrap();
+        let file = |name: &str, bytes: &[u8]| std::fs::write(dir.join(name), bytes).unwrap();
+        file("windows/a.png", b"one");
+        file("windows/b.png", b"two");
+        let all = vec!["windows/a.png".to_string(), "windows/b.png".to_string()];
+        // The first run: all pictures are new.
+        assert_eq!(changes(&dir, &all), (all.clone(), vec![]));
+        // The same pictures again: no change.
+        assert_eq!(changes(&dir, &all), (vec![], vec![]));
+        // One picture changed. A run of a part of the pictures keeps the
+        // hashes of the others.
+        file("windows/b.png", b"three");
+        assert_eq!(changes(&dir, &all[1..]), (vec![], vec![all[1].clone()]));
+        file("windows/a.png", b"four");
+        assert_eq!(changes(&dir, &all), (vec![], vec![all[0].clone()]));
+        // A picture that is not there is not counted.
+        assert_eq!(changes(&dir, &["windows/none.png".to_string()]), (vec![], vec![]));
+        assert_ne!(hash(b"one"), hash(b"two"));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
     /// The pictures of all windows in all languages. Run it by hand in a
     /// release build (see the top of this file).
     #[test]
@@ -1138,7 +1205,35 @@ mod tests {
         let start = std::time::Instant::now();
         let results = draw_all(&all, &langs, Some(&out));
         std::fs::write(out.join("index.html"), index_page(&all, &langs, &results)).unwrap();
-        let text = report(&all, &langs, &results);
+        let mut text = report(&all, &langs, &results);
+        // The pictures that are not the pictures of the run before.
+        let files: Vec<String> = results
+            .iter()
+            .flatten()
+            .flat_map(|r| r.files.iter().map(|(_, path)| path.clone()))
+            .collect();
+        let (new, changed) = changes(&out, &files);
+        let list = |title: &str, paths: &[String]| {
+            let mut s = format!("== {title}: {}\n", paths.len());
+            for p in paths {
+                s.push_str(&format!("{p}\n"));
+            }
+            s
+        };
+        std::fs::write(
+            out.join("changed.txt"),
+            format!(
+                "{}\n{}",
+                list("Pictures that changed since the run before", &changed),
+                list("New pictures", &new)
+            ),
+        )
+        .unwrap();
+        text = format!(
+            "== Pictures that changed since the run before: {} (new: {}; see changed.txt)\n\n{text}",
+            changed.len(),
+            new.len()
+        );
         std::fs::write(out.join("report.txt"), &text).unwrap();
         let end = text.find("\n== Texts that do not fit: all").unwrap_or(text.len());
         println!("{}", &text[..end]);

@@ -121,7 +121,13 @@ Usage:
       Print the quality score of an embroidery font (ADR 0115). With
       --source (the font that it was converted from), measure the score
       again and print the letters with the lowest scores; else print the
-      score in the file.";
+      score in the file.
+  emb-cli content <out.json>
+      Write the built-in library items as data: the motifs, the
+      program-split patterns, the carving stamps, the decorative borders
+      (their stitches round a small box) and the clipart items of the
+      content families (ADR 0118). tools/content-sheet.py draws a contact
+      sheet of each kind from the file.";
 
 /// The files of `emb-cli library`.
 struct LibraryFiles<'a> {
@@ -667,6 +673,20 @@ fn run(args: &[String]) -> Result<(), String> {
                 sizes.len(),
                 b.width(),
                 b.height()
+            );
+            Ok(())
+        }
+        ["content", output] => {
+            let items = emb_cli::content::items();
+            let count = |kind: &str| items[kind].as_array().map_or(0, Vec::len);
+            std::fs::write(output, items.to_string()).map_err(|e| format!("{output}: {e}"))?;
+            println!(
+                "wrote {output}: {} motifs, {} split patterns, {} stamps, {} borders, {} clipart items",
+                count("motifs"),
+                count("splits"),
+                count("stamps"),
+                count("borders"),
+                count("clipart")
             );
             Ok(())
         }

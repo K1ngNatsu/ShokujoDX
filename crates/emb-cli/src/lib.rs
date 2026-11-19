@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 pub mod bench;
+pub mod content;
 pub mod corpus;
 pub mod fontaudit;
 

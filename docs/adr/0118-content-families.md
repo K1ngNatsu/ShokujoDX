@@ -71,8 +71,8 @@ waves, a star with five or six points, a tile of small or large diamonds.
   name, so the object shows where it comes from.
 - The corpus design `content-families` sews motifs, patterns, stamps,
   borders and clipart of the families. A contact sheet of all items was
-  looked at when the families were made; the script that draws it is not
-  in the repository.
+  looked at when the families were made; `emb-cli content` and
+  `tools/content-sheet.py` make such sheets.
 - A pattern or a stamp of the user has no library: the object keeps it,
   and the description makes it again.
 - No sew-out confirms the new items (the exit test of the owner: five new

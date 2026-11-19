@@ -297,7 +297,13 @@ tools), then 5 to 8. Lane 5 and lane 6 wait for a sew-out.
 2. **Development tools** (S): a contact sheet of the items of the
    families from the repository (`emb-cli` writes the items, a script in
    `tools` draws them); a list of the window pictures that changed
-   since the last run.
+   since the last run. **Done (2026-11-19):** `emb-cli content` writes
+   the built-in items as data and `tools/content-sheet.py` draws one
+   sheet for each kind (motifs, patterns, stamps, borders, clipart).
+   The test of the window pictures keeps a hash of each picture
+   (`hashes.txt`) and writes `changed.txt`: the pictures that are new
+   and the pictures that changed since the run before. Two runs of the
+   same program give no changed picture.
 3. **Pictures in the lists** (M): the patterns, the stamps and the
    borders as picture grids, as the motifs have, with a search. The
    Families window draws them already. **Done (2026-11-19):**
