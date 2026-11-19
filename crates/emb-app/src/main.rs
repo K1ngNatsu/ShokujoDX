@@ -34,6 +34,7 @@ mod drawing_aids;
 mod editing;
 mod effects_ui;
 mod export;
+mod families;
 mod file;
 mod first_start;
 mod font_sheet;

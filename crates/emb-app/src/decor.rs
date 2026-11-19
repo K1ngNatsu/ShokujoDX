@@ -23,6 +23,10 @@ pub struct DecorWindows {
     /// The index of the frame in the list.
     pub frame: usize,
     pub frame_margin_mm: f64,
+    /// Another shape for the border (`None`: its own; P17 Milestone 8).
+    pub frame_shape: Option<emb_model::FrameShape>,
+    /// The size of the stitch of the border, as a factor.
+    pub frame_scale: f64,
 }
 
 impl Default for DecorWindows {
@@ -35,6 +39,8 @@ impl Default for DecorWindows {
             buttonhole: Default::default(),
             frame: 0,
             frame_margin_mm: 4.0,
+            frame_shape: None,
+            frame_scale: 1.0,
         }
     }
 }
@@ -308,7 +314,7 @@ impl AppState {
     pub fn add_frame(&mut self) -> bool {
         let w = self.decor.clone();
         let all = frames();
-        let Some(frame) = all.get(w.frame).cloned() else {
+        let Some(frame) = all.get(w.frame).map(|f| f.with(w.frame_shape, w.frame_scale)) else {
             return false;
         };
         let d = self.doc.design();
@@ -364,13 +370,45 @@ fn borders_window(ctx: &egui::Context, st: &mut AppState) {
     .default_width(300.0)
     .show(ctx, |ui| {
         let w = &mut st.decor;
-        egui::Grid::new("frames").spacing([6.0, 4.0]).show(ui, |ui| {
-            for (i, f) in all.iter().enumerate() {
-                ui.selectable_value(&mut w.frame, i, &f.name);
-                if i % 3 == 2 {
-                    ui.end_row();
+        egui::ScrollArea::vertical().max_height(230.0).show(ui, |ui| {
+            egui::Grid::new("frames").spacing([6.0, 4.0]).show(ui, |ui| {
+                for (i, f) in all.iter().enumerate() {
+                    ui.selectable_value(&mut w.frame, i, &f.name);
+                    if i % 3 == 2 {
+                        ui.end_row();
+                    }
                 }
-            }
+            });
+        });
+        ui.horizontal(|ui| {
+            ui.label(tr("Shape")).on_hover_text(tr(
+                "Each border has a shape of its own. Choose another shape to make a border of your own.",
+            ));
+            let own = all.get(w.frame).map_or("", |f| f.shape.name());
+            egui::ComboBox::from_id_salt("frame_shape")
+                .selected_text(w.frame_shape.map_or_else(
+                    || crate::i18n::fill("As the border ({})", &[&tr(own)]),
+                    |s| tr(s.name()).to_string(),
+                ))
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut w.frame_shape, None, tr("As the border"));
+                    for s in emb_model::FrameShape::ALL {
+                        ui.selectable_value(&mut w.frame_shape, Some(s), tr(s.name()));
+                    }
+                });
+        });
+        ui.horizontal(|ui| {
+            ui.label(tr("Size of the stitches")).on_hover_text(tr(
+                "The width of a satin border, the gap of two lines, or the size of the motifs: 100 % is the size of the border.",
+            ));
+            let mut pct = w.frame_scale * 100.0;
+            ui.add(
+                egui::Slider::new(&mut pct, 50.0..=200.0)
+                    .clamping(egui::SliderClamping::Always)
+                    .fixed_decimals(0)
+                    .suffix(" %"),
+            );
+            w.frame_scale = pct / 100.0;
         });
         ui.horizontal(|ui| {
             ui.label(tr("Space round the objects"));

@@ -12,7 +12,7 @@ use emb_model::{
     SatinGeometry, SatinParams, ThreadId,
 };
 
-pub const NAMES: [&str; 64] = [
+pub const NAMES: [&str; 65] = [
     "circle-fill",
     "satin-column",
     "s-curve",
@@ -77,6 +77,7 @@ pub const NAMES: [&str; 64] = [
     "cap-order",
     "cutwork",
     "sketch-badge",
+    "content-families",
 ];
 
 const MACHINE: &str = "husqvarna_topaz20";
@@ -118,6 +119,7 @@ pub fn build(name: &str) -> Option<Design> {
         "curved-fills" => curved_fills(),
         "texture-fills" => texture_fills(),
         "motifs" => motifs(),
+        "content-families" => content_families(),
         "patterns" => patterns(),
         "effects" => effects(),
         "blends" => blends(),
@@ -287,6 +289,139 @@ fn lettering_names() -> Design {
         l.justify = Justify::Center;
         emb_letter::relayout(&mut l, &font);
         d.add_object(t, ObjectKind::Lettering(Box::new(l)));
+    }
+    d
+}
+
+/// Items of the content families (P17 Milestone 8, ADR 0118): motif runs
+/// with motifs of the families and with a motif from a description, fills
+/// with split patterns and with stamps of the families, borders with the
+/// new shapes and motifs, and three clipart items.
+fn content_families() -> Design {
+    use emb_model::family::{Item, Kind, family, from_description};
+    use emb_model::{Motif, MotifRun, SplitPattern, Stamp, StampPlacement};
+    let mut d = Design::new("");
+    let navy = d.add_thread("Navy", Rgb(25, 40, 100));
+    let red = d.add_thread("Red", Rgb(200, 30, 50));
+    let green = d.add_thread("Green", Rgb(40, 140, 70));
+    // Motif runs: lines 95 mm long, on the left.
+    for (i, (name, len, h)) in [
+        ("Double wave", 8.0, 3.0),
+        ("Sharp zigzag", 9.0, 3.0),
+        ("Key", 6.0, 3.0),
+        ("Arcade", 8.0, 3.0),
+        ("Daisy", 9.0, 5.0),
+        ("Vine", 10.0, 4.0),
+        ("Shell", 8.0, 4.0),
+        ("Snowflake", 8.0, 5.0),
+        ("Cross stitch", 6.0, 3.0),
+        ("Stairs", 8.0, 3.0),
+        ("Double heart", 10.0, 4.0),
+        // A motif from the description of a family.
+        ("Star: 7, 0.45, 0.4", 8.0, 5.0),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let y = -104.0 + 9.5 * i as f64;
+        d.add_object(
+            navy,
+            ObjectKind::Running {
+                path: Path::new().move_to(p(-88.0, y)).line_to(p(0.0, y)),
+                params: RunningParams {
+                    motif: Some(MotifRun {
+                        length_mm: len,
+                        height_mm: h,
+                        ..MotifRun::new(Motif::builtin(name).expect("a motif of a family"))
+                    }),
+                    ..RunningParams::default()
+                },
+            },
+        );
+    }
+    // Fills with split patterns of the families, on the right.
+    let split = |name: &str| SplitPattern::builtin(name).expect("a pattern of a family");
+    let from_family = match from_description(Kind::Split, "Flowers: 7, 6, 0.9") {
+        Some(Item::Split(s)) => s,
+        _ => unreachable!("a description of a family"),
+    };
+    for (i, pattern) in [
+        split("Hearts"),
+        split("Lattice"),
+        split("Stars"),
+        split("Long brick"),
+        from_family,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let y = -108.0 + 24.0 * i as f64;
+        d.add_object(
+            red,
+            ObjectKind::Fill {
+                outer: Path::rect(BBox::new(p(6.0, y), p(44.0, y + 20.0))),
+                holes: Vec::new(),
+                params: FillParams {
+                    angle_deg: 0.0,
+                    pattern: FillPattern::ProgramSplit { pattern, scale: 1.0 },
+                    ..FillParams::default()
+                },
+            },
+        );
+    }
+    // Fills with stamps of the families.
+    for (i, name) in ["Snowflake", "Sunburst", "Nested hexagons", "Clover", "Tight spiral"]
+        .into_iter()
+        .enumerate()
+    {
+        let y = -108.0 + 24.0 * i as f64;
+        d.add_object(
+            green,
+            ObjectKind::Fill {
+                outer: Path::rect(BBox::new(p(50.0, y), p(88.0, y + 20.0))),
+                holes: Vec::new(),
+                params: FillParams {
+                    stamps: vec![StampPlacement {
+                        stamp: Stamp::builtin(name).expect("a stamp of a family"),
+                        center: p(69.0, y + 10.0),
+                        size_mm: 16.0,
+                        angle_deg: 0.0,
+                    }],
+                    ..FillParams::default()
+                },
+            },
+        );
+    }
+    // Borders: the new shapes, a border with a motif of a family, and a
+    // border with another shape and size.
+    let frames = emb_model::decor::frames();
+    let frame = |name: &str| frames.iter().find(|f| f.name == name).expect("a border").clone();
+    for (i, f) in [
+        frame("Satin hexagon"),
+        frame("Greek key"),
+        frame("Double line diamond"),
+        frame("Daisies").with(Some(emb_model::FrameShape::Octagon), 0.8),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let c = p(-69.0 + 46.0 * i as f64, 38.0);
+        let b = BBox::from_center_size(c, 22.0, 14.0);
+        for kind in emb_model::decor::frame_objects(&f, &b, 2.0) {
+            d.add_object(navy, kind);
+        }
+    }
+    // Clipart items of the families.
+    for (i, (name, values)) in [("Gear", [10.0, 0.35]), ("Flower", [6.0, 0.3]), ("Sun", [12.0, 0.35])]
+        .into_iter()
+        .enumerate()
+    {
+        let Item::Clipart(item) = family(Kind::Clipart, name).expect("a family").item(name, &values) else {
+            unreachable!("a clipart family")
+        };
+        let objects: Vec<emb_model::DesignObject> = item.objects().iter().map(|o| (**o).clone()).collect();
+        let ids = d.paste_objects(&objects, &item.threads);
+        d.center_objects_at(&ids, p(-58.0 + 58.0 * i as f64, 86.0));
     }
     d
 }
@@ -1405,6 +1540,9 @@ fn borders() -> Design {
     let mut d = Design::new("");
     let fill_t = d.add_thread("Gold", Rgb(230, 170, 30));
     let frame_t = d.add_thread("Navy", Rgb(25, 40, 100));
+    // The twelve borders of P5 Milestone 7 (the design `content-families`
+    // has borders of P17 Milestone 8).
+    let frames = || frames().into_iter().take(12).collect::<Vec<_>>();
     let boxes: Vec<BBox> = (0..frames().len())
         .map(|i| {
             let (col, row) = (i % 4, i / 4);

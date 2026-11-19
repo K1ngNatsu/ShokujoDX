@@ -73,6 +73,16 @@ Schrift, von 15 mm bis 300 mm, und für fette Buchstaben, deren Formen keine
 klaren Säulen haben. In **Schrift > Schriften** zeigt **Für große Schrift**
 sie. Siehe [Schrift](lettering).
 
+**Mehr Motive, Muster, Stempel, Ränder und Clipart.** Das Programm hat
+71 Motive (vorher 15), 48 Programmteilungs-Muster (10), 39 Prägestempel
+(8), 50 dekorative Ränder (12) und 45 Clipart-Elemente (8). Die meisten
+kommen aus **Familien**: Eine Familie macht ein Element aus einigen Zahlen,
+zum Beispiel aus der Anzahl und der Höhe der Wellen. **Familien…** im
+Fenster Motive, in den Objekteigenschaften und in der Gruppe Clipart macht
+ein eigenes Element. Ein Rand kann eine andere Form haben (auch eine
+Raute, ein Sechseck und ein Achteck) und eine andere Größe seiner Stiche.
+Siehe [Sticharten](stitch-types).
+
 **Neue Versionen.** Das Programm kann Ihnen sagen, wenn eine neue Version
 verfügbar ist. Siehe [Optionen](options).
 

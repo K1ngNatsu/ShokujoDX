@@ -153,6 +153,34 @@ blendet zum Stoff aus.
 - **Umbenennen** und **Löschen** ändern Ihre eigenen Motive. Designs
   behalten ihre Kopie eines Motivs.
 
+## Familien
+
+Eine Familie macht ein Element aus einigen Zahlen: Die Familie **Waves**
+macht ein Motiv aus der Anzahl der Wellen und ihrer Höhe. Die meisten
+Motive, Programmteilungs-Muster, Prägestempel und Clipart-Elemente des
+Programms kommen aus Familien, und Sie können ein eigenes Element machen.
+
+- **Familien…** öffnet das Fenster Familien. Die Schaltfläche ist im
+  Fenster Motive, neben den Listen der Muster und der Stempel in den
+  Objekteigenschaften und in der Gruppe Clipart.
+- Wählen Sie die Art und die **Familie**. **Eingebaute Elemente** sind die
+  Elemente der Familie, die in den Listen des Programms sind. Ändern Sie
+  die Zahlen: Das Bild zeigt das Element.
+- **Für die Auswahl verwenden** verwendet ein Motiv oder ein Muster für die
+  ausgewählten Objekte. **Zu den ausgewählten Füllungen hinzufügen** setzt
+  einen Stempel in die Mitte jeder ausgewählten Füllung. **Einfügen** setzt
+  ein Clipart-Element in die Mitte der Ansicht.
+- **In der Bibliothek behalten** fügt ein Motiv zu Ihren Motiven oder ein
+  Clipart-Element zu Ihrem Clipart hinzu, mit dem **Namen**, den Sie
+  eingeben.
+- Die **Beschreibung** ist der Name der Familie und ihre Zahlen, zum
+  Beispiel `Waves: 2, 0.3`. Die gleiche Beschreibung gibt das gleiche
+  Element.
+
+Ein dekorativer Rand ist auch eine Familie: In **Digitalisieren > Ränder**
+gibt **Form** einem Rand eine andere Form, und **Größe der Stiche** macht
+seine Stiche kleiner oder größer.
+
 ## Farbverläufe
 
 **Digitalisieren > Farbverläufe** mischt zwei oder mehr Farben in einer

@@ -127,6 +127,12 @@ fn embroidery_fonts_8() {
     golden("embroidery-fonts-8");
 }
 
+/// Items of the content families (ADR 0118).
+#[test]
+fn content_families() {
+    golden("content-families");
+}
+
 #[test]
 fn lettering_circle() {
     golden("lettering-circle");

@@ -155,6 +155,33 @@ desvanece hacia la tela.
 - **Renombrar** y **Eliminar** cambian sus propios motivos. Los diseños
   conservan su copia de un motivo.
 
+## Familias
+
+Una familia crea un elemento a partir de unos números: la familia
+**Waves** crea un motivo a partir del número de ondas y de su altura. La
+mayoría de los motivos, los patrones de división programada, los sellos de
+relieve y los elementos de clipart del programa vienen de familias, y
+usted puede crear un elemento propio.
+
+- **Familias…** abre la ventana Familias. El botón está en la ventana
+  Motivos, junto a las listas de los patrones y de los sellos en
+  Propiedades del objeto, y en el panel Clipart.
+- Elija el tipo y la **Familia**. **Elementos incluidos** son los elementos
+  de la familia que están en las listas del programa. Cambie los números:
+  la imagen muestra el elemento.
+- **Usar para la selección** usa un motivo o un patrón para los objetos
+  seleccionados. **Añadir a los rellenos seleccionados** pone un sello en
+  el centro de cada relleno seleccionado. **Insertar** pone un elemento de
+  clipart en el centro de la vista.
+- **Guardar en la biblioteca** añade un motivo a sus motivos, o un elemento
+  de clipart a su clipart, con el **Nombre** que usted escribe.
+- La **Descripción** es el nombre de la familia y sus números, por ejemplo
+  `Waves: 2, 0.3`. La misma descripción da el mismo elemento.
+
+Un borde decorativo también es una familia: en **Digitalizar > Bordes**,
+**Forma** da otra forma a un borde, y **Tamaño de las puntadas** hace sus
+puntadas más pequeñas o más grandes.
+
 ## Mezclas
 
 **Digitalizar > Mezclas** mezcla dos o más colores en un relleno o una

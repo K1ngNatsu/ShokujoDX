@@ -64,9 +64,16 @@ impl Motif {
         })
     }
 
-    /// The built-in motif with this name.
+    /// The built-in motif with this name, or the motif of this
+    /// description of a family (`Waves: 2, 0.3`, see [`crate::family`]).
     pub fn builtin(name: &str) -> Option<Motif> {
-        builtin().into_iter().find(|m| m.name == name)
+        if let Some(m) = builtin().into_iter().find(|m| m.name == name) {
+            return Some(m);
+        }
+        match crate::family::from_description(crate::family::Kind::Motif, name) {
+            Some(crate::family::Item::Motif(m)) if name.contains(':') => Some(m),
+            _ => None,
+        }
     }
 }
 
@@ -184,6 +191,8 @@ pub fn builtin() -> Vec<Motif> {
     for m in &mut v {
         m.points.dedup();
     }
+    // The motifs of the families (P17 Milestone 8, ADR 0118).
+    v.extend(crate::family::preset_motifs());
     v
 }
 

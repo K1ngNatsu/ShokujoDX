@@ -28,6 +28,10 @@ const THUMB: f32 = 80.0;
 
 /// The folder of the built-in items in the clipart folder.
 pub const BUILTIN_FOLDER: &str = "Built-in";
+/// The folder of the built-in items of the families (P17 Milestone 8, ADR
+/// 0118). It is a folder of its own, so a user who has the first built-in
+/// items gets these too.
+pub const FAMILY_FOLDER: &str = "Built-in shapes";
 
 /// The payload of a clipart drag from the Clipart tab to the canvas.
 #[derive(Debug, Clone, PartialEq)]
@@ -67,8 +71,32 @@ pub fn clipart_dir() -> Option<PathBuf> {
     crate::about::user_folder().map(|d| d.join("clipart"))
 }
 
-/// The built-in items: a name, keywords and the design.
+/// The built-in items: a name, keywords and the design. The first ones
+/// are drawn by hand ([`BUILTIN_FOLDER`]); the others are the items of the
+/// clipart families ([`FAMILY_FOLDER`]).
+#[cfg(test)]
 pub fn builtins() -> Vec<(&'static str, &'static str, Design)> {
+    let mut all = first_builtins();
+    all.extend(family_builtins());
+    all
+}
+
+/// The built-in items of the clipart families (`emb_model::family`).
+fn family_builtins() -> Vec<(&'static str, &'static str, Design)> {
+    use emb_model::family::{Item, Kind, families_of};
+    let mut out = Vec::new();
+    for f in families_of(Kind::Clipart) {
+        for (name, values) in f.preset_values() {
+            if let Item::Clipart(d) = f.item(name, &values) {
+                out.push((name, f.keywords(), *d));
+            }
+        }
+    }
+    out
+}
+
+/// The built-in items that are drawn by hand.
+fn first_builtins() -> Vec<(&'static str, &'static str, Design)> {
     let p = Point::new;
     let fill = |d: &mut Design, color: Rgb, name: &str, outer: GeomPath, angle: f64| {
         let t = d.add_thread(name, color);
@@ -208,18 +236,20 @@ pub fn builtins() -> Vec<(&'static str, &'static str, Design)> {
     out
 }
 
-/// Writes the built-in items into `dir/Built-in` if that folder is not
-/// there (so an item that the user deleted does not come back while the
-/// folder is there).
+/// Writes the built-in items into `dir/Built-in` and `dir/Built-in shapes`,
+/// each one if that folder is not there (so an item that the user deleted
+/// does not come back while the folder is there).
 pub fn write_builtins(dir: &Path) -> std::io::Result<()> {
-    let folder = dir.join(BUILTIN_FOLDER);
-    if folder.exists() {
-        return Ok(());
-    }
-    std::fs::create_dir_all(&folder)?;
-    for (name, _, d) in builtins() {
-        project::save(&d, &folder.join(format!("{name}.{}", project::FILE_EXTENSION)))
-            .map_err(std::io::Error::other)?;
+    for (folder, items) in [(BUILTIN_FOLDER, first_builtins()), (FAMILY_FOLDER, family_builtins())] {
+        let folder = dir.join(folder);
+        if folder.exists() {
+            continue;
+        }
+        std::fs::create_dir_all(&folder)?;
+        for (name, _, d) in items {
+            project::save(&d, &folder.join(format!("{name}.{}", project::FILE_EXTENSION)))
+                .map_err(std::io::Error::other)?;
+        }
     }
     Ok(())
 }
@@ -370,6 +400,15 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
         );
         if text != st.clipart.text {
             st.set_clipart_search(&text);
+        }
+        if ui
+            .button(tr("Families…"))
+            .on_hover_text(tr(
+                "Make a clipart item of your own from a family: choose the family and change its numbers.",
+            ))
+            .clicked()
+        {
+            st.families_window.show(emb_model::family::Kind::Clipart);
         }
         let any = !st.selection.is_empty();
         if ui
@@ -566,7 +605,16 @@ mod tests {
         let (mut h, dir) = harness("builtin");
         assert_eq!(h.st.clipart.index.entries.len(), builtins().len());
         h.st.set_clipart_search("");
-        assert_eq!(h.st.clipart.found.len(), 8);
+        // The items that are drawn by hand and the items of the families
+        // (the target of P17 Milestone 8 is 40 items).
+        assert_eq!(h.st.clipart.found.len(), builtins().len());
+        assert!(
+            first_builtins().len() == 8 && builtins().len() >= 40,
+            "{}",
+            builtins().len()
+        );
+        h.st.set_clipart_search("snow");
+        assert_eq!(h.st.clipart.found.len(), 2, "the items of a family have its keywords");
         h.st.set_clipart_search("valentine");
         let names: Vec<&str> =
             h.st.clipart
@@ -583,6 +631,12 @@ mod tests {
         std::fs::remove_file(dir.join(BUILTIN_FOLDER).join("Star.embproj")).unwrap();
         h.st.start_clipart(Some(dir.clone()));
         assert_eq!(h.st.clipart.index.entries.len(), builtins().len() - 1);
+        // A user of an earlier version has the first folder only: the
+        // items of the families come, and the deleted item does not.
+        std::fs::remove_dir_all(dir.join(FAMILY_FOLDER)).unwrap();
+        h.st.start_clipart(Some(dir.clone()));
+        assert_eq!(h.st.clipart.index.entries.len(), builtins().len() - 1);
+        assert!(dir.join(FAMILY_FOLDER).join("Gear.embproj").is_file());
         std::fs::remove_dir_all(&dir).ok();
     }
 

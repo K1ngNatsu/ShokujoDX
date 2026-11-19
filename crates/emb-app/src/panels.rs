@@ -1745,6 +1745,15 @@ fn split_pattern_ui(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, current:
                     }
                 }
             });
+        if ui
+            .small_button(tr("Families…"))
+            .on_hover_text(tr(
+                "Make a pattern of your own from a family: choose the family and change its numbers.",
+            ))
+            .clicked()
+        {
+            st.families_window.show(emb_model::family::Kind::Split);
+        }
     });
     if let Some(p) = pick {
         st.doc.edit(crate::i18n::fill("Pattern {}", &[&p.name]), |d| {
@@ -1887,6 +1896,15 @@ fn stamps_ui(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &FillPa
                     }
                 }
             });
+        if ui
+            .small_button(tr("Families…"))
+            .on_hover_text(tr(
+                "Make a stamp of your own from a family: choose the family and change its numbers.",
+            ))
+            .clicked()
+        {
+            st.families_window.show(emb_model::family::Kind::Stamp);
+        }
     });
     if let Some(stamp) = add {
         let size = st

@@ -572,6 +572,18 @@ fn scenes() -> Vec<Scene> {
         st.fonts_window.by_quality = true;
         st.fonts_window.select(emb_model::FontRef::embroidery("Brush Hand", ""));
     }));
+    for kind in emb_model::family::Kind::ALL {
+        let name = match kind {
+            emb_model::family::Kind::Motif => "families window motif",
+            emb_model::family::Kind::Split => "families window split pattern",
+            emb_model::family::Kind::Stamp => "families window stamp",
+            emb_model::family::Kind::Clipart => "families window clipart",
+        };
+        v.push(Scene::new(name, View::Windows, move |st, _| {
+            st.families_window.show(kind);
+            st.families_window.choose(1);
+        }));
+    }
     v.push(Scene::new("fonts window fill fonts", View::Windows, |st, _| {
         st.fonts_window.open = true;
         st.fonts_window.large_text = true;

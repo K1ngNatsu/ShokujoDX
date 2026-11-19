@@ -147,6 +147,32 @@ fabric.
 - **Rename** and **Delete** change your own motifs. Designs keep their
   copy of a motif.
 
+## Families
+
+A family makes an item from some numbers: the family **Waves** makes a
+motif from the number of the waves and their height. Most of the motifs,
+the program-split patterns, the carving stamps and the clipart items of
+the program come from families, and you can make an item of your own.
+
+- **Families…** opens the Families window. The button is in the Motifs
+  window, next to the lists of the patterns and of the stamps in Object
+  Properties, and in the Clipart panel.
+- Choose the kind and the **Family**. **Built-in items** are the items of
+  the family that are in the lists of the program. Change the numbers: the
+  picture shows the item.
+- **Use for the selection** uses a motif or a pattern for the selected
+  objects. **Add to the selected fills** puts a stamp in the middle of
+  each selected fill. **Insert** puts a clipart item at the center of the
+  view.
+- **Keep in the library** adds a motif to your motifs, or a clipart item
+  to your clipart, with the **Name** that you type.
+- The **Description** is the name of the family and its numbers, for
+  example `Waves: 2, 0.3`. The same description gives the same item.
+
+A decorative border is a family too: in **Digitize > Borders**, **Shape**
+gives a border another shape, and **Size of the stitches** makes its
+stitches smaller or larger.
+
 ## Blends
 
 **Digitize > Blends** blends two or more colors in one fill or satin

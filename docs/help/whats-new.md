@@ -68,6 +68,16 @@ Rubik Mono One Fill and Shrikhand Fill. They are for large text, from
 columns. In **Lettering > Fonts**, **For large text** shows them.
 See [Lettering](lettering).
 
+**More motifs, patterns, stamps, borders and clipart.** The program has
+71 motifs (15 before), 48 program-split patterns (10), 39 carving stamps
+(8), 50 decorative borders (12) and 45 clipart items (8). Most of them
+come from **families**: a family makes an item from some numbers, for
+example the number and the height of the waves. **Families…** in the
+Motifs window, in Object Properties and in the Clipart panel makes an
+item of your own. A border can have another shape (also a diamond, a
+hexagon and an octagon) and another size of its stitches. See
+[Stitch types](stitch-types).
+
 **New versions.** The program can tell you when a new version is
 available. See [Options](options).
 

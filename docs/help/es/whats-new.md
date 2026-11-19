@@ -71,6 +71,16 @@ Slab Fill, Rubik Mono One Fill y Shrikhand Fill. Son para texto grande, de
 claras. En **Letras > Fuentes**, **Para texto grande** las muestra.
 Consulte [Letras](lettering).
 
+**Más motivos, patrones, sellos, bordes y clipart.** El programa tiene
+71 motivos (antes 15), 48 patrones de división programada (10), 39 sellos
+de relieve (8), 50 bordes decorativos (12) y 45 elementos de clipart (8).
+La mayoría vienen de **familias**: una familia crea un elemento a partir de
+unos números, por ejemplo el número y la altura de las ondas.
+**Familias…** en la ventana Motivos, en Propiedades del objeto y en el
+panel Clipart crea un elemento propio. Un borde puede tener otra forma
+(también un rombo, un hexágono y un octágono) y otro tamaño de sus
+puntadas. Consulte [Tipos de puntada](stitch-types).
+
 **Versiones nuevas.** El programa puede avisarle cuando hay una versión
 nueva disponible. Consulte [Opciones](options).
 

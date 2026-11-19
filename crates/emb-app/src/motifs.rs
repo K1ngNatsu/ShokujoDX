@@ -47,7 +47,7 @@ pub fn library() -> Vec<(Motif, Option<PathBuf>)> {
 }
 
 /// A file name from a motif name.
-fn file_name(name: &str) -> String {
+pub(crate) fn file_name(name: &str) -> String {
     let stem: String = name
         .chars()
         .map(|c| {
@@ -232,6 +232,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
     w.selected = w.selected.min(all.len().saturating_sub(1));
     let mut open = true;
     let (mut use_it, mut create, mut do_rename, mut delete) = (false, false, false, false);
+    let mut families = false;
     let has_selection = !st.selection.is_empty();
     // The motif that the selected object uses, if it has one.
     let in_use: Option<String> = st
@@ -290,6 +291,12 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                     "Lines become motif runs, satin columns motif columns, fills motif fills.",
                 ))
                 .clicked();
+            families = ui
+                .button(tr("Families…"))
+                .on_hover_text(tr(
+                    "Make a motif of your own from a family: choose the family and change its numbers.",
+                ))
+                .clicked();
         });
         ui.horizontal(|ui| {
             ui.label(tr("Name"));
@@ -317,6 +324,9 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
     });
     let selected = all.get(w.selected).cloned();
     st.motifs_window = MotifsWindow { open, ..w.clone() };
+    if families {
+        st.families_window.show(emb_model::family::Kind::Motif);
+    }
     if use_it && let Some((m, _)) = &selected {
         let ids = st.sel();
         let n = st.apply_motif(&ids, m);

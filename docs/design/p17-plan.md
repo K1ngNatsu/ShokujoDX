@@ -528,6 +528,32 @@ The libraries of motifs and patterns are large enough for daily work.
 
 **Exit test (owner):** a sew-out of five new items of each kind.
 
+**Done in software (2026-11-19, ADR 0118).**
+
+- **Families** (`emb_model::family`): 25 families of motifs, 18 of
+  program-split patterns, 15 of carving stamps and 19 of clipart. A
+  family makes an item from its parameters, and the description of an
+  item is a text (`Waves: 2, 0.3`).
+- **The libraries:** 71 motifs (15 before), 48 program-split patterns
+  (10), 39 carving stamps (8), 50 decorative borders (12) and 45 clipart
+  items (8). All targets are met. The items that were there keep their
+  names and their shapes.
+- **Borders** have three more shapes, and the Borders window gives a
+  border another shape and another size of its stitches.
+- **The Families window** makes an item of the user from a family, uses
+  it for the selection, and keeps a motif or a clipart item in the
+  library.
+- **No asset package:** the items are made by code, so they add no data
+  to the program.
+
+**Left open:**
+
+- The sew-out of the owner.
+- The names of the items are in English only, as before.
+- A split pattern or a stamp of the user has no library.
+- The clipart items are simple shapes (stars, flowers, a gear, a tree):
+  pictures with more detail need drawing by hand.
+
 ## Not in this phase
 
 - More formats to write: all machines of the machine library have a

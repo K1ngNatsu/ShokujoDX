@@ -65,7 +65,7 @@ fn dense(n: usize) -> Vec<f64> {
 
 /// The built-in program-split patterns, in menu order.
 pub fn split_patterns() -> Vec<SplitPattern> {
-    vec![
+    let mut all = vec![
         pattern("Brick", 4.0, 16, |r, _| match r {
             0 | 8 => dense(8),
             r if r < 8 => vec![0.0],
@@ -105,7 +105,10 @@ pub fn split_patterns() -> Vec<SplitPattern> {
             vec![x, x + 0.5]
         }),
         pattern("Grid", 3.0, 15, |r, _| if r == 0 { dense(6) } else { vec![0.0] }),
-    ]
+    ];
+    // The patterns of the families (P17 Milestone 8, ADR 0118).
+    all.extend(crate::family::preset_splits());
+    all
 }
 
 /// A carving stamp: lines in a unit box, from -0.5 to 0.5.
@@ -144,7 +147,7 @@ pub fn stamps() -> Vec<Stamp> {
             Point::new(r * cos(a), r * sin(a))
         })
         .collect();
-    vec![
+    let mut all = vec![
         stamp("Circle", vec![closed(48, |t| (0.5 * cos(TAU * t), 0.5 * sin(TAU * t)))]),
         stamp("Star", vec![star]),
         stamp(
@@ -210,7 +213,10 @@ pub fn stamps() -> Vec<Stamp> {
                 })
                 .collect(),
         ),
-    ]
+    ];
+    // The stamps of the families (P17 Milestone 8, ADR 0118).
+    all.extend(crate::family::preset_stamps());
+    all
 }
 
 /// A carving stamp on a fill: its middle, size and turn, in design coordinates.

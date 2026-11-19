@@ -51,6 +51,7 @@ fn draw_all(h: &mut Harness) {
         crate::fonts::window(&ctx, st);
         crate::monogram::window(&ctx, st);
         crate::motifs::window(&ctx, st);
+        crate::families::window(&ctx, st);
         crate::decor::windows(&ctx, st);
         crate::artwork::windows(&ctx, st);
         crate::wizard::window(&ctx, st);
@@ -81,6 +82,7 @@ fn open_windows(st: &mut AppState) {
     st.show_split = true;
     st.player.shown = true;
     st.motifs_window.open = true;
+    st.families_window.open = true;
     st.team_window.open = true;
     st.keyboard_window.open = true;
     st.decor.blends = true;

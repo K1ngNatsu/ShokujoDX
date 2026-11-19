@@ -360,6 +360,8 @@ pub struct AppState {
     pub team_window: crate::teamnames::TeamNamesWindow,
     pub keyboard_window: crate::keyboard::KeyboardWindow,
     pub motifs_window: crate::motifs::MotifsWindow,
+    /// The Families window (P17 Milestone 8, ADR 0118).
+    pub families_window: crate::families::FamiliesWindow,
     pub decor: crate::decor::DecorWindows,
     pub color_fills: crate::color_fills::ColorFillsWindow,
     pub quilting: crate::quilting::QuiltingWindow,
@@ -813,6 +815,7 @@ impl AppState {
             team_window: Default::default(),
             keyboard_window: Default::default(),
             motifs_window: Default::default(),
+            families_window: Default::default(),
             decor: Default::default(),
             color_fills: Default::default(),
             quilting: Default::default(),
@@ -1808,6 +1811,7 @@ impl EmbApp {
         crate::fonts::window(&ctx, st);
         crate::monogram::window(&ctx, st);
         crate::motifs::window(&ctx, st);
+        crate::families::window(&ctx, st);
         crate::decor::windows(&ctx, st);
         crate::color_fills::window(&ctx, st);
         crate::quilting::window(&ctx, st);

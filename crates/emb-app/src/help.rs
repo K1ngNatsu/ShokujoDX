@@ -153,6 +153,7 @@ pub const WINDOW_HELP: &[(&str, &str)] = &[
     ("Hole Inside the Outline", "editing"),
     ("Save as Clipart", "library"),
     ("Motifs", "stitch-types"),
+    ("Families", "stitch-types"),
     ("Borders", "stitch-types"),
     ("Buttonholes", "buttonholes"),
     ("Blends", "stitch-types"),

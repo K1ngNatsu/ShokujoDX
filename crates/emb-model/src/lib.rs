@@ -31,6 +31,7 @@ pub mod edit;
 pub mod editing;
 pub mod envelope;
 pub mod fabric;
+pub mod family;
 pub mod history;
 pub mod hoop;
 pub mod hooping;
