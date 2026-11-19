@@ -78,6 +78,8 @@ struct Row {
     /// and the part of the frames that had all their tiles.
     first_ms: Option<f64>,
     complete: Option<f64>,
+    /// The surface: the time until the first view showed with drafts, ms.
+    shown_ms: Option<f64>,
     /// The surface: its tiles at the end (number, level, memory).
     tiles: Option<(usize, i32, usize)>,
     /// The lightest look that a frame used, if it is not `look`
@@ -108,6 +110,7 @@ struct Bench {
     tiles: TileCache,
     case_start: Option<Instant>,
     first_ms: Option<f64>,
+    shown_ms: Option<f64>,
     complete: usize,
     /// The level of the tiles of the first view.
     level: i32,
@@ -165,6 +168,7 @@ pub fn run(renderer: Renderer, out: Option<PathBuf>) -> eframe::Result {
         tiles: TileCache::default(),
         case_start: None,
         first_ms: None,
+        shown_ms: None,
         complete: 0,
         level: 0,
         table: emb_render::thread3d::ShadeTable::new(Default::default()),
@@ -264,6 +268,9 @@ impl eframe::App for Bench {
                 };
                 let frame = self.tiles.draw(&ctx, rect, &view, &scene);
                 let complete = frame.as_ref().is_some_and(|f| f.complete);
+                if self.shown_ms.is_none() && frame.as_ref().is_some_and(|f| f.shown) {
+                    self.shown_ms = Some((now - start).as_secs_f64() * 1000.0);
+                }
                 let level = frame.as_ref().map_or(0, |f| f.level);
                 let missing = frame
                     .as_ref()
@@ -305,6 +312,7 @@ impl Bench {
             stitches,
             look,
             first_ms: if surface { self.first_ms } else { None },
+            shown_ms: if surface { self.shown_ms } else { None },
             complete: surface.then(|| self.complete as f64 / counted.max(1) as f64),
             tiles: surface.then(|| (self.tiles.len(), self.level, self.tiles.bytes())),
             drawn: self.drawn.take(),
@@ -316,7 +324,7 @@ impl Bench {
         });
         self.case += 1;
         (self.frames, self.start, self.last, self.mesh_ms, self.triangles) = (0, None, None, 0.0, 0);
-        (self.case_start, self.first_ms, self.complete) = (None, None, 0);
+        (self.case_start, self.first_ms, self.shown_ms, self.complete) = (None, None, None, 0);
         self.tiles = TileCache::default();
     }
 
@@ -355,8 +363,9 @@ impl Bench {
                 (Some(first), Some(c)) => {
                     let (n, level, bytes) = r.tiles.unwrap_or_default();
                     format!(
-                        "first full view {first:.0} ms (level {level}); {:.0} % of the frames with all tiles; \
-                         {n} tiles, {} MB",
+                        "first view {:.0} ms with drafts, all tiles {first:.0} ms (level {level}); \
+                         {:.0} % of the frames with all tiles; {n} tiles, {} MB",
+                        r.shown_ms.unwrap_or(first),
                         100.0 * c,
                         bytes >> 20
                     )

@@ -78,24 +78,44 @@ the design makes again only where it changed, and that all views use.
   time for each block (not for each pixel), and a shadow line stops where
   it is above the highest point of the squares of 16 pixels in front of
   it (`Tops`; the same result).
+- **The speed pass** (the owner, 2026-11-19, after the first measures):
+  - **Quick pictures** show until a tile is made, as provisional entries
+    of the cache. Where no tile of another level can show (a first view),
+    a draft made with half the detail (`DRAFT_PX_PER_MM`, 8 pixels for
+    each mm). After a change of the light, a picture from the surface of
+    the tile and of the tiles round it (`sheen::overlay_around`, the
+    shadows from the heights of its level): the cache keeps the surfaces
+    of the tiles (96 MB at most, the oldest go first).
+  - The levels under and over the screen are made when all tiles of the
+    screen are there (they take as much work as the screen).
+  - A change reaches as far as the shadows of the design in its light and
+    of the lay before (`surface::apron_for`), in squares of 1 mm.
+  - `relay` copies the old grid one time and makes the index of the new
+    lay on a second thread; the plies are two parabolas (no call of the
+    math library for each pixel); a stitch tests only the pixels of the
+    rows that it reaches.
 
 ## Consequences
 
 - The numbers of the development computer (32 processor threads, 12 tile
   threads; `docs/design/p18-view-m5-report.md`): with the graphics card
-  the canvas pans and zooms 787,408 stitches at 122 frames in a second
-  (24.5 with the 3D meshes) and 106,576 at 826 (192). The first full view
-  of 100,000 stitches takes about 0.4 s (lay 0.13 s; budget 0.3 s), new
-  tiles after a change of an object of 2,000 stitches in 200,000 about
-  0.13 s (budget 0.1 s), a change of the light about 0.24 s (budget
-  0.1 s; the tiles in the light before show until then). The software
-  renderer gains less: a frame with almost nothing in it takes about
-  67 ms.
+  the canvas pans and zooms 787,408 stitches at 117 frames in a second
+  (23 with the 3D meshes) and 106,576 at 740 (182). After the speed pass
+  the first view of 100,000 stitches shows drafts in 0.20 s (budget
+  0.3 s; all tiles 0.43 s, the lay 0.13 s of it), new tiles after a change
+  of an object of 2,000 stitches in 200,000 take 0.10 to 0.11 s (budget
+  0.1 s), and a new light shows in 0.02 s (budget 0.1 s; all tiles
+  0.23 s). The tiles of a view use about 100 to 140 MB with their
+  surfaces. The software renderer gains less: a frame with almost nothing
+  in it takes about 67 ms.
+- A first view and a new light change a little when the exact tiles come
+  (a draft is within 3 % of its tile in mean light, a picture in a new
+  light within 0.1 %; tests).
 - All 80 corpus designs show all their tiles at three zooms when the work
   is done (test `every_corpus_design_has_all_its_tiles`).
 - The cells of the lay moved to fixed places: 37 surface pictures of the
   bench changed by a fraction of a pixel; the closest two of the eight
-  satin columns are 0.8 % apart now (the test asks 0.5 %).
-- Open: the numbers of a small computer; the budgets that are not met
-  (a change of the light needs the surfaces of the tiles or the graphics
-  card, Milestone 9).
+  satin columns are 0.8 % apart now (the test asks 0.5 %). The plies of
+  the speed pass changed all 39 surface pictures a little.
+- Open: the numbers of a small computer; the lay is on one thread (0.9 s
+  for 1,000,000 stitches).

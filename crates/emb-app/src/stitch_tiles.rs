@@ -21,6 +21,14 @@
 //! - **A change** (a new lay, another view filter, a step of the stitch
 //!   player, a drag) keeps the tiles that it does not reach; only the
 //!   others are made again.
+//! - **A first view**: where no tile of another level can show, a draft
+//!   with half the detail ([`DRAFT_PX_PER_MM`], a quarter of the work)
+//!   shows first, then the tile.
+//! - **A change of the light**: the cache keeps the surface of the tiles
+//!   that show ([`SURFACE_BUDGET`]), so a tile gets a quick picture in the
+//!   new light from its surface and the surfaces round it
+//!   (`sheen::overlay_around`, the shadows of its level) until it is made
+//!   again.
 //! - **The stitch player** shows the tiles up to a step of [`PLAYER_STEP`]
 //!   records, and the stitches after the step as today.
 //! - **A drag** shows the objects that move as today, and the tiles of the
@@ -39,7 +47,7 @@ use eframe::egui::{self, Color32, ColorImage, Pos2, Rect, Shape, TextureHandle, 
 use emb_geom::{BBox, Point, Transform};
 use emb_model::{Design, ObjectId, Rgb};
 use emb_render::strand::Strand;
-use emb_render::surface::{self, APRON_MM, Changes, Laid};
+use emb_render::surface::{self, APRON_MM, Changes, Laid, Surface};
 use emb_render::thread3d::Lighting;
 use emb_stitch::StitchPlan;
 
@@ -63,6 +71,9 @@ const UPLOADS: usize = 24;
 pub const BUDGET: usize = 256 * 1024 * 1024;
 /// The size that an empty tile counts for, bytes.
 const EMPTY_BYTES: usize = 64;
+/// The memory of the surfaces that the cache keeps for a change of the
+/// light (a part of [`BUDGET`]), bytes: about 70 tiles.
+const SURFACE_BUDGET: usize = 96 * 1024 * 1024;
 /// The lay of a design that no view used for this long goes.
 const KEEP_LAY: Duration = Duration::from_secs(60);
 /// The changes of the last lays that are kept (to keep the tiles that they
@@ -71,6 +82,9 @@ const KEEP_CHANGES: usize = 16;
 /// From this level, one job makes 2 × 2 tiles (the apron of a tile is large
 /// for its size).
 const GROUP_LEVEL: i32 = 5;
+/// A draft tile is made with this many pixels for each mm (the tiles with
+/// `surface::DETAIL_PX_PER_MM`).
+pub const DRAFT_PX_PER_MM: f64 = 8.0;
 /// The most threads that make tiles.
 const MAX_WORKERS: usize = 12;
 
@@ -143,6 +157,22 @@ struct Entry {
     dirty: Option<[u32; 4]>,
     /// The parts of `dirty` that are not made yet (each one a job).
     parts: Vec<[u32; 4]>,
+    /// The surface of the pixels of the texture, for a quick picture in
+    /// another light.
+    surface: Option<Arc<Surface>>,
+    /// A quick picture in a new light: the tile is made again.
+    provisional: bool,
+}
+
+impl Entry {
+    /// The bytes of the surface that this entry keeps (a quick picture
+    /// keeps the surface of another entry).
+    fn surface_bytes(&self) -> usize {
+        match &self.surface {
+            Some(s) if !self.provisional => s.bytes(),
+            _ => 0,
+        }
+    }
 }
 
 /// A tile whose dirty part is more than this part of it is made again all.
@@ -280,8 +310,9 @@ struct DesignLay {
     job: Option<LayJob>,
     /// The state whose lay stopped with an error (not tried again).
     failed: Option<u64>,
-    /// The changes that made each lay from the lay before.
-    changes: VecDeque<(u64, Changes)>,
+    /// The changes that made each lay from the lay before, and the highest
+    /// point of the lay before (a change can take a high part away).
+    changes: VecDeque<(u64, Changes, f64)>,
     /// The tiles that showed last.
     shown: Option<Variant>,
     /// The tiles in the light before a change of the light: they show
@@ -304,12 +335,22 @@ struct Job {
     n: i64,
     /// The pixels of the texture to make again (`x0`, `y0`, `x1`, `y1`).
     patch: Option<[u32; 4]>,
+    /// A quick picture in a new light from the surfaces of the tile and of
+    /// the eight tiles round it (the tile in the middle, row by row).
+    relight: Option<Neighbors>,
+    /// A draft with less detail ([`DRAFT_PX_PER_MM`]).
+    draft: bool,
     laid: Arc<Laid>,
     shown: Shown,
     light: Lighting,
 }
 
 impl Job {
+    /// A quick picture (in a new light, or a draft): the tile is made again.
+    fn quick(&self) -> bool {
+        self.relight.is_some() || self.draft
+    }
+
     fn keys(&self) -> Vec<Key> {
         let mut out = Vec::with_capacity((self.n * self.n) as usize);
         for j in 0..self.n {
@@ -333,7 +374,25 @@ struct Done {
     /// The picture of each tile (`None` for an empty tile); `None` if the
     /// work stopped with an error.
     images: Option<Vec<Option<ColorImage>>>,
+    /// The surface of each tile.
+    surfaces: Vec<Option<Arc<Surface>>>,
+    /// A quick picture (in a new light, or a draft).
+    quick: bool,
     ms: f64,
+}
+
+/// The surfaces of a tile and of the eight tiles round it (the tile in the
+/// middle, row by row).
+type Neighbors = Arc<[Option<Arc<Surface>>; 9]>;
+
+/// A quick picture to make: the tile, and the surfaces round it for a
+/// picture in a new light (none for a draft).
+type Quick = (i64, i64, Option<Neighbors>);
+
+/// What a job made: the picture and the surface of each tile.
+struct Made {
+    images: Vec<Option<ColorImage>>,
+    surfaces: Vec<Option<Arc<Surface>>>,
 }
 
 #[derive(Default)]
@@ -342,6 +401,8 @@ struct Queue {
     /// The tiles that a thread makes now, and the parts of tiles.
     running: HashSet<Key>,
     running_parts: HashSet<(Key, [u32; 4])>,
+    /// The quick pictures that a thread makes now.
+    running_quick: HashSet<Key>,
     stop: bool,
     repaint: Option<egui::Context>,
 }
@@ -373,6 +434,8 @@ pub struct Stats {
     pub dropped: usize,
     /// The parts of tiles made again after a change.
     pub patches: usize,
+    /// The quick pictures of tiles: in a new light, and drafts.
+    pub quick: usize,
 }
 
 /// What a view shows (see [`TileCache::draw`]).
@@ -400,6 +463,9 @@ pub struct TileFrame {
     pub missing: Vec<Rect>,
     /// All tiles of the level of the screen are there.
     pub complete: bool,
+    /// All tiles of the level of the screen show their tile or its quick
+    /// picture in a new light (no tile of another level, no look of today).
+    pub shown: bool,
     /// The level of the tiles.
     pub level: i32,
     /// The records from this one show as today over the tiles (the stitch
@@ -411,7 +477,10 @@ pub struct TileFrame {
 pub struct TileCache {
     designs: HashMap<u64, DesignLay>,
     tiles: HashMap<Key, Entry>,
+    /// The memory of the tiles (their textures and surfaces) and of their
+    /// surfaces alone.
     bytes: usize,
+    surface_bytes: usize,
     pub budget: usize,
     shared: Arc<Shared>,
     tx: mpsc::Sender<Done>,
@@ -422,6 +491,7 @@ pub struct TileCache {
     queue_frame: u64,
     queued: HashSet<Key>,
     queued_parts: HashSet<(Key, [u32; 4])>,
+    queued_relights: HashSet<Key>,
     /// Make the lays and the tiles in the frame that asks for them, with no
     /// threads (the tests).
     pub sync: bool,
@@ -435,6 +505,7 @@ impl Default for TileCache {
             designs: HashMap::new(),
             tiles: HashMap::new(),
             bytes: 0,
+            surface_bytes: 0,
             budget: BUDGET,
             shared: Arc::new(Shared::default()),
             tx,
@@ -443,6 +514,7 @@ impl Default for TileCache {
             queue_frame: u64::MAX,
             queued: HashSet::new(),
             queued_parts: HashSet::new(),
+            queued_relights: HashSet::new(),
             sync: false,
             stats: Stats::default(),
         }
@@ -483,6 +555,7 @@ impl TileCache {
         !q.jobs.is_empty()
             || !q.running.is_empty()
             || !q.running_parts.is_empty()
+            || !q.running_quick.is_empty()
             || self.designs.values().any(|d| d.job.is_some())
     }
 
@@ -511,7 +584,7 @@ impl TileCache {
             }
             let idle = {
                 let q = self.shared.lock();
-                q.jobs.is_empty() && q.running.is_empty() && q.running_parts.is_empty()
+                q.jobs.is_empty() && q.running.is_empty() && q.running_parts.is_empty() && q.running_quick.is_empty()
             };
             if (idle && self.designs.values().all(|d| d.job.is_none())) || t0.elapsed() > limit {
                 break;
@@ -562,6 +635,7 @@ impl TileCache {
         let mut out = TileFrame {
             level,
             complete: true,
+            shown: true,
             today_from: variant.shown.upto.map(|u| u as usize),
             ..Default::default()
         };
@@ -596,11 +670,14 @@ impl TileCache {
             Rect::from_two_pos(view.to_screen(rect, b.min), view.to_screen(rect, b.max))
         };
         let mut wanted: Vec<(i32, i64, i64, Option<[u32; 4]>)> = Vec::new();
+        // Quick pictures: in a new light (with their surfaces), or drafts.
+        let mut relights: Vec<Quick> = Vec::new();
         for (x, y) in sorted(level) {
             let at = screen(level, x, y);
             if is_stale(tile_box(level, x, y)) {
                 out.missing.push(at);
                 out.complete = false;
+                out.shown = false;
                 continue;
             }
             let key = Key {
@@ -611,12 +688,18 @@ impl TileCache {
             };
             if let Some(e) = self.tiles.get_mut(&key) {
                 e.used = frame;
+                if e.provisional {
+                    // A quick picture in a new light: the tile is made again.
+                    out.complete = false;
+                    wanted.push((level, x, y, None));
+                }
                 match (&e.tile, e.dirty) {
                     (Cached::Texture(t), Some(hole)) => {
                         // The part that a change reached: the look of today
                         // until it is made again.
                         out.missing.push(with_hole(&mut out.shapes, t, at, hole));
                         out.complete = false;
+                        out.shown = false;
                         wanted.push((level, x, y, Some(hole)));
                     }
                     (Cached::Texture(t), None) => out.shapes.push(Shape::image(t.id(), at, inner_uv(), Color32::WHITE)),
@@ -624,20 +707,61 @@ impl TileCache {
                     (Cached::Failed, _) => {
                         out.missing.push(at);
                         out.complete = false;
+                        out.shown = false;
                     }
                 }
                 continue;
             }
             out.complete = false;
+            out.shown = false;
             wanted.push((level, x, y, None));
+            // A quick picture in the new light from the surfaces of the
+            // tiles in the light before.
+            let mut quick = false;
+            if let Some(b) = before_light {
+                match self.relight_of(b, variant.id, level, x, y) {
+                    Some(Relight::Job(tiles)) => {
+                        relights.push((x, y, Some(tiles)));
+                        quick = true;
+                    }
+                    Some(Relight::Empty) => {
+                        self.bytes += EMPTY_BYTES;
+                        self.tiles.insert(
+                            key,
+                            Entry {
+                                tile: Cached::Empty,
+                                bytes: EMPTY_BYTES,
+                                used: frame,
+                                dirty: None,
+                                parts: Vec::new(),
+                                surface: None,
+                                provisional: true,
+                            },
+                        );
+                    }
+                    None => {}
+                }
+            }
             if !self.stand_in(&mut out.shapes, variant.id, before_light, level, x, y, at, frame) {
                 out.missing.push(at);
+                // Nothing shows there: a draft first, where it takes less
+                // work than the tile.
+                if !quick && level_ppm(level) < DRAFT_PX_PER_MM * 2.0 - 1e-9 {
+                    relights.push((x, y, None));
+                }
             }
         }
-        // The levels under and over it, for a zoom: the level of a larger
-        // zoom only for the middle of the view.
+        self.request_relights(ctx, frame, level, &relights, &variant, &laid);
+        // The levels under and over it, for a zoom, when all tiles of the
+        // screen are there (they take as long as the screen): the level of a
+        // larger zoom only for the middle of the view.
         let middle = BBox::from_center_size(mid, visible.width() / 2.0, visible.height() / 2.0);
-        for l in [level - 1, level + 1] {
+        let next = if out.complete {
+            vec![level - 1, level + 1]
+        } else {
+            Vec::new()
+        };
+        for l in next {
             if (MIN_LEVEL..=MAX_LEVEL).contains(&l) {
                 for (x, y) in sorted(l) {
                     let b = tile_box(l, x, y);
@@ -744,6 +868,105 @@ impl TileCache {
         false
     }
 
+    /// The surfaces for a quick picture of the tile (`x`, `y`) of `level` in
+    /// the light of `variant`, from the tiles of the variant `before` (in
+    /// the light before): the tile and the tiles round it.
+    fn relight_of(&self, before: u64, variant: u64, level: i32, x: i64, y: i64) -> Option<Relight> {
+        let entry = |v: u64, dx: i64, dy: i64| {
+            self.tiles.get(&Key {
+                variant: v,
+                level: level as i8,
+                x: (x + dx) as i32,
+                y: (y + dy) as i32,
+            })
+        };
+        let middle = entry(before, 0, 0)?;
+        if matches!(middle.tile, Cached::Empty) && middle.dirty.is_none() {
+            return Some(Relight::Empty);
+        }
+        middle.surface.as_ref()?;
+        let mut tiles: [Option<Arc<Surface>>; 9] = Default::default();
+        for dy in -1..=1 {
+            for dx in -1..=1 {
+                tiles[((dy + 1) * 3 + dx + 1) as usize] = [before, variant]
+                    .into_iter()
+                    .find_map(|v| entry(v, dx, dy).and_then(|e| e.surface.clone()));
+            }
+        }
+        Some(Relight::Job(Arc::new(tiles)))
+    }
+
+    /// Puts the jobs of quick pictures (in a new light, or drafts) first in
+    /// the queue.
+    fn request_relights(
+        &mut self,
+        ctx: &egui::Context,
+        frame: u64,
+        level: i32,
+        relights: &[Quick],
+        v: &Variant,
+        laid: &Arc<Laid>,
+    ) {
+        if relights.is_empty() {
+            return;
+        }
+        if !self.sync {
+            self.start_workers();
+        }
+        let mut jobs = Vec::new();
+        {
+            let mut q = self.shared.lock();
+            q.repaint = Some(ctx.clone());
+            if self.queue_frame != frame {
+                q.jobs.clear();
+                self.queued.clear();
+                self.queued_parts.clear();
+                self.queued_relights.clear();
+                self.queue_frame = frame;
+            }
+            for (x, y, tiles) in relights {
+                let job = Job {
+                    variant: v.id,
+                    level,
+                    gx: *x,
+                    gy: *y,
+                    n: 1,
+                    patch: None,
+                    relight: tiles.clone(),
+                    draft: tiles.is_none(),
+                    laid: laid.clone(),
+                    shown: v.shown.clone(),
+                    light: v.light,
+                };
+                let key = job.keys()[0];
+                if q.running_quick.contains(&key) || !self.queued_relights.insert(key) {
+                    continue;
+                }
+                jobs.push(job);
+            }
+            if !self.sync {
+                // Before the other jobs, in the order of the view.
+                for job in jobs.drain(..).rev() {
+                    q.jobs.push_front(job);
+                }
+            }
+        }
+        self.shared.wake.notify_all();
+        for job in jobs {
+            let t0 = Instant::now();
+            let made = make(&job);
+            let done = Done {
+                keys: job.keys(),
+                images: Some(made.images),
+                surfaces: made.surfaces,
+                quick: true,
+                patch: None,
+                ms: t0.elapsed().as_secs_f64() * 1000.0,
+            };
+            self.take(ctx, done, frame);
+        }
+    }
+
     /// Puts the jobs for the tiles `wanted` (in this order) in the queue of
     /// the threads; the first view of a frame starts the queue again.
     fn request(
@@ -768,6 +991,7 @@ impl TileCache {
                 q.jobs.clear();
                 self.queued.clear();
                 self.queued_parts.clear();
+                self.queued_relights.clear();
                 self.queue_frame = frame;
             }
             for &(level, x, y, patch) in wanted {
@@ -791,6 +1015,8 @@ impl TileCache {
                             gy: y,
                             n: 1,
                             patch: Some(part),
+                            relight: None,
+                            draft: false,
                             laid: laid.clone(),
                             shown: v.shown.clone(),
                             light: v.light,
@@ -813,15 +1039,15 @@ impl TileCache {
                     gy,
                     n,
                     patch,
+                    relight: None,
+                    draft: false,
                     laid: laid.clone(),
                     shown: v.shown.clone(),
                     light: v.light,
                 };
                 let keys = job.keys();
-                if !self.queued.insert(keys[0])
-                    || keys.iter().all(|k| self.tiles.contains_key(k))
-                    || keys.iter().any(|k| q.running.contains(k))
-                {
+                let made = |k: &Key| self.tiles.get(k).is_some_and(|e| !e.provisional);
+                if !self.queued.insert(keys[0]) || keys.iter().all(made) || keys.iter().any(|k| q.running.contains(k)) {
                     continue;
                 }
                 if self.sync {
@@ -835,10 +1061,12 @@ impl TileCache {
         // With no threads: here, now.
         for job in jobs {
             let t0 = Instant::now();
-            let images = Some(make(&job));
+            let made = make(&job);
             let done = Done {
                 keys: job.keys(),
-                images,
+                images: Some(made.images),
+                surfaces: made.surfaces,
+                quick: false,
                 patch: job.patch,
                 ms: t0.elapsed().as_secs_f64() * 1000.0,
             };
@@ -910,12 +1138,22 @@ impl TileCache {
             }
             return;
         }
-        self.stats.tiles += done.keys.len();
+        if done.quick {
+            self.stats.quick += done.keys.len();
+        } else {
+            self.stats.tiles += done.keys.len();
+        }
         let images: Vec<Option<Option<ColorImage>>> = match done.images {
             Some(images) => images.into_iter().map(Some).collect(),
             None => done.keys.iter().map(|_| None).collect(),
         };
+        let mut surfaces = done.surfaces.into_iter();
         for (key, image) in done.keys.into_iter().zip(images) {
+            let surface = surfaces.next().flatten();
+            // A quick picture does not take the place of a tile.
+            if done.quick && self.tiles.get(&key).is_some_and(|e| !e.provisional) {
+                continue;
+            }
             let (tile, bytes) = match image {
                 None => (Cached::Failed, EMPTY_BYTES),
                 Some(None) => (Cached::Empty, EMPTY_BYTES),
@@ -927,26 +1165,56 @@ impl TileCache {
                     )
                 }
             };
-            self.bytes += bytes;
-            if let Some(old) = self.tiles.insert(
-                key,
-                Entry {
-                    tile,
-                    bytes,
-                    used: frame,
-                    dirty: None,
-                    parts: Vec::new(),
-                },
-            ) {
-                self.bytes -= old.bytes;
+            let entry = Entry {
+                tile,
+                bytes,
+                used: frame,
+                dirty: None,
+                parts: Vec::new(),
+                surface,
+                provisional: done.quick,
+            };
+            let extra = entry.surface_bytes();
+            self.bytes += bytes + extra;
+            self.surface_bytes += extra;
+            if let Some(old) = self.tiles.insert(key, entry) {
+                self.remove_bytes(&old);
             }
         }
+    }
+
+    /// Takes the memory of an entry that goes out of the counts.
+    fn remove_bytes(&mut self, e: &Entry) {
+        let extra = e.surface_bytes();
+        self.bytes -= e.bytes + extra;
+        self.surface_bytes -= extra;
     }
 
     /// Takes out the tiles that were not used for the longest time, until
     /// the cache is in its budget (not the tiles of this frame and the frame
     /// before).
     fn trim(&mut self, frame: u64) {
+        if self.surface_bytes > SURFACE_BUDGET {
+            // The surfaces of the tiles that showed longest ago go first.
+            let mut kept: Vec<(u64, Key)> = self
+                .tiles
+                .iter()
+                .filter(|(_, e)| e.surface_bytes() > 0)
+                .map(|(k, e)| (e.used, *k))
+                .collect();
+            kept.sort_unstable_by_key(|(used, _)| *used);
+            for (_, k) in kept {
+                if self.surface_bytes <= SURFACE_BUDGET / 10 * 9 {
+                    break;
+                }
+                if let Some(e) = self.tiles.get_mut(&k) {
+                    let extra = e.surface_bytes();
+                    e.surface = None;
+                    self.bytes -= extra;
+                    self.surface_bytes -= extra;
+                }
+            }
+        }
         if self.bytes <= self.budget {
             return;
         }
@@ -962,7 +1230,7 @@ impl TileCache {
                 break;
             }
             if let Some(e) = self.tiles.remove(&k) {
-                self.bytes -= e.bytes;
+                self.remove_bytes(&e);
                 self.stats.dropped += 1;
             }
         }
@@ -1014,6 +1282,9 @@ impl TileCache {
             return;
         }
         d.before_light = None;
+        // The highest point of the stitches that changed (in the lays from
+        // the old one to the new one).
+        let mut top = laid.top();
         let changes = if old.generation == v.generation {
             laid.changes_where(|r| old.shown.shows(r) != v.shown.shows(r))
         } else if old.generation < v.generation
@@ -1025,9 +1296,10 @@ impl TileCache {
         {
             let mut c = Changes::default();
             let mut count = 0;
-            for (g, ch) in &d.changes {
+            for (g, ch, before) in &d.changes {
                 if *g > old.generation && *g <= v.generation {
                     c.merge(ch);
+                    top = top.max(*before);
                     count += 1;
                 }
             }
@@ -1042,17 +1314,19 @@ impl TileCache {
         if changes.is_everywhere() {
             return;
         }
+        // A pixel changes if a changed stitch is this near.
+        let apron = surface::apron_for(&v.light, top);
         let keys: Vec<Key> = self.tiles.keys().filter(|k| k.variant == old.id).copied().collect();
         for k in keys {
             let ppm = level_ppm(i32::from(k.level));
             let (level, x, y) = (i32::from(k.level), i64::from(k.x), i64::from(k.y));
-            let b = tile_box(level, x, y).expand(APRON_MM + 2.0 / ppm);
+            let b = tile_box(level, x, y).expand(apron + 2.0 / ppm);
             let mut part = None;
             if let Some(c) = changes.within(b) {
                 // The pixels that the change reaches (with the apron): made
                 // again if they are a small part of a texture, else all.
                 let tex = self.tiles.get(&k).is_some_and(|e| matches!(e.tile, Cached::Texture(_)));
-                part = texture_part(level, x, y, c.expand(APRON_MM));
+                part = texture_part(level, x, y, c.expand(apron));
                 let n = TEXTURE as f64;
                 let small = part.is_some_and(|p| f64::from((p[2] - p[0]) * (p[3] - p[1])) <= PATCH_MAX * n * n);
                 if !tex || !small {
@@ -1064,10 +1338,15 @@ impl TileCache {
                 let dirty = union(e.dirty, p);
                 e.dirty = Some(dirty);
                 e.parts = patch_parts(level, dirty);
+                // Its surface is not the surface of the tile any more.
+                let extra = e.surface_bytes();
+                e.surface = None;
+                self.bytes -= extra;
+                self.surface_bytes -= extra;
             }
             let to = Key { variant: v.id, ..k };
             match self.tiles.entry(to) {
-                std::collections::hash_map::Entry::Occupied(_) => self.bytes -= e.bytes,
+                std::collections::hash_map::Entry::Occupied(_) => self.remove_bytes(&e),
                 std::collections::hash_map::Entry::Vacant(slot) => {
                     slot.insert(e);
                 }
@@ -1180,7 +1459,8 @@ pub fn paint(
 /// Takes in a finished lay.
 fn adopt(d: &mut DesignLay, done: LayDone, stats: &mut Stats) {
     let generation = d.lay.as_ref().map_or(0, |l| l.generation + 1);
-    d.changes.push_back((generation, done.changes));
+    let top = d.lay.as_ref().map_or(0.0, |l| l.laid.top());
+    d.changes.push_back((generation, done.changes, top));
     while d.changes.len() > KEEP_CHANGES {
         d.changes.pop_front();
     }
@@ -1378,6 +1658,7 @@ fn work(shared: &Shared, tx: &mpsc::Sender<Done>) {
                         Some(p) => {
                             q.running_parts.insert((job.keys()[0], p));
                         }
+                        None if job.quick() => q.running_quick.extend(job.keys()),
                         None => q.running.extend(job.keys()),
                     }
                     break job;
@@ -1386,13 +1667,22 @@ fn work(shared: &Shared, tx: &mpsc::Sender<Done>) {
             }
         };
         let t0 = Instant::now();
-        let images = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| make(&job))).ok();
+        let made = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| make(&job))).ok();
+        let (images, surfaces) = match made {
+            Some(m) => (Some(m.images), m.surfaces),
+            None => (None, Vec::new()),
+        };
         let keys = job.keys();
         let repaint = {
             let mut q = shared.lock();
             match job.patch {
                 Some(p) => {
                     q.running_parts.remove(&(keys[0], p));
+                }
+                None if job.quick() => {
+                    for k in &keys {
+                        q.running_quick.remove(k);
+                    }
                 }
                 None => {
                     for k in &keys {
@@ -1405,6 +1695,8 @@ fn work(shared: &Shared, tx: &mpsc::Sender<Done>) {
         let done = Done {
             keys,
             images,
+            surfaces,
+            quick: job.quick(),
             patch: job.patch,
             ms: t0.elapsed().as_secs_f64() * 1000.0,
         };
@@ -1418,8 +1710,11 @@ fn work(shared: &Shared, tx: &mpsc::Sender<Done>) {
 }
 
 /// The pictures of the tiles of a job (`None` for an empty tile).
-fn make(job: &Job) -> Vec<Option<ColorImage>> {
+fn make(job: &Job) -> Made {
     let ppm = level_ppm(job.level);
+    if let Some(tiles) = &job.relight {
+        return relight(tiles, &job.light);
+    }
     if let Some(p) = job.patch {
         // A part of a tile: its pixels, transparent where nothing is.
         let (w, h) = (p[2] - p[0], p[3] - p[1]);
@@ -1431,11 +1726,19 @@ fn make(job: &Job) -> Vec<Option<ColorImage>> {
             }
             None => ColorImage::new([w as usize, h as usize], vec![Color32::TRANSPARENT; (w * h) as usize]),
         };
-        return vec![Some(image)];
+        return Made {
+            images: vec![Some(image)],
+            surfaces: vec![None],
+        };
     }
     let count = (job.n * job.n) as usize;
     let side = (job.n * SIDE + 2) as u32;
-    let block = job.laid.block(
+    let detail = if job.draft {
+        DRAFT_PX_PER_MM
+    } else {
+        surface::DETAIL_PX_PER_MM
+    };
+    let block = job.laid.block_with(
         ppm,
         job.gx * SIDE - 1,
         job.gy * SIDE - 1,
@@ -1443,12 +1746,19 @@ fn make(job: &Job) -> Vec<Option<ColorImage>> {
         side,
         &job.light,
         &|r| job.shown.shows(r),
+        detail,
     );
     let Some(s) = block else {
-        return vec![None; count];
+        return Made {
+            images: vec![None; count],
+            surfaces: vec![None; count],
+        };
     };
     let picture = emb_render::sheen::overlay(&s, &job.light);
-    let mut out = Vec::with_capacity(count);
+    let mut out = Made {
+        images: Vec::with_capacity(count),
+        surfaces: Vec::with_capacity(count),
+    };
     for j in 0..job.n {
         for i in 0..job.n {
             let (x0, y0) = ((i * SIDE) as usize, (j * SIDE) as usize);
@@ -1458,10 +1768,66 @@ fn make(job: &Job) -> Vec<Option<ColorImage>> {
                 rgba.extend_from_slice(&picture.rgba[at..at + TEXTURE * 4]);
             }
             let seen = rgba.iter().skip(3).step_by(4).any(|a| *a > 0);
-            out.push(seen.then(|| ColorImage::from_rgba_premultiplied([TEXTURE, TEXTURE], &rgba)));
+            out.images
+                .push(seen.then(|| ColorImage::from_rgba_premultiplied([TEXTURE, TEXTURE], &rgba)));
+            out.surfaces.push((seen && !job.draft).then(|| {
+                Arc::new(if job.n == 1 {
+                    s.clone()
+                } else {
+                    s.crop(x0 as u32, y0 as u32, TEXTURE as u32, TEXTURE as u32)
+                })
+            }));
         }
     }
     out
+}
+
+/// A quick picture of a tile in a new light from its surface and the
+/// surfaces of the tiles round it (`tiles`, the tile in the middle): the
+/// shadows from the heights of its level.
+fn relight(tiles: &[Option<Arc<Surface>>; 9], light: &Lighting) -> Made {
+    let Some(middle) = tiles[4].as_ref() else {
+        return Made {
+            images: vec![None],
+            surfaces: vec![None],
+        };
+    };
+    // The pixels 1 to 256 of each texture are those of its tile.
+    let height = |x: i64, y: i64| -> f64 {
+        let (gx, gy) = (x - 1, y - 1);
+        let (dx, dy) = (gx.div_euclid(SIDE), gy.div_euclid(SIDE));
+        let other = (dx.abs() <= 1 && dy.abs() <= 1)
+            .then(|| tiles[((dy + 1) * 3 + dx + 1) as usize].as_ref())
+            .flatten();
+        match other {
+            Some(s) => f64::from(s.height(gx.rem_euclid(SIDE) + 1, gy.rem_euclid(SIDE) + 1)),
+            None => f64::from(middle.height(x, y)),
+        }
+    };
+    let top = tiles
+        .iter()
+        .flatten()
+        .map(|s| f64::from(s.max_height()))
+        .fold(0.0, f64::max);
+    let around = emb_render::sheen::Around {
+        height: &height,
+        pixels: (1 - SIDE, 1 - SIDE, 1 + 2 * SIDE, 1 + 2 * SIDE),
+        top,
+    };
+    let picture = emb_render::sheen::overlay_around(middle, light, &around);
+    let seen = picture.rgba.iter().skip(3).step_by(4).any(|a| *a > 0);
+    Made {
+        images: vec![seen.then(|| ColorImage::from_rgba_premultiplied([TEXTURE, TEXTURE], &picture.rgba))],
+        surfaces: vec![Some(middle.clone())],
+    }
+}
+
+/// Where the quick picture of a tile in a new light comes from.
+enum Relight {
+    /// The tile was empty: it is empty in the new light too.
+    Empty,
+    /// The surfaces of the tile and of the tiles round it.
+    Job(Neighbors),
 }
 
 #[cfg(test)]
@@ -1622,12 +1988,116 @@ mod tests {
     }
 
     #[test]
+    fn a_new_light_shows_at_once_and_the_tiles_follow() {
+        let mut h = harness(1.0);
+        frame(&mut h);
+        assert!(frame(&mut h).complete);
+        h.st.settings.look.light.azimuth_deg = 45.0;
+        // The first frame in the new light asks for the quick pictures; in
+        // the next one they show (with no threads, they are made at once).
+        let f = frame(&mut h);
+        assert!(!f.complete);
+        let f = frame(&mut h);
+        assert!(f.shown && f.missing.is_empty(), "{:?}", f.missing);
+        assert!(h.st.stitch_tiles.stats.quick > 0);
+        let f = frame(&mut h);
+        assert!(f.complete, "the tiles in the new light");
+    }
+
+    #[test]
+    fn a_quick_picture_in_a_new_light_is_near_the_tile() {
+        // The puff letters (high, with long shadows) at 8 pixels for each mm.
+        let design = emb_cli::corpus::build("view-puff").expect("corpus design");
+        let opts = emb_cli::plan_options(&design, None).expect("a machine");
+        let plan = emb_cli::plan(&design, &opts);
+        let back = design.from_hoop_transform();
+        let strands: Vec<Strand> = emb_render::strand::strands(&plan.stitches, &[])
+            .into_iter()
+            .map(|s| Strand {
+                a: back.apply(s.a),
+                b: back.apply(s.b),
+                ..s
+            })
+            .collect();
+        let laid = Arc::new(surface::lay(&strands, &[]));
+        let level = 3;
+        let c = laid.bounds().center();
+        let (cx, cy) = (
+            (c.x * level_ppm(level) / SIDE as f64).floor() as i64,
+            (c.y * level_ppm(level) / SIDE as f64).floor() as i64,
+        );
+        let job = |x: i64, y: i64, light: Lighting| Job {
+            variant: 0,
+            level,
+            gx: x,
+            gy: y,
+            n: 1,
+            patch: None,
+            relight: None,
+            draft: false,
+            laid: laid.clone(),
+            shown: Shown::default(),
+            light,
+        };
+        let (a, b) = (
+            Lighting::default(),
+            Lighting {
+                azimuth_deg: 30.0,
+                elevation_deg: 30.0,
+                ..Default::default()
+            },
+        );
+        let mut tiles: [Option<Arc<Surface>>; 9] = Default::default();
+        for dy in -1..=1 {
+            for dx in -1..=1 {
+                tiles[((dy + 1) * 3 + dx + 1) as usize] = make(&job(cx + dx, cy + dy, a)).surfaces.pop().flatten();
+            }
+        }
+        let quick = relight(&tiles, &b).images.pop().flatten().expect("stitches");
+        let exact = make(&job(cx, cy, b)).images.pop().flatten().expect("stitches");
+        // The mean light of the threads and the shadows, in the colors of
+        // the screen: near (the shadows are made from this level).
+        let mean = |img: &ColorImage| {
+            let sum: f64 = img
+                .pixels
+                .iter()
+                .map(|p| f64::from(p.r()) + f64::from(p.g()) + f64::from(p.b()) + f64::from(p.a()))
+                .sum();
+            sum / img.pixels.len() as f64
+        };
+        let (q, e) = (mean(&quick), mean(&exact));
+        assert!((q - e).abs() < 0.05 * e, "{q:.1} {e:.1}");
+        // A draft of a small zoom (made with half the detail): near too.
+        for level in [1, 2] {
+            let c = laid.bounds().center();
+            let at = |v: f64| (v * level_ppm(level) / SIDE as f64).floor() as i64;
+            let (x, y) = (at(c.x), at(c.y));
+            let draft = make(&Job {
+                level,
+                draft: true,
+                ..job(x, y, a)
+            })
+            .images
+            .pop()
+            .flatten()
+            .expect("stitches");
+            let exact = make(&Job { level, ..job(x, y, a) })
+                .images
+                .pop()
+                .flatten()
+                .expect("stitches");
+            let (d, e) = (mean(&draft), mean(&exact));
+            assert!((d - e).abs() < 0.03 * e, "level {level}: {d:.1} {e:.1}");
+        }
+    }
+
+    #[test]
     fn the_cache_keeps_its_budget() {
         let mut h = harness(2.0);
         h.st.stitch_tiles.budget = 1;
         h.st.show_plan = true;
         h.st.show_thread_look = true;
-        for _ in 0..3 {
+        for _ in 0..6 {
             h.frame(vec![]);
         }
         let t = &h.st.stitch_tiles;
@@ -1647,6 +2117,8 @@ mod tests {
         h.st.stitch_tiles.wait(&ctx, Duration::from_secs(60));
         let f = frame(&mut h);
         assert!(f.complete, "{:?}", f.missing);
+        // Then the levels under and over the screen.
+        h.st.stitch_tiles.wait(&ctx, Duration::from_secs(60));
         assert!(!h.st.stitch_tiles.busy());
     }
 
@@ -1665,7 +2137,8 @@ mod tests {
         let design = Design::new("stress");
         let filter = ViewFilter::default();
         // Runs frames until all tiles of the screen show; gives the time, ms.
-        let until_complete = |cache: &mut TileCache, view: &CanvasView, scene: &Scene| {
+        // Runs frames until a frame has what `ready` asks; gives the time, ms.
+        let until = |cache: &mut TileCache, view: &CanvasView, scene: &Scene, ready: fn(&TileFrame) -> bool| {
             let t0 = Instant::now();
             while t0.elapsed() < Duration::from_secs(60) {
                 let input = egui::RawInput {
@@ -1674,7 +2147,7 @@ mod tests {
                 };
                 let mut done = false;
                 let mut out = ctx.run_ui(input, |ui| {
-                    done = cache.draw(ui.ctx(), rect, view, scene).is_some_and(|f| f.complete);
+                    done = cache.draw(ui.ctx(), rect, view, scene).is_some_and(|f| ready(&f));
                 });
                 out.textures_delta.clear();
                 if done {
@@ -1684,6 +2157,8 @@ mod tests {
             }
             f64::NAN
         };
+        let until_complete =
+            |cache: &mut TileCache, view: &CanvasView, scene: &Scene| until(cache, view, scene, |f| f.complete);
         let fit = |plan: &StitchPlan| {
             let segs: Vec<emb_render::Segment> = emb_render::segments(&plan.stitches);
             let mut v = CanvasView::default();
@@ -1704,9 +2179,10 @@ mod tests {
                 cursor: None,
                 moving: &[],
             };
-            let first = until_complete(&mut cache, &view, &scene);
+            let shown = until(&mut cache, &view, &scene, |f| f.shown);
+            let first = until_complete(&mut cache, &view, &scene) + shown;
             println!(
-                "first view, {n:>9} stitches: {first:>6.0} ms (lay {:.0} ms), {} tiles of level {}",
+                "first view, {n:>9} stitches: shown in {shown:>5.0} ms, all tiles in {first:>6.0} ms (lay {:.0} ms), {} tiles of level {}",
                 cache.stats.lay_ms,
                 cache.len(),
                 level_for(view.scale())
@@ -1736,8 +2212,12 @@ mod tests {
                 ..Default::default()
             };
             let light = Scene { lighting, ..scene };
-            let t = until_complete(&mut cache, &view, &light);
-            println!("  another light: {t:.0} ms, {} MB of tiles", cache.bytes() >> 20);
+            let shown = until(&mut cache, &view, &light, |f| f.shown);
+            let t = until_complete(&mut cache, &view, &light) + shown;
+            println!(
+                "  another light: shown in {shown:.0} ms, all tiles in {t:.0} ms; {} MB of tiles",
+                cache.bytes() >> 20
+            );
         }
         // A change of one object in 200,000 stitches.
         let plan = stress_plan(200_000);
@@ -1807,7 +2287,12 @@ mod tests {
     fn write_tile_pictures() {
         let out = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/tmp/tiles");
         std::fs::create_dir_all(&out).expect("a folder");
-        for (name, zoom) in [("view-fill-border", 1.0), ("view-lettering", 3.0), ("view-puff", 2.0)] {
+        for (name, zoom, draft) in [
+            ("view-fill-border", 1.0, false),
+            ("view-fill-border", 1.0, true),
+            ("view-lettering", 3.0, false),
+            ("view-puff", 2.0, false),
+        ] {
             let design = emb_cli::corpus::build(name).expect("corpus design");
             let opts = emb_cli::plan_options(&design, None).expect("a machine");
             let plan = Arc::new(emb_cli::plan(&design, &opts));
@@ -1853,11 +2338,13 @@ mod tests {
                         gy: ty,
                         n: 1,
                         patch: None,
+                        relight: None,
+                        draft,
                         laid: laid.clone(),
                         shown: Shown::default(),
                         light: Lighting::default(),
                     };
-                    let Some(img) = make(&job).pop().flatten() else {
+                    let Some(img) = make(&job).images.pop().flatten() else {
                         continue;
                     };
                     let at = Rect::from_two_pos(
@@ -1888,7 +2375,12 @@ mod tests {
                     image::Rgb(p.map(|v| v.round().clamp(0.0, 255.0) as u8)),
                 );
             }
-            img.save(out.join(format!("{name}.png"))).expect("a picture");
+            let file = if draft {
+                format!("{name}-draft.png")
+            } else {
+                format!("{name}.png")
+            };
+            img.save(out.join(file)).expect("a picture");
         }
     }
 

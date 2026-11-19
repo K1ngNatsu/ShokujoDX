@@ -86,7 +86,7 @@ const INDEX_MM: f64 = 2.0;
 /// heights under a stitch, mm.
 const QUERY_MM: f64 = 1.0;
 /// The side of the squares of [`Changes`], mm.
-pub const CHANGE_MM: f64 = 2.0;
+pub const CHANGE_MM: f64 = 1.0;
 /// [`Changes`] with more squares than this are a change everywhere.
 const MAX_CHANGE_SQUARES: usize = 1_000_000;
 /// The small changes of each thread: of its width and of its brightness
@@ -198,6 +198,20 @@ fn cells_between(lo: f64, hi: f64, cell: f64, o: i64, n: usize) -> Range<usize> 
 }
 
 impl Grid {
+    /// The cells of a grid for the area `b` with no heights (to find cells).
+    fn shape(b: BBox, cell: f64) -> Grid {
+        let (ox, oy) = ((b.min.x / cell).floor() as i64, (b.min.y / cell).floor() as i64);
+        Grid {
+            ox,
+            oy,
+            cell,
+            w: ((b.max.x / cell).ceil() as i64 - ox).max(1) as usize,
+            h: ((b.max.y / cell).ceil() as i64 - oy).max(1) as usize,
+            height: Vec::new(),
+            layers: Vec::new(),
+        }
+    }
+
     fn new(b: BBox, cell: f64) -> Grid {
         let (ox, oy) = ((b.min.x / cell).floor() as i64, (b.min.y / cell).floor() as i64);
         let w = ((b.max.x / cell).ceil() as i64 - ox).max(1) as usize;
@@ -403,7 +417,7 @@ pub struct Laid {
 }
 
 /// The strands in squares: for each square the strands whose box meets
-/// it, in sew order.
+/// it, in sew order (all lists in one array).
 #[derive(Debug, Clone, PartialEq)]
 struct Index {
     side: f64,
@@ -413,13 +427,15 @@ struct Index {
     oy: i64,
     w: usize,
     h: usize,
-    lists: Vec<Vec<u32>>,
+    /// The list of square `k` is `items[starts[k]..starts[k + 1]]`.
+    starts: Vec<u32>,
+    items: Vec<u32>,
 }
 
 impl Index {
     /// The index of the boxes of the strands, in their order, in the area
     /// `b`.
-    fn new(boxes: impl Iterator<Item = BBox>, b: BBox, side: f64) -> Index {
+    fn new(boxes: impl Iterator<Item = BBox> + Clone, b: BBox, side: f64) -> Index {
         let (ox, oy) = ((b.min.x / side).floor() as i64, (b.min.y / side).floor() as i64);
         let w = ((b.max.x / side).floor() as i64 - ox + 1).max(1) as usize;
         let h = ((b.max.y / side).floor() as i64 - oy + 1).max(1) as usize;
@@ -429,17 +445,44 @@ impl Index {
             oy,
             w,
             h,
-            lists: vec![Vec::new(); w * h],
+            starts: vec![0; w * h + 1],
+            items: Vec::new(),
         };
+        // The length of each list, then the lists.
+        for bb in boxes.clone() {
+            let (xs, ys) = index.squares(bb);
+            for y in ys {
+                for x in xs.clone() {
+                    index.starts[y * w + x + 1] += 1;
+                }
+            }
+        }
+        for k in 0..w * h {
+            index.starts[k + 1] += index.starts[k];
+        }
+        index.items = vec![0; index.starts[w * h] as usize];
+        let mut next = index.starts.clone();
         for (i, bb) in boxes.enumerate() {
             let (xs, ys) = index.squares(bb);
             for y in ys {
                 for x in xs.clone() {
-                    index.lists[y * w + x].push(i as u32);
+                    let at = &mut next[y * w + x];
+                    index.items[*at as usize] = i as u32;
+                    *at += 1;
                 }
             }
         }
         index
+    }
+
+    /// The number of squares.
+    fn len(&self) -> usize {
+        self.w * self.h
+    }
+
+    /// The strands of square `k`.
+    fn list(&self, k: usize) -> &[u32] {
+        &self.items[self.starts[k] as usize..self.starts[k + 1] as usize]
     }
 
     /// The squares that `b` meets.
@@ -464,7 +507,7 @@ impl Index {
 
     /// The strands of the square of `p`.
     fn at(&self, p: Point) -> &[u32] {
-        self.square(p).map_or(&[], |i| &self.lists[i])
+        self.square(p).map_or(&[], |i| self.list(i))
     }
 
     /// Sets the squares that `b` meets.
@@ -489,7 +532,7 @@ impl Index {
         let mut out: Vec<u32> = Vec::new();
         for y in ys {
             for x in xs.clone() {
-                out.extend_from_slice(&self.lists[y * self.w + x]);
+                out.extend_from_slice(self.list(y * self.w + x));
             }
         }
         out.sort_unstable();
@@ -499,7 +542,7 @@ impl Index {
 
     /// The size of the data, bytes.
     fn bytes(&self) -> usize {
-        self.lists.iter().map(|l| l.len() * 4 + 24).sum()
+        (self.starts.len() + self.items.len()) * 4
     }
 }
 
@@ -829,17 +872,21 @@ pub fn relay(old: &Laid, strands: &[Strand], areas: &Areas) -> (Laid, Changes) {
     let boxes: Vec<BBox> = list.iter().map(|s| strand_box(s)).collect();
     let index = Index::new(boxes.iter().copied(), b, QUERY_MM);
     // The squares where a stitch changed.
-    let mut changed_at = vec![false; index.lists.len()];
+    let mut changed_at = vec![false; index.len()];
     let mut changes = Changes::default();
     for s in &old.strands[p..n_old - q] {
         index.mark(&mut changed_at, s.bbox);
         changes.add(s.bbox);
     }
-    // The pieces alone.
-    let mut base = Grid::new(b, cell);
-    for (rings, _) in areas {
-        base.piece(rings, PIECE_MM as f32);
-    }
+    // The cells of the new grid, and the pieces alone (if there are pieces).
+    let shape = Grid::shape(b, cell);
+    let base = (!areas.is_empty()).then(|| {
+        let mut g = Grid::new(b, cell);
+        for (rings, _) in areas {
+            g.piece(rings, PIECE_MM as f32);
+        }
+        g
+    });
     let mut laid: Vec<LaidStrand> = Vec::with_capacity(n_new);
     let mut z: Vec<f32> = Vec::with_capacity(old.z.len());
     if p > 0 {
@@ -850,60 +897,63 @@ pub fn relay(old: &Laid, strands: &[Strand], areas: &Areas) -> (Laid, Changes) {
         record: s.record,
         ..*ls
     }));
-    let mut sc = Scratch::default();
-    for k in p..n_new {
-        let s = list[k];
-        let after = k >= n_new - q;
-        if after && !index.any(&changed_at, boxes[k]) {
-            // Nothing that changed is under it: as it was.
-            let os = old.strands[k + n_old - n_new];
-            let start = z.len();
-            z.extend_from_slice(&old.z[os.start..os.start + os.n]);
-            laid.push(LaidStrand {
-                start,
-                record: s.record,
-                ..os
-            });
-            continue;
+    // The index of the new lay and the cells of the grid that no change
+    // reaches, on a second thread while the stitches are laid.
+    let (new_index, mut grid) = std::thread::scope(|scope| {
+        let helper = scope.spawn(|| {
+            (
+                Index::new(boxes.iter().copied(), b, INDEX_MM),
+                initial_grid(old, &shape, base.as_ref(), b, cell),
+            )
+        });
+        let mut sc = Scratch::default();
+        for k in p..n_new {
+            let s = list[k];
+            let after = k >= n_new - q;
+            if after && !index.any(&changed_at, boxes[k]) {
+                // Nothing that changed is under it: as it was.
+                let os = old.strands[k + n_old - n_new];
+                let start = z.len();
+                z.extend_from_slice(&old.z[os.start..os.start + os.n]);
+                laid.push(LaidStrand {
+                    start,
+                    record: s.record,
+                    ..os
+                });
+                continue;
+            }
+            // On the stitches before it but the one just before it (as `lay`).
+            let limit = k.saturating_sub(1);
+            let ls = {
+                let (laid, z) = (&laid, &z);
+                lay_one(
+                    s,
+                    cell,
+                    z.len(),
+                    |at| under(&index, &shape, base.as_ref(), laid, z, limit, at),
+                    &mut sc,
+                )
+            };
+            let Some(ls) = ls else { continue };
+            let changed = !after || {
+                let os = old.strands[k + n_old - n_new];
+                os.thick != ls.thick || old.z[os.start..os.start + os.n] != sc.z[..]
+            };
+            z.extend_from_slice(&sc.z);
+            if changed {
+                index.mark(&mut changed_at, boxes[k]);
+                changes.add(boxes[k]);
+            }
+            laid.push(ls);
         }
-        // On the stitches before it but the one just before it (as `lay`).
-        let limit = k.saturating_sub(1);
-        let ls = {
-            let (laid, z) = (&laid, &z);
-            lay_one(s, cell, z.len(), |at| under(&index, &base, laid, z, limit, at), &mut sc)
-        };
-        let Some(ls) = ls else { continue };
-        let changed = !after || {
-            let os = old.strands[k + n_old - n_new];
-            os.thick != ls.thick || old.z[os.start..os.start + os.n] != sc.z[..]
-        };
-        z.extend_from_slice(&sc.z);
-        if changed {
-            index.mark(&mut changed_at, boxes[k]);
-            changes.add(boxes[k]);
-        }
-        laid.push(ls);
-    }
-    // The grid: the cells that no change reaches as in the old grid, the
-    // others from the pieces and the stitches again.
-    let mut grid = base.clone();
-    let og = &old.grid;
-    for y in 0..grid.h {
-        let oy = grid.oy + y as i64 - og.oy;
-        let from = (og.ox - grid.ox).max(0);
-        let to = (og.ox + og.w as i64 - grid.ox).min(grid.w as i64);
-        if oy < 0 || oy >= og.h as i64 || from >= to {
-            continue;
-        }
-        let (dst, n) = (y * grid.w + from as usize, (to - from) as usize);
-        let src = oy as usize * og.w + (grid.ox + from - og.ox) as usize;
-        grid.height[dst..dst + n].copy_from_slice(&og.height[src..src + n]);
-        grid.layers[dst..dst + n].copy_from_slice(&og.layers[src..src + n]);
-    }
-    for (square, ids) in index.lists.iter().enumerate() {
-        if !changed_at[square] {
-            continue;
-        }
+        helper
+            .join()
+            .expect("the helper of a relay does not stop with an error")
+    });
+    // The cells that a change reaches: from the pieces and the stitches
+    // again.
+    for (square, _) in changed_at.iter().enumerate().filter(|(_, c)| **c) {
+        let ids = index.list(square);
         // The cells whose centers are in the square.
         let (sx, sy) = (
             index.ox + (square % index.w) as i64,
@@ -925,9 +975,12 @@ pub fn relay(old: &Laid, strands: &[Strand], areas: &Areas) -> (Laid, Changes) {
         };
         let (cols, rows) = (x0..x0 + xs.len(), y0..y0 + ys.len());
         for y in rows.clone() {
-            let i = y * grid.w;
-            grid.height[i + cols.start..i + cols.end].copy_from_slice(&base.height[i + cols.start..i + cols.end]);
-            grid.layers[i + cols.start..i + cols.end].fill(0);
+            let r = y * grid.w + cols.start..y * grid.w + cols.end;
+            match &base {
+                Some(base) => grid.height[r.clone()].copy_from_slice(&base.height[r.clone()]),
+                None => grid.height[r.clone()].fill(0.0),
+            }
+            grid.layers[r].fill(0);
         }
         for &j in ids {
             let s = laid[j as usize];
@@ -937,19 +990,54 @@ pub fn relay(old: &Laid, strands: &[Strand], areas: &Areas) -> (Laid, Changes) {
             grid.stamp_in(&s, &z, xs, ys);
         }
     }
-    (Laid::new(laid, z, areas.to_vec(), grid, b), changes)
+    (Laid::with_index(laid, z, areas.to_vec(), grid, new_index), changes)
+}
+
+/// The grid of a relay before the cells that the change reaches are made
+/// again: the cells of the old grid, with the cells of `shape` (and the
+/// pieces of `base`).
+fn initial_grid(old: &Laid, shape: &Grid, base: Option<&Grid>, b: BBox, cell: f64) -> Grid {
+    let og = &old.grid;
+    let same = base.is_none() && (shape.ox, shape.oy, shape.w, shape.h) == (og.ox, og.oy, og.w, og.h);
+    let mut grid = match base {
+        _ if same => og.clone(),
+        Some(base) => base.clone(),
+        None => Grid::new(b, cell),
+    };
+    for y in 0..if same { 0 } else { grid.h } {
+        let oy = grid.oy + y as i64 - og.oy;
+        let from = (og.ox - grid.ox).max(0);
+        let to = (og.ox + og.w as i64 - grid.ox).min(grid.w as i64);
+        if oy < 0 || oy >= og.h as i64 || from >= to {
+            continue;
+        }
+        let (dst, n) = (y * grid.w + from as usize, (to - from) as usize);
+        let src = oy as usize * og.w + (grid.ox + from - og.ox) as usize;
+        grid.height[dst..dst + n].copy_from_slice(&og.height[src..src + n]);
+        grid.layers[dst..dst + n].copy_from_slice(&og.layers[src..src + n]);
+    }
+    grid
 }
 
 /// The height and the layers of thread of the grid at `p` when the strands
-/// before `limit` are laid: the pieces and the strands of the square of
-/// `p` (as the grid of [`lay`] has them).
-fn under(index: &Index, base: &Grid, laid: &[LaidStrand], z: &[f32], limit: usize, p: Point) -> (f64, u8) {
-    let cell = base.cell;
+/// before `limit` are laid: the pieces (`base`, if there are pieces) and the
+/// strands of the square of `p` (as the grid of [`lay`] with the cells of
+/// `shape` has them).
+fn under(
+    index: &Index,
+    shape: &Grid,
+    base: Option<&Grid>,
+    laid: &[LaidStrand],
+    z: &[f32],
+    limit: usize,
+    p: Point,
+) -> (f64, u8) {
+    let cell = shape.cell;
     let q = cell_center((p.x / cell).floor() as i64, (p.y / cell).floor() as i64, cell);
-    let Some(i) = base.index(q) else {
+    let Some(i) = shape.index(q) else {
         return (0.0, 0);
     };
-    let mut h = base.height[i];
+    let mut h = base.map_or(0.0, |b| b.height[i]);
     let mut layers = 0u8;
     for &j in index.at(q) {
         let j = j as usize;
@@ -971,8 +1059,19 @@ fn under(index: &Index, base: &Grid, laid: &[LaidStrand], z: &[f32], limit: usiz
 impl Laid {
     fn new(strands: Vec<LaidStrand>, z: Vec<f32>, pieces: Vec<(Vec<Vec<Point>>, Rgb)>, grid: Grid, b: BBox) -> Laid {
         let index = Index::new(strands.iter().map(|s| s.bbox), b, INDEX_MM);
+        Laid::with_index(strands, z, pieces, grid, index)
+    }
+
+    /// As [`Laid::new`], with the index of the boxes of the strands.
+    fn with_index(
+        strands: Vec<LaidStrand>,
+        z: Vec<f32>,
+        pieces: Vec<(Vec<Vec<Point>>, Rgb)>,
+        grid: Grid,
+        index: Index,
+    ) -> Laid {
         let piece = if pieces.is_empty() { 0.0 } else { PIECE_MM };
-        let top = z.iter().fold(piece, |m, v| m.max(f64::from(*v)));
+        let top = f64::from(z.iter().copied().fold(0.0, f32::max)).max(piece);
         Laid {
             strands,
             z,
@@ -986,6 +1085,13 @@ impl Laid {
     /// The highest point of the stitches and pieces, mm.
     pub fn top(&self) -> f64 {
         self.top
+    }
+
+    /// How far from a pixel a stitch can change its light in `lighting`,
+    /// mm: the longest shadow of these stitches, and the gaps (at most
+    /// [`APRON_MM`]).
+    pub fn apron(&self, lighting: &Lighting) -> f64 {
+        apron_for(lighting, self.top)
     }
 
     /// The area of the laid stitches and pieces, with a margin.
@@ -1105,8 +1211,25 @@ impl Laid {
         lighting: &Lighting,
         show: &dyn Fn(u32) -> bool,
     ) -> Option<Surface> {
+        self.block_with(ppm, x0, y0, w, h, lighting, show, DETAIL_PX_PER_MM)
+    }
+
+    /// As [`Laid::block`], made with at least `detail` pixels for each mm
+    /// (a quick draft with less than [`DETAIL_PX_PER_MM`]).
+    #[allow(clippy::too_many_arguments)]
+    pub fn block_with(
+        &self,
+        ppm: f64,
+        x0: i64,
+        y0: i64,
+        w: u32,
+        h: u32,
+        lighting: &Lighting,
+        show: &dyn Fn(u32) -> bool,
+        detail: f64,
+    ) -> Option<Surface> {
         let mut k = 0u32;
-        while ppm * f64::from(1u32 << k) < DETAIL_PX_PER_MM - 1e-9 && k < MAX_BLOCK_HALVINGS {
+        while ppm * f64::from(1u32 << k) < detail - 1e-9 && k < MAX_BLOCK_HALVINGS {
             k += 1;
         }
         self.block_at(ppm, k, x0, y0, w, h, lighting, show)
@@ -1156,7 +1279,7 @@ impl Laid {
         }
         // The block with its apron, in pixels of the level: as far as the
         // longest shadow of these stitches can fall, and the gaps.
-        let apron_mm = shadow_reach(lighting, self.top) + GAP_RADIUS_MM + 0.2;
+        let apron_mm = self.apron(lighting);
         let apron = (apron_mm * ppm).ceil().max(1.0) as i64;
         let (bx, by) = (x0 - apron, y0 - apron);
         let (bw, bh) = (i64::from(w) + 2 * apron, i64::from(h) + 2 * apron);
@@ -1307,8 +1430,24 @@ impl Laid {
             let px1 = ((fx(b.max.x).ceil().max(0.0)) as u32).min(x0 + w).max(x0) - x0;
             let py0 = ((fy(b.min.y).floor().max(0.0) as u32).max(y0)).min(y0 + h) - y0;
             let py1 = ((fy(b.max.y).ceil().max(0.0)) as u32).min(y0 + h).max(y0) - y0;
+            // A pixel has a part of the thread if its center is nearer to
+            // the middle line than this, mm.
+            let reach = (r_px + 0.5) / ppm;
             for py in py0..py1 {
-                for px in px0..px1 {
+                // The pixels of the row that can be that near (the stitch,
+                // longer and wider by `reach`, meets the row there), and one
+                // more on each side.
+                let qy = center(x0, y0 + py).y;
+                let Some((xa, xb)) = row_span(s, qy, reach) else {
+                    continue;
+                };
+                let g = |x: f64| (x - base.x) * ppm - 0.5 - origin.0 as f64 - f64::from(x0);
+                let lo = (g(xa).floor() - 1.0).max(f64::from(px0));
+                let hi = (g(xb).ceil() + 2.0).min(f64::from(px1));
+                if hi <= lo {
+                    continue;
+                }
+                for px in lo as u32..hi as u32 {
                     let q = center(x0 + px, y0 + py);
                     let (rx, ry) = (q.x - s.a.x, q.y - s.a.y);
                     let along = rx * s.dir.0 + ry * s.dir.1;
@@ -1335,7 +1474,7 @@ impl Laid {
                         t.material[k] = s.material;
                         // The twist of the plies: a pattern along the
                         // thread, slanted across it.
-                        let p = emb_geom::math::sin(std::f64::consts::TAU * (along / PLY_PITCH_MM + 0.6 * side));
+                        let p = wave(along / PLY_PITCH_MM + 0.6 * side);
                         t.ply[k] = (p * 127.0).round() as i8;
                     }
                 }
@@ -1345,8 +1484,54 @@ impl Laid {
     }
 }
 
+/// The part of the line `y = qy` that is less than `reach` mm from the
+/// middle line of the strand `s` or its long line between `-reach` and its
+/// length plus `reach` (a rectangle round the strand, more than all places
+/// that near): the smallest and the largest x, mm.
+fn row_span(s: &LaidStrand, qy: f64, reach: f64) -> Option<(f64, f64)> {
+    let (dx, dy) = s.dir;
+    let ry = qy - s.a.y;
+    let (mut lo, mut hi) = (f64::NEG_INFINITY, f64::INFINITY);
+    // `c0 + c1 * rx` from `min` to `max`, with `rx = x - a.x`.
+    let mut keep = |c0: f64, c1: f64, min: f64, max: f64| {
+        if c1.abs() < 1e-12 {
+            if c0 < min || c0 > max {
+                lo = f64::INFINITY;
+            }
+            return;
+        }
+        let (u, v) = ((min - c0) / c1, (max - c0) / c1);
+        lo = lo.max(u.min(v));
+        hi = hi.min(u.max(v));
+    };
+    // Across the strand: `ry * dx - rx * dy`.
+    keep(ry * dx, -dy, -reach, reach);
+    // Along it: `rx * dx + ry * dy`.
+    keep(ry * dy, dx, -reach, s.len + reach);
+    (lo <= hi).then_some((s.a.x + lo, s.a.x + hi))
+}
+
+/// A wave with one turn for each 1 of `t`, from -1 to 1: near the sine of
+/// `2π t` (two parabolas), with no call of the math library (the plies of
+/// each pixel of each thread).
+fn wave(t: f64) -> f64 {
+    let f = t - t.floor();
+    if f < 0.5 {
+        16.0 * f * (0.5 - f)
+    } else {
+        -16.0 * (f - 0.5) * (1.0 - f)
+    }
+}
+
 /// How long a shadow can be, mm.
 const SHADOW_MAX_MM: f64 = 4.0;
+
+/// How far from a pixel stitches up to `top` mm high can change its light
+/// in `lighting`, mm: their longest shadow and the gaps (at most
+/// [`APRON_MM`]).
+pub fn apron_for(lighting: &Lighting, top: f64) -> f64 {
+    shadow_reach(lighting, top) + GAP_RADIUS_MM + 0.2
+}
 
 /// How far the shadow of a part `top` mm high falls in the light `l`, mm (at
 /// most [`SHADOW_MAX_MM`]).
@@ -1367,7 +1552,7 @@ const TOP_SQUARE: usize = 16;
 
 /// The highest point in each square of [`TOP_SQUARE`] pixels of a map of
 /// heights: a line to the light that is above them all has no shadow.
-struct Tops {
+pub(crate) struct Tops {
     w: usize,
     h: usize,
     across: usize,
@@ -1425,16 +1610,15 @@ pub(crate) fn shadow_at(
     ppm: f64,
     top: f64,
 ) -> f64 {
-    shadow_with(at, None, w, h, x, y, v, strength, ppm, top)
+    shadow_with(at, None, (0, 0, w, h), x, y, v, strength, ppm, top)
 }
 
 /// As [`shadow_at`], with the highest points in squares.
 #[allow(clippy::too_many_arguments)]
-fn shadow_with(
+pub(crate) fn shadow_with(
     at: &impl Fn(i64, i64) -> f64,
     tops: Option<&Tops>,
-    w: i64,
-    h: i64,
+    (x0, y0, x1, y1): (i64, i64, i64, i64),
     x: i64,
     y: i64,
     v: [f64; 3],
@@ -1463,7 +1647,7 @@ fn shadow_with(
     let mut dark: f64 = 0.0;
     for k in 1..=steps {
         let (px, py) = (x as f64 + 0.5 + ux * k as f64, y as f64 + 0.5 + uy * k as f64);
-        if px < 0.0 || py < 0.0 || px >= w as f64 || py >= h as f64 {
+        if px < x0 as f64 || py < y0 as f64 || px >= x1 as f64 || py >= y1 as f64 {
             break;
         }
         let over = at(px as i64, py as i64) - (h0 + rise * k as f64);
@@ -1799,7 +1983,17 @@ impl Surface {
                         let depth = (f64::from(around[y as usize * w + x as usize]) - at(x, y)).max(0.0);
                         let open = 1.0 - GAP_DARK * (depth / GAP_DEPTH_MM).min(1.0);
                         t.open[k] = (open * 255.0).round() as u8;
-                        let dark = shadow_with(&at, Some(tops), w as i64, h as i64, x, y, lv, light.strength, ppm, top);
+                        let dark = shadow_with(
+                            &at,
+                            Some(tops),
+                            (0, 0, w as i64, h as i64),
+                            x,
+                            y,
+                            lv,
+                            light.strength,
+                            ppm,
+                            top,
+                        );
                         t.shadow[k] = (dark * 255.0).round() as u8;
                         let shade = open * (1.0 - crate::sheen::SHADOW_DARK * dark);
                         t.fabric_shade[k] = (shade * 255.0).round() as u8;
@@ -2365,8 +2559,8 @@ mod tests {
         println!(
             "index 2 mm {:.1} ms ({} {})",
             t.elapsed().as_secs_f64() * 1000.0,
-            ix.lists.len(),
-            ix2.lists.len()
+            ix.len(),
+            ix2.len()
         );
         let t = std::time::Instant::now();
         let k: u64 = new.iter().map(key).fold(0, |a, b| a ^ b);

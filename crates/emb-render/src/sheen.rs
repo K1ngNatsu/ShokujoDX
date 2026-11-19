@@ -272,7 +272,12 @@ pub fn light_values(s: &Surface, lighting: &Lighting, fabric: Option<(Rgb, Weave
 /// gaps and its shadows. The colors are those of the screen, with the
 /// alpha multiplied in (premultiplied).
 pub fn overlay(s: &Surface, lighting: &Lighting) -> Picture {
-    let lit = Lit::new(s, lighting);
+    picture_over(&Lit::new(s, lighting))
+}
+
+/// The picture of [`overlay`] from the light of each pixel.
+fn picture_over(lit: &Lit) -> Picture {
+    let s = lit.s;
     let (w, h) = (s.width as usize, s.height as usize);
     let mut rgba = Vec::with_capacity(w * h * 4);
     for y in 0..h {
@@ -301,6 +306,30 @@ pub fn overlay(s: &Surface, lighting: &Lighting) -> Picture {
     }
 }
 
+/// The heights round a surface, for its shadows in a light other than its
+/// own (see [`overlay_around`]).
+pub struct Around<'a> {
+    /// The height at the pixel (`x`, `y`) of the surface, also outside it,
+    /// mm.
+    pub height: &'a (dyn Fn(i64, i64) -> f64 + Sync),
+    /// The pixels that it has: `x0`, `y0`, `x1`, `y1` (the last ones not).
+    pub pixels: (i64, i64, i64, i64),
+    /// The highest point in them, mm.
+    pub top: f64,
+}
+
+/// As [`overlay`], in a light other than the light of the surface: the
+/// shadows from the heights of this zoom level in `around` (the surface
+/// and the tiles round it), the diffuse light from its slopes. A quick
+/// picture of a tile in a new light, until the tile is made again (ADR
+/// 0126); less exact at a small zoom, as [`light`] in another light.
+pub fn overlay_around(s: &Surface, lighting: &Lighting, around: &Around) -> Picture {
+    let mut lit = Lit::new(s, lighting);
+    lit.around = Some(around);
+    lit.same_light = false;
+    picture_over(&lit)
+}
+
 /// The light of one pixel.
 struct Pixel {
     /// The color of the threads (linear light, before the tone curve), if
@@ -323,6 +352,8 @@ struct Lit<'a> {
     /// The mean highlight over all directions, for each kind.
     means: Vec<f64>,
     twist: f64,
+    /// The heights round the surface for the shadows in another light.
+    around: Option<&'a Around<'a>>,
 }
 
 impl<'a> Lit<'a> {
@@ -337,6 +368,7 @@ impl<'a> Lit<'a> {
             top: f64::from(s.max_height()),
             means: ThreadKind::ALL.iter().map(|&kd| mean_lobe(l, sheen_of(kd).1)).collect(),
             twist: math::to_radians(TWIST_DEG),
+            around: None,
         }
     }
 
@@ -345,10 +377,20 @@ impl<'a> Lit<'a> {
         let (s, k, l) = (self.s, self.k, self.l);
         let (t, i) = s.at(x as u32, y as u32);
         let open = f64::from(t.open[i]) / 255.0;
-        let dark = if k > 0.0 {
-            shadow(s, x as i64, y as i64, self.lighting, l, self.top)
-        } else {
-            0.0
+        let dark = match self.around {
+            _ if k <= 0.0 => 0.0,
+            Some(a) => crate::surface::shadow_with(
+                &|x, y| (a.height)(x, y),
+                None,
+                a.pixels,
+                x as i64,
+                y as i64,
+                l,
+                self.lighting.strength,
+                s.px_per_mm,
+                a.top,
+            ),
+            None => shadow(s, x as i64, y as i64, self.lighting, l, self.top),
         };
         let shade = 1.0 + (open * (1.0 - SHADOW_DARK * dark) - 1.0) * k;
         let fabric = if self.same_light {
