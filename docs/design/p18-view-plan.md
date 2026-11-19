@@ -7,7 +7,8 @@ P18 (2026-11-19). The first part of P18 (designs from other programs,
 first, with Milestone 1 (2026-11-19). Milestone 1 is done except the
 sew-out of the reference set and the numbers of a small computer
 (`docs/design/p18-view-m1-report.md`, ADR 0122). Milestone 2 is done
-(`docs/design/p18-view-m2-report.md`, ADR 0123).
+(`docs/design/p18-view-m2-report.md`, ADR 0123). Milestone 3 is done
+(`docs/design/p18-view-m3-report.md`, ADR 0124).
 
 ## Goal
 
@@ -254,6 +255,18 @@ is higher than the fill, a satin with underlay is higher than one with
 none, and puff is the highest. A test reads these heights from the
 surface. The surface of a design with 100,000 stitches at 10 pixels for
 each mm is made in less than 1 s.
+
+**Done (2026-11-19, ADR 0124).** `emb_render::strand` and
+`emb_render::surface`: the stitches are laid in sew order on a grid of
+0.1 mm as taut threads (a flat oval, an arch for a short stitch, thread
+presses thread, foam as a floor), and tiles of 256 pixels are made on all
+processors; `surface::light` is the first light. The heights: a border
+0.85 mm on a fill of 0.41 mm, a satin with underlay 0.63 mm and with none
+0.21 mm, puff 2.3 mm, nothing else above 1.14 mm (test). The surface of
+100,000 stitches at 10 pixels for each mm takes 0.17 s. A satin looks the
+same in each sew direction. The strands have no role for each stitch: the
+plan does not mark underlay, and the heights come from the sew order
+(`docs/design/p18-view-m3-report.md`).
 
 ## Milestone 4: the light on the surface (L)
 

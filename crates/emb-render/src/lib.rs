@@ -15,6 +15,8 @@
 //!   the rhinestone template on paper.
 //! - [`density`]: the layers of thread on each small square (density map).
 //! - [`light`]: colors mix in linear light (ADR 0123).
+//! - [`strand`], [`surface`]: the stitches laid on the fabric with their
+//!   heights, in tiles, and its first light (ADR 0124).
 //! - [`compare`]: two pictures side by side with their difference, for the
 //!   developer; [`stress`]: large synthetic stitch lists to measure speed
 //!   (ADR 0122).
@@ -33,7 +35,9 @@ pub mod product;
 pub mod raster;
 pub mod sheet;
 pub mod stone_sheet;
+pub mod strand;
 pub mod stress;
+pub mod surface;
 pub mod svg;
 pub mod template;
 pub mod thread3d;

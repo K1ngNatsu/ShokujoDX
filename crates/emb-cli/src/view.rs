@@ -11,6 +11,10 @@
 //!
 //! The memory of a step is the size of the data that it makes (the stitch
 //! records, the segments, the pixels), not the memory of the process.
+//!
+//! Each design has two pictures at each zoom: the 3D thread look of today
+//! (`<design>-<zoom>`) and the surface with its first light
+//! (`<design>-<zoom>-surface`, Milestone 3, ADR 0124).
 
 use std::fmt::Write as _;
 use std::path::Path;
@@ -170,6 +174,21 @@ pub struct Measure {
     pub shots: Vec<Shot>,
 }
 
+/// The stitches of the stitch plan of `design` laid on the fabric (ADR
+/// 0124): the strands with the foam of puff objects, on the appliqué
+/// fabric and the stones of the design.
+pub fn lay_design(design: &emb_model::Design) -> emb_render::surface::Laid {
+    let opts = crate::plan_options(design, None).expect("the machine of the design");
+    lay_plan(design, &crate::plan(design, &opts))
+}
+
+/// As [`lay_design`], for a stitch plan of `design`.
+fn lay_plan(design: &emb_model::Design, plan: &emb_stitch::StitchPlan) -> emb_render::surface::Laid {
+    let lifts = emb_render::strand::lifts(design, plan.spans.iter().map(|s| (s.object, s.records.clone())));
+    let strands = emb_render::strand::strands(&plan.stitches, &lifts);
+    emb_render::surface::lay(&strands, &emb_render::sheet::picture_areas(design))
+}
+
 /// The time of `f`, ms.
 fn timed<T>(f: impl FnOnce() -> T) -> (T, f64) {
     let t = Instant::now();
@@ -230,6 +249,14 @@ pub fn run(r: &Reference, flat: bool) -> Measure {
     let look = crate::picture_look(&design, false);
     let all = whole(&segments, &areas);
     let at = design.output_transform().apply(Point::new(r.close.0, r.close.1));
+    let (laid, ms) = timed(|| lay_plan(&design, &plan));
+    steps.push(Step {
+        name: "lay".into(),
+        ms,
+        bytes: laid.bytes(),
+    });
+    let fabric = design.background.zip(look.fabric);
+    let mut surface_shots = Vec::new();
     let mut shots = Vec::new();
     for z in ZOOMS {
         let b = z.close_mm.map_or(all, |s| BBox::from_center_size(at, s, s));
@@ -255,7 +282,25 @@ pub fn run(r: &Reference, flat: bool) -> Measure {
             hash: hash(&p),
             picture: p,
         });
+        let (surface, ms) = timed(|| laid.surface(b, z.px_per_mm));
+        steps.push(Step {
+            name: format!("surface {}", z.name),
+            ms,
+            bytes: surface.bytes(),
+        });
+        let (p, ms) = timed(|| emb_render::surface::light(&surface, &Default::default(), fabric));
+        steps.push(Step {
+            name: format!("light {}", z.name),
+            ms,
+            bytes: p.rgba.len(),
+        });
+        surface_shots.push(Shot {
+            name: format!("{}-{}-surface", r.name, z.name),
+            hash: hash(&p),
+            picture: p,
+        });
     }
+    shots.extend(surface_shots);
     Measure {
         name: r.name.to_string(),
         stitches: plan.stitches.stitch_count(),
@@ -266,7 +311,9 @@ pub fn run(r: &Reference, flat: bool) -> Measure {
 
 /// Measures the segments and the pictures of a synthetic design of about
 /// `n` stitches (`emb_render::stress`, about 200 × 180 mm) at the whole and
-/// the normal zoom, in the flat and the 3D look. It keeps no picture.
+/// the normal zoom, in the flat and the 3D look, and the surface and its
+/// light at 10 pixels for each mm (the budget of Milestone 3: 1 s for
+/// 100,000 stitches). It keeps no picture.
 pub fn stress(n: usize) -> Measure {
     let s = emb_render::stress::make(n);
     let mut steps = Vec::new();
@@ -290,6 +337,26 @@ pub fn stress(n: usize) -> Measure {
             });
         }
     }
+    let strands = emb_render::strand::strands(&s, &[]);
+    let (laid, ms) = timed(|| emb_render::surface::lay(&strands, &[]));
+    steps.push(Step {
+        name: "lay".into(),
+        ms,
+        bytes: laid.bytes(),
+    });
+    let (surface, ms) = timed(|| laid.surface(all, 10.0));
+    steps.push(Step {
+        name: "surface 10/mm".into(),
+        ms,
+        bytes: surface.bytes(),
+    });
+    let fabric = Some((STRESS_FABRIC, emb_render::thread3d::Weave::Plain));
+    let (p, ms) = timed(|| emb_render::surface::light(&surface, &Default::default(), fabric));
+    steps.push(Step {
+        name: "light 10/mm".into(),
+        ms,
+        bytes: p.rgba.len(),
+    });
     Measure {
         name: format!("stress {n}"),
         stitches: s.stitch_count(),

@@ -60,6 +60,27 @@ const SHINE: f64 = 0.38;
 /// The brightness at the needle points, where the thread goes into the fabric.
 const END_DARK: f64 = 0.82;
 
+impl Lighting {
+    /// The light of a point of a surface whose normal is `n` (a unit
+    /// vector in picture coordinates, z toward the viewer): the brightness
+    /// factor and the highlight, with the constants of [`Lighting::shade`]
+    /// (the first light of the surface, ADR 0124).
+    pub fn shade_normal(&self, n: [f64; 3]) -> (f64, f64) {
+        let l = self.vector();
+        let diffuse = (n[0] * l[0] + n[1] * l[1] + n[2] * l[2]).max(0.0);
+        let h = {
+            let v = [l[0], l[1], l[2] + 1.0];
+            let len = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt().max(1e-9);
+            [v[0] / len, v[1] / len, v[2] / len]
+        };
+        let nh = (n[0] * h[0] + n[1] * h[1] + n[2] * h[2]).max(0.0);
+        let factor = AMBIENT + DIFFUSE * diffuse;
+        let shine = SHINE * math::pow(nh, SHINE_POWER);
+        let k = self.strength.clamp(0.0, 1.0);
+        (1.0 + (factor - 1.0) * k, shine * k)
+    }
+}
+
 /// The strength of the highlight of a kind of thread, as a part of the
 /// highlight of polyester (ADR 0123): rayon shines more, metallic thread
 /// most; cotton, wool and acrylic are matte and have no highlight.
