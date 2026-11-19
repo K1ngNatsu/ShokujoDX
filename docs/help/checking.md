@@ -84,6 +84,13 @@ and the height of the light, the strength of the shade, and the **Fabric
 texture** (the weave of the fabric of the design under the fabric color).
 **Default light** sets them back.
 
+With **Fine surface** (on at the start), the 3D look shows the surface of
+the stitches: thread on thread is higher, each area is lighter or darker
+by the direction of its stitches to the light, and high parts put
+shadows on the fabric. The program makes the surface in parts while you
+work; a part that is not ready yet shows the faster look for a moment.
+Clear **Fine surface** on a slow computer.
+
 ## Other views of the stitches
 
 **View > Show** has **Jumps** (jumps and travel lines), **Needle Points**

@@ -98,6 +98,14 @@ und ein mattes Garn ohne Glanz. Ein Garn einer Karte gibt seine Art, wenn
 der Name der Karte sie nennt. In den Designbildern mischen sich die
 Farben an den Rändern der Garne jetzt wie Licht. Siehe [Farben und Garne](colors-and-threads).
 
+**Eine neue 3D-Garnansicht.** Die 3D-Garnansicht der Arbeitsfläche zeigt
+die Oberfläche der Stiche: Garn auf Garn ist höher, eine Fläche ist heller
+oder dunkler nach der Richtung ihrer Stiche zum Licht, Garne glänzen nach
+ihrer Art, und hohe Teile werfen Schatten auf den Stoff. Große Designs
+bewegen und zoomen sich auch schneller. **Ansicht > Garnansicht > Feine
+Oberfläche** schaltet sie auf einem langsamen Computer aus. Siehe [Ein
+Design prüfen](checking).
+
 **Designs mit sehr vielen Stichen.** Das Programm konnte abbrechen, wenn
 die Arbeitsfläche etwa 350.000 Stiche oder mehr auf einmal in der
 Garnansicht zeigte. Jetzt zeigt die Arbeitsfläche sie bei diesem Zoom

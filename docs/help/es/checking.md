@@ -86,6 +86,14 @@ la altura de la luz, la fuerza de la sombra y la **Textura de la tela** (el
 tejido de la tela del diseño bajo el color de la tela). **Luz
 predeterminada** los restablece.
 
+Con **Superficie fina** (activada al inicio), el aspecto 3D muestra la
+superficie de las puntadas: el hilo sobre hilo es más alto, cada zona es
+más clara o más oscura según la dirección de sus puntadas respecto a la
+luz, y las partes altas proyectan sombras sobre la tela. El programa hace
+la superficie por partes mientras trabaja; una parte que aún no está
+lista muestra un momento el aspecto más rápido. Desactive **Superficie
+fina** en un equipo lento.
+
 ## Otras vistas de las puntadas
 
 **Ver > Mostrar** tiene **Saltos** (saltos y líneas de desplazamiento),

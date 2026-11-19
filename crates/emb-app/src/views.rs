@@ -30,9 +30,9 @@ pub struct OtherDesign {
     pub tab: usize,
     pub view: CanvasView,
     pub fit: bool,
-    /// The stitches of the design (canvas coordinates) and the state of the
-    /// design they are made from.
-    stitches: Option<(u64, u64, Segments)>,
+    /// The stitches of the design (canvas coordinates), its plan and the
+    /// state of the design they are made from.
+    stitches: Option<(u64, u64, Segments, Arc<emb_stitch::StitchPlan>)>,
 }
 
 impl AppState {
@@ -68,15 +68,15 @@ impl AppState {
     }
 
     /// The stitches of design tab `i` (not the active one), in canvas
-    /// coordinates, made once for each state of the design.
-    fn other_stitches(&mut self, i: usize) -> Option<Segments> {
+    /// coordinates, and its plan, made once for each state of the design.
+    fn other_stitches(&mut self, i: usize) -> Option<(Segments, Arc<emb_stitch::StitchPlan>)> {
         let slot = self.tabs.get(i)?.as_ref()?;
         let key = (slot.doc_id, slot.doc.state_id());
         if let Some(o) = &self.other_design
-            && let Some((id, state, segs)) = &o.stitches
+            && let Some((id, state, segs, plan)) = &o.stitches
             && (*id, *state) == key
         {
-            return Some(segs.clone());
+            return Some((segs.clone(), plan.clone()));
         }
         let d = slot.doc.design();
         let opts = d
@@ -96,10 +96,36 @@ impl AppState {
             })
             .collect();
         let segs = Arc::new(segs);
+        let plan = Arc::new(plan);
         if let Some(o) = &mut self.other_design {
-            o.stitches = Some((key.0, key.1, segs.clone()));
+            o.stitches = Some((key.0, key.1, segs.clone(), plan.clone()));
         }
-        Some(segs)
+        Some((segs, plan))
+    }
+
+    /// The tiles of design tab `i` (the other design view), as
+    /// [`crate::stitch_tiles::tiles_of`] for the active design.
+    fn other_tiles(
+        &mut self,
+        ctx: &egui::Context,
+        rect: egui::Rect,
+        view: &CanvasView,
+        i: usize,
+        plan: &Arc<emb_stitch::StitchPlan>,
+    ) -> Option<crate::stitch_tiles::TileFrame> {
+        let slot = self.tabs.get(i)?.as_ref()?;
+        let filter = crate::viewing::ViewFilter::default();
+        let scene = crate::stitch_tiles::Scene {
+            doc: slot.doc_id,
+            state: slot.doc.state_id(),
+            plan,
+            design: slot.doc.design(),
+            lighting: self.settings.look.light,
+            filter: &filter,
+            cursor: None,
+            moving: &[],
+        };
+        self.stitch_tiles.draw(ctx, rect, view, &scene)
     }
 }
 
@@ -195,8 +221,9 @@ pub fn other_design(ui: &mut egui::Ui, st: &mut AppState) {
         }
     }
     st.other_design = Some(o);
-    let segs = st.other_stitches(st.other_design.as_ref().map_or(0, |o| o.tab));
+    let made = st.other_stitches(st.other_design.as_ref().map_or(0, |o| o.tab));
     let Some(mut o) = st.other_design.take() else { return };
+    let segs = made.as_ref().map(|m| m.0.clone());
     let (response, painter) = ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
     let rect = response.rect;
     painter.rect_filled(rect, 0.0, ui.visuals().extreme_bg_color);
@@ -224,8 +251,27 @@ pub fn other_design(ui: &mut egui::Ui, st: &mut AppState) {
             crate::canvas::MeshLook::Thread
         };
         let table = emb_render::thread3d::ShadeTable::new(st.settings.look.light);
-        let mesh = crate::canvas::fitted_mesh(rect, &o.view, segs, false, look, &table).0;
-        painter.with_clip_rect(rect).add(Shape::mesh(mesh));
+        let clip = painter.with_clip_rect(rect);
+        // The tiles of the 3D thread look (ADR 0126), else the stitches.
+        let tiles = match &made {
+            Some((_, plan)) if look == crate::canvas::MeshLook::Thread3d && st.settings.look.surface => {
+                st.other_tiles(ui.ctx(), rect, &o.view, o.tab, plan)
+            }
+            _ => None,
+        };
+        match tiles {
+            Some(frame) => {
+                if let Some(missing) = frame.missing.iter().copied().reduce(|a, b| a.union(b)) {
+                    let mesh = crate::canvas::fitted_mesh(rect, &o.view, segs, false, look, &table).0;
+                    clip.with_clip_rect(missing.intersect(rect)).add(Shape::mesh(mesh));
+                }
+                clip.extend(frame.shapes);
+            }
+            None => {
+                let mesh = crate::canvas::fitted_mesh(rect, &o.view, segs, false, look, &table).0;
+                clip.add(Shape::mesh(mesh));
+            }
+        }
     }
     st.other_design = Some(o);
     if let Some(i) = switch {
@@ -282,7 +328,7 @@ mod tests {
         assert_eq!(h.st.active_tab, 1);
         h.st.show_other_design();
         assert_eq!(h.st.other_design.as_ref().unwrap().tab, 0);
-        let segs = h.st.other_stitches(0).unwrap();
+        let (segs, _) = h.st.other_stitches(0).unwrap();
         assert!(!segs.is_empty(), "the stitches of the other design");
         // Drawn in a frame, then Edit this design (as the button does).
         let ctx = egui::Context::default();

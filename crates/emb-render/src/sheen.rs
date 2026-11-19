@@ -124,13 +124,24 @@ fn fabric_mean(s: &Surface, weave: Weave, x: usize, y: usize) -> f64 {
 /// The shadow at the pixel (`x`, `y`): the shadow of the surface when its
 /// light is `l` (made at the detail and halved), else from the heights of
 /// this zoom level.
-fn shadow(s: &Surface, x: i64, y: i64, l: &Lighting, top: f64) -> f64 {
+/// `v` is the direction of the light `l` (`Lighting::vector`).
+fn shadow(s: &Surface, x: i64, y: i64, l: &Lighting, v: [f64; 3], top: f64) -> f64 {
     if l.azimuth_deg == s.light.azimuth_deg && l.elevation_deg == s.light.elevation_deg {
         let (t, i) = s.at(x as u32, y as u32);
         return f64::from(t.shadow[i]) / 255.0;
     }
     let at = |x: i64, y: i64| f64::from(s.height(x, y));
-    crate::surface::shadow_at(&at, i64::from(s.width), i64::from(s.height), x, y, l, s.px_per_mm, top)
+    crate::surface::shadow_at(
+        &at,
+        i64::from(s.width),
+        i64::from(s.height),
+        x,
+        y,
+        v,
+        l.strength,
+        s.px_per_mm,
+        top,
+    )
 }
 
 /// The light of a surface: for each pixel the color in linear light (it
@@ -217,87 +228,31 @@ pub fn light(s: &Surface, lighting: &Lighting, fabric: Option<(Rgb, Weave)>) -> 
 /// As [`light`], the light before the tone curve.
 pub fn light_values(s: &Surface, lighting: &Lighting, fabric: Option<(Rgb, Weave)>) -> Light {
     let (w, h) = (s.width as usize, s.height as usize);
-    let l = lighting.vector();
-    let k = lighting.strength.clamp(0.0, 1.0);
-    let same_light = lighting.azimuth_deg == s.light.azimuth_deg && lighting.elevation_deg == s.light.elevation_deg;
-    let top = f64::from(s.max_height());
-    // The mean highlight over all directions, for each kind.
-    let means: Vec<f64> = ThreadKind::ALL.iter().map(|&kd| mean_lobe(l, sheen_of(kd).1)).collect();
-    let twist = math::to_radians(TWIST_DEG);
+    let lit = Lit::new(s, lighting);
     let mut rgba = vec![[0.0f32; 4]; w * h];
     let rows_per = h
         .div_ceil(std::thread::available_parallelism().map_or(1, usize::from))
         .max(1);
     std::thread::scope(|scope| {
         for (band, chunk) in rgba.chunks_mut(rows_per * w).enumerate() {
-            let means = &means;
+            let lit = &lit;
             scope.spawn(move || {
                 for (r, row) in chunk.chunks_mut(w).enumerate() {
                     let y = band * rows_per + r;
                     for (x, px) in row.iter_mut().enumerate() {
-                        let (t, i) = s.at(x as u32, y as u32);
-                        let open = f64::from(t.open[i]) / 255.0;
-                        let dark = if k > 0.0 {
-                            shadow(s, x as i64, y as i64, lighting, top)
-                        } else {
-                            0.0
-                        };
-                        let shade = 1.0 + (open * (1.0 - SHADOW_DARK * dark) - 1.0) * k;
-                        let fabric_shade = if same_light {
-                            1.0 + (f64::from(t.fabric_shade[i]) / 255.0 - 1.0) * k
-                        } else {
-                            shade
-                        };
+                        let p = lit.at(x, y);
                         let under = fabric.map(|(c, weave)| {
-                            let v = fabric_mean(s, weave, x, y) * fabric_shade;
+                            let v = fabric_mean(s, weave, x, y) * p.fabric;
                             [c.0, c.1, c.2].map(|c| to_linear(c) * v)
                         });
-                        let cover = f64::from(t.cover[i]) / 255.0;
-                        if cover <= 0.0 {
-                            *px = match under {
-                                Some(u) => [u[0] as f32, u[1] as f32, u[2] as f32, 1.0],
-                                None => [0.0; 4],
-                            };
-                            continue;
-                        }
-                        // Diffuse light from the mean normal, the plies, the
-                        // gaps and the shadow.
-                        let ply = f64::from(t.ply[i]) / 127.0;
-                        let lit = if same_light {
-                            f64::from(t.diffuse[i]) / 255.0 * 2.0
-                        } else {
-                            diffuse(t.normal[i].map(|v| f64::from(v) / 127.0), l)
-                        };
-                        let factor = lit * (1.0 + PLY_LIGHT * ply);
-                        let factor = 1.0 + (factor - 1.0) * k;
-                        let base = t.color[i].map(to_linear);
-                        let mut c = base.map(|v| v * factor * shade);
-                        // The sheen of the fibers (a piece of fabric has the
-                        // diffuse light only).
-                        if let Some(kind) = kind_of(t.material[i]) {
-                            let (strength, sharp) = sheen_of(kind);
-                            let a = t.axis[i].map(|v| f64::from(v) / 127.0);
-                            let one = (a[0] * a[0] + a[1] * a[1]).sqrt().min(1.0);
-                            let angle = math::atan2(a[1], a[0]) / 2.0 + twist;
-                            let mean = means[ThreadKind::ALL.iter().position(|x| *x == kind).unwrap_or(0)];
-                            let hl = one * lobe(angle, l, sharp) + (1.0 - one) * mean;
-                            let hl = strength * hl * (0.6 + 0.4 * ply) * shade * k;
-                            // Metallic thread reflects in its own color.
-                            let tint = if kind == ThreadKind::Metallic {
-                                base.map(|v| 0.5 + 0.5 * v)
-                            } else {
-                                [1.0; 3]
-                            };
-                            for (ch, tn) in c.iter_mut().zip(tint) {
-                                *ch += hl * tn;
-                            }
-                        }
-                        *px = match under {
-                            Some(u) => {
-                                let m = |j: usize| (c[j] * cover + u[j] * (1.0 - cover)) as f32;
+                        *px = match (p.thread, under) {
+                            (None, Some(u)) => [u[0] as f32, u[1] as f32, u[2] as f32, 1.0],
+                            (None, None) => [0.0; 4],
+                            (Some(c), Some(u)) => {
+                                let m = |j: usize| (c[j] * p.cover + u[j] * (1.0 - p.cover)) as f32;
                                 [m(0), m(1), m(2), 1.0]
                             }
-                            None => [c[0] as f32, c[1] as f32, c[2] as f32, cover as f32],
+                            (Some(c), None) => [c[0] as f32, c[1] as f32, c[2] as f32, p.cover as f32],
                         };
                     }
                 }
@@ -308,6 +263,144 @@ pub fn light_values(s: &Surface, lighting: &Lighting, fabric: Option<(Rgb, Weave
         width: s.width,
         height: s.height,
         rgba,
+    }
+}
+
+/// The picture of a surface to put over a fabric (the tiles of the canvas,
+/// ADR 0126), on this processor: the threads in the part of each pixel
+/// that they cover, and a dark layer that gives the fabric under them its
+/// gaps and its shadows. The colors are those of the screen, with the
+/// alpha multiplied in (premultiplied).
+pub fn overlay(s: &Surface, lighting: &Lighting) -> Picture {
+    let lit = Lit::new(s, lighting);
+    let (w, h) = (s.width as usize, s.height as usize);
+    let mut rgba = Vec::with_capacity(w * h * 4);
+    for y in 0..h {
+        for x in 0..w {
+            let p = lit.at(x, y);
+            // The light of the fabric as a factor of the colors of the
+            // screen (the screen mixes in its colors).
+            let keep = (1.0 - p.cover) * math::pow(p.fabric.clamp(0.0, 1.0), 1.0 / 2.2);
+            let alpha = 1.0 - keep;
+            let c = match p.thread {
+                Some(c) => tone(c).map(|v| f64::from(to_srgb(v)) * p.cover),
+                None => [0.0; 3],
+            };
+            rgba.extend_from_slice(&[
+                c[0].round().min(255.0) as u8,
+                c[1].round().min(255.0) as u8,
+                c[2].round().min(255.0) as u8,
+                (alpha * 255.0).round().clamp(0.0, 255.0) as u8,
+            ]);
+        }
+    }
+    Picture {
+        width: s.width,
+        height: s.height,
+        rgba,
+    }
+}
+
+/// The light of one pixel.
+struct Pixel {
+    /// The color of the threads (linear light, before the tone curve), if
+    /// threads or pieces cover a part of it.
+    thread: Option<[f64; 3]>,
+    /// The part that they cover.
+    cover: f64,
+    /// The light of the fabric under them: its gaps and its shadow.
+    fabric: f64,
+}
+
+/// The light of the pixels of a surface (see the module text).
+struct Lit<'a> {
+    s: &'a Surface,
+    lighting: &'a Lighting,
+    l: [f64; 3],
+    k: f64,
+    same_light: bool,
+    top: f64,
+    /// The mean highlight over all directions, for each kind.
+    means: Vec<f64>,
+    twist: f64,
+}
+
+impl<'a> Lit<'a> {
+    fn new(s: &'a Surface, lighting: &'a Lighting) -> Lit<'a> {
+        let l = lighting.vector();
+        Lit {
+            s,
+            lighting,
+            l,
+            k: lighting.strength.clamp(0.0, 1.0),
+            same_light: lighting.azimuth_deg == s.light.azimuth_deg && lighting.elevation_deg == s.light.elevation_deg,
+            top: f64::from(s.max_height()),
+            means: ThreadKind::ALL.iter().map(|&kd| mean_lobe(l, sheen_of(kd).1)).collect(),
+            twist: math::to_radians(TWIST_DEG),
+        }
+    }
+
+    /// The light of the pixel (`x`, `y`).
+    fn at(&self, x: usize, y: usize) -> Pixel {
+        let (s, k, l) = (self.s, self.k, self.l);
+        let (t, i) = s.at(x as u32, y as u32);
+        let open = f64::from(t.open[i]) / 255.0;
+        let dark = if k > 0.0 {
+            shadow(s, x as i64, y as i64, self.lighting, l, self.top)
+        } else {
+            0.0
+        };
+        let shade = 1.0 + (open * (1.0 - SHADOW_DARK * dark) - 1.0) * k;
+        let fabric = if self.same_light {
+            1.0 + (f64::from(t.fabric_shade[i]) / 255.0 - 1.0) * k
+        } else {
+            shade
+        };
+        let cover = f64::from(t.cover[i]) / 255.0;
+        if cover <= 0.0 {
+            return Pixel {
+                thread: None,
+                cover: 0.0,
+                fabric,
+            };
+        }
+        // Diffuse light from the mean normal, the plies, the gaps and the
+        // shadow.
+        let ply = f64::from(t.ply[i]) / 127.0;
+        let lit = if self.same_light {
+            f64::from(t.diffuse[i]) / 255.0 * 2.0
+        } else {
+            diffuse(t.normal[i].map(|v| f64::from(v) / 127.0), l)
+        };
+        let factor = lit * (1.0 + PLY_LIGHT * ply);
+        let factor = 1.0 + (factor - 1.0) * k;
+        let base = t.color[i].map(to_linear);
+        let mut c = base.map(|v| v * factor * shade);
+        // The sheen of the fibers (a piece of fabric has the diffuse light
+        // only).
+        if let Some(kind) = kind_of(t.material[i]) {
+            let (strength, sharp) = sheen_of(kind);
+            let a = t.axis[i].map(|v| f64::from(v) / 127.0);
+            let one = (a[0] * a[0] + a[1] * a[1]).sqrt().min(1.0);
+            let angle = math::atan2(a[1], a[0]) / 2.0 + self.twist;
+            let mean = self.means[ThreadKind::ALL.iter().position(|x| *x == kind).unwrap_or(0)];
+            let hl = one * lobe(angle, l, sharp) + (1.0 - one) * mean;
+            let hl = strength * hl * (0.6 + 0.4 * ply) * shade * k;
+            // Metallic thread reflects in its own color.
+            let tint = if kind == ThreadKind::Metallic {
+                base.map(|v| 0.5 + 0.5 * v)
+            } else {
+                [1.0; 3]
+            };
+            for (ch, tn) in c.iter_mut().zip(tint) {
+                *ch += hl * tn;
+            }
+        }
+        Pixel {
+            thread: Some(c),
+            cover,
+            fabric,
+        }
     }
 }
 
@@ -327,6 +420,7 @@ mod tests {
             kind,
             weight: 40,
             lift_mm: 0.0,
+            record: 0,
         }
     }
 
@@ -392,6 +486,7 @@ mod tests {
         // light at the top left), as long as it is high.
         let s = Strand {
             lift_mm: crate::strand::FOAM_MM,
+            record: 0,
             ..strand((0.0, 0.0), (10.0, 0.0), ThreadKind::Polyester)
         };
         let p = picture(&[s], BBox::new(Point::new(-2.0, -4.0), Point::new(12.0, 4.0)), 16.0);

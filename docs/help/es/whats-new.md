@@ -96,6 +96,14 @@ hilo mate sin brillo. Un hilo de una carta da su tipo cuando el nombre de
 la carta lo indica. En las imágenes del diseño, los colores de los bordes
 de los hilos se mezclan ahora como la luz. Consulte [Colores e hilos](colors-and-threads).
 
+**Un nuevo aspecto de hilo 3D.** El aspecto de hilo 3D del lienzo muestra
+la superficie de las puntadas: el hilo sobre hilo es más alto, una zona es
+más clara o más oscura según la dirección de sus puntadas respecto a la
+luz, los hilos brillan según su tipo y las partes altas proyectan sombras
+sobre la tela. Los diseños grandes también se mueven y se amplían más
+rápido. **Ver > Aspecto de hilo > Superficie fina** lo desactiva en un
+equipo lento. Consulte [Comprobar un diseño](checking).
+
 **Diseños con muchísimas puntadas.** El programa podía cerrarse cuando el
 lienzo mostraba unas 350 000 puntadas o más a la vez con el aspecto de
 hilo. Ahora el lienzo las muestra con un aspecto más simple con ese zoom,

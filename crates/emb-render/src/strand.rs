@@ -27,6 +27,9 @@ pub struct Strand {
     pub weight: u16,
     /// The foam under the stitch (puff), mm; 0 for none.
     pub lift_mm: f64,
+    /// The record of the plan at the end of the stitch: the stitch player
+    /// shows the stitch from this record on.
+    pub record: u32,
 }
 
 /// The stitches of `design` in sew order (jumps and the movements after a
@@ -54,6 +57,7 @@ pub fn strands(design: &StitchDesign, lifts: &[(Range<usize>, f64)]) -> Vec<Stra
                         kind: t.map_or(ThreadKind::default(), |t| t.kind),
                         weight: t.map_or(emb_model::thread::DEFAULT_WEIGHT, |t| t.weight),
                         lift_mm: lifts.iter().find(|(range, _)| range.contains(&i)).map_or(0.0, |l| l.1),
+                        record: i as u32,
                     });
                 }
                 if r.kind == StitchKind::Stitch {
@@ -136,5 +140,6 @@ mod tests {
         );
         assert_eq!((s[2].color, s[2].lift_mm), (Rgb(9, 9, 9), 2.0));
         assert_eq!(s[0].lift_mm, 0.0);
+        assert_eq!((s[0].record, s[1].record, s[2].record), (1, 2, 7));
     }
 }

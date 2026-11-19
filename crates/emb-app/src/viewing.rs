@@ -196,10 +196,17 @@ impl AppState {
 pub fn visible_segments(st: &mut AppState) -> Arc<Vec<(Segment, Color32)>> {
     let pv = st.shown_plan();
     let segs = pv.segments.clone();
-    let plan = pv.plan.clone();
     if !st.view_filter.is_active() && st.cursor.is_none() {
         return segs;
     }
+    Arc::new(segments_where(st, 0, None))
+}
+
+/// As [`visible_segments`], only the records from `from` on, and only those
+/// of the objects `only` if it is given (the stitches that show as today
+/// over the tiles of the canvas, ADR 0126).
+pub fn segments_where(st: &mut AppState, from: usize, only: Option<&[ObjectId]>) -> Vec<(Segment, Color32)> {
+    let plan = st.shown_plan().plan.clone();
     let back = st.doc.design().from_hoop_transform();
     // Whether each record shows: the records of an object if the filter
     // shows the object, the connections between objects if no filter is on.
@@ -210,15 +217,17 @@ pub fn visible_segments(st: &mut AppState) -> Arc<Vec<(Segment, Color32)>> {
         .design()
         .objects()
         .iter()
-        .map(|o| (o.id, filter.shows(o)))
+        .map(|o| (o.id, filter.shows(o) && only.is_none_or(|ids| ids.contains(&o.id))))
         .collect();
-    let mut show = vec![!filter.is_active(); plan.stitches.records.len()];
+    let mut show = vec![!filter.is_active() && only.is_none(); plan.stitches.records.len()];
     for s in &plan.spans {
-        let v = objects.get(&s.object).copied().unwrap_or(true);
+        let v = objects.get(&s.object).copied().unwrap_or(only.is_none());
         show[s.records.clone()].fill(v);
     }
+    let n = show.len();
+    show[..from.min(n)].fill(false);
     let cursor = st.cursor.unwrap_or(usize::MAX);
-    let mut out = Vec::with_capacity(segs.len());
+    let mut out = Vec::with_capacity(n);
     let mut thread = 0usize;
     let mut last: Option<Point> = None;
     let mut cut = false;
@@ -269,7 +278,7 @@ pub fn visible_segments(st: &mut AppState) -> Arc<Vec<(Segment, Color32)>> {
             StitchKind::Stop | StitchKind::End => {}
         }
     }
-    Arc::new(out)
+    out
 }
 
 /// Draws the stitch cursor, needle points and function symbols.

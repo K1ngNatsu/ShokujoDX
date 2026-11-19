@@ -92,6 +92,14 @@ matte thread with no shine. A chart thread gives its kind when the name
 of the chart tells it. In the design pictures, the colors at the edges of
 the threads now mix as light does. See [Colors and threads](colors-and-threads).
 
+**A new 3D thread look.** The 3D thread look of the canvas shows the
+surface of the stitches: thread on thread is higher, an area is lighter or
+darker by the direction of its stitches to the light, threads shine by
+their kind, and high parts put shadows on the fabric. It also shows large
+designs faster when you move and zoom the view. **View > Thread Look >
+Fine surface** turns it off on a slow computer. See [Checking a
+design](checking).
+
 **Designs with very many stitches.** The program could stop when the
 canvas showed about 350,000 stitches or more at one time in the thread
 look. Now the canvas shows them in a simpler look at that zoom, and in

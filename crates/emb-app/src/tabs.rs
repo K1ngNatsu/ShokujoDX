@@ -167,6 +167,8 @@ impl AppState {
     /// The last tab gets a new empty design.
     pub fn close_tab(&mut self) {
         self.backups_forget(self.doc_id);
+        // The lay and the tiles of its 3D thread look go.
+        self.stitch_tiles.forget(self.doc_id);
         if self.tabs.len() == 1 {
             let mut d = Design::new("Untitled");
             d.machine = self.doc.design().machine.clone();

@@ -1,5 +1,7 @@
 //! `--view-bench` (P18 view plan, Milestone 1, ADR 0122): how fast the
-//! canvas of today draws large designs with the renderer of this computer.
+//! canvas of today draws large designs with the renderer of this computer,
+//! and the canvas on tiles (Milestone 5, ADR 0126): the time of its first
+//! full view, then its frames while the view moves.
 //!
 //! The program opens a window of its own, not the main window: it reads
 //! and writes no settings, makes no backups and opens no design. The
@@ -24,6 +26,7 @@ use emb_render::Segment;
 
 use crate::canvas::{CanvasView, MeshLook, color32, fitted_mesh};
 use crate::startup::Renderer;
+use crate::stitch_tiles::{Scene, TileCache};
 
 /// The segments of a design with their colors on the screen.
 type Segments = Vec<(Segment, Color32)>;
@@ -37,21 +40,46 @@ const WARM_UP: usize = 5;
 /// The size of the window, in points.
 const WINDOW: [f32; 2] = [1280.0, 720.0];
 
-/// The meshes of the canvas that the bench measures.
-const LOOKS: [MeshLook; 3] = [MeshLook::Stitches, MeshLook::Thread, MeshLook::Thread3d];
+/// A look of the canvas that the bench measures.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Look {
+    /// The meshes of today.
+    Mesh(MeshLook),
+    /// The surface on tiles (ADR 0126).
+    Surface,
+}
 
-fn name(look: MeshLook) -> &'static str {
+/// The looks of the canvas that the bench measures.
+const LOOKS: [Look; 4] = [
+    Look::Mesh(MeshLook::Stitches),
+    Look::Mesh(MeshLook::Thread),
+    Look::Mesh(MeshLook::Thread3d),
+    Look::Surface,
+];
+
+fn name(look: Look) -> &'static str {
     match look {
-        MeshLook::Stitches => "stitches",
-        MeshLook::Thread => "thread look",
-        MeshLook::Thread3d => "3D thread look",
+        Look::Mesh(MeshLook::Stitches) => "stitches",
+        Look::Mesh(MeshLook::Thread) => "thread look",
+        Look::Mesh(MeshLook::Thread3d) => "3D thread look",
+        Look::Surface => "surface (tiles)",
     }
+}
+
+fn mesh_name(look: MeshLook) -> &'static str {
+    name(Look::Mesh(look))
 }
 
 /// The result of one case.
 struct Row {
     stitches: usize,
-    look: MeshLook,
+    look: Look,
+    /// The surface: the time until all tiles of the first view showed, ms,
+    /// and the part of the frames that had all their tiles.
+    first_ms: Option<f64>,
+    complete: Option<f64>,
+    /// The surface: its tiles at the end (number, level, memory).
+    tiles: Option<(usize, i32, usize)>,
     /// The lightest look that a frame used, if it is not `look`
     /// (`canvas::fitted_mesh`).
     drawn: Option<MeshLook>,
@@ -67,11 +95,22 @@ struct Bench {
     renderer: Renderer,
     /// The report file of `--view-bench=<file>`.
     out: Option<PathBuf>,
-    cases: Vec<(usize, MeshLook)>,
+    cases: Vec<(usize, Look)>,
     case: usize,
     /// The segments of the design of the case: the number of stitches
     /// asked for, the number made, and the segments.
     segments: Option<(usize, usize, Segments)>,
+    /// The stitch plan of the design of the case (for the surface).
+    plan: Option<std::sync::Arc<emb_stitch::StitchPlan>>,
+    design: emb_model::Design,
+    /// The tiles of the surface case, the start of the case, the time of
+    /// its first full view and the frames with all tiles.
+    tiles: TileCache,
+    case_start: Option<Instant>,
+    first_ms: Option<f64>,
+    complete: usize,
+    /// The level of the tiles of the first view.
+    level: i32,
     table: emb_render::thread3d::ShadeTable,
     /// The start of the counted frames of the case, and the frames so far.
     start: Option<Instant>,
@@ -121,6 +160,13 @@ pub fn run(renderer: Renderer, out: Option<PathBuf>) -> eframe::Result {
             .collect(),
         case: 0,
         segments: None,
+        plan: None,
+        design: emb_model::Design::new("view bench"),
+        tiles: TileCache::default(),
+        case_start: None,
+        first_ms: None,
+        complete: 0,
+        level: 0,
         table: emb_render::thread3d::ShadeTable::new(Default::default()),
         start: None,
         frames: 0,
@@ -152,16 +198,20 @@ impl eframe::App for Bench {
             return;
         };
         if self.segments.as_ref().is_none_or(|(m, _, _)| *m != n) {
-            let design = emb_render::stress::make(n);
-            let segs = emb_render::segments(&design)
+            let plan = crate::stitch_tiles::stress_plan(n);
+            let segs = emb_render::segments(&plan.stitches)
                 .into_iter()
                 .map(|s| (s, color32(s.color)))
                 .collect();
-            self.segments = Some((n, design.stitch_count(), segs));
+            self.segments = Some((n, plan.stitches.stitch_count(), segs));
+            self.plan = Some(std::sync::Arc::new(plan));
             self.last = None;
         }
         let now = Instant::now();
-        if let Some(last) = self.last {
+        let start = *self.case_start.get_or_insert(now);
+        // The surface: the frames count from its first full view.
+        let counting = look != Look::Surface || self.first_ms.is_some();
+        if counting && let Some(last) = self.last {
             self.frames += 1;
             if self.frames == WARM_UP {
                 self.start = Some(now);
@@ -185,18 +235,60 @@ impl eframe::App for Bench {
         let (s, c) = emb_geom::math::sin_cos_deg(360.0 * t);
         view.zoom *= 1.0 + 1.5 * (1.0 - c);
         view.center = emb_geom::Point::new(view.center.x + 20.0 * s, view.center.y + 20.0 * (1.0 - c));
+        ui.painter().rect_filled(rect, 0.0, Color32::from_rgb(238, 234, 226));
         let t0 = Instant::now();
-        let (mesh, drawn) = fitted_mesh(rect, &view, segs, false, look, &self.table);
-        if self.frames > WARM_UP {
-            self.mesh_ms += t0.elapsed().as_secs_f64() * 1000.0;
-            self.triangles = self.triangles.max(mesh.indices.len() / 3);
-            if drawn != look && self.drawn.is_none_or(|d| d != MeshLook::Stitches) {
-                self.drawn = Some(drawn);
+        match look {
+            Look::Mesh(mesh_look) => {
+                let (mesh, drawn) = fitted_mesh(rect, &view, segs, false, mesh_look, &self.table);
+                if self.frames > WARM_UP {
+                    self.mesh_ms += t0.elapsed().as_secs_f64() * 1000.0;
+                    self.triangles = self.triangles.max(mesh.indices.len() / 3);
+                    if drawn != mesh_look && self.drawn.is_none_or(|d| d != MeshLook::Stitches) {
+                        self.drawn = Some(drawn);
+                    }
+                }
+                ui.painter().add(Shape::mesh(mesh));
+            }
+            Look::Surface => {
+                let plan = self.plan.clone().expect("made above");
+                let filter = crate::viewing::ViewFilter::default();
+                let scene = Scene {
+                    doc: n as u64,
+                    state: 1,
+                    plan: &plan,
+                    design: &self.design,
+                    lighting: Default::default(),
+                    filter: &filter,
+                    cursor: None,
+                    moving: &[],
+                };
+                let frame = self.tiles.draw(&ctx, rect, &view, &scene);
+                let complete = frame.as_ref().is_some_and(|f| f.complete);
+                let level = frame.as_ref().map_or(0, |f| f.level);
+                let missing = frame
+                    .as_ref()
+                    .map_or(Some(rect), |f| f.missing.iter().copied().reduce(|a, b| a.union(b)));
+                if let Some(clip) = missing {
+                    let (mesh, _) = fitted_mesh(rect, &view, segs, false, MeshLook::Thread3d, &self.table);
+                    ui.painter().with_clip_rect(clip.intersect(rect)).add(Shape::mesh(mesh));
+                }
+                if let Some(f) = frame {
+                    ui.painter().extend(f.shapes);
+                }
+                if self.frames > WARM_UP {
+                    self.mesh_ms += t0.elapsed().as_secs_f64() * 1000.0;
+                    self.complete += usize::from(complete);
+                }
+                if self.first_ms.is_none() && complete {
+                    // The first full view: from here the view moves and the
+                    // frames count.
+                    self.first_ms = Some((now - start).as_secs_f64() * 1000.0);
+                    self.level = level;
+                    (self.frames, self.start, self.last) = (0, None, None);
+                }
             }
         }
-        ui.painter().rect_filled(rect, 0.0, Color32::from_rgb(238, 234, 226));
-        ui.painter().add(Shape::mesh(mesh));
-        if self.start.is_some_and(|s| now - s >= DURATION) {
+        if self.start.is_some_and(|s| now - s >= DURATION) || now - start > 4 * DURATION {
             self.next_case(made, look, now);
         }
         ctx.request_repaint();
@@ -204,13 +296,17 @@ impl eframe::App for Bench {
 }
 
 impl Bench {
-    fn next_case(&mut self, stitches: usize, look: MeshLook, now: Instant) {
+    fn next_case(&mut self, stitches: usize, look: Look, now: Instant) {
         let mut frame_ms = std::mem::take(&mut self.frame_ms);
         frame_ms.sort_by(f64::total_cmp);
         let counted = frame_ms.len();
+        let surface = look == Look::Surface;
         self.rows.push(Row {
             stitches,
             look,
+            first_ms: if surface { self.first_ms } else { None },
+            complete: surface.then(|| self.complete as f64 / counted.max(1) as f64),
+            tiles: surface.then(|| (self.tiles.len(), self.level, self.tiles.bytes())),
             drawn: self.drawn.take(),
             frames: counted,
             seconds: self.start.map_or(0.0, |s| (now - s).as_secs_f64()),
@@ -220,6 +316,8 @@ impl Bench {
         });
         self.case += 1;
         (self.frames, self.start, self.last, self.mesh_ms, self.triangles) = (0, None, None, 0.0, 0);
+        (self.case_start, self.first_ms, self.complete) = (None, None, 0);
+        self.tiles = TileCache::default();
     }
 
     /// The report: the computer, the renderer and a line for each case.
@@ -253,9 +351,21 @@ impl Bench {
                     .get(((r.frame_ms.len() as f64 - 1.0) * q).round() as usize)
                     .copied()
             };
-            let note = r.drawn.map_or(String::new(), |d| {
-                format!("too large: some frames drawn as {}", name(d))
-            });
+            let note = match (r.first_ms, r.complete) {
+                (Some(first), Some(c)) => {
+                    let (n, level, bytes) = r.tiles.unwrap_or_default();
+                    format!(
+                        "first full view {first:.0} ms (level {level}); {:.0} % of the frames with all tiles; \
+                         {n} tiles, {} MB",
+                        100.0 * c,
+                        bytes >> 20
+                    )
+                }
+                (None, Some(_)) => "no full view in the time".to_string(),
+                _ => r.drawn.map_or(String::new(), |d| {
+                    format!("too large: some frames drawn as {}", mesh_name(d))
+                }),
+            };
             let _ = writeln!(
                 text,
                 "{:>9}  {:<15} {:>9.1} {:>11.2} {:>11.2} {:>9.2} {:>10}  {note}",
@@ -270,7 +380,8 @@ impl Bench {
         }
         let _ = writeln!(
             text,
-            "\nslow ms: 95 % of the frames are faster. mesh ms: the mean time to make the mesh of a frame.\n\
+            "\nslow ms: 95 % of the frames are faster. mesh ms: the mean time to make the mesh of a frame\n\
+             (for the surface: to find and draw the tiles, and the look of today where a tile is not there).\n\
              A mesh of more than {} vertices gets a lighter look (canvas::fitted_mesh).",
             crate::canvas::MAX_MESH_VERTICES
         );
@@ -317,14 +428,14 @@ mod tests {
 
     #[test]
     fn each_design_size_has_each_look() {
-        let cases: Vec<(usize, MeshLook)> = STITCHES
+        let cases: Vec<(usize, Look)> = STITCHES
             .iter()
             .flat_map(|&n| LOOKS.into_iter().map(move |l| (n, l)))
             .collect();
-        assert_eq!(cases.len(), 9);
-        assert_eq!(cases[8], (1_000_000, MeshLook::Thread3d));
+        assert_eq!(cases.len(), 12);
+        assert_eq!(cases[11], (1_000_000, Look::Surface));
         let names: std::collections::BTreeSet<&str> = LOOKS.iter().map(|&l| name(l)).collect();
-        assert_eq!(names.len(), 3);
+        assert_eq!(names.len(), 4);
     }
 
     #[test]

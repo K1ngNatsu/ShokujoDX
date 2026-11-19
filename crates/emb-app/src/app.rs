@@ -117,6 +117,9 @@ pub struct AppState {
     pub stitch_cache: emb_stitch::StitchCache,
     /// The stitch plan of the current design state.
     pub plan_view: Option<crate::preview::PlanView>,
+    /// The tiles of the 3D thread look of all open designs (P18 view,
+    /// Milestone 5, ADR 0126).
+    pub stitch_tiles: crate::stitch_tiles::TileCache,
     /// The plan is older than the design (a slow plan during a drag): the
     /// canvas asks for another frame soon.
     pub plan_waits: bool,
@@ -675,6 +678,7 @@ impl AppState {
             draw: DrawState::default(),
             stitch_cache: emb_stitch::StitchCache::default(),
             plan_view: None,
+            stitch_tiles: Default::default(),
             plan_waits: false,
             plan_change: (0, std::time::Instant::now()),
             show_plan: true,

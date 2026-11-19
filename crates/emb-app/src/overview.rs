@@ -42,8 +42,27 @@ pub fn contents(ui: &mut egui::Ui, st: &mut AppState) {
     painter.rect_filled(rect, 2.0, ui.visuals().extreme_bg_color);
     let view = overview_view(st, rect);
     let segs = st.shown_plan().segments.clone();
-    let (mesh, _) = stitch_mesh(rect, &view, &segs, false);
-    painter.with_clip_rect(rect).add(Shape::mesh(mesh));
+    let look = st.settings.look;
+    // The tiles of the 3D thread look (ADR 0126), else the stitches.
+    let tiles = if st.show_thread_look && look.three_d && look.surface {
+        crate::stitch_tiles::tiles_of(ui.ctx(), rect, &view, st)
+    } else {
+        None
+    };
+    let clip = painter.with_clip_rect(rect);
+    match tiles {
+        Some(frame) => {
+            if let Some(missing) = frame.missing.iter().copied().reduce(|a, b| a.union(b)) {
+                let (mesh, _) = stitch_mesh(rect, &view, &segs, false);
+                clip.with_clip_rect(missing.intersect(rect)).add(Shape::mesh(mesh));
+            }
+            clip.extend(frame.shapes);
+        }
+        None => {
+            let (mesh, _) = stitch_mesh(rect, &view, &segs, false);
+            clip.add(Shape::mesh(mesh));
+        }
+    }
 
     // The hoop field.
     if let Some(field) = st.hoop_outline(0.0) {

@@ -10,7 +10,9 @@ sew-out of the reference set and the numbers of a small computer
 (`docs/design/p18-view-m2-report.md`, ADR 0123). Milestone 3 is done
 (`docs/design/p18-view-m3-report.md`, ADR 0124). Milestone 4 is done
 except the compare with the photos (`docs/design/p18-view-m4-report.md`,
-ADR 0125).
+ADR 0125). Milestone 5 is done; three of its budgets are not met and the
+numbers of a small computer are open (`docs/design/p18-view-m5-report.md`,
+ADR 0126).
 
 ## Goal
 
@@ -342,6 +344,19 @@ view and a change of one object, on the development computer and on the
 small computer of Milestone 1 (with its budgets); the smoke test of
 each corpus design passes with the new view; no picture of the canvas
 shows a missing tile after the work is done.
+
+**Done (2026-11-19, ADR 0126), with three budgets not met and the small
+computer open.** `emb-app/src/stitch_tiles.rs` keeps the tiles of all
+designs and views (256 MB); threads lay each plan (`surface::relay` after
+a change: only the stitches that the change reaches) and make the tiles
+(`Laid::block`, the same pixels in each block). A change makes again only
+the part of a tile that it reaches. All 80 corpus designs show all their
+tiles at three zooms (test). With the graphics card the canvas moves
+787,408 stitches at 122 frames in a second (24.5 with the meshes). The
+first full view of 100,000 stitches takes 0.39 s (budget 0.3 s), a change
+of one object in 200,000 stitches 0.13 s (budget 0.1 s), a change of the
+light 0.24 s (budget 0.1 s); the canvas shows the look of today or the
+tiles before until then (`docs/design/p18-view-m5-report.md`).
 
 ## Milestone 6: the fabric (M)
 

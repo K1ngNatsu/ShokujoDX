@@ -85,6 +85,10 @@ pub struct LookSettings {
     pub light: emb_render::thread3d::Lighting,
     /// The texture of the fabric under the background color.
     pub fabric: bool,
+    /// The 3D thread look shows the surface of the stitches on tiles (their
+    /// heights, the sheen of the thread and the shadows; P18 view, ADR
+    /// 0126). Else it shows the faster look of the stitches one by one.
+    pub surface: bool,
 }
 
 impl Default for LookSettings {
@@ -93,6 +97,9 @@ impl Default for LookSettings {
             three_d: true,
             light: Default::default(),
             fabric: true,
+            // The tests of the program draw the faster look, unless they
+            // ask for the surface.
+            surface: !cfg!(test),
         }
     }
 }
@@ -337,6 +344,9 @@ pub fn look_ui(ui: &mut egui::Ui, st: &mut AppState) {
                 );
                 ui.end_row();
             });
+            ui.checkbox(&mut l.surface, tr("Fine surface")).on_hover_text(tr(
+                "Shows the surface of the stitches: their heights, the sheen of the thread and the shadows. Clear it on a slow computer for the faster look.",
+            ));
             ui.checkbox(&mut l.fabric, tr("Fabric texture")).on_hover_text(tr(
                 "The weave of the fabric of the design under the background color (Color tab).",
             ));

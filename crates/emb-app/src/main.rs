@@ -98,6 +98,7 @@ mod sketch;
 mod smoke;
 mod start;
 mod startup;
+mod stitch_tiles;
 mod stitch_types;
 mod stock;
 mod styles;

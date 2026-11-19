@@ -399,8 +399,20 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
             MeshLook::Thread
         };
         let table = emb_render::thread3d::ShadeTable::new(st.settings.look.light);
-        let mesh = fitted_mesh(rect, &st.view, &segs, st.show_jumps, look, &table).0;
-        painter.add(Shape::mesh(mesh));
+        // The surface on tiles (ADR 0126), else the meshes of the stitches.
+        let tiles = if look == MeshLook::Thread3d && st.settings.look.surface {
+            let view = st.view;
+            crate::stitch_tiles::tiles_of(ui.ctx(), rect, &view, st)
+        } else {
+            None
+        };
+        match tiles {
+            Some(frame) => crate::stitch_tiles::paint(&painter, rect, st, frame, &segs, look, &table),
+            None => {
+                let mesh = fitted_mesh(rect, &st.view, &segs, st.show_jumps, look, &table).0;
+                painter.add(Shape::mesh(mesh));
+            }
+        }
         if st.show_density {
             crate::density::draw(&painter, ui.ctx(), rect, st);
         }

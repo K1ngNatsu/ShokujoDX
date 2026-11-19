@@ -157,6 +157,9 @@ fn canvas_keeps_its_size_while_an_object_moves_with_the_player_open() {
 #[test]
 fn every_panel_draws_each_corpus_design_with_no_edit() {
     let mut h = Harness::empty();
+    // With the surface of the 3D thread look (ADR 0126) and its threads.
+    h.st.settings.look.surface = true;
+    h.st.show_thread_look = true;
     open_windows(&mut h.st);
     for name in emb_cli::corpus::NAMES {
         let design = emb_cli::corpus::build(name).expect("corpus design");
