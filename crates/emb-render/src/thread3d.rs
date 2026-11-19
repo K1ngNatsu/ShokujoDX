@@ -36,6 +36,9 @@ pub struct Lighting {
     pub elevation_deg: f64,
     /// 0: flat colors; 1: full light and shade.
     pub strength: f64,
+    /// The lights of the room are off (ADR 0128): the surface of the view
+    /// shows only glow thread, in its own light.
+    pub lights_off: bool,
 }
 
 impl Default for Lighting {
@@ -44,6 +47,7 @@ impl Default for Lighting {
             azimuth_deg: 135.0,
             elevation_deg: 45.0,
             strength: 1.0,
+            lights_off: false,
         }
     }
 }

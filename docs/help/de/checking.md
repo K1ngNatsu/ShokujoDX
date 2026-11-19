@@ -98,6 +98,13 @@ oder dunkler nach der Richtung ihrer Stiche zum Licht, und hohe Teile
 werfen Schatten auf den Stoff. Jedes Nadelloch ist eine kleine Delle
 (größer auf Leder). Auf einem Handtuch oder Fleece ohne Deckvlies sinken
 dünne Stiche in den Flor (siehe [Stoffe, Stile und Vorlagen](fabrics-and-styles)).
+Was kein Garn ist, hat seine eigene Oberfläche: Applikationsstoff mit
+seiner Webart und einer Schnittkante, Strasssteine mit Facetten, die das
+Licht fangen, die Löcher von Cutwork, kein Stoff unter Spitze, Polster
+unter einer Trapunto-Füllung und auf einem Quilt das Vlies zwischen den
+Stichlinien. Metallgarn hat bei großem Zoom kleine Glanzpunkte. **Licht
+aus** zeigt einen dunklen Raum: Nur nachtleuchtendes Garn ist zu sehen,
+in seinem eigenen Licht.
 Das Programm macht die Oberfläche in
 Teilen, während Sie arbeiten; ein Teil, der noch nicht fertig ist, zeigt
 kurz die schnellere Ansicht. Schalten Sie **Feine Oberfläche** auf einem

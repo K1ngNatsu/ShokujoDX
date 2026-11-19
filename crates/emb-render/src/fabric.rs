@@ -16,6 +16,8 @@
 //! - **Terry**: loops that stand up. **Fleece**: soft hair that stands up.
 //!   **Felt**: pressed fibers.
 //! - **Leather**: a grain of small flat areas between fine creases.
+//! - **Aida**: blocks of threads with a hole at each corner (for cross
+//!   stitch, ADR 0128).
 //! - On a fabric that is not woven, the second color is a part of the
 //!   fibers (a heather).
 //!
@@ -99,6 +101,7 @@ fn params(weave: Weave) -> Params {
         Weave::Fleece => p(1.0, 0.4, 0.3, 0.0),
         Weave::Felt => p(1.0, 0.12, 0.15, 0.0),
         Weave::Leather => p(1.0, 0.25, 0.2, 0.12),
+        Weave::Aida => p(1.0, 0.22, 0.45, 0.0),
     }
 }
 
@@ -136,13 +139,20 @@ impl FabricLook {
     }
 }
 
-/// The fabric under the stitches as the surface needs it: the pile and the
-/// needle holes.
+/// The fabric under the stitches as the surface needs it: the pile, the
+/// needle holes, a fabric that is not there (lace) and the batting of a
+/// quilt.
 #[derive(Debug, Clone)]
 pub struct Ground {
     pub fabric: Arc<Fabric>,
     /// The sew-out has a topping: the stitches stay on top of a pile.
     pub topping: bool,
+    /// Free-standing lace: the stabilizer washes away, so no fabric shows
+    /// and nothing puts a shadow on it (ADR 0128).
+    pub lace: bool,
+    /// The loft of the batting under the fabric (a quilt), mm: the fabric
+    /// is this much higher far from the stitches (ADR 0128).
+    pub loft_mm: f64,
 }
 
 impl Ground {
@@ -150,23 +160,33 @@ impl Ground {
         Ground {
             fabric: Fabric::shared(weave, size_mm),
             topping,
+            lace: false,
+            loft_mm: 0.0,
         }
     }
 
     /// The fabric of `design` (its preset `fabric`): with a topping if the
     /// fabric names one and the design does not say that it has none.
     pub fn of(fabric: &emb_model::Fabric, design: &Design) -> Ground {
-        Ground::new(
-            fabric.weave,
-            fabric.weave_size(),
-            fabric.topping.is_some() && !design.no_topping,
-        )
+        Ground {
+            lace: fabric.is_lace(),
+            loft_mm: fabric.loft_mm.unwrap_or(0.0),
+            ..Ground::new(
+                fabric.weave,
+                fabric.weave_size(),
+                fabric.topping.is_some() && !design.no_topping,
+            )
+        }
     }
 
     /// The same number for the same ground.
     pub fn key(&self) -> u64 {
         let w = Weave::ALL.iter().position(|w| *w == self.fabric.weave).unwrap_or(0) as u64;
-        self.fabric.size_mm.to_bits().rotate_left(7) ^ (w << 1) ^ u64::from(self.topping)
+        self.fabric.size_mm.to_bits().rotate_left(7)
+            ^ (w << 1)
+            ^ u64::from(self.topping)
+            ^ (u64::from(self.lace) << 5)
+            ^ self.loft_mm.to_bits().rotate_left(23)
     }
 
     /// Thin stitches sink into a pile: the fabric has one and no topping.
@@ -366,6 +386,22 @@ fn loops(u: f64, v: f64, r: &Repeat) -> f64 {
     best
 }
 
+/// Aida: a block of threads in each cell (a unit), a groove between two
+/// blocks and a hole where four blocks meet, and the fine threads of each
+/// block.
+fn aida(u: f64, v: f64) -> f64 {
+    let (fu, fv) = (u - u.floor() - 0.5, v - v.floor() - 0.5);
+    let block = |d: f64| {
+        let q = (2.0 * d.abs()).min(1.0);
+        let q2 = q * q;
+        1.0 - q2 * q2 * q2
+    };
+    let (a, b) = (block(fu), block(fv));
+    // Three threads each way in a block, over and under.
+    let fine = tri(3.0 * u) * tri(3.0 * v);
+    0.33 * a + 0.33 * b + 0.26 * a * b + 0.08 * fine
+}
+
 /// Leather: a point in each cell; a fine crease where two points are at the
 /// same distance, and round pebbles between the creases.
 fn grain(u: f64, v: f64, r: &Repeat) -> f64 {
@@ -433,6 +469,10 @@ fn sample(weave: Weave, u: f64, v: f64, r: &Repeat) -> (f64, f64) {
         Weave::Fleece => (0.5 * n(1, 11) + 0.3 * n(3, 12) + 0.2 * n(9, 13), heather(u, v, r)),
         Weave::Felt => (0.4 * n(2, 11) + 0.35 * n(5, 12) + 0.25 * n(12, 13), heather(u, v, r)),
         Weave::Leather => (grain(u, v, r), 0.0),
+        Weave::Aida => (
+            (aida(u, v) + 0.06 * (n(r.fiber, 3) - 0.5)).clamp(0.0, 1.0),
+            heather(u, v, r),
+        ),
     }
 }
 
@@ -618,6 +658,11 @@ impl Fabric {
         a + (b - a) * ty
     }
 
+    /// The height of the relief from its lowest to its highest place, mm.
+    pub fn relief_mm(&self) -> f64 {
+        relief_of(self.weave, self.size_mm)
+    }
+
     /// The height of the pile of this fabric, mm (0: no pile).
     pub fn pile_mm(&self) -> f64 {
         let base = match self.weave {
@@ -638,14 +683,21 @@ impl Fabric {
         }
     }
 
-    /// The light of the fabric in `lighting` (see [`Shade`]).
+    /// The light of the fabric in `lighting` (see [`Shade`]); with the
+    /// lights off, the little light of a dark room
+    /// ([`crate::sheen::LIGHTS_OFF`]).
     pub fn shade(&self, lighting: &Lighting) -> Shade {
         let k = lighting.strength.clamp(0.0, 1.0);
+        let dark = if lighting.lights_off {
+            crate::sheen::LIGHTS_OFF
+        } else {
+            1.0
+        };
         let n = TEXELS;
         let mut a = Vec::with_capacity(n * n);
         let mut b = Vec::with_capacity(n * n);
         for t in &self.texels {
-            let f = 1.0 + (self.light(t, lighting) / self.norm - 1.0) * k;
+            let f = (1.0 + (self.light(t, lighting) / self.norm - 1.0) * k) * dark;
             let m = f64::from(t.mix);
             a.push((f * (1.0 - m)) as f32);
             b.push((f * m) as f32);
@@ -674,6 +726,12 @@ pub fn level_for(repeat_mm: f64, px_per_mm: f64) -> usize {
         level += 1;
     }
     level
+}
+
+/// The height of the relief of `weave` at `size_mm` from its lowest to its
+/// highest place, mm (with no relief made).
+pub fn relief_of(weave: Weave, size_mm: f64) -> f64 {
+    params(weave).depth * size_of(weave, size_mm)
 }
 
 /// One zoom level of a [`Shade`]: `n` × `n` texels.

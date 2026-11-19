@@ -117,6 +117,17 @@ es fest. Ein Stoff kann eine **Zweite Farbe** haben (die hellen Fäden
 eines Denims, die zweite Faser eines Melange-Stoffs). Die Produktansicht
 zeigt denselben Stoff. Siehe [Stoffe, Stile und Vorlagen](fabrics-and-styles).
 
+**Was kein Garn ist, in der 3D-Ansicht.** Applikationsstoff hat die
+Oberfläche seiner Webart (**Stoffoberfläche** im Applikationsfenster) und
+eine Schnittkante, Strasssteine haben Facetten, die das Licht fangen, die
+Löcher von Cutwork zeigen, was hinter dem Stoff ist, Spitze hat keinen
+Stoff, eine Trapunto-Füllung ist über ihrem Polster höher, und auf dem
+neuen Stoff **Quilt** wölbt sich das Vlies zwischen den Stichlinien.
+Kreuzstich hat den neuen Stoff **Aida cloth**. Puff-Säulen sind über
+ihrem Schaumstoff rund. Metallgarn hat bei großem Zoom kleine
+Glanzpunkte, und **Ansicht > Garnansicht > Licht aus** zeigt nur
+nachtleuchtendes Garn. Siehe [Ein Design prüfen](checking).
+
 **Designs mit sehr vielen Stichen.** Das Programm konnte abbrechen, wenn
 die Arbeitsfläche etwa 350.000 Stiche oder mehr auf einmal in der
 Garnansicht zeigte. Jetzt zeigt die Arbeitsfläche sie bei diesem Zoom

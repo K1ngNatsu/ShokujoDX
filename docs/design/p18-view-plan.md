@@ -13,7 +13,9 @@ except the compare with the photos (`docs/design/p18-view-m4-report.md`,
 ADR 0125). Milestone 5 is done, with a speed pass after it; the numbers
 of a small computer are open (`docs/design/p18-view-m5-report.md`, ADR
 0126). Milestone 6 is done except the compare with the photos
-(`docs/design/p18-view-m6-report.md`, ADR 0127).
+(`docs/design/p18-view-m6-report.md`, ADR 0127). Milestone 7 is done
+except the compare with the sew-outs (`docs/design/p18-view-m7-report.md`,
+ADR 0128).
 
 ## Goal
 
@@ -423,6 +425,23 @@ cotton, and a towel with no topping is about 10 % slower
 **Exit test:** one reference design for each item, each with a picture
 at two zooms in the report; the owner compares the ones that have a
 sew-out (appliqué, puff, cross stitch, rhinestones on a transfer).
+
+**Done (2026-11-19, ADR 0128), except the compare with the sew-outs.**
+What is not thread is a piece of the surface (`surface::Piece`, from
+`strand::pieces`): appliqué fabric with the relief of its weave (a setting
+of the object, twill if not set) and a cut edge; rhinestones with a table
+and eight facets, glass in the light (a highlight on a facet that faces
+the light, the foil at the back on the far side); padding under trapunto
+fills (a dome); and holes from the cut lines of cutting needles (joined
+again; they are not thread), which show what is behind the fabric. Lace
+has no fabric. The new fabric `quilt` has a loft: the fabric rises between
+the lines of stitches. Cross stitch has a ninth weave, Aida (the preset
+`aida`). Puff columns are round over their foam. Metallic thread has
+glints at a large zoom, and View > Thread Look > Lights off shows only
+glow thread. Five new reference designs (`view-rhinestones`,
+`view-cutwork`, `view-lace`, `view-cross-stitch`, `view-quilting`) and
+the lights-off pictures of `view-thread-kinds`; the tiles of a design with
+no pieces take as long as before (`docs/design/p18-view-m7-report.md`).
 
 ## Milestone 8: the viewer (M to L)
 

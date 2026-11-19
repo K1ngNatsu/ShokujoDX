@@ -272,6 +272,22 @@ pub fn properties(
             p.fabric = None;
         }
     });
+    // The weave of the appliqué fabric in the 3D look (ADR 0128).
+    ui.horizontal(|ui| {
+        ui.label(tr("Fabric surface")).on_hover_text(tr(
+            "The weave of the appliqué fabric, for the 3D look. Twill is the usual fabric of appliqué.",
+        ));
+        let now = p.fabric_weave();
+        egui::ComboBox::from_id_salt("applique_weave")
+            .selected_text(tr(now.label()))
+            .show_ui(ui, |ui| {
+                for w in emb_model::Weave::ALL {
+                    if ui.selectable_label(w == now, tr(w.label())).clicked() {
+                        p.weave = Some(w);
+                    }
+                }
+            });
+    });
 
     let mut new_pieces = pieces.to_vec();
     // Layers of fabric and the color of each piece (P10 Milestone 6).

@@ -45,7 +45,7 @@ use std::time::{Duration, Instant};
 
 use eframe::egui::{self, Color32, ColorImage, Pos2, Rect, Shape, TextureHandle, TextureOptions};
 use emb_geom::{BBox, Point, Transform};
-use emb_model::{Design, ObjectId, Rgb};
+use emb_model::{Design, ObjectId};
 use emb_render::fabric::Ground;
 use emb_render::strand::Strand;
 use emb_render::surface::{self, APRON_MM, Changes, Laid, Surface};
@@ -622,6 +622,7 @@ impl TileCache {
                 scene.lighting.azimuth_deg.to_bits(),
                 scene.lighting.elevation_deg.to_bits(),
                 scene.lighting.strength.to_bits(),
+                scene.lighting.lights_off,
                 scene.ground.as_ref().map(Ground::key),
                 shown.key,
             )),
@@ -1499,22 +1500,16 @@ fn adopt(d: &mut DesignLay, done: LayDone, stats: &mut Stats) {
 fn start_lay(d: &mut DesignLay, ctx: &egui::Context, scene: &Scene, sync: bool, stats: &mut Stats) {
     let plan = scene.plan.clone();
     let back = scene.design.from_hoop_transform();
-    let lifts = emb_render::strand::lifts(scene.design, plan.spans.iter().map(|s| (s.object, s.records.clone())));
-    let areas: Vec<(Vec<Vec<Point>>, Rgb)> = emb_render::sheet::picture_areas(scene.design)
-        .into_iter()
-        .map(|(rings, c)| {
-            let rings = rings
-                .into_iter()
-                .map(|r| r.into_iter().map(|p| back.apply(p)).collect())
-                .collect();
-            (rings, c)
-        })
+    let marks = emb_render::strand::marks(scene.design, plan.spans.iter().map(|s| (s.object, s.records.clone())));
+    let areas: Vec<surface::Piece> = emb_render::strand::pieces(scene.design)
+        .iter()
+        .map(|p| p.transformed(&back))
         .collect();
     let old = d.lay.as_ref().filter(|l| l.back == back).map(|l| l.laid.clone());
     let state = scene.state;
     let work = move || {
         let t0 = Instant::now();
-        let strands: Vec<Strand> = emb_render::strand::strands(&plan.stitches, &lifts)
+        let strands: Vec<Strand> = emb_render::strand::strands(&plan.stitches, &marks)
             .into_iter()
             .map(|s| Strand {
                 a: back.apply(s.a),
@@ -1853,6 +1848,7 @@ enum Relight {
 mod tests {
     use super::*;
     use crate::test_util::Harness;
+    use emb_model::Rgb;
 
     fn rect() -> Rect {
         Rect::from_min_size(Pos2::ZERO, egui::vec2(1200.0, 900.0))
@@ -2031,7 +2027,7 @@ mod tests {
         let opts = emb_cli::plan_options(&design, None).expect("a machine");
         let plan = emb_cli::plan(&design, &opts);
         let back = design.from_hoop_transform();
-        let strands: Vec<Strand> = emb_render::strand::strands(&plan.stitches, &[])
+        let strands: Vec<Strand> = emb_render::strand::strands(&plan.stitches, &Default::default())
             .into_iter()
             .map(|s| Strand {
                 a: back.apply(s.a),

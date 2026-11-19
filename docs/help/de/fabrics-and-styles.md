@@ -16,7 +16,8 @@ Schlingen oder seine Narbung in echter Größe).
 
 Die Stoffe sind: Woven cotton; Denim and canvas; T-shirt knit; Piqué knit
 (Poloshirts); Fleece and sweatshirt; Towel (terry); Felt; Leather and
-vinyl; Silk and thin woven; Structured cap; Water-soluble stabilizer
+vinyl; Silk and thin woven; Structured cap; Aida cloth (Kreuzstich);
+Quilt (top, batting and backing); Water-soluble stabilizer
 (freistehende Spitze). **Nicht festgelegt** benutzt die
 Grundeinstellungen.
 

@@ -116,6 +116,18 @@ hilos claros de un denim, la segunda fibra de una tela jaspeada). La
 vista de producto muestra la misma tela. Consulte [Telas, estilos y
 plantillas](fabrics-and-styles).
 
+**Lo que no es hilo en el aspecto 3D.** La tela de aplique tiene la
+superficie de su trama (**Superficie de la tela** en la ventana de
+aplique) y un borde cortado, los diamantes de imitación tienen facetas
+que reciben la luz, los agujeros del calado muestran lo que hay detrás de
+la tela, el encaje no tiene tela, un relleno trapunto es más alto sobre
+su relleno y, en la nueva tela **Quilt**, la guata se abomba entre las
+líneas de puntadas. El punto de cruz tiene la nueva tela **Aida cloth**.
+Las columnas de puff son redondas sobre su espuma. El hilo metálico tiene
+pequeños destellos con mucho zoom, y **Ver > Aspecto de hilo > Luces
+apagadas** solo muestra el hilo fosforescente. Consulte [Comprobar un
+diseño](checking).
+
 **Diseños con muchísimas puntadas.** El programa podía cerrarse cuando el
 lienzo mostraba unas 350 000 puntadas o más a la vez con el aspecto de
 hilo. Ahora el lienzo las muestra con un aspecto más simple con ese zoom,

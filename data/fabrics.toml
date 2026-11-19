@@ -26,12 +26,15 @@
 #                          estimate (Design info, worksheets). 0.05 to 10.
 #                          Optional: 0.6.
 #   weave                  The surface in the 3D view: plain | twill | knit |
-#                          pique | terry | fleece | felt | leather. Optional:
-#                          plain.
+#                          pique | terry | fleece | felt | leather | aida.
+#                          Optional: plain.
 #   weave_mm               The size of the weave, mm: the distance from one
 #                          thread to the next one, or the size of a loop, a
 #                          cell or a grain. 0.05 to 5. Optional: the usual
 #                          size of the weave.
+#   loft_mm                Optional. The loft of the batting under the
+#                          fabric (a quilt), mm: in the 3D view the fabric is
+#                          higher between the lines of stitches. 0 to 10.
 
 [[fabric]]
 id = "cotton"
@@ -165,6 +168,33 @@ underlay = "normal"
 backing = "Cap backing (stiff tear-away)"
 weave = "twill"
 weave_mm = 0.4
+
+[[fabric]]
+id = "aida"
+name = "Aida cloth (cross stitch)"
+thickness_mm = 0.6
+description = "An even weave with a hole at each corner of its blocks, for cross stitch. 14 blocks to the inch."
+spacing_factor = 1.0
+stitch_length_factor = 1.0
+pull_mm = 0.0
+underlay = "light"
+backing = "Tear-away, light"
+weave = "aida"
+weave_mm = 1.814
+
+[[fabric]]
+id = "quilt"
+name = "Quilt (top, batting and backing)"
+thickness_mm = 4.0
+description = "A cotton top, batting and a backing, hooped together. The batting puffs up between the lines of stitches."
+spacing_factor = 1.0
+stitch_length_factor = 1.1
+pull_mm = 0.1
+underlay = "light"
+backing = "None (the backing of the quilt)"
+weave = "plain"
+weave_mm = 0.25
+loft_mm = 2.0
 
 [[fabric]]
 id = "water_soluble"

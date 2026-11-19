@@ -40,7 +40,8 @@ Die Objekteigenschaften zeigen die **Schritte** der Applikation:
    **Außerhalb des Umrisses** fest.
 
 Legen Sie die **Stofffarbe** fest, damit die Arbeitsfläche und die Bilder
-den Stoff des Herzens zeigen.
+den Stoff des Herzens zeigen. **Stoffoberfläche** legt seine Webart in
+der 3D-Ansicht fest (Köper, wenn Sie sie nicht festlegen).
 
 ## Prüfen
 

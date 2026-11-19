@@ -10,7 +10,7 @@ keywords: 生地, 裏打ち, 表打ち, 安定紙, ニット, t シャツ, ポ�
 
 **デザイン > 生地**で、デザインの生地を設定します。生地によって、サテンとフィルのステッチの密度、縮み補正、アンダーレイが決まり、作業シートの裏打ちと表打ちも決まります。3D の糸表示では、生地の表面(織り目、ループ、しぼ)が実寸で表示されます。
 
-生地は次のとおりです: Woven cotton、Denim and canvas、T-shirt knit、Piqué knit(ポロシャツ)、Fleece and sweatshirt、Towel (terry)、Felt、Leather and vinyl、Silk and thin woven、Structured cap、Water-soluble stabilizer(フリースタンディングレース)。**未設定**では基本の設定を使います。
+生地は次のとおりです: Woven cotton、Denim and canvas、T-shirt knit、Piqué knit(ポロシャツ)、Fleece and sweatshirt、Towel (terry)、Felt、Leather and vinyl、Silk and thin woven、Structured cap、Aida cloth(クロスステッチ)、Quilt (top, batting and backing)、Water-soluble stabilizer(フリースタンディングレース)。**未設定**では基本の設定を使います。
 
 生地を変えると:
 

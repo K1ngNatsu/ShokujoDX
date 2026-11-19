@@ -91,7 +91,13 @@ the stitches: thread on thread is higher, each area is lighter or darker
 by the direction of its stitches to the light, and high parts put
 shadows on the fabric. Each needle hole is a small dent (larger on
 leather). On a towel or fleece with no topping, thin stitches sink into
-the pile (see [Fabrics, styles and templates](fabrics-and-styles)). The
+the pile (see [Fabrics, styles and templates](fabrics-and-styles)). What
+is not thread has its own surface: appliqué fabric with its weave and a
+cut edge, rhinestones with facets that take the light, the holes of
+cutwork, no fabric under lace, padding under a trapunto fill, and on a
+quilt the batting between the lines of stitches. Metallic thread has
+small glints at a large zoom. **Lights off** shows a dark room: only
+glow-in-the-dark thread shows, in its own light. The
 program makes the surface in parts while you
 work; a part that is not ready yet shows the faster look for a moment.
 Clear **Fine surface** on a slow computer.

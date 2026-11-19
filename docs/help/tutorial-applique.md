@@ -38,7 +38,8 @@ Object Properties shows the **Steps** of the appliqué:
    width** (3 to 4 mm is usual) and the distance **Outside the outline**.
 
 Set the **Fabric Color**, so the canvas and the pictures show the fabric
-of the heart.
+of the heart. **Fabric surface** sets its weave in the 3D look (twill if
+you do not set it).
 
 ## Check it
 

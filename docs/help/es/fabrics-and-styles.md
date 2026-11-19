@@ -16,7 +16,8 @@ su tamaño real).
 
 Las telas son: Woven cotton; Denim and canvas; T-shirt knit; Piqué knit
 (polos); Fleece and sweatshirt; Towel (terry); Felt; Leather and vinyl;
-Silk and thin woven; Structured cap; Water-soluble stabilizer (encaje
+Silk and thin woven; Structured cap; Aida cloth (punto de cruz); Quilt
+(top, batting and backing); Water-soluble stabilizer (encaje
 independiente). **Sin definir** usa los ajustes básicos.
 
 Cuando cambia la tela:

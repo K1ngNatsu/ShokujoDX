@@ -224,6 +224,36 @@ fn view_dark() {
     golden("view-dark");
 }
 
+/// The reference set of the 3D view: what is not thread (ADR 0128).
+#[test]
+fn view_rhinestones() {
+    golden("view-rhinestones");
+}
+
+/// The reference set of the 3D view: what is not thread (ADR 0128).
+#[test]
+fn view_cutwork() {
+    golden("view-cutwork");
+}
+
+/// The reference set of the 3D view: what is not thread (ADR 0128).
+#[test]
+fn view_lace() {
+    golden("view-lace");
+}
+
+/// The reference set of the 3D view: what is not thread (ADR 0128).
+#[test]
+fn view_cross_stitch() {
+    golden("view-cross-stitch");
+}
+
+/// The reference set of the 3D view: what is not thread (ADR 0128).
+#[test]
+fn view_quilting() {
+    golden("view-quilting");
+}
+
 /// The reference set of the 3D view: the kinds and the weights (ADR 0123).
 #[test]
 fn view_thread_kinds() {

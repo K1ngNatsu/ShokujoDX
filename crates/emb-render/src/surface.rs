@@ -43,16 +43,22 @@
 //! down where they cover the area round a place, so a dense column and a
 //! fill under the stitches (a laydown) keep them on top; a topping keeps
 //! all stitches on top.
+//!
+//! What is not thread (Milestone 7, ADR 0128) is a [`Piece`]: appliqué
+//! fabric (thick, with a cut edge and the relief of its weave), rhinestones
+//! (a table and facets), padding under the fabric (trapunto: a dome) and
+//! holes cut in the fabric (cutwork: [`Tile::behind`]). On a quilt the
+//! batting lifts the fabric far from the stitches ([`Ground::loft_mm`]);
+//! lace has no fabric ([`Ground::lace`]).
 
 use std::collections::HashSet;
 use std::ops::Range;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use emb_geom::{BBox, Point};
-use emb_model::{Rgb, ThreadKind};
+use emb_geom::{BBox, Point, Transform};
+use emb_model::{Rgb, ThreadKind, Weave};
 
-use crate::fabric::{Ground, PILE_HIDE, PILE_PRESS, PILE_PRESS_FROM, PILE_RADIUS_MM, PILE_SOFT_MM};
-use crate::raster::Areas;
+use crate::fabric::{Fabric, Ground, PILE_HIDE, PILE_PRESS, PILE_PRESS_FROM, PILE_RADIUS_MM, PILE_SOFT_MM};
 use crate::strand::Strand;
 use crate::thread3d::Lighting;
 
@@ -70,8 +76,38 @@ pub const FOAM_EDGE_MM: f64 = 0.3;
 /// Thread presses thread: on `n` layers a thread adds its thickness
 /// divided by `1 + PRESS × n`.
 pub const PRESS: f64 = 0.15;
-/// The thickness of a piece of appliqué fabric (and of a stone), mm.
+/// The thickness of a piece of appliqué fabric, mm.
 pub const PIECE_MM: f64 = 0.3;
+/// The cut edge of appliqué fabric: the fabric is lower this near to its
+/// edge (cut threads), mm.
+const CUT_EDGE_MM: f64 = 0.15;
+/// The height of a rhinestone as a part of its radius.
+const STONE_HEIGHT: f64 = 0.9;
+/// The flat top of a rhinestone (its table) as a part of its radius.
+const TABLE: f64 = 0.45;
+/// The directions of the eight facets of the crown of a rhinestone.
+const FACETS: [(f64, f64); 8] = [
+    (1.0, 0.0),
+    (std::f64::consts::FRAC_1_SQRT_2, std::f64::consts::FRAC_1_SQRT_2),
+    (0.0, 1.0),
+    (-std::f64::consts::FRAC_1_SQRT_2, std::f64::consts::FRAC_1_SQRT_2),
+    (-1.0, 0.0),
+    (-std::f64::consts::FRAC_1_SQRT_2, -std::f64::consts::FRAC_1_SQRT_2),
+    (0.0, -1.0),
+    (std::f64::consts::FRAC_1_SQRT_2, -std::f64::consts::FRAC_1_SQRT_2),
+];
+/// Padding (trapunto) rises to its height in this distance from its edge,
+/// mm.
+const PAD_RISE_MM: f64 = 2.5;
+/// A hole cut in the fabric is this deep (the edge puts its shadow in it),
+/// mm.
+const CUT_DEPTH_MM: f64 = 1.0;
+/// The batting of a quilt rises to its loft in this distance from the
+/// stitches, mm.
+const LOFT_RISE_MM: f64 = 3.0;
+/// The foam of puff rises to its height in this distance after
+/// [`FOAM_EDGE_MM`] (the column is round across), mm.
+const FOAM_ROUND_MM: f64 = 0.8;
 /// The side of a tile, pixels.
 pub const TILE: u32 = 256;
 /// A surface is made with at least this many pixels for each mm (a 40
@@ -119,10 +155,179 @@ const HOLE_DEPTH_MM: f64 = 0.15;
 pub mod material {
     /// No thread and no piece.
     pub const FABRIC: u8 = 0;
-    /// Appliqué fabric or a stone.
+    /// Appliqué fabric.
     pub const PIECE: u8 = 1;
+    /// A rhinestone.
+    pub const STONE: u8 = 2;
     /// Thread: `THREAD` plus the index of its kind in `ThreadKind::ALL`.
-    pub const THREAD: u8 = 2;
+    pub const THREAD: u8 = 3;
+}
+
+/// What is on the fabric or under it and is not thread (Milestone 7, ADR
+/// 0128), in the coordinates of the strands.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Piece {
+    /// The rings of its area (even-odd).
+    pub rings: Vec<Vec<Point>>,
+    pub color: Rgb,
+    pub kind: PieceKind,
+}
+
+/// The kinds of [`Piece`].
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum PieceKind {
+    /// Appliqué fabric of a weave: [`PIECE_MM`] thick, lower at its cut
+    /// edge, with the relief of its weave.
+    Fabric { weave: Weave, size_mm: f64 },
+    /// A rhinestone with a flat back: a flat table and a crown of eight
+    /// facets.
+    Stone { center: Point, radius: f64 },
+    /// Padding under the fabric (trapunto): a dome as high as `height` mm.
+    Pad { height: f64 },
+    /// A hole cut in the fabric (cutwork): what is behind shows.
+    Hole,
+}
+
+impl Piece {
+    /// A piece of appliqué fabric of `weave` (at its usual size).
+    pub fn fabric(rings: Vec<Vec<Point>>, color: Rgb, weave: Weave) -> Piece {
+        Piece {
+            rings,
+            color,
+            kind: PieceKind::Fabric {
+                weave,
+                size_mm: weave.default_mm(),
+            },
+        }
+    }
+
+    /// The piece moved by `t` (a move and a turn).
+    pub fn transformed(&self, t: &Transform) -> Piece {
+        let kind = match self.kind {
+            PieceKind::Stone { center, radius } => PieceKind::Stone {
+                center: t.apply(center),
+                radius,
+            },
+            k => k,
+        };
+        Piece {
+            rings: self
+                .rings
+                .iter()
+                .map(|r| r.iter().map(|p| t.apply(*p)).collect())
+                .collect(),
+            color: self.color,
+            kind,
+        }
+    }
+
+    /// The box of its area.
+    pub fn bbox(&self) -> Option<BBox> {
+        BBox::from_points(self.rings.iter().flatten().copied())
+    }
+
+    /// The highest point of the piece, mm.
+    pub fn top(&self) -> f64 {
+        match self.kind {
+            PieceKind::Fabric { weave, size_mm } => PIECE_MM + crate::fabric::relief_of(weave, size_mm) / 2.0,
+            PieceKind::Stone { radius, .. } => STONE_HEIGHT * radius,
+            PieceKind::Pad { height } => height,
+            PieceKind::Hole => 0.0,
+        }
+    }
+}
+
+/// The height of a rhinestone of `radius` mm at (`dx`, `dy`) mm from its
+/// center (`None` outside it): a flat table in the middle and planes round
+/// it down to the edge.
+fn stone_height(dx: f64, dy: f64, radius: f64) -> Option<f64> {
+    if dx * dx + dy * dy >= radius * radius {
+        return None;
+    }
+    let p = FACETS.iter().map(|(c, s)| dx * c + dy * s).fold(f64::MIN, f64::max) / radius;
+    let t = ((p - TABLE) / (1.0 - TABLE)).clamp(0.0, 1.0);
+    Some(STONE_HEIGHT * radius * (1.0 - 0.7 * t))
+}
+
+/// A round rise from 0 to 1 for `x` from 0 to 1 (a quarter of a circle).
+fn round_rise(x: f64) -> f64 {
+    let y = 1.0 - x.clamp(0.0, 1.0);
+    (1.0 - y * y).sqrt()
+}
+
+/// For each cell of a `w` × `h` grid, the distance from the nearest cell
+/// that is not `inside`, in cells (a chamfer distance, near the true
+/// distance; cells outside the grid are inside).
+fn distance_out(inside: &[bool], w: usize, h: usize) -> Vec<f32> {
+    const BIG: f32 = 1.0e9;
+    let mut d: Vec<f32> = inside.iter().map(|i| if *i { BIG } else { 0.0 }).collect();
+    let at = |d: &[f32], x: i64, y: i64| {
+        if x < 0 || y < 0 || x >= w as i64 || y >= h as i64 {
+            BIG
+        } else {
+            d[y as usize * w + x as usize]
+        }
+    };
+    for y in 0..h as i64 {
+        for x in 0..w as i64 {
+            let i = y as usize * w + x as usize;
+            if d[i] == 0.0 {
+                continue;
+            }
+            let m = (at(&d, x - 1, y) + 3.0)
+                .min(at(&d, x, y - 1) + 3.0)
+                .min(at(&d, x - 1, y - 1) + 4.0)
+                .min(at(&d, x + 1, y - 1) + 4.0);
+            d[i] = d[i].min(m);
+        }
+    }
+    for y in (0..h as i64).rev() {
+        for x in (0..w as i64).rev() {
+            let i = y as usize * w + x as usize;
+            if d[i] == 0.0 {
+                continue;
+            }
+            let m = (at(&d, x + 1, y) + 3.0)
+                .min(at(&d, x, y + 1) + 3.0)
+                .min(at(&d, x + 1, y + 1) + 4.0)
+                .min(at(&d, x - 1, y + 1) + 4.0);
+            d[i] = d[i].min(m);
+        }
+    }
+    d.iter().map(|v| v / 3.0).collect()
+}
+
+/// The heights of padding (a [`PieceKind::Pad`]) on cells of the grid of
+/// the lay: the floor under the fabric.
+#[derive(Debug, Clone, PartialEq)]
+struct Floor {
+    ox: i64,
+    oy: i64,
+    cell: f64,
+    w: usize,
+    h: usize,
+    height: Vec<f32>,
+}
+
+impl Floor {
+    /// The height at `p` (between the centers of the cells: the mean of the
+    /// four nearest), mm.
+    fn at(&self, p: Point) -> f64 {
+        let fx = p.x / self.cell - 0.5 - self.ox as f64;
+        let fy = p.y / self.cell - 0.5 - self.oy as f64;
+        let (x0, y0) = (fx.floor(), fy.floor());
+        let (tx, ty) = (fx - x0, fy - y0);
+        let g = |x: f64, y: f64| {
+            if x < 0.0 || y < 0.0 || x >= self.w as f64 || y >= self.h as f64 {
+                0.0
+            } else {
+                f64::from(self.height[y as usize * self.w + x as usize])
+            }
+        };
+        let a = g(x0, y0) + (g(x0 + 1.0, y0) - g(x0, y0)) * tx;
+        let b = g(x0, y0 + 1.0) + (g(x0 + 1.0, y0 + 1.0) - g(x0, y0 + 1.0)) * tx;
+        a + (b - a) * ty
+    }
 }
 
 /// The material of a thread of `kind`.
@@ -270,38 +475,117 @@ impl Grid {
         cell_center(self.ox + x as i64, self.oy + y as i64, self.cell)
     }
 
-    /// A piece of fabric: the rings (even-odd) at the height `h`. Row by
-    /// row, from the places where the edges cross the middle of the row:
-    /// the same test as [`inside`] for the center of each cell.
-    fn piece(&mut self, rings: &[Vec<Point>], h: f32) {
-        let mut xs: Vec<f64> = Vec::new();
-        for y in 0..self.h {
+    /// The cells `xs` × `ys` whose centers are inside the rings (even-odd),
+    /// row by row. From the places where the edges cross the middle of each
+    /// row: the same test as [`inside`] for the center of each cell.
+    fn inside_cells(&self, rings: &[Vec<Point>], xs: Range<usize>, ys: Range<usize>) -> Vec<bool> {
+        let mut out = vec![false; xs.len() * ys.len()];
+        let mut cross: Vec<f64> = Vec::new();
+        for (row, y) in ys.enumerate() {
             let yc = self.center(0, y).y;
-            xs.clear();
+            cross.clear();
             for r in rings {
                 for i in 0..r.len() {
                     let (a, b) = (r[i], r[(i + 1) % r.len()]);
                     if (a.y <= yc) != (b.y <= yc) {
-                        xs.push(a.x + (yc - a.y) / (b.y - a.y) * (b.x - a.x));
+                        cross.push(a.x + (yc - a.y) / (b.y - a.y) * (b.x - a.x));
                     }
                 }
             }
-            if xs.is_empty() {
+            if cross.is_empty() {
                 continue;
             }
-            xs.sort_by(f64::total_cmp);
+            cross.sort_by(f64::total_cmp);
             // The crossings at the center of the cell or to its left.
             let mut left = 0;
-            for x in 0..self.w {
+            for (col, x) in xs.clone().enumerate() {
                 let xc = self.center(x, 0).x;
-                while left < xs.len() && xs[left] <= xc {
+                while left < cross.len() && cross[left] <= xc {
                     left += 1;
                 }
-                if (xs.len() - left) % 2 == 1 {
-                    let i = y * self.w + x;
-                    self.height[i] = self.height[i].max(h);
+                if (cross.len() - left) % 2 == 1 {
+                    out[row * xs.len() + col] = true;
                 }
             }
+        }
+        out
+    }
+
+    /// The cells of the box of `rings` and one more on each side.
+    fn cells_of(&self, rings: &[Vec<Point>]) -> (Range<usize>, Range<usize>) {
+        match BBox::from_points(rings.iter().flatten().copied()) {
+            Some(b) => {
+                let b = b.expand(self.cell);
+                (self.xs(b.min.x, b.max.x), self.ys(b.min.y, b.max.y))
+            }
+            None => (0..0, 0..0),
+        }
+    }
+
+    /// A piece under the stitches (the floor): appliqué fabric at
+    /// [`PIECE_MM`], a stone with its facets, padding as its `floor`
+    /// ([`Grid::floor_of`]). A hole is no floor.
+    fn piece(&mut self, piece: &Piece, floor: Option<&Floor>) {
+        let (xs, ys) = self.cells_of(&piece.rings);
+        match piece.kind {
+            PieceKind::Hole => {}
+            PieceKind::Fabric { .. } => {
+                let mask = self.inside_cells(&piece.rings, xs.clone(), ys.clone());
+                for (row, y) in ys.enumerate() {
+                    for (col, x) in xs.clone().enumerate() {
+                        if mask[row * xs.len() + col] {
+                            let i = y * self.w + x;
+                            self.height[i] = self.height[i].max(PIECE_MM as f32);
+                        }
+                    }
+                }
+            }
+            PieceKind::Stone { center, radius } => {
+                let b = BBox::from_center_size(center, 2.0 * radius, 2.0 * radius);
+                for y in self.ys(b.min.y, b.max.y) {
+                    for x in self.xs(b.min.x, b.max.x) {
+                        let q = self.center(x, y);
+                        if let Some(h) = stone_height(q.x - center.x, q.y - center.y, radius) {
+                            let i = y * self.w + x;
+                            self.height[i] = self.height[i].max(h as f32);
+                        }
+                    }
+                }
+            }
+            PieceKind::Pad { .. } => {
+                let Some(f) = floor else { return };
+                for y in 0..f.h {
+                    for x in 0..f.w {
+                        let (gx, gy) = (f.ox + x as i64 - self.ox, f.oy + y as i64 - self.oy);
+                        if gx < 0 || gy < 0 || gx >= self.w as i64 || gy >= self.h as i64 {
+                            continue;
+                        }
+                        let i = gy as usize * self.w + gx as usize;
+                        self.height[i] = self.height[i].max(f.height[y * f.w + x]);
+                    }
+                }
+            }
+        }
+    }
+
+    /// The floor of padding of `height` mm in `rings`: a dome that rises in
+    /// [`PAD_RISE_MM`] from its edge, on the cells of this grid.
+    fn floor_of(&self, rings: &[Vec<Point>], height: f64) -> Floor {
+        let (xs, ys) = self.cells_of(rings);
+        let mask = self.inside_cells(rings, xs.clone(), ys.clone());
+        let (w, h) = (xs.len(), ys.len());
+        let d = distance_out(&mask, w, h);
+        let heights = d
+            .iter()
+            .map(|d| (height * round_rise(f64::from(*d) * self.cell / PAD_RISE_MM)) as f32)
+            .collect();
+        Floor {
+            ox: self.ox + xs.start as i64,
+            oy: self.oy + ys.start as i64,
+            cell: self.cell,
+            w,
+            h,
+            height: heights,
         }
     }
 
@@ -355,6 +639,19 @@ fn inside(rings: &[Vec<Point>], p: Point) -> bool {
         }
     }
     odd
+}
+
+/// The distance from `p` to the segment `a`–`b`, mm.
+fn distance_to_segment(p: Point, a: Point, b: Point) -> f64 {
+    let (dx, dy) = (b.x - a.x, b.y - a.y);
+    let l2 = dx * dx + dy * dy;
+    let t = if l2 > 0.0 {
+        (((p.x - a.x) * dx + (p.y - a.y) * dy) / l2).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let (ex, ey) = (p.x - a.x - t * dx, p.y - a.y - t * dy);
+    (ex * ex + ey * ey).sqrt()
 }
 
 /// A stitch laid on the grid.
@@ -422,7 +719,9 @@ impl LaidStrand {
 pub struct Laid {
     strands: Vec<LaidStrand>,
     z: Vec<f32>,
-    pieces: Vec<(Vec<Vec<Point>>, Rgb)>,
+    pieces: Vec<Piece>,
+    /// The floors of the pads of `pieces` (in their order).
+    floors: Vec<Floor>,
     grid: Grid,
     /// The strands in squares of [`INDEX_MM`] (for the blocks).
     index: Index,
@@ -722,12 +1021,12 @@ fn key(s: &Strand) -> u64 {
     h
 }
 
-/// The area of the grid for `strands` and `areas`.
-fn extent(strands: &[Strand], areas: &Areas) -> BBox {
+/// The area of the grid for `strands` and `pieces`.
+fn extent(strands: &[Strand], pieces: &[Piece]) -> BBox {
     let points = strands
         .iter()
         .flat_map(|s| [s.a, s.b])
-        .chain(areas.iter().flat_map(|(rings, _)| rings.iter().flatten().copied()));
+        .chain(pieces.iter().flat_map(|p| p.rings.iter().flatten().copied()));
     BBox::from_points(points)
         .unwrap_or(BBox::new(Point::ZERO, Point::ZERO))
         .expand(1.0)
@@ -788,8 +1087,16 @@ fn lay_one(
         let t = step * k as f64;
         let p = Point::new(s.a.x + dir.0 * t, s.a.y + dir.1 * t);
         let (mut h, l) = under_at(p);
-        if t.min(len - t) >= FOAM_EDGE_MM.min(len / 2.0) {
-            h = h.max(s.lift_mm);
+        // The foam is cut at the needle points and round across the column.
+        let edge = FOAM_EDGE_MM.min(len / 2.0);
+        if s.lift_mm > 0.0 && t.min(len - t) >= edge {
+            let rise = FOAM_ROUND_MM.min(len / 2.0 - edge);
+            let x = if rise > 1e-9 {
+                (t.min(len - t) - edge) / rise
+            } else {
+                1.0
+            };
+            h = h.max(s.lift_mm * round_rise(x));
         }
         sc.ts.push(t);
         sc.under.push(if k == 0 || k == n - 1 { 0.0 } else { h });
@@ -826,15 +1133,34 @@ fn lay_one(
     })
 }
 
-/// Lays `strands` in sew order on the pieces of fabric `areas` (appliqué
-/// fabric and stones, under all stitches).
-pub fn lay(strands: &[Strand], areas: &Areas) -> Laid {
-    let b = extent(strands, areas);
+/// The floors of the pads of `pieces` on the cells of `grid`.
+fn floors_of(grid: &Grid, pieces: &[Piece]) -> Vec<Floor> {
+    pieces
+        .iter()
+        .filter_map(|p| match p.kind {
+            PieceKind::Pad { height } => Some(grid.floor_of(&p.rings, height)),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Puts `pieces` on `grid` (the floors of their pads: `floors`).
+fn put_pieces(grid: &mut Grid, pieces: &[Piece], floors: &[Floor]) {
+    let mut pads = floors.iter();
+    for p in pieces {
+        let floor = matches!(p.kind, PieceKind::Pad { .. }).then(|| pads.next()).flatten();
+        grid.piece(p, floor);
+    }
+}
+
+/// Lays `strands` in sew order on the `pieces` (appliqué fabric, stones
+/// and padding, under all stitches).
+pub fn lay(strands: &[Strand], pieces: &[Piece]) -> Laid {
+    let b = extent(strands, pieces);
     let cell = cell_for(b);
     let mut grid = Grid::new(b, cell);
-    for (rings, _) in areas {
-        grid.piece(rings, PIECE_MM as f32);
-    }
+    let floors = floors_of(&grid, pieces);
+    put_pieces(&mut grid, pieces, &floors);
     let mut laid: Vec<LaidStrand> = Vec::with_capacity(strands.len());
     let mut z: Vec<f32> = Vec::new();
     let mut sc = Scratch::default();
@@ -856,7 +1182,7 @@ pub fn lay(strands: &[Strand], areas: &Areas) -> Laid {
         let ls = laid[w];
         grid.stamp(&ls, &z);
     }
-    Laid::new(laid, z, areas.to_vec(), grid, b)
+    Laid::new(laid, z, pieces.to_vec(), floors, grid, b)
 }
 
 /// The stitches `strands` laid again after a change of the design (ADR
@@ -865,11 +1191,11 @@ pub fn lay(strands: &[Strand], areas: &Areas) -> Laid {
 /// first changed stitch are the same; a stitch after the change is laid
 /// again only if a changed stitch is under it, and changes only if its
 /// heights change. Also gives the areas where the laid stitches changed.
-pub fn relay(old: &Laid, strands: &[Strand], areas: &Areas) -> (Laid, Changes) {
-    let b = extent(strands, areas);
+pub fn relay(old: &Laid, strands: &[Strand], pieces: &[Piece]) -> (Laid, Changes) {
+    let b = extent(strands, pieces);
     let cell = cell_for(b);
-    if cell != old.grid.cell || areas != old.pieces.as_slice() {
-        return (lay(strands, areas), Changes::everywhere());
+    if cell != old.grid.cell || pieces != old.pieces.as_slice() {
+        return (lay(strands, pieces), Changes::everywhere());
     }
     let list: Vec<&Strand> = strands.iter().filter(|s| has_length(s)).collect();
     let keys: Vec<u64> = list.iter().map(|s| key(s)).collect();
@@ -894,11 +1220,9 @@ pub fn relay(old: &Laid, strands: &[Strand], areas: &Areas) -> (Laid, Changes) {
     }
     // The cells of the new grid, and the pieces alone (if there are pieces).
     let shape = Grid::shape(b, cell);
-    let base = (!areas.is_empty()).then(|| {
+    let base = (!pieces.is_empty()).then(|| {
         let mut g = Grid::new(b, cell);
-        for (rings, _) in areas {
-            g.piece(rings, PIECE_MM as f32);
-        }
+        put_pieces(&mut g, pieces, &old.floors);
         g
     });
     let mut laid: Vec<LaidStrand> = Vec::with_capacity(n_new);
@@ -1004,7 +1328,10 @@ pub fn relay(old: &Laid, strands: &[Strand], areas: &Areas) -> (Laid, Changes) {
             grid.stamp_in(&s, &z, xs, ys);
         }
     }
-    (Laid::with_index(laid, z, areas.to_vec(), grid, new_index), changes)
+    (
+        Laid::with_index(laid, z, pieces.to_vec(), old.floors.clone(), grid, new_index),
+        changes,
+    )
 }
 
 /// The grid of a relay before the cells that the change reaches are made
@@ -1071,25 +1398,27 @@ fn under(
 }
 
 impl Laid {
-    fn new(strands: Vec<LaidStrand>, z: Vec<f32>, pieces: Vec<(Vec<Vec<Point>>, Rgb)>, grid: Grid, b: BBox) -> Laid {
+    fn new(strands: Vec<LaidStrand>, z: Vec<f32>, pieces: Vec<Piece>, floors: Vec<Floor>, grid: Grid, b: BBox) -> Laid {
         let index = Index::new(strands.iter().map(|s| s.bbox), b, INDEX_MM);
-        Laid::with_index(strands, z, pieces, grid, index)
+        Laid::with_index(strands, z, pieces, floors, grid, index)
     }
 
     /// As [`Laid::new`], with the index of the boxes of the strands.
     fn with_index(
         strands: Vec<LaidStrand>,
         z: Vec<f32>,
-        pieces: Vec<(Vec<Vec<Point>>, Rgb)>,
+        pieces: Vec<Piece>,
+        floors: Vec<Floor>,
         grid: Grid,
         index: Index,
     ) -> Laid {
-        let piece = if pieces.is_empty() { 0.0 } else { PIECE_MM };
+        let piece = pieces.iter().map(Piece::top).fold(0.0, f64::max);
         let top = f64::from(z.iter().copied().fold(0.0, f32::max)).max(piece);
         Laid {
             strands,
             z,
             pieces,
+            floors,
             grid,
             index,
             top,
@@ -1327,10 +1656,7 @@ impl Laid {
             .into_iter()
             .filter(|&i| show(self.strands[i as usize].record))
             .collect();
-        let pieces = self
-            .pieces
-            .iter()
-            .any(|(rings, _)| BBox::from_points(rings.iter().flatten().copied()).is_some_and(|b| b.intersects(&mm)));
+        let pieces = self.pieces.iter().any(|p| p.bbox().is_some_and(|b| b.intersects(&mm)));
         if ids.is_empty() && !pieces {
             return None;
         }
@@ -1446,22 +1772,102 @@ impl Laid {
         // The area of the tile, for the pieces.
         let (c0, c1) = (center(x0, y0), center(x0 + w, y0 + h));
         let area = BBox::new(c0, c1).expand(1.0 / ppm);
-        for (rings, c) in &self.pieces {
-            if BBox::from_points(rings.iter().flatten().copied()).is_none_or(|b| !b.intersects(&area)) {
+        let mut pads = self.floors.iter();
+        for piece in &self.pieces {
+            let floor = matches!(piece.kind, PieceKind::Pad { .. })
+                .then(|| pads.next())
+                .flatten();
+            let Some(pb) = piece.bbox().filter(|b| b.intersects(&area)) else {
                 continue;
-            }
-            for py in 0..h {
-                for px in 0..w {
-                    if inside(rings, center(x0 + px, y0 + py)) {
-                        let k = (py * w + px) as usize;
-                        t.height[k] = PIECE_MM as f32;
-                        t.color[k] = [c.0, c.1, c.2];
-                        t.material[k] = material::PIECE;
-                        t.cover[k] = 255;
+            };
+            // The pixels of the tile in the box of the piece.
+            let range = |lo: f64, hi: f64, b: f64, o: i64, s: u32, n: u32| {
+                let a = (((lo - b) * ppm - o as f64).floor().max(0.0) as u32).clamp(s, s + n) - s;
+                let e = (((hi - b) * ppm - o as f64).ceil().max(0.0) as u32 + 1).clamp(s, s + n) - s;
+                a..e.max(a)
+            };
+            let xs = range(pb.min.x, pb.max.x, base.x, origin.0, x0, w);
+            let ys = range(pb.min.y, pb.max.y, base.y, origin.1, y0, h);
+            let c = [piece.color.0, piece.color.1, piece.color.2];
+            match piece.kind {
+                PieceKind::Fabric { weave, size_mm } => {
+                    let relief = Fabric::shared(weave, size_mm);
+                    let depth = relief.relief_mm();
+                    // The edges near the tile, for its cut edge.
+                    let near = area.expand(CUT_EDGE_MM);
+                    let edges: Vec<(Point, Point)> = piece
+                        .rings
+                        .iter()
+                        .flat_map(|r| (0..r.len()).map(move |i| (r[i], r[(i + 1) % r.len()])))
+                        .filter(|(a, b)| BBox::from_points([*a, *b]).is_some_and(|e| e.intersects(&near)))
+                        .collect();
+                    for py in ys.clone() {
+                        for px in xs.clone() {
+                            let q = center(x0 + px, y0 + py);
+                            if !inside(&piece.rings, q) {
+                                continue;
+                            }
+                            let d = edges
+                                .iter()
+                                .map(|(a, b)| distance_to_segment(q, *a, *b))
+                                .fold(CUT_EDGE_MM, f64::min);
+                            let cut = 0.4 + 0.6 * (d / CUT_EDGE_MM).sqrt();
+                            let k = (py * w + px) as usize;
+                            t.height[k] = ((PIECE_MM + (relief.height_at(q.x, q.y) - 0.5) * depth) * cut) as f32;
+                            t.color[k] = c;
+                            t.material[k] = material::PIECE;
+                            t.cover[k] = 255;
+                        }
+                    }
+                }
+                PieceKind::Stone { center: sc, radius } => {
+                    for py in ys.clone() {
+                        for px in xs.clone() {
+                            let q = center(x0 + px, y0 + py);
+                            let (dx, dy) = (q.x - sc.x, q.y - sc.y);
+                            // The part of the pixel in the stone.
+                            let part = ((radius - (dx * dx + dy * dy).sqrt()) * ppm + 0.5).clamp(0.0, 1.0);
+                            if part <= 0.0 {
+                                continue;
+                            }
+                            let hz = stone_height(dx, dy, radius).unwrap_or(0.0) as f32;
+                            let k = (py * w + px) as usize;
+                            let open = (1.0 - f64::from(t.cover[k]) / 255.0) * (1.0 - part);
+                            t.cover[k] = ((1.0 - open) * 255.0).round() as u8;
+                            if hz >= t.height[k] {
+                                t.height[k] = hz;
+                                t.color[k] = c;
+                                t.material[k] = material::STONE;
+                            }
+                        }
+                    }
+                }
+                PieceKind::Pad { .. } => {
+                    let Some(f) = floor else { continue };
+                    for py in ys.clone() {
+                        for px in xs.clone() {
+                            let k = (py * w + px) as usize;
+                            let hz = f.at(center(x0 + px, y0 + py)) as f32;
+                            t.height[k] = t.height[k].max(hz);
+                        }
+                    }
+                }
+                PieceKind::Hole => {
+                    for py in ys.clone() {
+                        for px in xs.clone() {
+                            if inside(&piece.rings, center(x0 + px, y0 + py)) {
+                                let k = (py * w + px) as usize;
+                                t.behind[k] = 255;
+                                t.height[k] = -CUT_DEPTH_MM as f32;
+                            }
+                        }
                     }
                 }
             }
         }
+        // The heights of the pieces and the padding, under the strands (if
+        // a piece is in the tile).
+        let floor = t.height.iter().any(|h| *h != 0.0).then(|| t.height.clone());
         for &i in ids {
             let s = &self.strands[i as usize];
             let z = &self.z[s.start..s.start + s.n];
@@ -1510,8 +1916,11 @@ impl Laid {
                     let side = (ry * s.dir.0 - rx * s.dir.1) / half;
                     let across = side.abs().min(1.0);
                     let zc = s.middle(z, along);
-                    let hz = zc * ((1.0 - across * across).sqrt() as f32);
                     let k = (py * w + px) as usize;
+                    // Round across the thread, down to what is under it
+                    // (the pieces and the padding: `floor`).
+                    let f = floor.as_ref().map_or(0.0, |fl| fl[k]);
+                    let hz = f + (zc - f).max(0.0) * ((1.0 - across * across).sqrt() as f32);
                     // The union of the threads in the pixel (each one covers
                     // its part of the part that the others leave open).
                     let open = (1.0 - f64::from(t.cover[k]) / 255.0) * (1.0 - cover);
@@ -1878,6 +2287,9 @@ pub struct Tile {
     /// that the threads do not cover; the values above are the means over
     /// the part that they cover.
     pub fabric_shade: Vec<u8>,
+    /// The part of the pixel where the fabric is cut away (cutwork, ADR
+    /// 0128), 0 to 255: what is behind the fabric shows there.
+    pub behind: Vec<u8>,
 }
 
 impl Tile {
@@ -1903,6 +2315,7 @@ impl Tile {
         self.shadow[k] = src.shadow[i];
         self.diffuse[k] = src.diffuse[i];
         self.fabric_shade[k] = src.fabric_shade[i];
+        self.behind[k] = src.behind[i];
     }
 
     fn new(x0: u32, y0: u32, w: u32, h: u32) -> Tile {
@@ -1923,6 +2336,7 @@ impl Tile {
             shadow: vec![0; n],
             diffuse: vec![128; n],
             fabric_shade: vec![255; n],
+            behind: vec![0; n],
         }
     }
 }
@@ -2042,9 +2456,9 @@ impl Surface {
             .fold(0.0, f32::max)
     }
 
-    /// The size of the data, bytes (20 for each pixel).
+    /// The size of the data, bytes (21 for each pixel).
     pub fn bytes(&self) -> usize {
-        self.tiles.iter().map(|t| t.height.len() * 20).sum()
+        self.tiles.iter().map(|t| t.height.len() * 21).sum()
     }
 
     /// The normals, the gaps and the shadows, from the heights (after the
@@ -2052,6 +2466,33 @@ impl Surface {
     /// processors (0: all).
     fn finish(&mut self, threads: usize, ground: Option<&Ground>) {
         let (w, h) = (self.width as usize, self.height as usize);
+        // The batting of a quilt: the fabric rises far from the stitches.
+        if let Some(g) = ground.filter(|g| g.loft_mm > 0.0) {
+            let mut thread = vec![false; w * h];
+            for t in &self.tiles {
+                for row in 0..t.h as usize {
+                    for col in 0..t.w as usize {
+                        let k = row * t.w as usize + col;
+                        thread[(t.y0 as usize + row) * w + t.x0 as usize + col] = t.cover[k] >= 128;
+                    }
+                }
+            }
+            let free: Vec<bool> = thread.iter().map(|t| !t).collect();
+            let d = distance_out(&free, w, h);
+            let ppm = self.px_per_mm;
+            for t in &mut self.tiles {
+                for row in 0..t.h as usize {
+                    for col in 0..t.w as usize {
+                        let k = row * t.w as usize + col;
+                        if t.material[k] != material::FABRIC || t.behind[k] > 0 {
+                            continue;
+                        }
+                        let dm = f64::from(d[(t.y0 as usize + row) * w + t.x0 as usize + col]) / ppm;
+                        t.height[k] += (g.loft_mm * round_rise(dm / LOFT_RISE_MM)) as f32;
+                    }
+                }
+            }
+        }
         let mut flat = vec![0.0f32; w * h];
         for t in &self.tiles {
             for row in 0..t.h as usize {
@@ -2087,6 +2528,27 @@ impl Surface {
         });
         let pile = &pile;
         let min = self.area.min;
+        let lace = ground.is_some_and(|g| g.lace);
+        // The fabric (not a thread, a piece or a hole): its slope makes its
+        // light, if it has a height (padding, batting).
+        let is_bare = |t: &Tile, k: usize| t.material[k] == material::FABRIC && t.cover[k] == 0 && t.behind[k] == 0;
+        let relief = self
+            .tiles
+            .iter()
+            .any(|t| (0..t.height.len()).any(|k| t.height[k] != 0.0 && is_bare(t, k)));
+        let mut bare = Vec::new();
+        if relief {
+            bare = vec![false; w * h];
+            for t in &self.tiles {
+                for row in 0..t.h as usize {
+                    for col in 0..t.w as usize {
+                        bare[(t.y0 as usize + row) * w + t.x0 as usize + col] = is_bare(t, row * t.w as usize + col);
+                    }
+                }
+            }
+        }
+        let bare = &bare;
+        let flat_light = crate::sheen::diffuse([0.0, 0.0, 1.0], self.light.vector());
         // The direction of the light, one time (not for each pixel).
         let lv = light.vector();
         let work = move |chunk: &mut [Tile]| {
@@ -2126,7 +2588,31 @@ impl Surface {
                             top,
                         );
                         t.shadow[k] = (dark * 255.0).round() as u8;
-                        let shade = open * (1.0 - crate::sheen::SHADOW_DARK * dark);
+                        let mut shade = open * (1.0 - crate::sheen::SHADOW_DARK * dark);
+                        // The slope of the fabric: from the heights of the
+                        // fabric round it only (not of the threads).
+                        let i = y as usize * w + x as usize;
+                        if relief && bare[i] {
+                            let g = |xx: i64, yy: i64| {
+                                let inside = xx >= 0 && yy >= 0 && xx < w as i64 && yy < h as i64;
+                                if inside && bare[yy as usize * w + xx as usize] {
+                                    at(xx, yy)
+                                } else {
+                                    at(x, y)
+                                }
+                            };
+                            let gx = (g(x + 1, y) - g(x - 1, y)) / d;
+                            let gy = (g(x, y + 1) - g(x, y - 1)) / d;
+                            if gx != 0.0 || gy != 0.0 {
+                                let len = (gx * gx + gy * gy + 1.0).sqrt();
+                                let lit = crate::sheen::diffuse([-gx / len, -gy / len, 1.0 / len], lv);
+                                shade *= (lit / flat_light).min(1.0);
+                            }
+                        }
+                        // Lace: no fabric, so no shadow on it.
+                        if lace {
+                            shade = 1.0;
+                        }
                         t.fabric_shade[k] = (shade * 255.0).round() as u8;
                         let n = [-dzdx / len, -dzdy / len, 1.0 / len];
                         let lit = crate::sheen::diffuse(n, lv);
@@ -2178,6 +2664,7 @@ impl Surface {
                     let mut lin = [0.0f64; 3];
                     let mut axis = [0.0f64; 2];
                     let mut mats: [(u8, f64); 4] = [(0, 0.0); 4];
+                    let mut behind = 0.0f64;
                     for (j, (dx, dy)) in [(0, 0), (1, 0), (0, 1), (1, 1)].into_iter().enumerate() {
                         if x + dx >= self.width || y + dy >= self.height {
                             continue;
@@ -2207,10 +2694,12 @@ impl Surface {
                             *a += c * f64::from(v);
                         }
                         mats[j] = (s.material[i], c);
+                        behind += f64::from(s.behind[i]);
                     }
                     let i = (row * t.w + col) as usize;
                     t.height[i] = (hs / n) as f32;
                     t.cover[i] = (cov / n * 255.0).round() as u8;
+                    t.behind[i] = (behind / n).round() as u8;
                     if cov > 0.0 {
                         t.normal[i] = normal.map(|v| (v / cov).round() as i8);
                         t.open[i] = (open / cov).round() as u8;
@@ -2378,7 +2867,10 @@ mod tests {
             Point::new(6.0, 1.0),
             Point::new(-1.0, 1.0),
         ]];
-        let on = lay(&[strand((0.0, 0.0), (5.0, 0.0))], &[(square, Rgb(0, 0, 200))]);
+        let on = lay(
+            &[strand((0.0, 0.0), (5.0, 0.0))],
+            &[Piece::fabric(square, Rgb(0, 0, 200), Weave::Twill)],
+        );
         assert!((on.height_at(Point::new(2.5, 0.0)) - (PIECE_MM + top())).abs() < 0.02);
         assert!((on.height_at(Point::new(2.5, 0.8)) - PIECE_MM).abs() < 1e-6);
     }
@@ -2401,7 +2893,7 @@ mod tests {
         }
         // The same again: the same bytes.
         assert_eq!(big, laid.surface(big.area, 20.0));
-        assert!(big.bytes() == 600 * 240 * 20);
+        assert!(big.bytes() == 600 * 240 * 21);
     }
 
     #[test]
@@ -2481,7 +2973,7 @@ mod tests {
             Point::new(9.0, 13.0),
             Point::new(-1.0, 13.0),
         ]];
-        for areas in [vec![], vec![(piece, Rgb(0, 0, 200))]] {
+        for areas in [vec![], vec![Piece::fabric(piece, Rgb(0, 0, 200), Weave::Twill)]] {
             let old = lay(&design(&[&fill, &satin, &far]), &areas);
             for new in [
                 design(&[&fill, &moved, &far]),
@@ -2527,7 +3019,7 @@ mod tests {
         ];
         let rings = vec![star, hole];
         let mut g = Grid::new(BBox::new(Point::new(-4.0, -4.0), Point::new(4.0, 4.0)), CELL_MM);
-        g.piece(&rings, 1.0);
+        g.piece(&Piece::fabric(rings.clone(), Rgb(0, 0, 0), Weave::Plain), None);
         for y in 0..g.h {
             for x in 0..g.w {
                 let want = inside(&rings, g.center(x, y));
@@ -2662,7 +3154,7 @@ mod tests {
     #[test]
     #[ignore]
     fn block_steps() {
-        let s = crate::strand::strands(&crate::stress::make(100_000), &[]);
+        let s = crate::strand::strands(&crate::stress::make(100_000), &Default::default());
         let t = std::time::Instant::now();
         let laid = lay(&s, &[]);
         println!("lay {:.0} ms", t.elapsed().as_secs_f64() * 1000.0);
@@ -2738,7 +3230,7 @@ mod tests {
     #[test]
     #[ignore]
     fn relay_time() {
-        let s = crate::strand::strands(&crate::stress::make(200_000), &[]);
+        let s = crate::strand::strands(&crate::stress::make(200_000), &Default::default());
         let t = std::time::Instant::now();
         let old = lay(&s, &[]);
         println!("lay {:.0} ms, {} strands", t.elapsed().as_secs_f64() * 1000.0, s.len());

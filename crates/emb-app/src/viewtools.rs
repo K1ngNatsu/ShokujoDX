@@ -249,6 +249,10 @@ pub fn draw_fabric(painter: &egui::Painter, ctx: &egui::Context, rect: egui::Rec
     }
     let d = st.doc.design();
     let Some(bg) = d.background else { return };
+    // Lace has no fabric: the stabilizer washes away (ADR 0128).
+    if st.fabrics.of(d).is_lace() {
+        return;
+    }
     let fabric = st.fabric_look(d);
     let key = (fabric, bg, look.light);
     if st.fabric_tex.as_ref().is_none_or(|t| t.key != key) {
@@ -351,8 +355,12 @@ pub fn look_ui(ui: &mut egui::Ui, st: &mut AppState) {
                 "Shows the surface of the stitches: their heights, the sheen of the thread and the shadows. Clear it on a slow computer for the faster look.",
             ));
             ui.checkbox(&mut l.fabric, tr("Fabric texture")).on_hover_text(tr(
-                "The weave of the fabric of the design under the background color (Color tab).",
+                "The surface of the fabric of the design (its weave, loops or grain) in the background color (Color tab).",
             ));
+            ui.add_enabled(l.surface, egui::Checkbox::new(&mut l.light.lights_off, tr("Lights off")))
+                .on_hover_text(tr(
+                    "A dark room: only glow-in-the-dark thread shows, in its own light (with Fine surface).",
+                ));
             if ui.button(tr("Default light")).clicked() {
                 l.light = Default::default();
             }

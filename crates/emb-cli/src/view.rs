@@ -17,7 +17,8 @@
 //! (`<design>-<zoom>-surface`, Milestone 3, ADR 0124), on the fabric of the
 //! design (Milestone 6, ADR 0127). A design on a pile with a topping also
 //! has the surface with no topping (`<design>-<zoom>-no-topping`): thin
-//! stitches sink into the pile. [`fabrics`] puts the lettering of
+//! stitches sink into the pile; a design with glow thread has it with the
+//! lights off (`<design>-<zoom>-lights-off`, Milestone 7, ADR 0128). [`fabrics`] puts the lettering of
 //! `view-towel` on each fabric of [`FABRICS`] (`fabric-<id>-<zoom>`).
 
 use std::fmt::Write as _;
@@ -44,8 +45,9 @@ pub struct Reference {
 
 /// The reference set: the faults of the list "What a sew-out shows and the
 /// view does not" of the plan, one design for each (twelve of Milestone 1,
-/// and the kinds and the weights of thread of Milestone 2).
-pub const REFERENCE: [Reference; 13] = [
+/// the kinds and the weights of thread of Milestone 2, and what is not
+/// thread of Milestone 7).
+pub const REFERENCE: [Reference; 18] = [
     Reference {
         name: "view-satin-angles",
         shows: "Sheen by direction: satin columns at eight angles",
@@ -110,6 +112,31 @@ pub const REFERENCE: [Reference; 13] = [
         name: "view-thread-kinds",
         shows: "Kinds of thread (polyester, rayon, cotton, metallic, wool, glow) and weights 30 and 60",
         close: (-11.0, -12.0),
+    },
+    Reference {
+        name: "view-rhinestones",
+        shows: "Rhinestones: crystal SS10, SS16 and SS20, gold SS8, on a black knit",
+        close: (0.0, 0.0),
+    },
+    Reference {
+        name: "view-cutwork",
+        shows: "Cutwork: holes cut in the fabric, with satin over the cut edges",
+        close: (-16.0, 0.0),
+    },
+    Reference {
+        name: "view-lace",
+        shows: "Free-standing lace: no fabric",
+        close: (0.0, 0.0),
+    },
+    Reference {
+        name: "view-cross-stitch",
+        shows: "Cross stitch on Aida cloth",
+        close: (0.0, 0.0),
+    },
+    Reference {
+        name: "view-quilting",
+        shows: "A quilt: a trapunto heart and echo lines, the batting between them",
+        close: (-12.0, -12.0),
     },
 ];
 
@@ -189,9 +216,9 @@ pub fn lay_design(design: &emb_model::Design) -> emb_render::surface::Laid {
 
 /// As [`lay_design`], for a stitch plan of `design`.
 fn lay_plan(design: &emb_model::Design, plan: &emb_stitch::StitchPlan) -> emb_render::surface::Laid {
-    let lifts = emb_render::strand::lifts(design, plan.spans.iter().map(|s| (s.object, s.records.clone())));
-    let strands = emb_render::strand::strands(&plan.stitches, &lifts);
-    emb_render::surface::lay(&strands, &emb_render::sheet::picture_areas(design))
+    let marks = emb_render::strand::marks(design, plan.spans.iter().map(|s| (s.object, s.records.clone())));
+    let strands = emb_render::strand::strands(&plan.stitches, &marks);
+    emb_render::surface::lay(&strands, &emb_render::strand::pieces(design))
 }
 
 /// The time of `f`, ms.
@@ -269,6 +296,12 @@ pub fn run(r: &Reference, flat: bool) -> Measure {
         ..ground.clone()
     };
     let bare = (ground.topping && bare.sinks()).then_some(bare);
+    // With the lights off, for a design with glow thread (ADR 0128).
+    let glow = design.threads.iter().any(|t| t.kind == emb_model::ThreadKind::Glow);
+    let dark = emb_render::thread3d::Lighting {
+        lights_off: true,
+        ..Default::default()
+    };
     let mut surface_shots = Vec::new();
     let mut bare_shots = Vec::new();
     let mut shots = Vec::new();
@@ -302,6 +335,14 @@ pub fn run(r: &Reference, flat: bool) -> Measure {
             ms,
             bytes: surface.bytes(),
         });
+        if glow {
+            let p = emb_render::sheen::light(&surface, &dark, fabric);
+            bare_shots.push(Shot {
+                name: format!("{}-{}-lights-off", r.name, z.name),
+                hash: hash(&p),
+                picture: p,
+            });
+        }
         if let Some(bare) = &bare {
             let s = laid.surface_on(b, z.px_per_mm, &Default::default(), Some(bare));
             let p = emb_render::sheen::light(&s, &Default::default(), fabric);
@@ -432,7 +473,7 @@ pub fn stress(n: usize) -> Measure {
             });
         }
     }
-    let strands = emb_render::strand::strands(&s, &[]);
+    let strands = emb_render::strand::strands(&s, &Default::default());
     let (laid, ms) = timed(|| emb_render::surface::lay(&strands, &[]));
     steps.push(Step {
         name: "lay".into(),
@@ -611,7 +652,9 @@ mod tests {
         for r in REFERENCE {
             assert!(corpus::NAMES.contains(&r.name), "{}", r.name);
             let d = corpus::build(r.name).unwrap();
-            assert!(d.background.is_some(), "{}: a fabric color", r.name);
+            // A fabric color, or lace (no fabric, ADR 0128).
+            let lace = emb_model::FabricCatalog::builtin().of(&d).is_lace();
+            assert!(d.background.is_some() || lace, "{}: a fabric color", r.name);
             // The close picture shows stitches of the design.
             let e = d.extents().unwrap();
             assert!(e.contains(Point::new(r.close.0, r.close.1)), "{}", r.name);

@@ -40,7 +40,8 @@ Propiedades del objeto muestra los **Pasos** del aplique:
    **Fuera del contorno**.
 
 Defina el **Color de la tela**, para que el lienzo y las imágenes muestren
-la tela del corazón.
+la tela del corazón. **Superficie de la tela** define su trama en el
+aspecto 3D (sarga si no la define).
 
 ## Comprobarlo
 

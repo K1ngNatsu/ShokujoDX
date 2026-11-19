@@ -524,6 +524,27 @@ fn scenes() -> Vec<Scene> {
             st.focus_tab = Some(Tab::Properties);
         }));
     }
+    // An appliqué object (its fabric color and fabric surface, ADR 0128).
+    v.push(Scene::new("object properties applique", View::Screen, |st, _| {
+        let thread = st.doc.design().threads[0].id;
+        let mut id = None;
+        st.doc.edit("Appliqué", |d| {
+            id = Some(d.add_object(
+                thread,
+                emb_model::ObjectKind::Applique {
+                    pieces: vec![emb_model::AppliquePiece::new(
+                        emb_geom::Path::ellipse(emb_geom::Point::new(0.0, 60.0), 15.0, 15.0),
+                        Vec::new(),
+                    )],
+                    params: emb_model::AppliqueParams::default(),
+                },
+            ));
+        });
+        if let Some(id) = id {
+            st.selection.set(id);
+        }
+        st.focus_tab = Some(Tab::Properties);
+    }));
     // The windows that no command opens with the sample design.
     v.push(Scene::new("first start", View::Windows, |st, _| {
         st.ask_machine = Some(crate::first_start::MachineStep::new(st));

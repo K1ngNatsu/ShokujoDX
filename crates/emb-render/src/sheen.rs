@@ -24,6 +24,11 @@
 //!   pattern along each thread).
 //! - **The bright end**: a tone curve takes a strong highlight toward
 //!   white slowly, so it keeps the color of the thread.
+//! - **What is not thread** (ADR 0128): a rhinestone is glass, so it has
+//!   less diffuse light and a sharp highlight on each facet that faces the
+//!   light; metallic thread has small glints of its foil at a large zoom;
+//!   a hole in the fabric shows what is behind it ([`BEHIND`]); with the
+//!   lights off ([`Lighting::lights_off`]) only glow thread shows.
 //!
 //! Then the threads mix with the fabric in the part of the pixel that they
 //! cover (the light of the fabric: [`crate::fabric`], ADR 0127).
@@ -51,6 +56,42 @@ const DIFFUSE: f64 = 0.537;
 const PLY_LIGHT: f64 = 0.07;
 /// From this brightness the tone curve makes the light grow more slowly.
 const KNEE: f64 = 1.0;
+/// With the lights off, the light that is left (a dark room), as a part of
+/// the light.
+pub const LIGHTS_OFF: f64 = 0.04;
+/// The light of glow thread with the lights off (its own light).
+const GLOW_LIGHT: f64 = 0.85;
+/// What shows through a hole in the fabric: the dark inside of a garment
+/// or the room behind it.
+pub const BEHIND: Rgb = Rgb(30, 30, 33);
+/// The highlight of a facet of a rhinestone: its strength and its
+/// sharpness; the diffuse light of the glass is this part.
+const STONE_SHINE: f64 = 1.8;
+const STONE_SHARP: f64 = 48.0;
+const STONE_DIFFUSE: f64 = 0.55;
+/// The foil at the back of a rhinestone: the light from a facet comes from
+/// the light on the other side (its direction this part of the facet's), and
+/// its strength.
+const FOIL: f64 = 0.45;
+const FOIL_SHINE: f64 = 0.8;
+/// The glints of metallic thread: a place for a glint each this many mm,
+/// from this many pixels for each mm (the full glints from 10 more), and
+/// their strength and sharpness.
+const GLINT_MM: f64 = 0.12;
+const GLINT_FROM_PX: f64 = 6.0;
+const GLINT: f64 = 1.4;
+const GLINT_SHARP: f64 = 120.0;
+
+/// A value from 0 to 1 for the cell (`x`, `y`) and `seed`.
+fn hash(x: i64, y: i64, seed: u64) -> f64 {
+    let mut h = (x as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
+        ^ (y as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F)
+        ^ seed.wrapping_mul(0x1656_67B1_9E37_79F9);
+    h ^= h >> 29;
+    h = h.wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    h ^= h >> 32;
+    (h & 0xFFFF) as f64 / 65535.0
+}
 
 /// The diffuse light of a surface with the normal `n` in the light `l`: a
 /// factor of the color of its thread.
@@ -217,6 +258,7 @@ pub fn light_values(s: &Surface, lighting: &Lighting, fabric: Option<(Rgb, Fabri
     let ground = fabric.map(|(c, f)| (f.fabric().shade(lighting), lin(c), f.mix.map(lin)));
     let ground = &ground;
     let size = 1.0 / s.px_per_mm;
+    let behind = lit.behind;
     let mut rgba = vec![[0.0f32; 4]; w * h];
     let rows_per = h
         .div_ceil(std::thread::available_parallelism().map_or(1, usize::from))
@@ -236,14 +278,18 @@ pub fn light_values(s: &Surface, lighting: &Lighting, fabric: Option<(Rgb, Fabri
                             );
                             shade.color(*c1, *c2, mx, my, size).map(|v| v * p.fabric)
                         });
-                        *px = match (p.thread, under) {
-                            (None, Some(u)) => [u[0] as f32, u[1] as f32, u[2] as f32, 1.0],
-                            (None, None) => [0.0; 4],
-                            (Some(c), Some(u)) => {
-                                let m = |j: usize| (c[j] * p.cover + u[j] * (1.0 - p.cover)) as f32;
+                        // The part that no thread covers: a hole (what is
+                        // behind) and the fabric.
+                        let open = 1.0 - p.cover;
+                        let (hole, bare) = (open * p.behind, open * (1.0 - p.behind));
+                        let c = p.thread.unwrap_or([0.0; 3]);
+                        *px = match under {
+                            Some(u) => {
+                                let m = |j: usize| (c[j] * p.cover + behind[j] * hole + u[j] * bare) as f32;
                                 [m(0), m(1), m(2), 1.0]
                             }
-                            (Some(c), None) => [c[0] as f32, c[1] as f32, c[2] as f32, p.cover as f32],
+                            None if p.cover > 0.0 => [c[0] as f32, c[1] as f32, c[2] as f32, p.cover as f32],
+                            None => [0.0; 4],
                         };
                     }
                 }
@@ -271,17 +317,22 @@ fn picture_over(lit: &Lit) -> Picture {
     let s = lit.s;
     let (w, h) = (s.width as usize, s.height as usize);
     let mut rgba = Vec::with_capacity(w * h * 4);
+    let behind = lit.behind.map(|v| f64::from(to_srgb(v)));
     for y in 0..h {
         for x in 0..w {
             let p = lit.at(x, y);
-            // The light of the fabric as a factor of the colors of the
-            // screen (the screen mixes in its colors).
-            let keep = (1.0 - p.cover) * math::pow(p.fabric.clamp(0.0, 1.0), 1.0 / 2.2);
+            // The part that no thread covers: a hole (what is behind, as it
+            // is) and the fabric, whose light is a factor of the colors of
+            // the screen (the screen mixes in its colors).
+            let open = 1.0 - p.cover;
+            let (hole, bare) = (open * p.behind, open * (1.0 - p.behind));
+            let keep = bare * math::pow(p.fabric.clamp(0.0, 1.0), 1.0 / 2.2);
             let alpha = 1.0 - keep;
-            let c = match p.thread {
+            let thread = match p.thread {
                 Some(c) => tone(c).map(|v| f64::from(to_srgb(v)) * p.cover),
                 None => [0.0; 3],
             };
+            let c = [0, 1, 2].map(|k| thread[k] + behind[k] * hole);
             rgba.extend_from_slice(&[
                 c[0].round().min(255.0) as u8,
                 c[1].round().min(255.0) as u8,
@@ -330,6 +381,8 @@ struct Pixel {
     cover: f64,
     /// The light of the fabric under them: its gaps and its shadow.
     fabric: f64,
+    /// The part of the open part that is a hole in the fabric.
+    behind: f64,
 }
 
 /// The light of the pixels of a surface (see the module text).
@@ -345,6 +398,10 @@ struct Lit<'a> {
     twist: f64,
     /// The heights round the surface for the shadows in another light.
     around: Option<&'a Around<'a>>,
+    /// What shows through a hole (linear light).
+    behind: [f64; 3],
+    /// The half vector of the light and the eye (straight above).
+    half: [f64; 3],
 }
 
 impl<'a> Lit<'a> {
@@ -360,6 +417,13 @@ impl<'a> Lit<'a> {
             means: ThreadKind::ALL.iter().map(|&kd| mean_lobe(l, sheen_of(kd).1)).collect(),
             twist: math::to_radians(TWIST_DEG),
             around: None,
+            behind: [BEHIND.0, BEHIND.1, BEHIND.2]
+                .map(|c| to_linear(c) * if lighting.lights_off { LIGHTS_OFF } else { 1.0 }),
+            half: {
+                let v = [l[0], l[1], l[2] + 1.0];
+                let len = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt().max(1e-9);
+                v.map(|c| c / len)
+            },
         }
     }
 
@@ -390,11 +454,13 @@ impl<'a> Lit<'a> {
             shade
         };
         let cover = f64::from(t.cover[i]) / 255.0;
+        let behind = f64::from(t.behind[i]) / 255.0;
         if cover <= 0.0 {
             return Pixel {
                 thread: None,
                 cover: 0.0,
                 fabric,
+                behind,
             };
         }
         // Diffuse light from the mean normal, the plies, the gaps and the
@@ -409,6 +475,23 @@ impl<'a> Lit<'a> {
         let factor = 1.0 + (factor - 1.0) * k;
         let base = t.color[i].map(to_linear);
         let mut c = base.map(|v| v * factor * shade);
+        // A rhinestone: glass, with a sharp highlight on each facet that
+        // faces the light.
+        if t.material[i] == crate::surface::material::STONE {
+            let n = t.normal[i].map(|v| f64::from(v) / 127.0);
+            let h = self.half;
+            let nh = (n[0] * h[0] + n[1] * h[1] + n[2] * h[2]).max(0.0);
+            // The light that the foil at the back of the stone sends back
+            // through it: the facets on the far side from the light.
+            let back = [-n[0] * FOIL, -n[1] * FOIL, n[2]];
+            let bl = (back[0] * back[0] + back[1] * back[1] + back[2] * back[2])
+                .sqrt()
+                .max(1e-9);
+            let bh = ((back[0] * h[0] + back[1] * h[1] + back[2] * h[2]) / bl).max(0.0);
+            let shine =
+                STONE_SHINE * (math::pow(nh, STONE_SHARP) + FOIL_SHINE * math::pow(bh, STONE_SHARP)) * shade * k;
+            c = base.map(|v| v * (STONE_DIFFUSE + (1.0 - STONE_DIFFUSE) * factor) * shade + shine);
+        }
         // The sheen of the fibers (a piece of fabric has the diffuse light
         // only).
         if let Some(kind) = kind_of(t.material[i]) {
@@ -418,7 +501,22 @@ impl<'a> Lit<'a> {
             let angle = math::atan2(a[1], a[0]) / 2.0 + self.twist;
             let mean = self.means[ThreadKind::ALL.iter().position(|x| *x == kind).unwrap_or(0)];
             let hl = one * lobe(angle, l, sharp) + (1.0 - one) * mean;
-            let hl = strength * hl * (0.6 + 0.4 * ply) * shade * k;
+            let mut hl = strength * hl * (0.6 + 0.4 * ply) * shade * k;
+            // Metallic thread: glints of its foil, each at a place along the
+            // thread and turned a little, so they change with the light.
+            if kind == ThreadKind::Metallic && s.px_per_mm >= GLINT_FROM_PX {
+                let size = 1.0 / s.px_per_mm;
+                let (mx, my) = (
+                    s.area.min.x + (x as f64 + 0.5) * size,
+                    s.area.min.y + (y as f64 + 0.5) * size,
+                );
+                let (gx, gy) = ((mx / GLINT_MM).floor() as i64, (my / GLINT_MM).floor() as i64);
+                if hash(gx, gy, 1) > 0.55 {
+                    let turn = (hash(gx, gy, 2) - 0.5) * 1.2;
+                    let fade = ((s.px_per_mm - GLINT_FROM_PX) / 10.0).clamp(0.0, 1.0);
+                    hl += GLINT * one * lobe(angle + turn, l, GLINT_SHARP) * shade * k * fade;
+                }
+            }
             // Metallic thread reflects in its own color.
             let tint = if kind == ThreadKind::Metallic {
                 base.map(|v| 0.5 + 0.5 * v)
@@ -429,10 +527,22 @@ impl<'a> Lit<'a> {
                 *ch += hl * tn;
             }
         }
+        // The lights off: the little light of a dark room, and glow thread
+        // in its own light.
+        if self.lighting.lights_off {
+            c = c.map(|v| v * LIGHTS_OFF);
+            if kind_of(t.material[i]) == Some(ThreadKind::Glow) {
+                let m = base[0].max(base[1]).max(base[2]).max(1e-6);
+                for (ch, b) in c.iter_mut().zip(base) {
+                    *ch += GLOW_LIGHT * b / m;
+                }
+            }
+        }
         Pixel {
             thread: Some(c),
             cover,
             fabric,
+            behind,
         }
     }
 }

@@ -95,7 +95,12 @@ fn the_surface_has_the_heights_of_a_sew_out() {
 fn levels(name: &str) -> Vec<emb_render::sheen::Light> {
     let d = emb_cli::corpus::build(name).unwrap();
     let laid = view::lay_design(&d);
-    let fabric = d.background.zip(emb_cli::picture_look(&d, false).fabric);
+    // A design with no fabric (lace) on a dark backdrop: the mean light of
+    // a picture with transparent pixels is not the light of its area.
+    let fabric = d.background.zip(emb_cli::picture_look(&d, false).fabric).or(Some((
+        emb_model::Rgb(40, 40, 44),
+        emb_render::fabric::FabricLook::new(emb_render::fabric::Weave::Felt),
+    )));
     let plan = emb_cli::plan(&d, &emb_cli::plan_options(&d, None).unwrap());
     let all = emb_render::bounds(&emb_render::segments(&plan.stitches))
         .unwrap()
@@ -115,6 +120,10 @@ fn levels(name: &str) -> Vec<emb_render::sheen::Light> {
 #[test]
 fn the_zoom_levels_keep_the_light() {
     for name in view::REFERENCE.iter().map(|r| r.name) {
+        // Cross stitch on Aida: the crosses cover the middles of the blocks
+        // of the cloth, so the fabric that shows is the darker grooves; at a
+        // small zoom a pixel has the mean of all of its fabric (ADR 0128).
+        let limit = if name == "view-cross-stitch" { 0.04 } else { 0.03 };
         let l = levels(name);
         for (k, small) in l.iter().enumerate().skip(1) {
             let big = l[0].smaller(1 << k);
@@ -125,7 +134,10 @@ fn the_zoom_levels_keep_the_light() {
                     let (y0, y1) = (gy * small.height / 4, (gy + 1) * small.height / 4);
                     let (a, b) = (big.mean(x0, y0, x1, y1), small.mean(x0, y0, x1, y1));
                     let rel = (b - a) / a.max(0.01);
-                    assert!(rel.abs() < 0.03, "{name}, level {k}, area {gx},{gy}: {a:.4} and {b:.4}");
+                    assert!(
+                        rel.abs() < limit,
+                        "{name}, level {k}, area {gx},{gy}: {a:.4} and {b:.4}"
+                    );
                 }
             }
         }

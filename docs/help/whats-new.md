@@ -111,6 +111,16 @@ box of the Styles panel sets it. A fabric can have a **Second color**
 product view shows the same fabric. See [Fabrics, styles and
 templates](fabrics-and-styles).
 
+**What is not thread in the 3D look.** Appliqué fabric has the surface of
+its weave (**Fabric surface** in the appliqué window) and a cut edge,
+rhinestones have facets that take the light, the holes of cutwork show
+what is behind the fabric, lace has no fabric, a trapunto fill is higher
+over its padding, and on the new fabric **Quilt** the batting puffs up
+between the lines of stitches. Cross stitch has the new fabric **Aida
+cloth**. Puff columns are round over their foam. Metallic thread has
+small glints at a large zoom, and **View > Thread Look > Lights off**
+shows only glow-in-the-dark thread. See [Checking a design](checking).
+
 **Designs with very many stitches.** The program could stop when the
 canvas showed about 350,000 stitches or more at one time in the thread
 look. Now the canvas shows them in a simpler look at that zoom, and in

@@ -64,11 +64,14 @@ pub enum Weave {
     Felt,
     /// Leather and vinyl: a fine grain.
     Leather,
+    /// Aida: an even weave of blocks of threads with a hole at each corner
+    /// of a block, for cross stitch.
+    Aida,
 }
 
 impl Weave {
     /// All weaves.
-    pub const ALL: [Weave; 8] = [
+    pub const ALL: [Weave; 9] = [
         Weave::Plain,
         Weave::Twill,
         Weave::Knit,
@@ -77,6 +80,7 @@ impl Weave {
         Weave::Fleece,
         Weave::Felt,
         Weave::Leather,
+        Weave::Aida,
     ];
 
     /// The usual size of the weave, mm: the distance from one thread to
@@ -91,6 +95,8 @@ impl Weave {
             Weave::Fleece => 0.5,
             Weave::Felt => 0.4,
             Weave::Leather => 0.7,
+            // 14 blocks to the inch.
+            Weave::Aida => 1.814,
         }
     }
 
@@ -105,6 +111,22 @@ impl Weave {
             Weave::Fleece => "fleece",
             Weave::Felt => "felt",
             Weave::Leather => "leather",
+            Weave::Aida => "aida",
+        }
+    }
+
+    /// The name that the program shows (translated where it shows).
+    pub fn label(self) -> &'static str {
+        match self {
+            Weave::Plain => "Plain weave",
+            Weave::Twill => "Twill",
+            Weave::Knit => "Knit",
+            Weave::Pique => "Piqué",
+            Weave::Terry => "Terry",
+            Weave::Fleece => "Fleece",
+            Weave::Felt => "Felt",
+            Weave::Leather => "Leather and vinyl",
+            Weave::Aida => "Aida (even weave)",
         }
     }
 
@@ -151,6 +173,10 @@ pub struct Fabric {
     /// ([`Weave::default_mm`]).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub weave_mm: Option<f64>,
+    /// The loft of the batting under the fabric (a quilt), mm: in the 3D
+    /// view the fabric is this much higher between the lines of stitches.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loft_mm: Option<f64>,
 }
 
 fn default_thickness() -> f64 {
@@ -184,6 +210,7 @@ impl Fabric {
             topping: None,
             weave: Weave::Plain,
             weave_mm: None,
+            loft_mm: None,
         }
     }
 
@@ -225,6 +252,12 @@ impl Fabric {
             .is_some_and(|v| !(v.is_finite() && (0.05..=5.0).contains(&v)))
         {
             return Err(text::fill("fabric {}: weave_mm must be from 0.05 to 5", &[&id]));
+        }
+        if self
+            .loft_mm
+            .is_some_and(|v| !(v.is_finite() && (0.0..=10.0).contains(&v)))
+        {
+            return Err(text::fill("fabric {}: loft_mm must be from 0 to 10", &[&id]));
         }
         Ok(())
     }

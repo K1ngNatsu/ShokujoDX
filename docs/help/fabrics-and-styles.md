@@ -16,7 +16,8 @@ real size).
 
 The fabrics are: Woven cotton; Denim and canvas; T-shirt knit; Piqué knit
 (polo shirts); Fleece and sweatshirt; Towel (terry); Felt; Leather and
-vinyl; Silk and thin woven; Structured cap; Water-soluble stabilizer
+vinyl; Silk and thin woven; Structured cap; Aida cloth (cross stitch);
+Quilt (top, batting and backing); Water-soluble stabilizer
 (free-standing lace). **Not set** uses the base settings.
 
 When you change the fabric:

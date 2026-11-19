@@ -111,6 +111,17 @@ pub struct AppliqueParams {
     /// The color of the appliqué fabric, for the display.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fabric: Option<Rgb>,
+    /// The weave of the appliqué fabric, for the 3D view (ADR 0128);
+    /// `None`: twill, the usual fabric of appliqué.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub weave: Option<crate::Weave>,
+}
+
+impl AppliqueParams {
+    /// The weave of the appliqué fabric.
+    pub fn fabric_weave(&self) -> crate::Weave {
+        self.weave.unwrap_or(crate::Weave::Twill)
+    }
 }
 
 impl Default for AppliqueParams {
@@ -132,6 +143,7 @@ impl Default for AppliqueParams {
                 ..SatinParams::default()
             },
             fabric: None,
+            weave: None,
         }
     }
 }

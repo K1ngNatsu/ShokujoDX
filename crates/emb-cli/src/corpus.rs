@@ -12,7 +12,7 @@ use emb_model::{
     SatinGeometry, SatinParams, ThreadId,
 };
 
-pub const NAMES: [&str; 80] = [
+pub const NAMES: [&str; 85] = [
     "circle-fill",
     "satin-column",
     "s-curve",
@@ -93,6 +93,11 @@ pub const NAMES: [&str; 80] = [
     "view-towel",
     "view-dark",
     "view-thread-kinds",
+    "view-rhinestones",
+    "view-cutwork",
+    "view-lace",
+    "view-cross-stitch",
+    "view-quilting",
 ];
 
 const MACHINE: &str = "husqvarna_topaz20";
@@ -186,6 +191,11 @@ pub fn build(name: &str) -> Option<Design> {
         "view-towel" => view_towel(),
         "view-dark" => view_dark(),
         "view-thread-kinds" => view_thread_kinds(),
+        "view-rhinestones" => view_rhinestones(),
+        "view-cutwork" => view_cutwork(),
+        "view-lace" => view_lace(),
+        "view-cross-stitch" => view_cross_stitch(),
+        "view-quilting" => view_quilting(),
         _ => return None,
     };
     d.name = name.to_string();
@@ -464,6 +474,199 @@ fn view_blend() -> Design {
         }
     }
     d.blends = vec![BlendRecord { group: 1 }];
+    d
+}
+
+/// Reference set (Milestone 7 of the view, ADR 0128): rhinestones on a
+/// black knit: crystal stones of three sizes in rows (SS10, SS16, SS20)
+/// and gold SS8 stones in a ring round them, with a white run.
+fn view_rhinestones() -> Design {
+    use emb_model::bling::{Bling, BlingLayout, STONE_COLORS, Stone};
+    let mut d = view_design();
+    d.set_fabric(&emb_model::FabricCatalog::builtin(), Some("knit"), true);
+    d.background = Some(Rgb(28, 28, 34));
+    let white = d.add_thread("White", Rgb(245, 245, 240));
+    d.add_object(
+        white,
+        ObjectKind::Running {
+            path: Path::ellipse(p(0.0, 0.0), 30.0, 22.0),
+            params: RunningParams::default(),
+        },
+    );
+    let stone = |ss: u32, color: usize| Stone {
+        ss,
+        color: STONE_COLORS[color].1,
+        name: STONE_COLORS[color].0.into(),
+    };
+    let row = |y: f64, step: f64, n: i32| -> Vec<Point> {
+        (0..n)
+            .map(|k| p(step * (f64::from(k) - f64::from(n - 1) / 2.0), y))
+            .collect()
+    };
+    for (ss, y, step, n) in [(10, -10.0, 4.0, 9), (16, 0.0, 5.5, 7), (20, 10.0, 6.5, 5)] {
+        d.add_object(
+            white,
+            ObjectKind::Bling(Box::new(Bling::new(
+                stone(ss, 0),
+                BlingLayout::Stones {
+                    points: row(y, step, n),
+                },
+            ))),
+        );
+    }
+    d.add_object(
+        white,
+        ObjectKind::Bling(Box::new(Bling::new(
+            stone(8, 2),
+            BlingLayout::Run {
+                path: Path::ellipse(p(0.0, 0.0), 26.0, 18.5),
+            },
+        ))),
+    );
+    d
+}
+
+/// Reference set (Milestone 7): cutwork on natural white cotton: a circle
+/// and a leaf, each with a run, the cut, then a navy satin over the cut
+/// edge.
+fn view_cutwork() -> Design {
+    let mut d = view_design();
+    let navy = d.add_thread("Navy", Rgb(25, 35, 90));
+    let leaf = Path::new()
+        .move_to(p(2.0, 0.0))
+        .cubic_to(p(10.0, -10.0), p(26.0, -10.0), p(34.0, 0.0))
+        .cubic_to(p(26.0, 10.0), p(10.0, 10.0), p(2.0, 0.0))
+        .close();
+    let shapes = [Path::ellipse(p(-16.0, 0.0), 10.0, 10.0), leaf];
+    for s in &shapes {
+        d.add_object(
+            navy,
+            ObjectKind::Running {
+                path: s.clone(),
+                params: RunningParams::default(),
+            },
+        );
+    }
+    let cuts: Vec<emb_model::ObjectId> = shapes
+        .iter()
+        .map(|s| {
+            d.add_object(
+                navy,
+                ObjectKind::Running {
+                    path: s.clone(),
+                    params: RunningParams::default(),
+                },
+            )
+        })
+        .collect();
+    d.make_cutwork(&cuts, emb_model::cutwork::CutBrand::Husqvarna, 1.0);
+    for s in &shapes {
+        d.add_object(
+            navy,
+            ObjectKind::Running {
+                path: s.clone(),
+                params: RunningParams {
+                    border: Some(LineBorder::new(2.5, ColumnPattern::Satin)),
+                    ..RunningParams::default()
+                },
+            },
+        );
+    }
+    d
+}
+
+/// Reference set (Milestone 7): free-standing lace (the lace ornament of
+/// the program on water-soluble stabilizer): no fabric shows.
+fn view_lace() -> Design {
+    emb_model::lace::ornament()
+}
+
+/// Reference set (Milestone 7): a cross-stitch heart on Aida cloth (14
+/// blocks to the inch): a cell of the grid is a block of the cloth, so the
+/// corners of the crosses are the holes of the cloth. Two half crosses for
+/// a highlight.
+fn view_cross_stitch() -> Design {
+    use emb_model::cross::{CrossStitch, Part};
+    let mut d = view_design();
+    d.set_fabric(&emb_model::FabricCatalog::builtin(), Some("aida"), true);
+    let red = d.add_thread("Red", Rgb(200, 30, 45));
+    let white = d.add_thread("White", Rgb(245, 245, 245));
+    let heart = [
+        "..XXX...XXX..",
+        ".XXXXX.XXXXX.",
+        "XXXXXXXXXXXXX",
+        "XXXXXXXXXXXXX",
+        ".XXXXXXXXXXX.",
+        "..XXXXXXXXX..",
+        "...XXXXXXX...",
+        "....XXXXX....",
+        ".....XXX.....",
+        "......X......",
+    ];
+    let cell = emb_model::Weave::Aida.default_mm();
+    let grid = CrossStitch::new(p(-7.0 * cell, -5.0 * cell), cell);
+    let cells: Vec<(i32, i32, Part)> = heart
+        .iter()
+        .enumerate()
+        .flat_map(|(r, row)| {
+            row.char_indices()
+                .filter(|(_, c)| *c == 'X')
+                .map(move |(c, _)| (c as i32, r as i32, Part::Full))
+        })
+        .collect();
+    d.cross_paint(&grid, red, &cells);
+    d.cross_paint(&grid, white, &[(2, 1, Part::HalfUp), (3, 1, Part::HalfUp)]);
+    d
+}
+
+/// Reference set (Milestone 7): a quilt (top, batting and backing): a
+/// trapunto heart (a fill over padding) and echo lines round it, 6 mm
+/// apart, in a square of 70 mm.
+fn view_quilting() -> Design {
+    let mut d = view_design();
+    d.set_fabric(&emb_model::FabricCatalog::builtin(), Some("quilt"), true);
+    d.background = Some(Rgb(236, 226, 205));
+    let red = d.add_thread("Red", Rgb(190, 30, 50));
+    let cream = d.add_thread("Cream", Rgb(240, 230, 200));
+    let heart = Path::new()
+        .move_to(p(0.0, 14.0))
+        .cubic_to(p(-22.0, 0.0), p(-20.0, -22.0), p(0.0, -10.0))
+        .cubic_to(p(20.0, -22.0), p(22.0, 0.0), p(0.0, 14.0))
+        .close();
+    let heart = d.add_object(
+        red,
+        ObjectKind::Fill {
+            outer: heart,
+            holes: Vec::new(),
+            params: FillParams {
+                trapunto: true,
+                ..FillParams::default()
+            },
+        },
+    );
+    let square = d.add_object(
+        cream,
+        ObjectKind::Vector {
+            path: Path::rect(BBox::from_center_size(p(0.0, 0.0), 70.0, 70.0)),
+            style: emb_model::VectorStyle::stroked(Rgb(120, 120, 120)),
+        },
+    );
+    let spec = emb_model::quilt::EchoSpec {
+        distance_mm: 3.0,
+        spacing_mm: 6.0,
+        rows: 6,
+    };
+    let echo = d.echo_path(&[heart, square], &spec).expect("echo lines");
+    d.add_object(
+        cream,
+        ObjectKind::Running {
+            path: echo,
+            params: RunningParams {
+                stitch_length_mm: 3.0,
+                ..RunningParams::default()
+            },
+        },
+    );
     d
 }
 

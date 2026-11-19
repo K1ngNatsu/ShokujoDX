@@ -94,7 +94,14 @@ más clara o más oscura según la dirección de sus puntadas respecto a la
 luz, y las partes altas proyectan sombras sobre la tela. Cada agujero de aguja es una pequeña
 hendidura (mayor en el cuero). En una toalla o un forro polar sin
 recubrimiento, las puntadas finas se hunden en el pelo (consulte [Telas,
-estilos y plantillas](fabrics-and-styles)). El programa hace
+estilos y plantillas](fabrics-and-styles)). Lo que no es hilo tiene su
+propia superficie: la tela de aplique con su trama y un borde cortado, los
+diamantes de imitación con facetas que reciben la luz, los agujeros del
+calado, ninguna tela bajo el encaje, el relleno bajo un relleno trapunto
+y, en un acolchado, la guata entre las líneas de puntadas. El hilo
+metálico tiene pequeños destellos con mucho zoom. **Luces apagadas**
+muestra una habitación oscura: solo se ve el hilo fosforescente, con su
+propia luz. El programa hace
 la superficie por partes mientras trabaja; una parte que aún no está
 lista muestra un momento el aspecto más rápido. Desactive **Superficie
 fina** en un equipo lento.

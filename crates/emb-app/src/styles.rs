@@ -134,11 +134,13 @@ impl AppState {
         emb_render::fabric::FabricLook::of(&self.fabrics.of(d), d)
     }
 
-    /// The fabric under the stitch tiles of `d` (its pile and its needle
-    /// holes, ADR 0127), if the 3D look shows a fabric under `d`.
+    /// The fabric under the stitch tiles of `d` (its pile, its needle holes
+    /// and the batting of a quilt, ADR 0127, 0128), if the 3D look shows a
+    /// fabric under `d`, or if `d` is lace (no fabric: no shadow on it).
     pub fn ground_of(&self, d: &emb_model::Design) -> Option<emb_render::fabric::Ground> {
-        (self.settings.look.fabric && d.background.is_some())
-            .then(|| emb_render::fabric::Ground::of(&self.fabrics.of(d), d))
+        let preset = self.fabrics.of(d);
+        ((self.settings.look.fabric && d.background.is_some()) || preset.is_lace())
+            .then(|| emb_render::fabric::Ground::of(&preset, d))
     }
 
     /// Sets the fabric as one undo step. With `objects`, the satin and fill
