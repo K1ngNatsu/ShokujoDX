@@ -277,13 +277,23 @@ the owner decides which become work.
    testers) is the oldest open part, and the fonts are not tested on
    such a machine.
 
+**The owner took the lanes in this order (2026-11-19):** 1 (the kit), 3
+(pictures in the lists), 4 (the route in the converter), 2 (development
+tools), then 5 to 8. Lane 5 and lane 6 wait for a sew-out.
+
 **Lanes, the cheapest first.**
 
 1. **A sew-out kit of the phase** (S): one folder with the test sheet of
    a tuned font at three sizes, a routed font that is not tuned, a fill
    font at 15, 40 and 100 mm, one word in Arabic and in Devanagari, and
    the design of the content families. The owner can then do the open
-   exit tests in one session.
+   exit tests in one session. **Done (2026-11-19):**
+   `tools/make-sewout-kit.py` makes `out/p17-sewout` (40 designs: VP3 and
+   DST files, a worksheet and a picture of each one, and a checklist with
+   the questions of the review). Two corpus designs came with it:
+   `shaped-text` (the three words of the exit test of Milestone 6) and
+   `content-clipart` (five clipart items, each in a border), so the kit
+   has five new items of each kind for Milestone 8.
 2. **Development tools** (S): a contact sheet of the items of the
    families from the repository (`emb-cli` writes the items, a script in
    `tools` draws them); a list of the window pictures that changed

@@ -12,7 +12,7 @@ use emb_model::{
     SatinGeometry, SatinParams, ThreadId,
 };
 
-pub const NAMES: [&str; 65] = [
+pub const NAMES: [&str; 67] = [
     "circle-fill",
     "satin-column",
     "s-curve",
@@ -78,6 +78,8 @@ pub const NAMES: [&str; 65] = [
     "cutwork",
     "sketch-badge",
     "content-families",
+    "shaped-text",
+    "content-clipart",
 ];
 
 const MACHINE: &str = "husqvarna_topaz20";
@@ -120,6 +122,8 @@ pub fn build(name: &str) -> Option<Design> {
         "texture-fills" => texture_fills(),
         "motifs" => motifs(),
         "content-families" => content_families(),
+        "shaped-text" => shaped_text(),
+        "content-clipart" => content_clipart(),
         "patterns" => patterns(),
         "effects" => effects(),
         "blends" => blends(),
@@ -289,6 +293,81 @@ fn lettering_names() -> Design {
         l.justify = Justify::Center;
         emb_letter::relayout(&mut l, &font);
         d.add_object(t, ObjectKind::Lettering(Box::new(l)));
+    }
+    d
+}
+
+/// Shaped text (P17 Milestone 6, ADR 0114), 20 mm high, as the exit test
+/// of the milestone asks: a word in Arabic (from right to left, joined
+/// forms), a word in Devanagari (two conjuncts and a vowel sign that sews
+/// before its consonant), and words in a Latin script font with the
+/// ligature "ff" and two forms of "t". The texts are the texts of the
+/// test of the glyphs in `emb_letter::shape`.
+fn shaped_text() -> Design {
+    let mut d = Design::new("");
+    let navy = d.add_thread("Navy", Rgb(25, 35, 90));
+    for (i, (family, style, text)) in [
+        ("Tajawal", "Bold", "SALAM"),
+        ("Poppins", "Bold", "KSHATRIYA"),
+        ("Pacifico", "Regular", "office tt"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let text = match text {
+            "SALAM" => "\u{0633}\u{0644}\u{0627}\u{0645}",
+            "KSHATRIYA" => "\u{0915}\u{094D}\u{0937}\u{0924}\u{094D}\u{0930}\u{093F}\u{092F}",
+            other => other,
+        };
+        let font = emb_letter::bundled::font(family, style).expect("bundled font");
+        let mut l = Lettering::new(text, font.font_ref(), 20.0, p(0.0, -40.0 + 45.0 * i as f64));
+        l.justify = Justify::Center;
+        emb_letter::relayout(&mut l, &font);
+        d.add_object(navy, ObjectKind::Lettering(Box::new(l)));
+    }
+    d
+}
+
+/// Five clipart items of the content families, each with a border of
+/// P17 Milestone 8 round it (ADR 0118): with the design
+/// `content-families`, the sew-out of the milestone has five new items of
+/// each kind.
+fn content_clipart() -> Design {
+    use emb_model::family::{Item, Kind, family};
+    let mut d = Design::new("");
+    let navy = d.add_thread("Navy", Rgb(25, 40, 100));
+    let frames = emb_model::decor::frames();
+    for (i, (name, item, border)) in [
+        ("Gear", "Cog", "Satin octagon"),
+        ("Clover", "Four-leaf clover", "Pearls"),
+        ("Crown", "Tall crown", "Zigzag"),
+        ("Shield", "Pointed shield", "Rope circle"),
+        ("Tree", "Tall tree", "Hexagon chain"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let f = family(Kind::Clipart, name).expect("a family");
+        let made = f.presets().into_iter().find(|x| x.name() == item).expect("an item");
+        let Item::Clipart(made) = made else {
+            unreachable!("a clipart family")
+        };
+        // Two columns; the last item is in the middle of its row.
+        let (col, row) = (i % 2, i / 2);
+        let x = if i == 4 { 0.0 } else { -44.0 + 88.0 * col as f64 };
+        let c = p(x, -84.0 + 84.0 * row as f64);
+        let objects: Vec<emb_model::DesignObject> = made.objects().iter().map(|o| (**o).clone()).collect();
+        let ids = d.paste_objects(&objects, &made.threads);
+        d.center_objects_at(&ids, c);
+        let b = ids
+            .iter()
+            .filter_map(|id| d.object(*id)?.control_bbox())
+            .reduce(BBox::union)
+            .expect("the item has objects");
+        let frame = frames.iter().find(|f| f.name == border).expect("a border");
+        for kind in emb_model::decor::frame_objects(frame, &b, 3.0) {
+            d.add_object(navy, kind);
+        }
     }
     d
 }

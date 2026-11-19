@@ -133,6 +133,27 @@ fn content_families() {
     golden("content-families");
 }
 
+/// Clipart items of the families in borders (ADR 0118).
+#[test]
+fn content_clipart() {
+    golden("content-clipart");
+}
+
+/// Arabic, Devanagari and ligatures (ADR 0114).
+#[test]
+fn shaped_text() {
+    golden("shaped-text");
+    // No character of the three texts is missing in its font.
+    let d = corpus::build("shaped-text").unwrap();
+    for o in d.objects() {
+        let emb_model::ObjectKind::Lettering(l) = &o.kind else {
+            panic!()
+        };
+        assert!(l.missing_characters().is_empty(), "{}", l.text);
+        assert!(l.letters.len() >= 3, "{}", l.text);
+    }
+}
+
 #[test]
 fn lettering_circle() {
     golden("lettering-circle");
