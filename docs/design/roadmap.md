@@ -44,7 +44,7 @@ Sizes are relative effort: S (days), M (one to two weeks), L (a month), XL (seve
 | 14. Sketch mode | Done (owner request, 2026-10-27): Milestones 1 (sketch model and constraint solver, ADR 0068), 2 (sketch mode in the app, ADR 0069), 3 (drawing help and sketch edits, ADR 0070), 4 (regions to embroidery, ADR 0075), 5 (objects that follow their sketch, ADR 0076) and 6 (parameters, splines and drawings to sketches, ADR 0078 and 0079). The owner's test in the app and the badge sew-outs on the Topaz 20 passed (owner, 2026-11-16). See `docs/design/p14-plan.md`. |
 | 16. Product view | Done in software (owner request, 2026-11-17): Milestones 1 (a realistic look, ADR 0101), 2 (other designs on the product, ADR 0102), 3 (front and back, ADR 0103), 4 (the product on the approval sheet, ADR 0104), 5 (better products, ADR 0105), 6 (two-tone products and swatches, ADR 0106), 7 (photos of the user's products, ADR 0107) and 8 (turntable view, ADR 0108); audit in "Audit of P16". Open: the exit tests of the eight milestones (owner, at the end of the phase). See `docs/design/product-plan.md`. |
 | 17. Polish and lettering | Accepted (owner, 2026-11-18); Milestones 1 (update check, ADR 0109), 2 (pictures of the windows, ADR 0110), 4 (font test sheet and letter corrections, ADR 0112), 5 (ten tuned fonts, ADR 0113), 6 (text shaping, ADR 0114) and 7 (quality score of the fonts, 55 fonts in the program and 68 in font packages, ADR 0115; then pen strokes in the stroke finder and routes for all fonts, ADR 0116, and ten fill fonts for large text, ADR 0117) and 8 (content families: 71 motifs, 48 split patterns, 39 stamps, 50 borders and 45 clipart items, ADR 0118) done in software, Milestone 3 set aside by the owner: eight milestones (update check, pictures of the windows, tests on an industrial machine, font test sheet and letter corrections, ten tuned fonts, text shaping, more fonts with a quality score, content families). See `docs/design/p17-plan.md`. |
-| 18. Designs from other programs | Accepted (owner, 2026-11-18), not started; after P17: eight milestones (the parts of a stitch file, runs and satin columns, fills, Recognize Objects, read Ink/Stitch files, write them and read its fonts, outlines with a stitch file, import helpers). See `docs/design/p18-plan.md`. |
+| 18. Designs from other programs, and the 3D stitch view | First part: accepted (owner, 2026-11-18), not started; after P17: eight milestones (the parts of a stitch file, runs and satin columns, fills, Recognize Objects, read Ink/Stitch files, write them and read its fonts, outlines with a stitch file, import helpers). See `docs/design/p18-plan.md`. Second part (owner request, 2026-11-19): a thorough upgrade of the engine of the 3D stitch view, proposed, not started: nine milestones (measures and a reference set, linear light and thread kinds, the surface with heights, the light on the surface, the canvas on tiles, the fabric, what is not thread, the viewer with tilt and light by hand, all pictures and quality settings). See `docs/design/p18-view-plan.md`. |
 | 19. Help and tutorials | Proposed (2026-11-18): nine milestones (pictures in the help, Show Me, guided lessons, the sew-out doctor, samples, ways to start, the help on the web, moving pictures, better answers); the owner selects them. See `docs/design/p19-plan.md`. |
 | 15. Browser version | Later (owner decision, 2026-11-16): not started. Start after the first feedback of users on the desktop program (about v0.4). See "P15. Browser version" below. |
 
@@ -1315,7 +1315,7 @@ larger libraries of motifs, patterns, stamps, borders and clipart.
 
 **Exit:** the exit tests of the eight milestones in the plan.
 
-### P18. Designs from other programs (L) — accepted, not started (`docs/design/p18-plan.md`)
+### P18. Designs from other programs, and the 3D stitch view (XL) — first part accepted, second part proposed, not started (`docs/design/p18-plan.md`, `docs/design/p18-view-plan.md`)
 
 A machine file of another program becomes objects with stitch types
 (runs, satin columns, fills) that scale with their density; the program
@@ -1325,6 +1325,24 @@ open through a helper program of the user (Inkscape for CDR and EPS).
 The native formats of closed-source programs stay out of scope.
 
 **Exit:** the exit tests of the eight milestones in the plan.
+
+**Second part: the 3D stitch view** (owner request, 2026-11-19; L to
+XL). The 3D thread look of P10 (ADR 0040) lights each stitch alone, as a
+cord, and the canvas makes a mesh of all stitches again for each frame.
+It does not look like a sew-out: no height, one sheen for satin and fill,
+one kind of thread, a flat fabric, thin lines at a small zoom. The
+upgrade makes a surface of the embroidery in tiles (height, direction of
+the thread, color, material) and lights it: sheen by the direction of
+the thread, shadows from the heights, threads with a kind and a
+thickness, fabrics with a surface, a canvas whose speed does not change
+with the number of stitches, a view from an angle with a light that the
+user moves, and the same engine for all pictures of the program. A
+picture needs no graphics card, as before. The owner decides which part
+of the phase starts first.
+
+**Exit:** the exit tests of the nine milestones in
+`docs/design/p18-view-plan.md`; the last one is a test with users: a
+photo of a sew-out next to a picture of the view.
 
 ### P19. Help and tutorials (L) — proposed (`docs/design/p19-plan.md`)
 
@@ -1351,6 +1369,7 @@ P1–P14 + user feedback (about v0.4) ─► P15 browser version (later)
 P7 ─► P16 product view
 P4 + P11 + tester reports ─► P17 polish and lettering
 P6 + P17 ─► P18 designs from other programs (recognize outlines, vector import)
+P10 + P11 + P16 ─► P18 second part: the 3D stitch view (thread look, density map, product view)
 P10 + P13 + P17 ─► P19 help and tutorials (help, scripts, pictures of the windows)
 ```
 
