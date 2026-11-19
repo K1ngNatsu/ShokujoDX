@@ -411,6 +411,12 @@ fn problem_text(p: &Problem) -> String {
     }
 }
 
+/// Opens the page of the releases in the browser of the system: the font
+/// packages are there (ADR 0115). The program downloads nothing.
+pub fn open_releases_page(st: &mut AppState) {
+    open_page(st, RELEASES_PAGE);
+}
+
 /// Opens a page of the releases in the browser of the system.
 fn open_page(st: &mut AppState, url: &str) {
     let url = safe_url(url).unwrap_or(RELEASES_PAGE);

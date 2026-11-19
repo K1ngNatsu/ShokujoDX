@@ -30,8 +30,8 @@ There are two kinds of fonts:
 
 - **Embroidery fonts** have ready-made embroidery letters. They sew best.
   Each has a **size range** (the capital height): the font list shows it,
-  and Object Properties warns when the text is out of the range. About
-  thirty embroidery fonts come with the program.
+  and Object Properties warns when the text is out of the range. 55
+  embroidery fonts come with the program.
 - **TrueType** and OpenType fonts of the computer. The program makes the
   letters from their outlines: satin for narrow strokes, fill for wide
   ones (**Automatic**), or all **Satin** or all **Fill**.
@@ -45,6 +45,33 @@ Ten of the embroidery fonts are **tuned** fonts. Their letters sew with
 few trims: the needle goes from one stroke to the next one under the
 stitches. Each letter of them was checked. The font lists show the tuned
 fonts first, and the font list of **Lettering > Fonts** marks them.
+
+Each embroidery font has a **quality score** from 0 to 100. The score
+says how well the letters of the font sew. The font list shows it after
+the name of the font, and **Sort by > Quality** puts the fonts with the
+best scores first. Select a font to see its score and these three
+measures:
+
+- how much of the shapes of the letters the stitches cover,
+- how much of the satin columns is too narrow at the smallest size of the
+  font,
+- how much of the satin columns has stitches that are too long at the
+  largest size of the font.
+
+Each font of the program has a score of 65 or more. A font that you
+convert gets its score when you convert it. The size range of a font
+keeps its thin strokes wide enough at the smallest size, so a font with
+thin and thick strokes has a small range.
+
+**More Fonts** opens the page of the program on the internet. The **font
+packages** there have 68 more embroidery fonts: sans, display, serif,
+script and hand fonts. Download a package, then add it with **File > My
+Assets > Import a package**. The program downloads nothing itself.
+
+Four fonts of earlier versions have a score below 65: Slab Heavy, Fat
+Face Serif, Shrikhand and Great Vibes. They are not in the program now.
+A design that has one of them stays as it is. To change its text, add the
+font package **Fonts of earlier versions**.
 
 **Convert to embroidery font** makes an embroidery font from a TrueType
 font, with a name, a size range and a stitch type. Check that the license

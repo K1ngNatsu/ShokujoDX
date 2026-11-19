@@ -76,7 +76,7 @@ seiner Verknüpfung hinzu, zum Beispiel `"ShokujoDX.exe" --kiosk`.
   Ornamenten.
 - **Teamnamen** erstellt ein Design mit einem anderen Namen in jeder
   Kopie.
-- **Schriften** öffnet die Schriftliste (dreißig Stickschriften kommen mit
+- **Schriften** öffnet die Schriftliste (55 Stickschriften, jede mit einer Qualitätswertung, kommen mit
   dem Programm). Wandeln Sie dort eine TrueType- oder OpenType-Schrift in
   eine Stickschrift um.
 

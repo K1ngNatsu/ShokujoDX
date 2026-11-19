@@ -1,6 +1,6 @@
 # Plan: polish and lettering (phase P17)
 
-Date: 2026-11-18 · Status: Accepted (owner, 2026-11-18). Milestones 1 (ADR 0109), 2 (ADR 0110), 4 (ADR 0112), 5 (ADR 0113) and 6 (ADR 0114) done in software; Milestone 3 is set aside by the owner (2026-11-18). The owner checks the exit test of Milestone 1 with the next release, sews the test sheets of Milestones 4 and 5, and sews the three words of Milestone 6.
+Date: 2026-11-18 · Status: Accepted (owner, 2026-11-18). Milestones 1 (ADR 0109), 2 (ADR 0110), 4 (ADR 0112), 5 (ADR 0113), 6 (ADR 0114) and 7 (ADR 0115) done in software; Milestone 3 is set aside by the owner (2026-11-18). The owner checks the exit test of Milestone 1 with the next release, sews the test sheets of Milestones 4 and 5, and sews the three words of Milestone 6.
 
 ## Goal
 
@@ -392,6 +392,69 @@ The user sees how good each font is before use.
 
 **Exit test:** each bundled font has a score above the limit; the size of
 the program grows by less than 10 MB.
+
+**Done in software (2026-11-18, ADR 0115).**
+
+- **Quality score** (`emb_letter::quality`), 0 to 100, from three
+  measures of the capital letters, the small letters and the digits: the
+  part of the outline of the source font that the letter covers (a letter
+  that sews as a fill counts as half), the part of the columns that is
+  too narrow at the smallest size (below 0.8 mm; 0.53 mm for a font for
+  small text), and the part of the columns with stitches longer than
+  12 mm at the largest size. The converter makes the score, because it
+  needs the source font; the font file keeps it.
+- **The size range fits the columns.** The first measures showed that the
+  size range was the largest fault: it came from the typical stroke only,
+  so a font with thin and thick strokes had thin strokes that were too
+  narrow at its smallest size (Brush Hand: 31 % of its columns at 8 mm).
+  The converter now makes the range smaller until at most 10 % of the
+  columns are too narrow at the smallest size and at most 10 % are too
+  long at the largest size. Ten of the fonts of the program have a
+  smaller range (Brush Hand: 13 to 65 mm, 8 to 65 mm before; Bold Script:
+  13 to 62 mm, 9 to 72 mm before; the table is in ADR 0115). Their
+  letters did not change.
+- **The limit is 65.** On proof pictures of fonts with scores from 47 to
+  73, the fonts below about 65 have letters with gaps that the eye sees.
+- **Fonts of earlier versions.** Four fonts of the program are below the
+  limit: Slab Heavy (44), Fat Face Serif (50), Great Vibes (56) and
+  Shrikhand (59). They are not in the program now; the font package
+  "Fonts of earlier versions" has them. A design that has one of them
+  keeps its letters, and Object Properties says where the font is.
+- **More fonts.** 111 more OFL fonts were converted and measured (141
+  with the fonts of the program). 97 have a score of 65 or more: the 29
+  with 85 or more are in the program (55 embroidery fonts now), and the
+  68 others are in five font packages (sans, display, serif and slab,
+  script, hand). 14 are not included. 52 of the 97 have a new name
+  (Reserved Font Name).
+- **Font packages:** zip files for File > My Assets > Import a package,
+  made by `tools/make-embroidery-fonts.py`, in `data/font-packages`
+  (9.5 MB together). The release workflow puts them in the release.
+  Lettering > Fonts > More Fonts opens the page of the releases; the
+  program downloads nothing itself.
+- **Fonts window:** the score after the name of each embroidery font,
+  Sort by Name or Quality, and for the selected font the score, what it
+  says and the three measures.
+
+The exit test in numbers: the lowest score of a bundled font is 66 (Bold
+Script), and the test `each_bundled_font_has_a_score_above_the_limit`
+checks all 55. The Windows program is 5.8 MB larger (69.2 MB; 63.4 MB
+before).
+
+**Left open:**
+
+- **No sew-out.** The score is a measure of pictures. The limit of 65
+  comes from a look at proof pictures, not from thread.
+- **The new fonts are not tuned** (Milestone 5): they have more trims
+  than the ten tuned fonts, and the score does not measure trims. The 29
+  new fonts of the program were not looked at letter by letter.
+- **The marks and the letters with accents** are not in the score.
+- An alphabet made by hand, a bitmap font and an embroidery font of an
+  earlier version have no score (the score needs the source font). A
+  TrueType font has no score.
+- The step of the release workflow that copies the font packages has not
+  run yet.
+- The test sheets of Milestone 5 use the size range: Brush Hand, Pacifico
+  and the other fonts of the table have other sizes now.
 
 ## Milestone 8: content families (M)
 

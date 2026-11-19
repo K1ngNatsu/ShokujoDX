@@ -12,7 +12,7 @@ use emb_model::{
     SatinGeometry, SatinParams, ThreadId,
 };
 
-pub const NAMES: [&str; 60] = [
+pub const NAMES: [&str; 63] = [
     "circle-fill",
     "satin-column",
     "s-curve",
@@ -25,6 +25,9 @@ pub const NAMES: [&str; 60] = [
     "embroidery-fonts-2",
     "embroidery-fonts-3",
     "embroidery-fonts-4",
+    "embroidery-fonts-5",
+    "embroidery-fonts-6",
+    "embroidery-fonts-7",
     "lettering-circle",
     "lettering-bridge",
     "monogram",
@@ -93,8 +96,12 @@ pub fn build(name: &str) -> Option<Design> {
         "embroidery-fonts-2" => {
             embroidery_fonts(emb_letter::bundled::FIRST_EMBROIDERY..emb_letter::bundled::P10_EMBROIDERY)
         }
-        "embroidery-fonts-3" => embroidery_fonts(emb_letter::bundled::P10_EMBROIDERY..20),
-        "embroidery-fonts-4" => embroidery_fonts(20..),
+        "embroidery-fonts-3" => embroidery_fonts(emb_letter::bundled::P10_EMBROIDERY..18),
+        "embroidery-fonts-4" => embroidery_fonts(18..emb_letter::bundled::P11_EMBROIDERY),
+        // The fonts of P17 Milestone 7 (ADR 0115).
+        "embroidery-fonts-5" => embroidery_fonts(emb_letter::bundled::P11_EMBROIDERY..36),
+        "embroidery-fonts-6" => embroidery_fonts(36..46),
+        "embroidery-fonts-7" => embroidery_fonts(46..),
         "lettering-circle" => lettering_circle(),
         "lettering-bridge" => lettering_bridge(LetterOrder::Closest),
         "monogram" => monogram(),

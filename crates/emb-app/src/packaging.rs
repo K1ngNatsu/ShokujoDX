@@ -251,6 +251,24 @@ fn the_help_text_names_each_language() {
     }
 }
 
+/// The font packages (ADR 0115) are files of each release: the release
+/// workflow takes all of them from `data/font-packages`.
+#[test]
+fn the_release_has_the_font_packages() {
+    let release = read(".github/workflows/release.yml");
+    assert!(release.contains("cp data/font-packages/shokujodx-fonts-*.zip dist/"));
+    assert!(release.contains("dist/shokujodx-fonts-*.zip"));
+    let packages = std::fs::read_dir(root().join("data/font-packages"))
+        .expect("data/font-packages")
+        .flatten()
+        .filter(|e| {
+            let name = e.file_name().to_string_lossy().into_owned();
+            name.starts_with("shokujodx-fonts-") && name.ends_with(".zip")
+        })
+        .count();
+    assert_eq!(packages, 6);
+}
+
 /// The release checks of the thumbnails use a test design of the
 /// repository, not a sample in a package (there are none, ADR 0080), and
 /// the program can open it.

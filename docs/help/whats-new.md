@@ -47,6 +47,15 @@ now shapes its text: ligatures, the joined letters of script fonts, Arabic
 (from right to left) and Devanagari. The fonts Tajawal (Arabic) and
 Poppins (Devanagari) come with the program. See [Lettering](lettering).
 
+**More fonts, with a quality score.** The program has 55 embroidery fonts
+(30 before), and the font packages on the page of the program have 68
+more. Each embroidery font has a quality score from 0 to 100:
+**Lettering > Fonts** shows it and can sort by it. The size ranges of some
+fonts are smaller now, so that their thin strokes are not too narrow at
+the smallest size. Four fonts with a low score (Slab Heavy, Fat Face
+Serif, Shrikhand and Great Vibes) are now in the font package **Fonts of
+earlier versions**. A design that has one of them stays as it is.
+
 **New versions.** The program can tell you when a new version is
 available. See [Options](options).
 

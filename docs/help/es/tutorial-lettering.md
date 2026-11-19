@@ -74,8 +74,8 @@ acceso directo, por ejemplo `"ShokujoDX.exe" --kiosk`.
 - **Monograma** crea dos o tres letras con un borde y adornos.
 - **Nombres de equipo** crea un diseño con un nombre distinto en cada
   copia.
-- **Fuentes** abre la lista de fuentes (con el programa vienen treinta
-  fuentes de bordado). Convierta allí una fuente TrueType u OpenType en una
+- **Fuentes** abre la lista de fuentes (con el programa vienen 55
+  fuentes de bordado, cada una con una puntuación de calidad). Convierta allí una fuente TrueType u OpenType en una
   fuente de bordado.
 
 ## Siguiente

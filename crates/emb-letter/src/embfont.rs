@@ -84,6 +84,12 @@ pub struct EmbFont {
     /// and each one was checked.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub tuned: bool,
+    /// The quality score of the font (P17 Milestone 7, ADR 0115). The
+    /// converter makes it, because it needs the font that this font was
+    /// converted from. `None`: not measured (an alphabet made by hand, a
+    /// bitmap font, a file of an earlier version).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quality: Option<crate::quality::Quality>,
     #[serde(skip)]
     kern: HashMap<(char, char), f64>,
 }
@@ -142,8 +148,39 @@ impl EmbFont {
             kerning: BTreeMap::new(),
             small_text: false,
             tuned: false,
+            quality: None,
             kern: HashMap::new(),
         }
+    }
+
+    /// Makes the size range fit the columns of the letters (ADR 0115). The
+    /// range of the converter comes from the typical stroke of the font. A
+    /// font with thin and thick strokes (a script, a serif font with
+    /// hairlines) then has thin strokes that are too narrow at the smallest
+    /// size, and thick strokes with stitches that are too long at the
+    /// largest size. The range gets smaller until at most
+    /// [`crate::quality::RANGE_TAIL`] of the length of the columns is too
+    /// narrow at the smallest size, and at most that part is too long at
+    /// the largest size. It never gets larger.
+    pub fn fit_size_range(&mut self) {
+        use crate::quality::{LONG_MM, RANGE_TAIL, narrow_mm, width_at};
+        let (Some(thin), Some(wide)) = (width_at(self, RANGE_TAIL), width_at(self, 1.0 - RANGE_TAIL)) else {
+            return;
+        };
+        if thin <= 0.0 || wide <= 0.0 {
+            return;
+        }
+        let lo = (narrow_mm(self) / thin * self.cap_height_mm * 2.0).ceil() / 2.0;
+        let hi = (LONG_MM / wide * self.cap_height_mm).floor();
+        self.min_height_mm = self.min_height_mm.max(lo);
+        self.max_height_mm = self.max_height_mm.min(hi).max(self.min_height_mm);
+    }
+
+    /// Measures the quality of the font again ([`crate::quality::measure`]),
+    /// after a change of its letters. `source` is the font that this font
+    /// was converted from.
+    pub fn measure_quality(&mut self, source: &Font) {
+        self.quality = crate::quality::measure(self, source);
     }
 
     /// Sets the letter of `c`, with its coordinates rounded as in the file.
@@ -589,9 +626,12 @@ pub fn convert_with(
         kerning,
         small_text,
         tuned: false,
+        quality: None,
         kern: HashMap::new(),
     };
     f.index();
+    f.fit_size_range();
+    f.measure_quality(font);
     f
 }
 

@@ -31,8 +31,8 @@ Hay dos tipos de fuentes:
 - Las **fuentes de bordado** tienen letras de bordado ya hechas. Se bordan
   mejor. Cada una tiene un **rango de tamaños** (la altura de las
   mayúsculas): la lista de fuentes lo muestra, y Propiedades del objeto
-  avisa cuando el texto está fuera del rango. Con el programa vienen unas
-  treinta fuentes de bordado.
+  avisa cuando el texto está fuera del rango. Con el programa vienen 55
+  fuentes de bordado.
 - Fuentes **TrueType** y OpenType del ordenador. El programa crea las
   letras a partir de sus contornos: satén para los trazos estrechos,
   relleno para los anchos (**Automático**), o todo **Satén** o todo
@@ -49,6 +49,35 @@ bordan con pocos cortes: la aguja pasa de un trazo al siguiente por debajo
 de las puntadas. Cada una de sus letras se revisó. Las listas de fuentes
 muestran primero las fuentes afinadas, y la lista de **Letras > Fuentes**
 las marca.
+
+Cada fuente de bordado tiene una **puntuación de calidad** de 0 a 100. La
+puntuación dice lo bien que se bordan las letras de la fuente. La lista de
+fuentes la muestra después del nombre de la fuente, y **Ordenar por >
+Calidad** pone primero las fuentes con las mejores puntuaciones. Seleccione
+una fuente para ver su puntuación y estas tres medidas:
+
+- qué parte de las formas de las letras cubren las puntadas,
+- qué parte de las columnas de satén es demasiado estrecha en el tamaño más
+  pequeño de la fuente,
+- qué parte de las columnas de satén tiene puntadas demasiado largas en el
+  tamaño más grande de la fuente.
+
+Cada fuente del programa tiene una puntuación de 65 o más. Una fuente que
+usted convierte recibe su puntuación al convertirla. El rango de tamaños de
+una fuente mantiene sus trazos finos lo bastante anchos en el tamaño más
+pequeño; por eso una fuente con trazos finos y gruesos tiene un rango
+pequeño.
+
+**Más fuentes** abre la página del programa en internet. Los **paquetes de
+fuentes** de allí tienen 68 fuentes de bordado más: fuentes sin serifas,
+decorativas, con serifas, caligráficas y manuscritas. Descargue un paquete
+y añádalo con **Archivo > Mis recursos > Importar un paquete**. El programa
+no descarga nada por sí mismo.
+
+Cuatro fuentes de versiones anteriores tienen una puntuación inferior a 65:
+Slab Heavy, Fat Face Serif, Shrikhand y Great Vibes. Ya no están en el
+programa. Un diseño que tiene una de ellas se queda como está. Para cambiar
+su texto, añada el paquete de fuentes **Fonts of earlier versions**.
 
 **Convertir en fuente de bordado** crea una fuente de bordado a partir de
 una fuente TrueType, con un nombre, un rango de tamaños y un tipo de

@@ -89,6 +89,8 @@ Usage:
       0.8 mm).
       Check that the license of the font lets you do this; an OFL font
       with a Reserved Font Name needs a new --name.
+      The font gets a quality score from 0 to 100 (ADR 0115), and its
+      size range fits its columns.
       --corrections <file>: apply the letter corrections of the file after
       the conversion (ADR 0112). A correction that does not apply is an
       error.
@@ -111,7 +113,12 @@ Usage:
       the outline of the source font its parts cover, how much is outside
       it or covered two times, the narrowest and widest column, and the
       trims in the letter at each size. --proof writes the geometry of the
-      letters for proof pictures.";
+      letters for proof pictures.
+  emb-cli font-quality <font.embfont> [--source <font.ttf>]
+      Print the quality score of an embroidery font (ADR 0115). With
+      --source (the font that it was converted from), measure the score
+      again and print the letters with the lowest scores; else print the
+      score in the file.";
 
 /// The files of `emb-cli library`.
 struct LibraryFiles<'a> {
@@ -577,6 +584,7 @@ fn run(args: &[String]) -> Result<(), String> {
                 .extension()
                 .map(|e| e.to_string_lossy().to_ascii_lowercase())
                 .unwrap_or_default();
+            let mut source_font = None;
             let f = if emb_letter::bitmap::EXTENSIONS.contains(&ext.as_str()) {
                 // A bitmap font: the largest face.
                 let faces = emb_letter::bitmap::read_file(&ext, &bytes).map_err(|e| format!("{input}: {e}"))?;
@@ -594,6 +602,7 @@ fn run(args: &[String]) -> Result<(), String> {
                 if extend_ends {
                     println!("extended: {} ends of columns", f.extend_ends(&font));
                 }
+                source_font = Some(font);
                 f
             };
             let mut f = f;
@@ -607,6 +616,13 @@ fn run(args: &[String]) -> Result<(), String> {
                     "routed: {} trims in the letters, {} travel runs, {} columns cut at a junction",
                     found.trims, found.runs, found.splits
                 );
+            }
+            // The quality of the letters as they are now (ADR 0115).
+            if let Some(font) = &source_font {
+                f.measure_quality(font);
+            }
+            if let Some(q) = &f.quality {
+                println!("{}", emb_cli::fontaudit::quality_line(q));
             }
             f.save(Path::new(output))?;
             println!(
@@ -651,6 +667,22 @@ fn run(args: &[String]) -> Result<(), String> {
             );
             Ok(())
         }
+        ["font-quality", input] => {
+            let mut f = emb_letter::EmbFont::load(Path::new(input))?;
+            match &audit_source {
+                Some(p) => {
+                    let bytes = std::fs::read(p).map_err(|e| format!("{}: {e}", p.display()))?;
+                    let source = emb_letter::Font::from_bytes(bytes, 0).map_err(|e| format!("{}: {e}", p.display()))?;
+                    f.measure_quality(&source);
+                    print!("{}", emb_cli::fontaudit::quality_table(&f, &source));
+                }
+                None => match &f.quality {
+                    Some(q) => println!("{}", emb_cli::fontaudit::quality_line(q)),
+                    None => println!("the font has no quality score; give --source <font.ttf> to measure it"),
+                },
+            }
+            Ok(())
+        }
         ["font-audit", input] => {
             use emb_letter::LetterSource;
             let mut f = emb_letter::EmbFont::load(Path::new(input))?;
@@ -682,6 +714,9 @@ fn run(args: &[String]) -> Result<(), String> {
             let chars = emb_letter::sheet::characters(&sheet_chars);
             let rows = emb_cli::fontaudit::audit(&f, source.as_ref(), &chars, &sizes);
             print!("{}", emb_cli::fontaudit::table(&f, &rows, &sizes));
+            if let Some(source) = &source {
+                print!("{}", emb_cli::fontaudit::quality_table(&f, source));
+            }
             if let Some(p) = &audit_proof {
                 std::fs::write(p, emb_cli::fontaudit::proof(&f, source.as_ref(), &rows))
                     .map_err(|e| format!("{}: {e}", p.display()))?;

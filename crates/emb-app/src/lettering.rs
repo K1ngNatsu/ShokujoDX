@@ -47,6 +47,9 @@ pub struct FontEntry {
     pub source: FontSource,
     /// A tuned embroidery font (ADR 0113): the lists show it first.
     pub tuned: bool,
+    /// The quality score of an embroidery font, 0 to 100 (ADR 0115).
+    /// `None`: not measured (a TrueType font, an alphabet made by hand).
+    pub score: Option<u8>,
 }
 
 /// The fonts that lettering can use.
@@ -215,6 +218,7 @@ impl Default for FontLibrary {
                 tuned: emb_letter::bundled::TUNED
                     .iter()
                     .any(|t| t.eq_ignore_ascii_case(family)),
+                score: emb_letter::bundled::quality(family).map(|q| q.score),
             })
             .collect();
         entries.extend(
@@ -227,6 +231,7 @@ impl Default for FontLibrary {
                         font: FontRef::new(&family, &style),
                         source: FontSource::Bundled(i),
                         tuned: false,
+                        score: None,
                     })
                 }),
         );
@@ -290,6 +295,11 @@ impl FontLibrary {
         self.entries.iter().any(|e| e.tuned && e.font.same(font))
     }
 
+    /// The quality score of an embroidery font (ADR 0115), if it has one.
+    pub fn score(&self, font: &FontRef) -> Option<u8> {
+        self.entries.iter().find(|e| e.font.same(font)).and_then(|e| e.score)
+    }
+
     /// Embroidery fonts first (the tuned ones before the others), then by
     /// name.
     fn sort(&mut self) {
@@ -326,6 +336,7 @@ impl FontLibrary {
             font: r.clone(),
             source: FontSource::EmbFile(path.to_path_buf()),
             tuned: f.tuned,
+            score: f.quality.map(|q| q.score),
         });
         self.loaded.insert(r.clone(), AnyFont::Embroidery(Arc::new(f)));
         self.sort();
@@ -488,6 +499,7 @@ pub fn scan(dirs: &[PathBuf]) -> Vec<FontEntry> {
                         font: FontRef::new(&family, &style),
                         source: FontSource::File(path.clone(), face),
                         tuned: false,
+                        score: None,
                     });
                 }
             }
@@ -592,6 +604,16 @@ pub fn tool_input(response: &egui::Response, st: &mut AppState, map: &ViewMap) {
         let d = LetteringDialog::new(at, "", st.letter_font.clone(), st.letter_height);
         st.open_lettering_dialog(d);
     }
+}
+
+/// True for an embroidery font of an earlier version that is not in the
+/// program now: its quality score is below the limit (ADR 0115). It is in
+/// a font package.
+pub fn is_earlier_font(font: &FontRef) -> bool {
+    font.kind == FontKind::Embroidery
+        && emb_letter::bundled::EARLIER
+            .iter()
+            .any(|f| f.eq_ignore_ascii_case(&font.family))
 }
 
 /// Makes the letters of `l` with its font. Returns `false` (and leaves the
@@ -1532,6 +1554,15 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, l: &Letter
                 &[&l.font.label()],
             ),
         );
+        if is_earlier_font(&l.font) {
+            ui.add(
+                egui::Label::new(tr(
+                    "This font was in the program before. It is now in the font package \"Fonts of \
+                     earlier versions\": Lettering > Fonts > More Fonts.",
+                ))
+                .wrap(),
+            );
+        }
     }
     font_picker(ui, st, &mut n.font, "properties");
     style_ui(ui, st, &mut n, &mut drag);

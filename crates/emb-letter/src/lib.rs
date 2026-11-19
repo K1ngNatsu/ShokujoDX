@@ -25,6 +25,7 @@ pub mod grid;
 pub mod keyboard;
 pub mod layout;
 pub mod monogram;
+pub mod quality;
 pub mod route;
 pub mod shape;
 pub mod sheet;
@@ -87,9 +88,12 @@ pub mod bundled {
     /// of OFL fonts, ADR 0016): (family, the JSON compressed by `build.rs`;
     /// [`embroidery_text`] gives the text). `tools/make-embroidery-fonts.py`
     /// makes them; fonts with a Reserved Font Name have a new name (for
-    /// example Bold Script: Lobster). The first ten came in P4 and P10, the
-    /// others in P11 Milestone 2 (the first four of them for small text).
-    pub const EMBROIDERY: [(&str, &[u8]); 30] = [
+    /// example Bold Script: Lobster). The first nine came in P4 and P10,
+    /// the next ones in P11 Milestone 2 (the first four of them for small
+    /// text), and the fonts from [`P11_EMBROIDERY`] in P17 Milestone 7
+    /// (ADR 0115). Each one has a quality score of
+    /// [`crate::quality::LIMIT`] or more ([`quality`]).
+    pub const EMBROIDERY: [(&str, &[u8]); 55] = [
         (
             "Block Sans",
             include_bytes!(concat!(env!("OUT_DIR"), "/block-sans.embfont.z")),
@@ -118,10 +122,6 @@ pub mod bundled {
         (
             "Bold Script",
             include_bytes!(concat!(env!("OUT_DIR"), "/bold-script.embfont.z")),
-        ),
-        (
-            "Slab Heavy",
-            include_bytes!(concat!(env!("OUT_DIR"), "/slab-heavy.embfont.z")),
         ),
         (
             "Casual Script",
@@ -164,18 +164,6 @@ pub mod bundled {
             include_bytes!(concat!(env!("OUT_DIR"), "/slab-round.embfont.z")),
         ),
         (
-            "Fat Face Serif",
-            include_bytes!(concat!(env!("OUT_DIR"), "/fat-face-serif.embfont.z")),
-        ),
-        (
-            "Shrikhand",
-            include_bytes!(concat!(env!("OUT_DIR"), "/shrikhand.embfont.z")),
-        ),
-        (
-            "Great Vibes",
-            include_bytes!(concat!(env!("OUT_DIR"), "/great-vibes.embfont.z")),
-        ),
-        (
             "Vintage Script",
             include_bytes!(concat!(env!("OUT_DIR"), "/vintage-script.embfont.z")),
         ),
@@ -200,6 +188,116 @@ pub mod bundled {
         (
             "Retro Display",
             include_bytes!(concat!(env!("OUT_DIR"), "/retro-display.embfont.z")),
+        ),
+        (
+            "Wide Tech",
+            include_bytes!(concat!(env!("OUT_DIR"), "/wide-tech.embfont.z")),
+        ),
+        (
+            "Plain Sans",
+            include_bytes!(concat!(env!("OUT_DIR"), "/plain-sans.embfont.z")),
+        ),
+        (
+            "Staatliches",
+            include_bytes!(concat!(env!("OUT_DIR"), "/staatliches.embfont.z")),
+        ),
+        (
+            "Square Tech",
+            include_bytes!(concat!(env!("OUT_DIR"), "/square-tech.embfont.z")),
+        ),
+        (
+            "Comic Neue",
+            include_bytes!(concat!(env!("OUT_DIR"), "/comic-neue.embfont.z")),
+        ),
+        (
+            "Sturdy Sans",
+            include_bytes!(concat!(env!("OUT_DIR"), "/sturdy-sans.embfont.z")),
+        ),
+        (
+            "Patrick Hand",
+            include_bytes!(concat!(env!("OUT_DIR"), "/patrick-hand.embfont.z")),
+        ),
+        (
+            "Chakra Petch",
+            include_bytes!(concat!(env!("OUT_DIR"), "/chakra-petch.embfont.z")),
+        ),
+        (
+            "Titillium Web",
+            include_bytes!(concat!(env!("OUT_DIR"), "/titillium-web.embfont.z")),
+        ),
+        (
+            "Sport Sans",
+            include_bytes!(concat!(env!("OUT_DIR"), "/sport-sans.embfont.z")),
+        ),
+        (
+            "Monoline Script",
+            include_bytes!(concat!(env!("OUT_DIR"), "/monoline-script.embfont.z")),
+        ),
+        (
+            "Amatic SC",
+            include_bytes!(concat!(env!("OUT_DIR"), "/amatic-sc.embfont.z")),
+        ),
+        (
+            "Friendly Hand",
+            include_bytes!(concat!(env!("OUT_DIR"), "/friendly-hand.embfont.z")),
+        ),
+        (
+            "Pangolin",
+            include_bytes!(concat!(env!("OUT_DIR"), "/pangolin.embfont.z")),
+        ),
+        (
+            "Soft Slab",
+            include_bytes!(concat!(env!("OUT_DIR"), "/soft-slab.embfont.z")),
+        ),
+        ("Itim", include_bytes!(concat!(env!("OUT_DIR"), "/itim.embfont.z"))),
+        (
+            "Rajdhani",
+            include_bytes!(concat!(env!("OUT_DIR"), "/rajdhani.embfont.z")),
+        ),
+        (
+            "Racer Sans",
+            include_bytes!(concat!(env!("OUT_DIR"), "/racer-sans.embfont.z")),
+        ),
+        (
+            "Poppins",
+            include_bytes!(concat!(env!("OUT_DIR"), "/poppins.embfont.z")),
+        ),
+        (
+            "Indie Flower",
+            include_bytes!(concat!(env!("OUT_DIR"), "/indie-flower.embfont.z")),
+        ),
+        (
+            "Wide Sans",
+            include_bytes!(concat!(env!("OUT_DIR"), "/wide-sans.embfont.z")),
+        ),
+        (
+            "Bai Jamjuree",
+            include_bytes!(concat!(env!("OUT_DIR"), "/bai-jamjuree.embfont.z")),
+        ),
+        (
+            "Square Narrow",
+            include_bytes!(concat!(env!("OUT_DIR"), "/square-narrow.embfont.z")),
+        ),
+        ("Alata", include_bytes!(concat!(env!("OUT_DIR"), "/alata.embfont.z"))),
+        (
+            "Neat Hand",
+            include_bytes!(concat!(env!("OUT_DIR"), "/neat-hand.embfont.z")),
+        ),
+        (
+            "Marker Hand",
+            include_bytes!(concat!(env!("OUT_DIR"), "/marker-hand.embfont.z")),
+        ),
+        (
+            "Barlow Condensed",
+            include_bytes!(concat!(env!("OUT_DIR"), "/barlow-condensed.embfont.z")),
+        ),
+        (
+            "Angle Sans",
+            include_bytes!(concat!(env!("OUT_DIR"), "/angle-sans.embfont.z")),
+        ),
+        (
+            "Balsamiq Sans",
+            include_bytes!(concat!(env!("OUT_DIR"), "/balsamiq-sans.embfont.z")),
         ),
     ];
 
@@ -246,7 +344,30 @@ pub mod bundled {
     /// The number of bundled embroidery fonts before P11 (`embroidery-fonts-2`
     /// shows the fonts from [`FIRST_EMBROIDERY`] to this one;
     /// `embroidery-fonts-3` and `-4` the fonts of P11 Milestone 2).
-    pub const P10_EMBROIDERY: usize = 10;
+    pub const P10_EMBROIDERY: usize = 9;
+    /// The number of bundled embroidery fonts before P17 Milestone 7 (the
+    /// corpus designs `embroidery-fonts-5` to `-7` show the fonts from this
+    /// one). Four fonts of earlier versions are not in the program now:
+    /// their quality score is below the limit (ADR 0115); [`EARLIER`].
+    pub const P11_EMBROIDERY: usize = 26;
+
+    /// The embroidery fonts of earlier versions that are not in the program
+    /// now, because their quality score is below
+    /// [`crate::quality::LIMIT`]. They are in the font package
+    /// `shokujodx-fonts-earlier.zip`.
+    pub const EARLIER: [&str; 4] = ["Slab Heavy", "Fat Face Serif", "Shrikhand", "Great Vibes"];
+
+    /// The quality scores of the fonts of [`EMBROIDERY`], from their files
+    /// (`build.rs` makes the table).
+    const QUALITY: &[(&str, crate::quality::Quality)] = include!(concat!(env!("OUT_DIR"), "/embroidery_quality.rs"));
+
+    /// The quality of a bundled embroidery font, with no read of the font.
+    pub fn quality(family: &str) -> Option<crate::quality::Quality> {
+        QUALITY
+            .iter()
+            .find(|(f, _)| f.eq_ignore_ascii_case(family))
+            .map(|(_, q)| *q)
+    }
 
     /// The default lettering font: an embroidery font, so that new
     /// lettering sews the same on each computer.
@@ -333,6 +454,59 @@ mod tests {
         }
     }
 
+    /// The exit test of P17 Milestone 7: each bundled font has a quality
+    /// score of the limit or more. The table of the scores is the scores
+    /// in the font files.
+    #[test]
+    fn each_bundled_font_has_a_score_above_the_limit() {
+        for (family, _) in bundled::EMBROIDERY {
+            let font = bundled::embroidery(family).unwrap();
+            let q = font
+                .quality
+                .unwrap_or_else(|| panic!("{family} has no quality score; make the fonts again"));
+            assert!(q.passes(), "{family}: {q:?}");
+            assert_eq!(bundled::quality(family), Some(q), "{family}");
+            assert!(q.coverage > 0.9 && q.narrow < 0.2 && q.long < 0.2, "{family}: {q:?}");
+        }
+        // The new fonts of P17 Milestone 7 have the score of a font of the
+        // program.
+        for (family, _) in &bundled::EMBROIDERY[bundled::P11_EMBROIDERY..] {
+            let q = bundled::quality(family).unwrap();
+            assert!(q.score >= quality::BUNDLE, "{family}: {q:?}");
+        }
+        assert_eq!(bundled::quality("no such font"), None);
+        assert_eq!(bundled::EMBROIDERY.len(), 55);
+    }
+
+    /// The score in a font file is the score of the font as it is. The
+    /// source fonts of some bundled fonts are in the repository.
+    #[test]
+    fn the_score_in_the_file_is_the_score_of_the_font() {
+        for (family, file) in [
+            ("Block Sans", "Lato-Bold.ttf"),
+            ("Anton", "Anton-Regular.ttf"),
+            ("Pacifico", "Pacifico-Regular.ttf"),
+            ("Varsity", "Graduate-Regular.ttf"),
+        ] {
+            let bytes = bundled::FILES.iter().find(|(n, _)| *n == file).unwrap().1;
+            let source = Font::from_bytes(bytes.to_vec(), 0).unwrap();
+            let font = bundled::embroidery(family).unwrap();
+            assert_eq!(
+                quality::measure(&font, &source),
+                font.quality,
+                "{family}; make the fonts again"
+            );
+            // The size range fits the columns: a new fit does not change it.
+            let mut again = font.clone();
+            again.fit_size_range();
+            assert_eq!(
+                (again.min_height_mm, again.max_height_mm),
+                (font.min_height_mm, font.max_height_mm),
+                "{family}"
+            );
+        }
+    }
+
     #[test]
     fn bundled_embroidery_fonts_load() {
         for (family, _) in bundled::EMBROIDERY {
@@ -370,6 +544,17 @@ mod tests {
         for (family, _) in bundled::EMBROIDERY {
             let tuned = bundled::embroidery(family).is_some_and(|f| f.tuned);
             assert_eq!(tuned, bundled::TUNED.contains(&family), "{family}");
+        }
+        // No family is in the list two times, and the fonts of earlier
+        // versions are not in it.
+        for (i, (family, _)) in bundled::EMBROIDERY.iter().enumerate() {
+            assert!(
+                bundled::EMBROIDERY[..i]
+                    .iter()
+                    .all(|(f, _)| !f.eq_ignore_ascii_case(family)),
+                "{family}"
+            );
+            assert!(!bundled::EARLIER.contains(family), "{family}");
         }
         assert!(bundled::embroidery(bundled::DEFAULT_EMBROIDERY).is_some());
         assert_eq!(bundled::fonts().len(), bundled::FILES.len());

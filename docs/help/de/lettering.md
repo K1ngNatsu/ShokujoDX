@@ -33,8 +33,8 @@ Es gibt zwei Arten von Schriften:
 - **Stickschriften** haben fertige Stickbuchstaben. Sie sticken sich am
   besten. Jede hat einen **Größenbereich** (die Höhe der Großbuchstaben):
   Die Schriftliste zeigt ihn, und die Objekteigenschaften warnen, wenn der
-  Text außerhalb des Bereichs ist. Etwa dreißig Stickschriften kommen mit
-  dem Programm.
+  Text außerhalb des Bereichs ist. 55 Stickschriften kommen mit dem
+  Programm.
 - **TrueType**- und OpenType-Schriften des Computers. Das Programm
   erstellt die Buchstaben aus ihren Umrissen: Satin für schmale Striche,
   Füllung für breite (**Automatisch**), oder alles **Satin** oder alles
@@ -50,6 +50,38 @@ sticken mit wenigen Fadenschnitten: Die Nadel geht unter den Stichen von
 einem Strich zum nächsten. Jeder ihrer Buchstaben wurde geprüft. Die
 Schriftlisten zeigen die abgestimmten Schriften zuerst, und die Schriftliste
 von **Schrift > Schriften** kennzeichnet sie.
+
+Jede Stickschrift hat eine **Qualitätswertung** von 0 bis 100. Die Wertung
+sagt, wie gut sich die Buchstaben der Schrift sticken lassen. Die
+Schriftliste zeigt sie hinter dem Namen der Schrift, und **Sortieren
+nach > Qualität** stellt die Schriften mit den besten Wertungen an den
+Anfang. Wählen Sie eine Schrift, um ihre Wertung und diese drei Maße zu
+sehen:
+
+- wie viel von den Formen der Buchstaben die Stiche decken,
+- wie viel von den Satinsäulen bei der kleinsten Größe der Schrift zu
+  schmal ist,
+- wie viel von den Satinsäulen bei der größten Größe der Schrift zu lange
+  Stiche hat.
+
+Jede Schrift des Programms hat eine Wertung von 65 oder mehr. Eine Schrift,
+die Sie umwandeln, bekommt ihre Wertung beim Umwandeln. Der Größenbereich
+einer Schrift hält ihre dünnen Striche bei der kleinsten Größe breit genug;
+eine Schrift mit dünnen und dicken Strichen hat deshalb einen kleinen
+Bereich.
+
+**Mehr Schriften** öffnet die Seite des Programms im Internet. Die
+**Schriftpakete** dort haben 68 weitere Stickschriften: serifenlose
+Schriften, Zierschriften, Serifenschriften, Schreibschriften und
+Handschriften. Laden Sie ein Paket herunter und fügen Sie es mit **Datei >
+Meine Ressourcen > Paket importieren** hinzu. Das Programm lädt selbst
+nichts herunter.
+
+Vier Schriften früherer Versionen haben eine Wertung unter 65: Slab Heavy,
+Fat Face Serif, Shrikhand und Great Vibes. Sie sind jetzt nicht mehr im
+Programm. Ein Design, das eine von ihnen hat, bleibt, wie es ist. Um seinen
+Text zu ändern, fügen Sie das Schriftpaket **Fonts of earlier versions**
+hinzu.
 
 **In Stickschrift umwandeln** erstellt eine Stickschrift aus einer
 TrueType-Schrift, mit einem Namen, einem Größenbereich und einer Stichart.

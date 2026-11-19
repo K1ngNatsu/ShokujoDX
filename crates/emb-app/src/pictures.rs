@@ -565,6 +565,13 @@ fn scenes() -> Vec<Scene> {
             st.open_lettering_dialog(dialog);
         },
     ));
+    // The Fonts window with the quality score of a font (ADR 0115), in the
+    // order of the scores.
+    v.push(Scene::new("fonts window quality", View::Windows, |st, _| {
+        st.fonts_window.open = true;
+        st.fonts_window.by_quality = true;
+        st.fonts_window.select(emb_model::FontRef::embroidery("Brush Hand", ""));
+    }));
     v.push(Scene::new("product window with a product", View::Windows, |st, ctx| {
         st.set_product(emb_model::ProductKind::ALL[0]);
         run_command(st, ctx, Cmd::ProductWindow);

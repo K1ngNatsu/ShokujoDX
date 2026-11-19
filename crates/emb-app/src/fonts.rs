@@ -24,6 +24,8 @@ struct Preview {
     letters: Vec<Letter>,
     range: Option<(f64, f64)>,
     notes: String,
+    /// The quality of an embroidery font (ADR 0115).
+    quality: Option<emb_letter::quality::Quality>,
 }
 
 /// The form to convert a TrueType font.
@@ -42,11 +44,22 @@ pub struct FontsWindow {
     kind: Option<FontKind>,
     /// Show only the embroidery fonts for small text (P11 Milestone 2).
     small_text: bool,
+    /// The list is in the order of the quality scores, the best first
+    /// (ADR 0115); else in the order of the font library.
+    pub by_quality: bool,
     selected: Option<FontRef>,
     preview: Option<Preview>,
     form: Option<ConvertForm>,
     /// A conversion that runs in the background.
     job: Option<Receiver<Result<PathBuf, String>>>,
+}
+
+impl FontsWindow {
+    /// Shows the details of `font` (as a click in the list does).
+    pub fn select(&mut self, font: FontRef) {
+        self.selected = Some(font);
+        self.form = None;
+    }
 }
 
 /// A file name from a font name: letters, digits, '-' and '_' only.
@@ -102,15 +115,16 @@ impl AppState {
         let src = any.source();
         let l = Lettering::new(PREVIEW_TEXT, font.clone(), 10.0, Point::new(0.0, 0.0));
         let letters = emb_letter::layout(&l, src);
-        let notes = match &any {
-            emb_letter::AnyFont::Embroidery(e) => e.notes.clone(),
-            emb_letter::AnyFont::TrueType(t) => t.copyright().unwrap_or_default(),
+        let (notes, quality) = match &any {
+            emb_letter::AnyFont::Embroidery(e) => (e.notes.clone(), e.quality),
+            emb_letter::AnyFont::TrueType(t) => (t.copyright().unwrap_or_default(), None),
         };
         Some(Preview {
             font: font.clone(),
             letters,
             range: src.size_range(LetterStitch::Auto),
             notes,
+            quality,
         })
     }
 }
@@ -214,6 +228,26 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                 ui.weak(tr("Finding the fonts of this computer…"));
             }
         });
+        ui.horizontal(|ui| {
+            let w = &mut st.fonts_window;
+            ui.label(tr("Sort by"));
+            ui.selectable_value(&mut w.by_quality, false, tr("Name"));
+            ui.selectable_value(&mut w.by_quality, true, tr("Quality"))
+                .on_hover_text(tr(
+                    "The embroidery fonts with the best quality score first. The score says how well the letters \
+                 of a font sew.",
+                ));
+            if ui
+                .button(tr("More Fonts…"))
+                .on_hover_text(tr(
+                    "Open the page of the program on the internet. The font packages there have more \
+                     embroidery fonts. Add a package with File > My Assets > Import a package.",
+                ))
+                .clicked()
+            {
+                crate::update::open_releases_page(st);
+            }
+        });
         ui.separator();
         ui.columns(2, |cols| {
             list(&mut cols[0], st);
@@ -234,11 +268,14 @@ fn list(ui: &mut egui::Ui, st: &mut AppState) {
         .filter(|f| kind.is_none_or(|k| f.kind == k))
         .filter(|f| f.label().to_lowercase().contains(&filter))
         .collect();
-    let entries: Vec<FontRef> = if st.fonts_window.small_text {
+    let mut entries: Vec<FontRef> = if st.fonts_window.small_text {
         entries.into_iter().filter(|f| is_small_text(st, f)).collect()
     } else {
         entries
     };
+    if st.fonts_window.by_quality {
+        by_quality(&mut entries, &st.fonts);
+    }
     egui::ScrollArea::vertical().id_salt("font_list").show(ui, |ui| {
         for f in entries {
             let on = st.fonts_window.selected.as_ref().is_some_and(|s| s.same(&f));
@@ -247,13 +284,70 @@ fn list(ui: &mut egui::Ui, st: &mut AppState) {
                 text.push_str("  ·  ");
                 text.push_str(tr("tuned"));
             }
-            let r = ui.selectable_label(on, text);
+            let score = st.fonts.score(&f);
+            if let Some(score) = score {
+                text.push_str(&format!("  ·  {score}"));
+            }
+            let mut r = ui.selectable_label(on, text);
+            if let Some(score) = score {
+                r = r.on_hover_text(crate::i18n::fill("Quality score: {} of 100", &[&score]));
+            }
             if r.clicked() {
-                st.fonts_window.selected = Some(f);
-                st.fonts_window.form = None;
+                st.fonts_window.select(f);
             }
         }
     });
+}
+
+/// Puts the fonts in the order of their quality scores, the best first; the
+/// fonts with no score (the TrueType fonts) come last. Fonts with the same
+/// score keep their order.
+fn by_quality(fonts: &mut [FontRef], library: &crate::lettering::FontLibrary) {
+    fonts.sort_by_key(|f| std::cmp::Reverse(library.score(f).map_or(-1, i32::from)));
+}
+
+/// What a quality score says, in one sentence (ADR 0115).
+pub fn quality_text(score: u8) -> &'static str {
+    if score >= emb_letter::quality::BUNDLE {
+        tr("The letters sew well.")
+    } else if score >= emb_letter::quality::LIMIT {
+        tr("The letters sew well. Some have small faults: look at the test sheet before you sew much text.")
+    } else {
+        tr("Below the limit of the program: some letters have parts with no stitches.")
+    }
+}
+
+/// The quality of an embroidery font: the score, what it says, and the
+/// three measures behind it.
+fn quality_ui(ui: &mut egui::Ui, q: &emb_letter::quality::Quality) {
+    let color = if q.passes() {
+        ui.visuals().text_color()
+    } else {
+        ui.visuals().warn_fg_color
+    };
+    ui.horizontal(|ui| {
+        ui.colored_label(color, crate::i18n::fill("Quality score: {} of 100", &[&q.score]));
+        ui.add(
+            egui::ProgressBar::new(f32::from(q.score) / 100.0)
+                .desired_width(90.0)
+                .desired_height(8.0),
+        );
+    });
+    ui.add(egui::Label::new(quality_text(q.score)).wrap());
+    let pct = |v: f64| format!("{:.0}", v * 100.0);
+    ui.add(
+        egui::Label::new(
+            egui::RichText::new(crate::i18n::fill(
+                "The stitches cover {} % of the shapes of the letters. At the smallest size, {} % of the \
+                 columns are too narrow. At the largest size, {} % of the columns have stitches that are \
+                 too long.",
+                &[&pct(q.coverage), &pct(q.narrow), &pct(q.long)],
+            ))
+            .small()
+            .weak(),
+        )
+        .wrap(),
+    );
 }
 
 /// True for an embroidery font for small text.
@@ -295,6 +389,15 @@ fn details(ui: &mut egui::Ui, st: &mut AppState) {
             "Size range: {}–{} mm (capital height)",
             &[&format!("{:.0}", lo), &format!("{:.0}", hi)],
         ));
+    }
+    match &p.quality {
+        Some(q) => quality_ui(ui, q),
+        None if sel.kind == FontKind::Embroidery => {
+            ui.weak(tr(
+                "No quality score: this version of the program did not convert the font.",
+            ));
+        }
+        None => {}
     }
     if !p.notes.is_empty() {
         ui.add(egui::Label::new(egui::RichText::new(&p.notes).small().weak()).wrap());
@@ -443,6 +546,153 @@ mod tests {
         assert!(small.iter().any(|s| s.contains("Atkinson Hyperlegible")), "{small:?}");
         let bundled = entries.iter().filter(|f| f.kind == FontKind::Embroidery).count();
         assert!(bundled >= 30, "all bundled embroidery fonts are in the list: {bundled}");
+    }
+
+    #[test]
+    fn the_fonts_have_quality_scores_and_sort_by_them() {
+        let st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        // The fonts of the program (the font library can also have the
+        // fonts of the user of this computer).
+        let embroidery: Vec<FontRef> = emb_letter::bundled::EMBROIDERY
+            .iter()
+            .map(|(family, _)| FontRef::embroidery(family, ""))
+            .collect();
+        // Each bundled embroidery font has a score of the limit or more;
+        // a TrueType font has none.
+        for f in &embroidery {
+            let score = st.fonts.score(f).unwrap_or_else(|| panic!("{}", f.label()));
+            assert!(score >= emb_letter::quality::LIMIT, "{}: {score}", f.label());
+        }
+        assert_eq!(st.fonts.score(&FontRef::new("Lato", "Bold")), None);
+        assert_eq!(st.fonts.score(&FontRef::embroidery("Varsity", "")), Some(98));
+        // By quality: the best first, the fonts with no score last.
+        let mut all = embroidery.clone();
+        all.insert(3, FontRef::new("Lato", "Bold"));
+        by_quality(&mut all, &st.fonts);
+        let scores: Vec<Option<u8>> = all.iter().map(|f| st.fonts.score(f)).collect();
+        assert_eq!(all[0].family, "Varsity");
+        assert!(scores.windows(2).all(|w| w[0] >= w[1]), "{scores:?}");
+        assert!(scores.last().unwrap().is_none());
+        // The three texts of a score.
+        let texts = [quality_text(90), quality_text(70), quality_text(50)];
+        assert!(texts[0] != texts[1] && texts[1] != texts[2]);
+        assert!(texts[2].contains("limit"));
+    }
+
+    #[test]
+    fn the_preview_has_the_quality_of_the_font() {
+        let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        let p = st.preview_of(&FontRef::embroidery("Block Sans", "")).unwrap();
+        let q = p.quality.expect("a bundled embroidery font has a quality");
+        assert_eq!(Some(q.score), st.fonts.score(&p.font));
+        assert!(q.coverage > 0.95 && q.narrow < 0.1 && q.long < 0.1, "{q:?}");
+        assert!(st.preview_of(&FontRef::new("Lato", "Bold")).unwrap().quality.is_none());
+        // A font that the user converts gets its score, and the list has it.
+        let dir = std::env::temp_dir().join(format!("emb-score-fonts-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let source = emb_letter::bundled::font("Lato", "Bold").unwrap();
+        let chars: Vec<char> = "ABCabc123".chars().collect();
+        let f = emb_letter::embfont::convert(&source, "My Sans", "", LetterStitch::Auto, &chars);
+        assert!(f.quality.is_some());
+        f.save(&dir.join("my-sans.embfont")).unwrap();
+        // An alphabet made by hand has no score.
+        emb_letter::EmbFont::empty("My Hand", "")
+            .save(&dir.join("my-hand.embfont"))
+            .unwrap();
+        st.fonts.add_user_fonts(&dir);
+        assert_eq!(
+            st.fonts.score(&FontRef::embroidery("My Sans", "")),
+            f.quality.map(|q| q.score)
+        );
+        assert_eq!(st.fonts.score(&FontRef::embroidery("My Hand", "")), None);
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    /// The font packages of the repository (ADR 0115,
+    /// `tools/make-embroidery-fonts.py`): each font reads, has its license
+    /// text and a quality score of the limit or more, and is not a font of
+    /// the program. The package of the fonts of earlier versions has the
+    /// fonts below the limit.
+    #[test]
+    fn the_font_packages_have_fonts_above_the_limit() {
+        use emb_letter::quality::{BUNDLE, LIMIT};
+        let dir = std::path::Path::new("../../data/font-packages");
+        let mut families: Vec<String> = Vec::new();
+        for (name, count) in [
+            ("sans", 23),
+            ("display", 19),
+            ("serif", 6),
+            ("script", 12),
+            ("hand", 8),
+            ("earlier", 4),
+        ] {
+            let path = dir.join(format!("shokujodx-fonts-{name}.zip"));
+            let bytes = std::fs::read(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+            let files = crate::share::unzip(&bytes).unwrap_or_else(|e| panic!("{name}: {e}"));
+            let readme = files.iter().find(|(n, _)| n == "README.txt").expect("README.txt");
+            assert!(String::from_utf8_lossy(&readme.1).contains("Import a package"));
+            let fonts: Vec<&(String, Vec<u8>)> = files.iter().filter(|(n, _)| n.ends_with(".embfont")).collect();
+            assert_eq!(fonts.len(), count, "{name}");
+            for (file, bytes) in fonts {
+                let stem = file
+                    .strip_prefix("fonts/")
+                    .and_then(|f| f.strip_suffix(".embfont"))
+                    .unwrap_or_else(|| panic!("{name}: {file}"));
+                let font = emb_letter::EmbFont::from_json(&String::from_utf8_lossy(bytes))
+                    .unwrap_or_else(|e| panic!("{name}: {file}: {e}"));
+                assert_eq!(file_name(&font.family), stem, "{name}: {file}");
+                assert!(font.letters.len() > 150, "{name}: {file}");
+                let license = files
+                    .iter()
+                    .find(|(n, _)| *n == format!("fonts/{stem}-OFL.txt"))
+                    .unwrap_or_else(|| panic!("{name}: no license text of {stem}"));
+                assert!(String::from_utf8_lossy(&license.1).contains("SIL OPEN FONT LICENSE"));
+                assert!(font.notes.contains("Converted from"), "{name}: {file}");
+                let q = font.quality.unwrap_or_else(|| panic!("{name}: {file} has no score"));
+                if name == "earlier" {
+                    assert!(q.score < LIMIT, "{file}: {q:?}");
+                    assert!(emb_letter::bundled::EARLIER.contains(&font.family.as_str()), "{file}");
+                } else {
+                    assert!(q.score >= LIMIT && q.score < BUNDLE, "{file}: {q:?}");
+                }
+                assert!(
+                    emb_letter::bundled::embroidery(&font.family).is_none(),
+                    "{} is a font of the program",
+                    font.family
+                );
+                assert!(!families.contains(&font.family), "{} is in two packages", font.family);
+                families.push(font.family.clone());
+            }
+        }
+        assert_eq!(families.len(), 72);
+        assert!(
+            emb_letter::bundled::EARLIER
+                .iter()
+                .all(|f| families.iter().any(|x| x == f))
+        );
+    }
+
+    /// A font package goes into the fonts of the user with Import Package
+    /// (My Assets), and its fonts are in the font list with their scores.
+    #[test]
+    fn a_font_package_adds_its_fonts() {
+        use crate::assets::AssetKind;
+        let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        let dir = std::env::temp_dir().join(format!("emb-font-package-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let bytes = std::fs::read("../../data/font-packages/shokujodx-fonts-serif.zip").unwrap();
+        let summary = st.import_package(&bytes, &[(AssetKind::Fonts, dir.clone())]).unwrap();
+        assert!(summary.ends_with(": 6"), "{summary}");
+        st.fonts.add_user_fonts(&dir);
+        let zilla = FontRef::embroidery("Zilla Slab", "");
+        assert!(st.fonts.score(&zilla).is_some_and(|s| s >= emb_letter::quality::LIMIT));
+        let p = st.preview_of(&zilla).unwrap();
+        assert!(p.letters.len() >= 10 && p.notes.contains("Zilla Slab"));
+        // The license texts of the package do not go into the folder of
+        // the fonts as fonts: only the font files are there.
+        let files = crate::assets::files_in(AssetKind::Fonts, &dir);
+        assert_eq!(files.len(), 6, "{files:?}");
+        std::fs::remove_dir_all(dir).ok();
     }
 
     #[test]

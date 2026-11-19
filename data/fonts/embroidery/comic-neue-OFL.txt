@@ -1,5 +1,4 @@
-Copyright (c) 2011, TypeTogether (www.type-together.com), 
-with Reserved Font Names "Abril" and "Abril Fatface"
+Copyright 2014 The Comic Neue Project Authors (https://github.com/crozynski/comicneue)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

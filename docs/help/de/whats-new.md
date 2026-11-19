@@ -49,6 +49,16 @@ Schreibschriften, Arabisch (von rechts nach links) und Devanagari. Die
 Schriften Tajawal (Arabisch) und Poppins (Devanagari) kommen mit dem
 Programm. Siehe [Schrift](lettering).
 
+**Mehr Schriften, mit einer Qualitätswertung.** Das Programm hat 55
+Stickschriften (vorher 30), und die Schriftpakete auf der Seite des
+Programms haben 68 weitere. Jede Stickschrift hat eine Qualitätswertung von
+0 bis 100: **Schrift > Schriften** zeigt sie und kann nach ihr sortieren.
+Die Größenbereiche einiger Schriften sind jetzt kleiner, damit ihre dünnen
+Striche bei der kleinsten Größe nicht zu schmal sind. Vier Schriften mit
+einer niedrigen Wertung (Slab Heavy, Fat Face Serif, Shrikhand und Great
+Vibes) sind jetzt im Schriftpaket **Fonts of earlier versions**. Ein Design,
+das eine von ihnen hat, bleibt, wie es ist.
+
 **Neue Versionen.** Das Programm kann Ihnen sagen, wenn eine neue Version
 verfügbar ist. Siehe [Optionen](options).
 

@@ -107,6 +107,21 @@ fn embroidery_fonts_4() {
 }
 
 #[test]
+fn embroidery_fonts_5() {
+    golden("embroidery-fonts-5");
+}
+
+#[test]
+fn embroidery_fonts_6() {
+    golden("embroidery-fonts-6");
+}
+
+#[test]
+fn embroidery_fonts_7() {
+    golden("embroidery-fonts-7");
+}
+
+#[test]
 fn lettering_circle() {
     golden("lettering-circle");
 }

@@ -85,20 +85,53 @@ fn widths(part: &ObjectKind) -> Vec<f64> {
     w
 }
 
-/// The outline of the letter `c` of the source font, in mm at the design
-/// size of `font`: outer rings with their holes.
-pub fn outline(font: &EmbFont, source: &Font, c: char) -> Vec<(Vec<Point>, Vec<Vec<Point>>)> {
-    let Some(g) = source.glyph(c) else {
-        return Vec::new();
+pub use emb_letter::quality::outline;
+
+/// The quality of a font in one line (ADR 0115).
+pub fn quality_line(q: &emb_letter::quality::Quality) -> String {
+    format!(
+        "quality {}: cover {:.1} %, too narrow {:.1} %, too long {:.1} %, fill letters {:.1} %",
+        q.score,
+        q.coverage * 100.0,
+        q.narrow * 100.0,
+        q.long * 100.0,
+        q.fills * 100.0
+    )
+}
+
+/// The quality of `font` (converted from `source`) and the letters with
+/// the lowest scores.
+pub fn quality_table(font: &EmbFont, source: &Font) -> String {
+    let mut rows = emb_letter::quality::letters(font, source);
+    let Some(q) = emb_letter::quality::of_letters(&rows) else {
+        return String::new();
     };
-    let s = font.cap_height_mm / source.cap_height;
-    let scale = |r: &Vec<Point>| -> Vec<Point> { r.iter().map(|p| Point::new(p.x * s, p.y * s)).collect() };
-    source
-        .shapes(g)
-        .fills
-        .iter()
-        .map(|(outer, holes)| (scale(outer), holes.iter().map(scale).collect()))
-        .collect()
+    let mut out = quality_line(&q);
+    let w = |part: f64| emb_letter::quality::width_at(font, part).unwrap_or(0.0);
+    out.push_str(&format!(
+        " | range {}-{} mm, widths at 25 mm: 5 % {:.2}, 10 % {:.2}, 50 % {:.2}, 90 % {:.2}, 95 % {:.2}",
+        font.min_height_mm,
+        font.max_height_mm,
+        w(0.05),
+        w(0.1),
+        w(0.5),
+        w(0.9),
+        w(0.95)
+    ));
+    out.push('\n');
+    rows.sort_by(|a, b| a.1.score().total_cmp(&b.1.score()));
+    for (c, l) in rows.iter().take(12).filter(|r| r.1.score() < 0.9) {
+        out.push_str(&format!(
+            "  {:<5} score {:>3.0}: cover {:5.1} %, too narrow {:5.1} %, too long {:5.1} %{}\n",
+            format!("{c:?}"),
+            l.score() * 100.0,
+            l.coverage * 100.0,
+            l.narrow * 100.0,
+            l.long * 100.0,
+            if l.fill { ", fill" } else { "" }
+        ));
+    }
+    out
 }
 
 /// The trims and the stitches of the letter `c` when it sews alone at the
