@@ -554,6 +554,11 @@ The libraries of motifs and patterns are large enough for daily work.
 - The clipart items are simple shapes (stars, flowers, a gear, a tree):
   pictures with more detail need drawing by hand.
 
+## Audit
+
+The audit of the phase and a review of its shortcomings are in the
+roadmap: "Audit of P17 (2026-11-19)" and "Review of P17 (2026-11-19)".
+
 ## Not in this phase
 
 - More formats to write: all machines of the machine library have a

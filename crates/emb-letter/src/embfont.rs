@@ -37,6 +37,60 @@ pub enum EmbFontError {
     Version(u32),
     #[error("{}", text::tr("not an embroidery font file"))]
     Format,
+    /// A number of the file is not in its range; the text names it.
+    #[error("{}", text::fill("the embroidery font has a wrong value: {}", &[.0]))]
+    Invalid(String),
+}
+
+/// The largest size and the largest coordinate in a font file, in mm at
+/// the design size of the font (the converter makes letters with a capital
+/// height of [`DESIGN_CAP_MM`]). A file with a larger value is not a font
+/// that the program made, and a very large value makes very large letters
+/// (the audit of P17).
+pub const MAX_FONT_MM: f64 = 1000.0;
+/// The largest capital height of a size range, in mm.
+pub const MAX_RANGE_MM: f64 = 10_000.0;
+
+/// Checks one letter of a font file: its width and the coordinates of its
+/// parts are numbers in the range of a font ([`MAX_FONT_MM`]), and each
+/// part is a column, a fill or a run. `Err`: what is wrong.
+pub fn check_letter(letter: &EmbLetter) -> Result<(), &'static str> {
+    let ok = |p: &emb_geom::Point| {
+        p.x.is_finite() && p.y.is_finite() && p.x.abs() <= MAX_FONT_MM && p.y.abs() <= MAX_FONT_MM
+    };
+    if !(letter.advance_mm.is_finite() && letter.advance_mm.abs() <= MAX_FONT_MM) {
+        return Err("advance_mm");
+    }
+    for part in &letter.parts {
+        let rungs: &[(emb_geom::Point, emb_geom::Point)] = match part {
+            ObjectKind::Satin { geometry, .. } => &geometry.rungs,
+            ObjectKind::Fill { .. } | ObjectKind::Running { .. } => &[],
+            _ => return Err("a part that is not a column, a fill or a run"),
+        };
+        if !rungs.iter().all(|(a, b)| ok(a) && ok(b)) {
+            return Err("parts");
+        }
+        let holes: &[emb_geom::Path] = match part {
+            ObjectKind::Fill { holes, .. } => holes,
+            _ => &[],
+        };
+        for path in part.paths().chain(holes) {
+            if !path.points().all(|p| ok(&p)) {
+                return Err("parts");
+            }
+            if let Some(b) = path.control_bbox()
+                && !(ok(&b.min) && ok(&b.max))
+            {
+                return Err("parts");
+            }
+        }
+    }
+    for t in &letter.tuning {
+        if !(t.pull_mm.is_finite() && t.pull_mm.abs() <= 10.0 && t.angle_deg.is_finite()) {
+            return Err("tuning");
+        }
+    }
+    Ok(())
 }
 
 /// One letter of an embroidery font.
@@ -109,8 +163,49 @@ impl EmbFont {
         if f.version > VERSION {
             return Err(EmbFontError::Version(f.version));
         }
+        f.validate().map_err(EmbFontError::Invalid)?;
         f.index();
         Ok(f)
+    }
+
+    /// Checks the numbers of a font file (the audit of P17): the sizes of
+    /// the font, its size range, each letter ([`check_letter`]), the
+    /// kerning and the quality. A font file can come from another person
+    /// (a font package). `Err`: the name of the wrong value in the file.
+    pub fn validate(&self) -> Result<(), String> {
+        let size = |v: f64, least: f64, most: f64| v.is_finite() && v >= least && v <= most;
+        if !size(self.cap_height_mm, 1.0, MAX_FONT_MM) {
+            return Err("cap_height_mm".into());
+        }
+        if !size(self.line_height_mm, 0.01, MAX_FONT_MM) {
+            return Err("line_height_mm".into());
+        }
+        if !size(self.space_mm, 0.0, MAX_FONT_MM) {
+            return Err("space_mm".into());
+        }
+        if !size(self.min_height_mm, 0.1, MAX_RANGE_MM) {
+            return Err("min_height_mm".into());
+        }
+        if !size(self.max_height_mm, self.min_height_mm, MAX_RANGE_MM) {
+            return Err("max_height_mm".into());
+        }
+        for (c, letter) in &self.letters {
+            check_letter(letter).map_err(|what| format!("letters.{c}: {what}"))?;
+        }
+        if let Some((pair, _)) = self
+            .kerning
+            .iter()
+            .find(|(_, k)| !(k.is_finite() && k.abs() <= MAX_FONT_MM))
+        {
+            return Err(format!("kerning.{pair}"));
+        }
+        if let Some(q) = &self.quality {
+            let part = |v: f64| v.is_finite() && (0.0..=1.0).contains(&v);
+            if q.score > 100 || !(part(q.coverage) && part(q.narrow) && part(q.long) && part(q.fills)) {
+                return Err("quality".into());
+            }
+        }
+        Ok(())
     }
 
     pub fn to_json(&self) -> String {
@@ -671,6 +766,87 @@ fn source_min() -> f64 {
 
 fn source_max() -> f64 {
     crate::source::MAX_HEIGHT_MM
+}
+
+#[cfg(test)]
+mod validate_tests {
+    use super::*;
+
+    fn font() -> EmbFont {
+        let source = crate::bundled::font("Lato", "Bold").unwrap();
+        convert(&source, "Check", "", LetterStitch::Auto, &['A', 'o'])
+    }
+
+    fn wrong(change: impl Fn(&mut EmbFont)) -> String {
+        let mut f = font();
+        change(&mut f);
+        match EmbFont::from_json(&f.to_json()) {
+            Err(EmbFontError::Invalid(what)) => what,
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_font_file_with_a_wrong_number_is_refused() {
+        let f = font();
+        assert_eq!(f.validate(), Ok(()));
+        assert!(EmbFont::from_json(&f.to_json()).is_ok());
+        // Each bundled font passes.
+        for (family, _) in crate::bundled::EMBROIDERY {
+            assert_eq!(
+                crate::bundled::embroidery(family).unwrap().validate(),
+                Ok(()),
+                "{family}"
+            );
+        }
+        assert_eq!(wrong(|f| f.cap_height_mm = 1e-9), "cap_height_mm");
+        assert_eq!(wrong(|f| f.cap_height_mm = 1e9), "cap_height_mm");
+        assert_eq!(wrong(|f| f.line_height_mm = -5.0), "line_height_mm");
+        assert_eq!(wrong(|f| f.space_mm = 1e9), "space_mm");
+        assert_eq!(wrong(|f| f.min_height_mm = 0.0), "min_height_mm");
+        assert_eq!(wrong(|f| f.max_height_mm = f.min_height_mm - 1.0), "max_height_mm");
+        assert_eq!(wrong(|f| f.max_height_mm = 1e9), "max_height_mm");
+        assert_eq!(
+            wrong(|f| f.letters.get_mut(&'A').unwrap().advance_mm = 1e9),
+            "letters.A: advance_mm"
+        );
+        assert_eq!(
+            wrong(|f| {
+                if let ObjectKind::Satin { geometry, .. } = &mut f.letters.get_mut(&'A').unwrap().parts[0] {
+                    geometry.rail_a = geometry.rail_a.transformed(&Transform::translate(1e9, 0.0));
+                }
+            }),
+            "letters.A: parts"
+        );
+        assert_eq!(
+            wrong(|f| {
+                if let ObjectKind::Satin { geometry, .. } = &mut f.letters.get_mut(&'o').unwrap().parts[0] {
+                    geometry
+                        .rungs
+                        .push((emb_geom::Point::new(0.0, 0.0), emb_geom::Point::new(0.0, 5000.0)));
+                }
+            }),
+            "letters.o: parts"
+        );
+        assert_eq!(
+            wrong(|f| {
+                f.kerning.insert("Ao".into(), -1e9);
+            }),
+            "kerning.Ao"
+        );
+        assert_eq!(wrong(|f| f.quality.as_mut().unwrap().score = 200), "quality");
+        assert_eq!(wrong(|f| f.quality.as_mut().unwrap().narrow = -1.0), "quality");
+        // A part that is not a column, a fill or a run is not a letter part.
+        let text = wrong(|f| {
+            let l = emb_model::Lettering::new("x", f.font_ref(), 10.0, emb_geom::Point::ZERO);
+            f.letters
+                .get_mut(&'A')
+                .unwrap()
+                .parts
+                .push(ObjectKind::Lettering(Box::new(l)));
+        });
+        assert!(text.starts_with("letters.A: a part that is not"), "{text}");
+    }
 }
 
 #[cfg(test)]

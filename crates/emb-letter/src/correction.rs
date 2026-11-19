@@ -118,6 +118,15 @@ impl LetterCorrection {
     /// The corrected letter. `letter` is the letter of the font (`None`: the
     /// font does not have it; then the correction must have a shape).
     pub fn apply(&self, letter: Option<&EmbLetter>) -> Result<EmbLetter, String> {
+        let new = self.corrected(letter)?;
+        // A corrections file can come from another person: the numbers of
+        // the letter are in the range of a font (the audit of P17).
+        crate::embfont::check_letter(&new)
+            .map_err(|what| text::fill("the embroidery font has a wrong value: {}", &[&what]))?;
+        Ok(new)
+    }
+
+    fn corrected(&self, letter: Option<&EmbLetter>) -> Result<EmbLetter, String> {
         let mut parts = match (&self.parts, letter) {
             (Some(parts), _) => parts.clone(),
             (None, Some(l)) => {

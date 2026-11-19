@@ -119,6 +119,193 @@ The audit of Stages 1 to 6 and the IP review of the release (the rules of the re
 - Open: the start test on the PC of the owner's friends. Passed (owner, 2026-11-16): endless pan with a real mouse, the My Machines window. The installer removes the older version before it asks to close a running ShokujoDX, so a Cancel at that question leaves no version installed (install again to fix).
 
 
+## Audit of P17 (2026-11-19)
+
+After Milestones 1, 2 and 4 to 8 of the phase (Milestone 3 is set aside by
+the owner), a check of the code and the documents: a probe with wrong
+values in font files and in letter corrections, a probe with text that is
+hard to shape, the rules of the spec, the translations, the licenses, the
+help and the numbers in the documents.
+
+**Fixed.**
+
+- **A font file with a wrong value ended the program.** A probe
+  (`p17_probe.rs`) set each number of three small font files (a routed
+  font, a script font and a fill font) in turn to wrong values (decimals
+  0, −5, 10⁻⁹ and 10⁹; whole numbers 0, 100 000 and 10⁹), read the file,
+  laid out and sewed a text, measured the font and made its test sheet,
+  in a thread with a time limit. A font file had no check of its numbers
+  at all. With a coordinate of 10⁹ mm in a letter, the probe asked for
+  32 GB of memory and the test program ended (the step was not found
+  out: the file is refused now). A font file can come from a font
+  package of another person. Now `EmbFont::validate` checks a file when
+  it is read: the capital height (1 mm to 1 m), the line height, the
+  space, the size range (to 10 m, the smallest size not above the
+  largest), each letter (`embfont::check_letter`: its width and each
+  coordinate within 1 m; its parts are columns, fills and runs only; its
+  settings), the kerning and the quality. A corrected letter of a
+  corrections file has the same check. After the change: 978 cases, 256
+  refused as wrong files, no crash, no hang and none slower than 3 s;
+  98 cases of a corrections file, none with a problem.
+- **The default motif and the default pattern made all items of the
+  families.** After Milestone 8, `Motif::default` made the 71 built-in
+  motifs and `SplitPattern::default` the 48 patterns to take the first
+  one. The stitch engine takes the default for each motif column and
+  each program-split column with no item of its own. Now the defaults
+  are the first items that are written by hand, with no family.
+- **The numbers in the help can go wrong with no notice.** The help says
+  how many fonts, motifs, patterns, stamps, borders and clipart items
+  the program has, in four languages. A new test compares these numbers
+  with the program (`the_numbers_in_the_help_are_the_numbers_of_the_program`).
+- ADR 0113 said that the script of the proof pictures is not in the
+  repository; it is `tools/font-proof.py`. The heading of P17 in this
+  roadmap named five milestones as done.
+
+**Left as it is.**
+
+- The Mitre Corners setting does nothing for the embroidery fonts of the
+  program and of the packages (a routed letter is fixed, ADR 0116).
+- Twelve fonts of the packages have a score of 85 or more, and fifteen
+  fonts of the program have less (the lowest: 71). The owner left the
+  fonts where they are.
+- The score of a fill font says little: the ten fill fonts have 99 and
+  100. The size range is what the measure gives (ADR 0117).
+- The score measures the 62 letters and digits. A check of all 199
+  characters of six fonts found at most one character of a font with
+  less than 90 % of its outline; of the 1045 marks of the 55 fonts with
+  satin letters, 12 have less than 90 %. A letter with an accent has a
+  trim for the accent.
+- The names of the motifs, patterns, stamps, borders, clipart items and
+  families are in English only. The lists of the patterns (48), stamps
+  (39) and borders (50) are names with no pictures.
+- The Families window has no ribbon command: the Motifs window, Object
+  Properties and the Clipart panel open it.
+- The pictures of the windows show the titles of some dock tabs cut
+  ("Clipart", "Información del diseño"; 115 texts in the report, 31 of
+  them only in a translation), and the View Options window is wider in
+  German and in Spanish than in English.
+- The Motifs window reads the motifs folder at each frame while it is
+  open (as before the phase).
+- A join under the strokes that sew later can be one stitch of up to
+  9.8 mm (ADR 0116). Heavy serif fonts and the "m" of Brush Hand are as
+  the plan says.
+- The update check needs the `curl` program of the system (ADR 0109).
+
+**Checked, no change.**
+
+- Rules 3 and 9: no names of closed-source programs in the changes of
+  the phase; no `unsafe` code (the one crate with `unsafe` is
+  `emb-thumbnail`, as before); the new dependencies are `harfrust` and
+  `unicode-bidi` (pure Rust, ADR 0114), and the list of licenses has
+  them; the trig functions of the engine code go through
+  `emb_geom::math` (the one other call is in a test).
+- Text that is hard to shape (Milestone 6): 36 cases (nine texts in four
+  bundled fonts: a line of 6 400 characters, 800 lines, direction
+  marks, 3 000 marks on one letter, Arabic with marks, Devanagari
+  conjuncts, joiners, characters that no font has, mixed scripts). No
+  crash, no hang; all cases and the corrections in less than 6 s.
+- The test sheet of a fill font (a range to 300 mm): the middle and the
+  largest size are on at the start only if the sheet fits the hoop.
+- Translations: the 4109 texts of the template are in German, Spanish
+  and Japanese, none missing and none extra. The help topics
+  (`options.md`, `lettering.md`, `tutorial-lettering.md`,
+  `stitch-types.md`, `whats-new.md`) and their translations describe
+  each milestone; F1 opens a topic from the Fonts, Alphabets, Font Test
+  Sheet, Families, Borders and Check for Updates windows.
+- ADRs 0109 to 0118; the plan, the inventory, the spec and `CLAUDE.md`
+  name each part of the phase.
+- Licenses: the 65 fonts of the program have 65 license texts next to
+  them; each font of a package has its license text in the package (a
+  test checks it).
+- Files of this version in an older program: the new fields of a font
+  file and of a project (the quality, the fill mark, fixed letters) have
+  default values, and the types do not refuse fields that they do not
+  know. No test with the program of version 0.3.0 was made.
+- The program is 72.3 MB (63.4 MB before Milestone 7).
+
+**Exit tests.** The software parts passed; the sew-outs are open.
+
+| Milestone | Exit test | State |
+| --- | --- | --- |
+| 1 | A build with an older version number shows the notice; with automatic checks off, the program makes no request | Passed in tests; a check with a real release is open (owner) |
+| 2 | The pictures of all windows in four languages in less than five minutes; a text that does not fit is found and corrected | Passed (588 pictures in 100 s) |
+| 3 | The kit sews correctly on the Tajima; the cap design on the cap frame; no open problem in the reports of the testers | Open (set aside by the owner) |
+| 4 | A corrected letter stays corrected after the fonts are made again; the owner sews the test sheet of one font | The test passes; the sew-out is open (owner) |
+| 5 | The test sheet of each of the ten fonts sews correctly on the Topaz 20 and on the Tajima, at the three sizes | Open (owner). The fonts were made again after the milestone (ADR 0116), so the sheets must be made again too |
+| 6 | A test text in Arabic, in Devanagari and in a script font gives the glyphs of a reference; the owner sews one word of each | The test passes; the sew-out is open (owner) |
+| 7 | Each bundled font has a score above the limit; the program grows by less than 10 MB | Passed (the lowest score is 71; 8.9 MB more with the fill fonts and Milestone 8) |
+| 8 | A sew-out of five new items of each kind | Open (owner) |
+
+## Review of P17 (2026-11-19): shortcomings and lanes
+
+A look at the phase as a whole, after its audit. These are proposals;
+the owner decides which become work.
+
+**Shortcomings.**
+
+1. **Nothing of the phase is sewn.** The scores, the routes, the fill
+   fonts and the new content are checked on pictures and with counts.
+   The limits (65 and 85, the 2 mm of a fill, the 6 mm of a tile row)
+   come from pictures. One sew-out can change them: travel runs under a
+   light thread, the seam of a cut column, a hidden join of 9.8 mm, the
+   edge of a fill letter.
+2. **The score does not see what the eye sees.** It measures the part of
+   the shape that has stitches, columns that are too narrow, and
+   stitches that are too long. It does not measure trims, stitches
+   outside the shape, places with two layers, the turn of the stitches
+   at a bend, the marks or the letters with accents. A fill font always
+   has a high score.
+3. **A font is all columns or all fills.** A heavy font has some letters
+   that are good as columns and some that are not. The converter does
+   not choose for each letter.
+4. **Routed letters lost a setting.** Mitre Corners does nothing for all
+   fonts of the program.
+5. **The new content is hard to choose.** 48 patterns, 39 stamps and 50
+   borders are lists of English names with no pictures. The clipart
+   meets its number with simple shapes.
+6. **The converter of the user is weaker than the font tool.** A font
+   that the user converts in the program is not extended and not routed
+   (the tool takes 5 to 30 s for a font).
+7. **Text shaping is for TrueType fonts only.** Arabic and Devanagari
+   text has letters that the program makes when the text is typed; they
+   have no route and no score.
+8. **Development tools are not complete.** The contact sheet of the
+   items of the families was drawn by a script that is not in the
+   repository. The pictures of the windows (588) are looked at as a
+   sample; nothing shows which pictures changed since the last run.
+9. **Milestone 3** (an industrial machine, reports of professional
+   testers) is the oldest open part, and the fonts are not tested on
+   such a machine.
+
+**Lanes, the cheapest first.**
+
+1. **A sew-out kit of the phase** (S): one folder with the test sheet of
+   a tuned font at three sizes, a routed font that is not tuned, a fill
+   font at 15, 40 and 100 mm, one word in Arabic and in Devanagari, and
+   the design of the content families. The owner can then do the open
+   exit tests in one session.
+2. **Development tools** (S): a contact sheet of the items of the
+   families from the repository (`emb-cli` writes the items, a script in
+   `tools` draws them); a list of the window pictures that changed
+   since the last run.
+3. **Pictures in the lists** (M): the patterns, the stamps and the
+   borders as picture grids, as the motifs have, with a search. The
+   Families window draws them already.
+4. **The route in the converter of the program** (S to M): Convert runs
+   the extension and the route as a background job with a progress
+   bar, so a font of the user is as good as a font of the tool.
+5. **The best of columns and fill for each letter** (M): the converter
+   makes both for each letter and keeps the one with the better letter
+   score. The score gets the measures that the audit of the fonts has
+   already (stitches outside the shape, two layers, trims).
+6. **Mitre corners in routed letters** (M): the route joins two columns
+   that meet at a corner when the font is made, or the layout does it
+   for two parts that sew one after the other.
+7. **Embroidery fonts for Arabic and Devanagari** (L): converted fonts
+   with a letter for each glyph of the font, routed and with a score.
+8. **Clipart sets** (L): pictures with more detail by theme, as asset
+   packages. They need drawing by hand or a source with a free license.
+
 ## Audit of P16 (2026-11-18)
 
 After Milestones 1 to 8 of the product view, a check of the code and the
@@ -1067,7 +1254,7 @@ and templates for the user's own product photos, and a turntable view
 
 **Exit:** the exit tests of the eight milestones in the plan.
 
-### P17. Polish and lettering (L) — Milestones 1, 2, 4, 5 and 6 done in software (`docs/design/p17-plan.md`)
+### P17. Polish and lettering (L) — done in software but Milestone 3 (set aside), exit tests open (audit: "Audit of P17") (`docs/design/p17-plan.md`)
 
 The features that the program has become better before it gets new ones
 (owner, 2026-11-18), in eight milestones: an update check that the user

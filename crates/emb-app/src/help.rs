@@ -1339,6 +1339,67 @@ mod tests {
         }
     }
 
+    /// The numbers of fonts and of library items in the help are the
+    /// numbers of the program (the audit of P17): a new font or a new item
+    /// needs the new number in the help and in its translations.
+    #[test]
+    fn the_numbers_in_the_help_are_the_numbers_of_the_program() {
+        let fonts = emb_letter::bundled::EMBROIDERY.len();
+        let fill = fonts - emb_letter::bundled::P17_EMBROIDERY;
+        let tuned = emb_letter::bundled::TUNED.len();
+        let items = [
+            emb_model::motif::builtin().len(),
+            emb_model::split::split_patterns().len(),
+            emb_model::split::stamps().len(),
+            emb_model::decor::frames().len(),
+            crate::clipart::builtins().len(),
+        ];
+        // The text of a topic with each run of white space as one space.
+        let plain = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
+        let english = |id: &str| {
+            let file = FILES
+                .iter()
+                .find(|f| parse_topic(f).is_some_and(|t| t.id == id))
+                .unwrap_or_else(|| panic!("no topic {id}"));
+            plain(file)
+        };
+        let has = |id: &str, text: String| assert!(english(id).contains(&plain(&text)), "{id}: {text:?} is not there");
+        has("lettering", format!("{fonts} embroidery fonts come with the program"));
+        has("lettering", "Ten of the fonts are **tuned** fonts".into());
+        has("lettering", "Ten of the embroidery fonts are **fill fonts**".into());
+        assert_eq!(
+            (tuned, fill),
+            (10, 10),
+            "the help says ten tuned fonts and ten fill fonts"
+        );
+        has(
+            "tutorial-lettering",
+            format!("({fonts} embroidery fonts come with the program"),
+        );
+        has("whats-new", format!("The program has {fonts} embroidery fonts"));
+        has(
+            "whats-new",
+            format!(
+                "{} motifs (15 before), {} program-split patterns (10), {} carving stamps (8), {} decorative borders (12) and {} clipart items (8)",
+                items[0], items[1], items[2], items[3], items[4]
+            ),
+        );
+        // The translations have the same numbers.
+        for (code, name, text) in HELP_TRANSLATIONS {
+            let numbers: Vec<usize> = match *name {
+                "lettering" | "tutorial-lettering" => vec![fonts],
+                "whats-new" => std::iter::once(fonts).chain(items).collect(),
+                _ => continue,
+            };
+            for n in numbers {
+                let found = text
+                    .split(|c: char| !c.is_ascii_digit())
+                    .any(|word| word.parse::<usize>() == Ok(n));
+                assert!(found, "{code}/{name}: the number {n} is not there");
+            }
+        }
+    }
+
     /// In a language with translations, the help shows them, and the search
     /// finds their words (also in Japanese, which has no spaces).
     #[test]

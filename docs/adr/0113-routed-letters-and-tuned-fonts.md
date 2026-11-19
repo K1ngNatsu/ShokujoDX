@@ -31,8 +31,7 @@ are not:
   narrowest and widest column, and the trims in the letter at the
   smallest, middle and largest size (from the stitch engine). It also
   gives the trims of a sample sentence. `--proof` writes the geometry of
-  the letters; a script outside the repository draws the proof pictures
-  from it.
+  the letters; `tools/font-proof.py` draws the proof pictures from it.
 - **Column ends** (`emb_letter::tune`, with the outline of the source
   font). An end goes on into a part of the outline with no stitches, as
   far as the outline, one rail more than the other at a slanted edge. An
@@ -96,5 +95,5 @@ are not:
   largest size.
 - Routing a font takes about 5 to 30 seconds (the letters in parallel
   threads), so only the font tool does it, not the program.
-- The proof pictures are a development tool: the script that draws them
-  is not in the repository.
+- The proof pictures are a development tool (`tools/font-proof.py`); the
+  program does not make them.

@@ -27,8 +27,11 @@ pub struct SplitPattern {
 }
 
 impl Default for SplitPattern {
+    /// The first built-in pattern. It does not make the patterns of the
+    /// families: the stitch engine takes the default pattern for each
+    /// program-split column with no pattern of its own.
     fn default() -> Self {
-        split_patterns().remove(0)
+        handmade_patterns().swap_remove(0)
     }
 }
 
@@ -63,9 +66,18 @@ fn dense(n: usize) -> Vec<f64> {
     (0..n).map(|i| i as f64 / n as f64).collect()
 }
 
-/// The built-in program-split patterns, in menu order.
+/// The built-in program-split patterns, in menu order: the patterns that
+/// are written by hand, then the patterns of the families (P17 Milestone
+/// 8, ADR 0118).
 pub fn split_patterns() -> Vec<SplitPattern> {
-    let mut all = vec![
+    let mut all = handmade_patterns();
+    all.extend(crate::family::preset_splits());
+    all
+}
+
+/// The built-in patterns that are written by hand (P5 Milestone 5).
+fn handmade_patterns() -> Vec<SplitPattern> {
+    vec![
         pattern("Brick", 4.0, 16, |r, _| match r {
             0 | 8 => dense(8),
             r if r < 8 => vec![0.0],
@@ -105,10 +117,7 @@ pub fn split_patterns() -> Vec<SplitPattern> {
             vec![x, x + 0.5]
         }),
         pattern("Grid", 3.0, 15, |r, _| if r == 0 { dense(6) } else { vec![0.0] }),
-    ];
-    // The patterns of the families (P17 Milestone 8, ADR 0118).
-    all.extend(crate::family::preset_splits());
-    all
+    ]
 }
 
 /// A carving stamp: lines in a unit box, from -0.5 to 0.5.
@@ -255,7 +264,10 @@ mod tests {
     #[test]
     fn builtin_patterns_and_stamps_are_well_formed() {
         let pats = split_patterns();
-        assert!(pats.len() >= 10);
+        assert!(pats.len() >= 40);
+        // The defaults are the first items, as before the families.
+        assert_eq!(SplitPattern::default(), pats[0]);
+        assert_eq!(crate::Motif::default(), crate::motif::builtin()[0]);
         for p in &pats {
             assert!(p.width_mm > 0.0 && p.rows.len() >= 10, "{}", p.name);
             for r in &p.rows {

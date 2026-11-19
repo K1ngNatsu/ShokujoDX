@@ -78,8 +78,11 @@ impl Motif {
 }
 
 impl Default for Motif {
+    /// The first built-in motif. It does not make the motifs of the
+    /// families: the stitch engine takes the default motif for each motif
+    /// column with no motif of its own.
     fn default() -> Self {
-        builtin().remove(0)
+        handmade().swap_remove(0)
     }
 }
 
@@ -98,8 +101,16 @@ fn curve(n: usize, f: impl Fn(f64) -> (f64, f64)) -> Vec<(f64, f64)> {
 const TAU: f64 = std::f64::consts::TAU;
 const PI: f64 = std::f64::consts::PI;
 
-/// The built-in motifs, in menu order.
+/// The built-in motifs, in menu order: the motifs that are written by
+/// hand, then the motifs of the families (P17 Milestone 8, ADR 0118).
 pub fn builtin() -> Vec<Motif> {
+    let mut v = handmade();
+    v.extend(crate::family::preset_motifs());
+    v
+}
+
+/// The built-in motifs that are written by hand (P5 Milestone 4).
+fn handmade() -> Vec<Motif> {
     let mut v = vec![
         motif("Peak", vec![(0.0, 0.0), (0.5, -0.5), (1.0, 0.0)]),
         motif(
@@ -191,8 +202,6 @@ pub fn builtin() -> Vec<Motif> {
     for m in &mut v {
         m.points.dedup();
     }
-    // The motifs of the families (P17 Milestone 8, ADR 0118).
-    v.extend(crate::family::preset_motifs());
     v
 }
 
