@@ -61,14 +61,16 @@ embroidery fonts.
 Each embroidery font has a **quality score** from 0 to 100. The score
 says how well the letters of the font sew. The font list shows it after
 the name of the font, and **Sort by > Quality** puts the fonts with the
-best scores first. Select a font to see its score and these three
+best scores first. Select a font to see its score and these
 measures:
 
 - how much of the shapes of the letters the stitches cover,
 - how much of the satin columns is too narrow at the smallest size of the
   font,
 - how much of the satin columns has stitches that are too long at the
-  largest size of the font.
+  largest size of the font,
+- how much of the stitches is outside the shapes of the letters,
+- how much of the letters has two layers of stitches.
 
 Each font of the program has a score of 65 or more. A font that you
 convert gets its score when you convert it. The size range of a font
@@ -93,6 +95,10 @@ the fonts of the program have it: the needle goes from one stroke to the
 next one under the stitches, and the columns reach the corners. This
 takes longer; a bar shows how far the conversion is, and **Stop** ends
 it.
+With the stitch type **Automatic**, the program makes each letter with
+satin columns and as a fill, and keeps the one that sews better. A fill is
+better only in a font for large letters (a size range from 15 mm): there,
+a letter whose columns leave a part of its shape open becomes a fill.
 
 ## Arabic, Devanagari and ligatures
 

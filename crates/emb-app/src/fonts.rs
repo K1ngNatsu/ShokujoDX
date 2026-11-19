@@ -80,7 +80,9 @@ impl ConvertProgress {
 /// letters of `chars`; with `route` (and not for fill letters), the ends
 /// of the columns reach the corners of the outline and each letter gets
 /// its sew order with few trims, as the fonts of the program have (ADR
-/// 0113, 0116); then the quality score. `Err` if the user stopped it.
+/// 0113, 0116); with the stitch type Auto, a letter that is better as a
+/// fill becomes a fill (ADR 0119); then the quality score. `Err` if the
+/// user stopped it.
 pub fn convert_font(
     font: &emb_letter::Font,
     name: &str,
@@ -108,7 +110,12 @@ pub fn convert_font(
         progress.step.store(STEP_ROUTE, Relaxed);
         f.route_until(&progress.routed, &progress.stop);
         stopped()?;
+    }
+    if !f.fill && (route || stitch == LetterStitch::Auto) {
         progress.step.store(STEP_SCORE, Relaxed);
+        if stitch == LetterStitch::Auto {
+            f.choose_fills(font, &[]);
+        }
         f.measure_quality(font);
     }
     Ok(f)
@@ -463,6 +470,22 @@ fn quality_ui(ui: &mut egui::Ui, q: &emb_letter::quality::Quality, fill: bool) {
         )
     };
     ui.add(egui::Label::new(egui::RichText::new(measures).small().weak()).wrap());
+    if !fill {
+        // The other measures of the score (ADR 0119).
+        let mut more = crate::i18n::fill(
+            "The stitches outside the shapes are {} % of the area of the letters. {} % of the area has two \
+             layers of stitches.",
+            &[&pct(q.outside), &pct(q.overlap)],
+        );
+        if q.fills > 0.0 {
+            more.push(' ');
+            more.push_str(&crate::i18n::fill(
+                "{} % of the letters are fills: columns do not sew them well.",
+                &[&pct(q.fills)],
+            ));
+        }
+        ui.add(egui::Label::new(egui::RichText::new(more).small().weak()).wrap());
+    }
 }
 
 /// True for an embroidery font for small text.
@@ -924,6 +947,15 @@ mod tests {
                 .trim_count()
         };
         assert!(trims(&routed) < trims(&plain), "{} {}", trims(&routed), trims(&plain));
+        // These letters are good as columns: none of them became a fill.
+        let fills = |f: &emb_letter::EmbFont| {
+            f.letters
+                .values()
+                .flat_map(|l| l.parts.iter())
+                .filter(|p| matches!(p, ObjectKind::Fill { .. }))
+                .count()
+        };
+        assert_eq!((fills(&routed), fills(&plain)), (0, 0));
         // A fill font has no route.
         let fill = convert_font(&font, "Fill", LetterStitch::Fill, true, &chars, &Default::default()).unwrap();
         assert!(fill.fill && fill.letters.values().all(|l| !l.fixed));

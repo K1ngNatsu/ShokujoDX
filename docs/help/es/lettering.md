@@ -65,13 +65,15 @@ Cada fuente de bordado tiene una **puntuación de calidad** de 0 a 100. La
 puntuación dice lo bien que se bordan las letras de la fuente. La lista de
 fuentes la muestra después del nombre de la fuente, y **Ordenar por >
 Calidad** pone primero las fuentes con las mejores puntuaciones. Seleccione
-una fuente para ver su puntuación y estas tres medidas:
+una fuente para ver su puntuación y estas medidas:
 
 - qué parte de las formas de las letras cubren las puntadas,
 - qué parte de las columnas de satén es demasiado estrecha en el tamaño más
   pequeño de la fuente,
 - qué parte de las columnas de satén tiene puntadas demasiado largas en el
-  tamaño más grande de la fuente.
+  tamaño más grande de la fuente,
+- qué parte de las puntadas queda fuera de las formas de las letras,
+- qué parte de las letras tiene dos capas de puntadas.
 
 Cada fuente del programa tiene una puntuación de 65 o más. Una fuente que
 usted convierte recibe su puntuación al convertirla. El rango de tamaños de
@@ -98,6 +100,11 @@ letra, como lo tienen las fuentes del programa: la aguja pasa de un trazo
 al siguiente por debajo de las puntadas, y las columnas llegan a las
 esquinas. Esto tarda más; una barra muestra hasta dónde ha llegado la
 conversión, y **Parada** la termina.
+Con el tipo de puntada **Automático**, el programa crea cada letra con
+columnas de satén y como relleno, y conserva la que se borda mejor. Un
+relleno solo es mejor en una fuente para letras grandes (un rango de
+tamaños desde 15 mm): allí, una letra cuyas columnas dejan abierta una
+parte de su forma pasa a ser un relleno.
 
 ## Árabe, devanagari y ligaduras
 

@@ -94,6 +94,10 @@ Usage:
       with a Reserved Font Name needs a new --name.
       The font gets a quality score from 0 to 100 (ADR 0115), and its
       size range fits its columns.
+      --stitch auto (the default): after the other steps, a letter whose
+      columns leave a part of its shape open becomes a fill, if its fill
+      letter has the better score (ADR 0119; only in a font with a
+      smallest size of 15 mm or more). --stitch satin keeps all columns.
       --corrections <file>: apply the letter corrections of the file after
       the conversion (ADR 0112). A correction that does not apply is an
       error.
@@ -117,11 +121,16 @@ Usage:
       it or covered two times, the narrowest and widest column, and the
       trims in the letter at each size. --proof writes the geometry of the
       letters for proof pictures.
-  emb-cli font-quality <font.embfont> [--source <font.ttf>]
+  emb-cli font-quality <font.embfont> [--source <font.ttf>] [--letters]
       Print the quality score of an embroidery font (ADR 0115). With
       --source (the font that it was converted from), measure the score
       again and print the letters with the lowest scores; else print the
-      score in the file.
+      score in the file. --letters (with --source): print one line for
+      each letter and digit, with a tab between the values: the
+      character, columns or fill, then the score, the coverage, the part
+      outside, the part with two layers, the part too narrow and the
+      part too long of the letter, and the same six values of the fill
+      letter of the character.
   emb-cli content <out.json>
       Write the built-in library items as data: the motifs, the
       program-split patterns, the carving stamps, the decorative borders
@@ -248,6 +257,7 @@ fn run(args: &[String]) -> Result<(), String> {
     let mut route_letters = false;
     let mut extend_ends = false;
     let mut tuned_font = false;
+    let mut all_letters = false;
     let (mut audit_source, mut audit_proof): (Option<PathBuf>, Option<PathBuf>) = (None, None);
     let (mut sheet_sizes, mut sheet_chars, mut sheet_row) = (Vec::new(), emb_letter::sheet::Characters::Basic, 180.0);
     let mut bench = emb_cli::bench::FolderSettings::default();
@@ -300,6 +310,7 @@ fn run(args: &[String]) -> Result<(), String> {
             "--route" => route_letters = true,
             "--extend" => extend_ends = true,
             "--tuned" => tuned_font = true,
+            "--letters" => all_letters = true,
             "--source" => audit_source = Some(PathBuf::from(it.next().ok_or("--source needs a font file")?)),
             "--proof" => audit_proof = Some(PathBuf::from(it.next().ok_or("--proof needs a file")?)),
             "--sizes" => {
@@ -616,8 +627,14 @@ fn run(args: &[String]) -> Result<(), String> {
             };
             let mut f = f;
             f.tuned = tuned_font;
+            let mut corrected = Vec::new();
             if let Some(file) = &corrections {
                 println!("{}", correct(&mut f, file)?);
+                corrected = emb_letter::correction::Corrections::load(file)?
+                    .letters
+                    .keys()
+                    .copied()
+                    .collect();
             }
             if route_letters {
                 let found = f.route();
@@ -625,6 +642,14 @@ fn run(args: &[String]) -> Result<(), String> {
                     "routed: {} trims in the letters, {} travel runs, {} columns cut at a junction",
                     found.trims, found.runs, found.splits
                 );
+            }
+            // The best of columns and fill for each letter (ADR 0119). A
+            // letter that a person corrected stays.
+            if let Some(font) = source_font.as_ref().filter(|_| stitch == emb_model::LetterStitch::Auto) {
+                let fills: String = f.choose_fills(font, &corrected).into_iter().collect();
+                if !fills.is_empty() {
+                    println!("fill letters: {} ({fills})", fills.chars().count());
+                }
             }
             // The quality of the letters as they are now (ADR 0115).
             if let Some(font) = &source_font {
@@ -697,7 +722,11 @@ fn run(args: &[String]) -> Result<(), String> {
                     let bytes = std::fs::read(p).map_err(|e| format!("{}: {e}", p.display()))?;
                     let source = emb_letter::Font::from_bytes(bytes, 0).map_err(|e| format!("{}: {e}", p.display()))?;
                     f.measure_quality(&source);
-                    print!("{}", emb_cli::fontaudit::quality_table(&f, &source));
+                    if all_letters {
+                        print!("{}", emb_cli::fontaudit::letters_table(&f, &source));
+                    } else {
+                        print!("{}", emb_cli::fontaudit::quality_table(&f, &source));
+                    }
                 }
                 None => match &f.quality {
                     Some(q) => println!("{}", emb_cli::fontaudit::quality_line(q)),

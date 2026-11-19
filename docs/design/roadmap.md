@@ -279,7 +279,8 @@ the owner decides which become work.
 
 **The owner took the lanes in this order (2026-11-19):** 1 (the kit), 3
 (pictures in the lists), 4 (the route in the converter), 2 (development
-tools), then 5 to 8. Lane 5 and lane 6 wait for a sew-out.
+tools), then 5 to 8. Lane 5 and lane 6 were to wait for a sew-out; the
+owner started lane 5 on pictures alone (2026-11-19).
 
 **Lanes, the cheapest first.**
 
@@ -327,7 +328,25 @@ tools), then 5 to 8. Lane 5 and lane 6 wait for a sew-out.
 5. **The best of columns and fill for each letter** (M): the converter
    makes both for each letter and keeps the one with the better letter
    score. The score gets the measures that the audit of the fonts has
-   already (stitches outside the shape, two layers, trims).
+   already (stitches outside the shape, two layers, trims). **Done
+   (2026-11-19, ADR 0119), on pictures only.** The score has two new
+   measures: the area of a letter outside its outline and the area with
+   two layers (not the trims: only the stitch engine can count them).
+   The mean score of the fonts is 81.6 (82.3 before); no font falls
+   below 65, and no letter of a font of the program changed. The
+   converter (the font tool, and Convert with the stitch type Automatic)
+   keeps the fill letter of a character if the columns leave a part of
+   the shape open and the font is for large letters (from 15 mm): 32
+   letters of five package fonts are fills now. **What the lane did not
+   reach:** the heavy fonts, which have most of the poor letters, have
+   size ranges from 5 to 9 mm, where a fill does not sew well. See lane
+   5b.
+   - **5b. Fill letters from a size** (M to L, proposed): each font with
+     satin letters keeps the fill letter of each character too, and the
+     layout takes the fills from the size at which the columns are too
+     wide. A word is then all satin or all fill, each font goes up to
+     300 mm, and the ten fill fonts are needed only for fills at small
+     sizes. It changes the font format and the layout.
 6. **Mitre corners in routed letters** (M): the route joins two columns
    that meet at a corner when the font is made, or the layout does it
    for two parts that sew one after the other.

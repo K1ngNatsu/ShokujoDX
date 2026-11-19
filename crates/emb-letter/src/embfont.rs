@@ -201,7 +201,8 @@ impl EmbFont {
         }
         if let Some(q) = &self.quality {
             let part = |v: f64| v.is_finite() && (0.0..=1.0).contains(&v);
-            if q.score > 100 || !(part(q.coverage) && part(q.narrow) && part(q.long) && part(q.fills)) {
+            let parts = [q.coverage, q.narrow, q.long, q.fills, q.outside, q.overlap];
+            if q.score > 100 || !parts.into_iter().all(part) {
                 return Err("quality".into());
             }
         }
@@ -305,6 +306,51 @@ impl EmbFont {
     /// was converted from.
     pub fn measure_quality(&mut self, source: &Font) {
         self.quality = crate::quality::measure(self, source);
+    }
+
+    /// The best of columns and fill for each letter (ADR 0119): for each
+    /// letter with columns, the fill letter of its character is made too
+    /// ([`crate::quality::fill_letter`]), and it takes the place of the
+    /// letter if its score is better than the shape score of the letter
+    /// ([`crate::quality::LetterQuality::shape_score`]) by
+    /// [`crate::quality::FILL_GAIN`]: the columns leave a part of the
+    /// shape open, sew outside it or lie on each other. Run
+    /// it after the steps that change the columns (the ends, the
+    /// corrections, the route). The letters of `keep` stay as they are
+    /// (the letters that a person corrected). `source` is the font that
+    /// this font was converted from. Returns the characters that are fill
+    /// letters now.
+    pub fn choose_fills(&mut self, source: &Font, keep: &[char]) -> Vec<char> {
+        use crate::quality::{FILL_GAIN, FILL_LETTER, fill_letter, letter_quality, outline};
+        if self.fill {
+            return Vec::new();
+        }
+        let mut better = Vec::new();
+        for (c, letter) in &self.letters {
+            let columns = letter.parts.iter().any(|p| matches!(p, ObjectKind::Satin { .. }));
+            if !columns || keep.contains(c) {
+                continue;
+            }
+            let shape = outline(self, source, *c);
+            let Some(now) = letter_quality(self, letter, &shape) else {
+                continue;
+            };
+            // No fill letter has a score of more than `FILL_LETTER`.
+            if now.shape_score() + FILL_GAIN >= FILL_LETTER {
+                continue;
+            }
+            let Some(fill) = fill_letter(self, source, *c) else {
+                continue;
+            };
+            if letter_quality(self, &fill, &shape).is_some_and(|q| q.score() > now.shape_score() + FILL_GAIN) {
+                better.push((*c, fill));
+            }
+        }
+        let changed = better.iter().map(|(c, _)| *c).collect();
+        for (c, fill) in better {
+            self.letters.insert(c, fill);
+        }
+        changed
     }
 
     /// Sets the letter of `c`, with its coordinates rounded as in the file.

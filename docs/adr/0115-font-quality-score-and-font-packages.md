@@ -1,6 +1,6 @@
 # ADR 0115: Quality score of embroidery fonts, and font packages
 
-Date: 2026-11-18 · Status: Accepted
+Date: 2026-11-18 · Status: Accepted (ADR 0119 adds two measures to the score)
 
 ## Context
 

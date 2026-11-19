@@ -68,14 +68,16 @@ Jede Stickschrift hat eine **Qualitätswertung** von 0 bis 100. Die Wertung
 sagt, wie gut sich die Buchstaben der Schrift sticken lassen. Die
 Schriftliste zeigt sie hinter dem Namen der Schrift, und **Sortieren
 nach > Qualität** stellt die Schriften mit den besten Wertungen an den
-Anfang. Wählen Sie eine Schrift, um ihre Wertung und diese drei Maße zu
+Anfang. Wählen Sie eine Schrift, um ihre Wertung und diese Maße zu
 sehen:
 
 - wie viel von den Formen der Buchstaben die Stiche decken,
 - wie viel von den Satinsäulen bei der kleinsten Größe der Schrift zu
   schmal ist,
 - wie viel von den Satinsäulen bei der größten Größe der Schrift zu lange
-  Stiche hat.
+  Stiche hat,
+- wie viel von den Stichen außerhalb der Formen der Buchstaben liegt,
+- wie viel von den Buchstaben zwei Stichlagen hat.
 
 Jede Schrift des Programms hat eine Wertung von 65 oder mehr. Eine Schrift,
 die Sie umwandeln, bekommt ihre Wertung beim Umwandeln. Der Größenbereich
@@ -104,6 +106,11 @@ jedes Buchstabens, wie die Schriften des Programms sie haben: Die Nadel
 geht unter den Stichen von einem Strich zum nächsten, und die Säulen
 reichen bis in die Ecken. Das dauert länger; ein Balken zeigt, wie weit
 die Umwandlung ist, und **Stopp** beendet sie.
+Mit der Stichart **Automatisch** erstellt das Programm jeden Buchstaben
+mit Satinsäulen und als Füllung und behält die Variante, die sich besser
+sticken lässt. Eine Füllung ist nur in einer Schrift für große Buchstaben
+besser (Größenbereich ab 15 mm): Dort wird ein Buchstabe, dessen Säulen
+einen Teil seiner Form offen lassen, zu einer Füllung.
 
 ## Arabisch, Devanagari und Ligaturen
 

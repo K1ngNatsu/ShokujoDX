@@ -73,6 +73,16 @@ Schrift, von 15 mm bis 300 mm, und für fette Buchstaben, deren Formen keine
 klaren Säulen haben. In **Schrift > Schriften** zeigt **Für große Schrift**
 sie. Siehe [Schrift](lettering).
 
+**Eine strengere Qualitätswertung.** Die Qualitätswertung einer
+Stickschrift zählt jetzt auch die Stiche außerhalb der Formen der
+Buchstaben und die Stellen mit zwei Stichlagen. Einige Schriften haben
+eine Wertung, die ein paar Punkte niedriger ist. Kein Buchstabe der
+Schriften des Programms hat sich geändert. Wenn Sie eine Schrift mit der
+Stichart **Automatisch** umwandeln, wird ein Buchstabe, dessen Säulen
+einen Teil seiner Form offen lassen, zu einer Füllung, wenn die Schrift
+für große Buchstaben ist (ab 15 mm).
+Siehe [Schrift](lettering).
+
 **Mehr Motive, Muster, Stempel, Ränder und Clipart.** Das Programm hat
 71 Motive (vorher 15), 48 Programmteilungs-Muster (10), 39 Prägestempel
 (8), 50 dekorative Ränder (12) und 45 Clipart-Elemente (8). Die meisten

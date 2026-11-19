@@ -2,24 +2,36 @@
 //! number from 0 to 100 that says how well the letters of the font sew,
 //! before the user sews them.
 //!
-//! The score comes from three measures of each letter. They need the font
+//! The score comes from five measures of each letter. They need the font
 //! that the embroidery font was converted from, so the converter makes the
 //! score and the font file keeps it ([`crate::EmbFont::quality`]):
 //!
 //! - **Shape:** the part of the outline of the source font that the parts
-//!   of the letter cover. A letter for which the stroke finder found no
-//!   columns sews as a fill (ADR 0100); it has its full shape, but not the
-//!   look of the other letters, so its shape counts as [`FILL_LETTER`].
+//!   of the letter cover.
 //! - **Narrow:** the part of the length of the satin columns that is too
 //!   narrow to sew well at the smallest size of the font.
 //! - **Long:** the part of the length of the satin columns whose stitches
 //!   are too long at the largest size of the font.
+//! - **Outside:** the area of the parts that is outside the outline (a
+//!   column that goes across a corner or closes a hole), ADR 0119.
+//! - **Two layers:** the part of the area of the letter that two or more
+//!   parts cover. Columns go into each other where strokes meet; more
+//!   than that is two columns on one stroke (ADR 0119).
 //!
-//! A fill font ([`crate::EmbFont::fill`], ADR 0117) has no columns. Its
-//! narrow measure is the part of the area of a letter that is too narrow
-//! for a fill at the smallest size, and each hole that
-//! is too narrow to stay open counts as [`HOLE_CLOSED`]. It has no long
-//! stitches: the rows of a fill have stitches of a set length.
+//! A fill letter has no columns. Its narrow measure is the part of its
+//! area that is too narrow for a fill at the smallest size, and each hole
+//! that is too narrow to stay open counts as [`HOLE_CLOSED`]. It has no
+//! long stitches: the rows of a fill have stitches of a set length. All
+//! letters of a fill font ([`crate::EmbFont::fill`], ADR 0117) are fill
+//! letters. A fill letter in a font of satin letters has its full shape,
+//! but not the look of the other letters, so its score is at most
+//! [`FILL_LETTER`]; and a fill does not sew well below
+//! [`FILL_MIN_HEIGHT_MM`], so in a font with a smaller smallest size all
+//! of it counts as too narrow.
+//!
+//! The trims are not in the score: the route of a letter (ADR 0113) has
+//! few of them, only the stitch engine can count them, and the audit of a
+//! font (`emb-cli font-audit`) does.
 
 use emb_geom::{BBox, Path, Point};
 use emb_model::{ObjectKind, SatinGeometry};
@@ -65,8 +77,26 @@ pub const FILL_MIN_HEIGHT_MM: f64 = 15.0;
 /// A satin stitch longer than this is too long, in mm: the longest stitch
 /// of the common machine formats is 12.1 mm, and a longer stitch is loose.
 pub const LONG_MM: f64 = 12.0;
-/// The shape value (0 to 1) of a letter that sews as a fill.
+/// The largest score (0 to 1) of a fill letter in a font of satin letters.
 pub const FILL_LETTER: f64 = 0.5;
+/// The converter keeps the fill letter of a character only if its score
+/// is this much more than the shape score of the letter with columns
+/// ([`crate::EmbFont::choose_fills`], [`LetterQuality::shape_score`]).
+pub const FILL_GAIN: f64 = 0.05;
+/// The area of a letter outside its outline, as a part of the area of the
+/// outline: up to [`OUTSIDE_FREE`] takes nothing from the score (the end of
+/// a column is straight where the outline is round), and
+/// [`OUTSIDE_ALL`] more takes all of it. On the proof pictures, a letter
+/// with 6 % outside has a point that sticks out of its shape.
+pub const OUTSIDE_FREE: f64 = 0.02;
+pub const OUTSIDE_ALL: f64 = 0.2;
+/// The part of the area of a letter with two or more layers: up to
+/// [`OVERLAP_FREE`] takes nothing from the score (19 of 20 letters of the
+/// fonts of the program have less: the joins of the strokes), and
+/// [`OVERLAP_ALL`] more takes all of it. On the proof pictures, a letter
+/// with 45 % has two columns on the same stroke.
+pub const OVERLAP_FREE: f64 = 0.2;
+pub const OVERLAP_ALL: f64 = 0.5;
 /// The shape value of a letter with columns is 0 at this coverage and
 /// below, and 1 at [`FULL`] and above. Below [`EMPTY`] the converter does
 /// not use the columns of the stroke finder
@@ -110,6 +140,14 @@ pub struct Quality {
     /// The letters that sew as a fill, as a part of the measured letters.
     #[serde(default)]
     pub fills: f64,
+    /// The mean area of the letters outside their outlines, as a part of
+    /// the area of the outline (0 to 1).
+    #[serde(default)]
+    pub outside: f64,
+    /// The mean part of the area of the letters that has two or more
+    /// layers (0 to 1).
+    #[serde(default)]
+    pub overlap: f64,
 }
 
 impl Quality {
@@ -129,19 +167,33 @@ pub struct LetterQuality {
     /// The letter has no satin column, in a font of satin letters. The
     /// letters of a fill font do not have this mark.
     pub fill: bool,
+    /// The area of the parts outside the outline, as a part of the area
+    /// of the outline.
+    pub outside: f64,
+    /// The part of the area of the parts that two or more parts cover.
+    pub overlap: f64,
 }
 
 impl LetterQuality {
     /// The score of the letter, 0 to 1.
     pub fn score(&self) -> f64 {
-        let shape = if self.fill {
-            FILL_LETTER
-        } else {
-            ((self.coverage - EMPTY) / (FULL - EMPTY)).clamp(0.0, 1.0)
-        };
         let narrow = (1.0 - self.narrow / NARROW_ALL).clamp(0.0, 1.0);
         let long = (1.0 - self.long / LONG_ALL).clamp(0.0, 1.0);
-        shape * narrow * long
+        self.shape_score() * narrow * long
+    }
+
+    /// The part of the score that does not change with the size of the
+    /// letter, 0 to 1: the shape that has stitches, the stitches outside
+    /// the shape, the layers, and the look of a fill letter. A fill can
+    /// make these better. It cannot make a thin stroke wider, and it is
+    /// not better at the smallest size because the columns are too wide
+    /// at the largest size.
+    pub fn shape_score(&self) -> f64 {
+        let shape = ((self.coverage - EMPTY) / (FULL - EMPTY)).clamp(0.0, 1.0);
+        let look = if self.fill { FILL_LETTER } else { 1.0 };
+        let outside = (1.0 - (self.outside - OUTSIDE_FREE).max(0.0) / OUTSIDE_ALL).clamp(0.0, 1.0);
+        let overlap = (1.0 - (self.overlap - OVERLAP_FREE).max(0.0) / OVERLAP_ALL).clamp(0.0, 1.0);
+        shape * look * outside * overlap
     }
 }
 
@@ -370,9 +422,48 @@ pub fn outline(font: &EmbFont, source: &Font, c: char) -> Vec<(Vec<Point>, Vec<V
         .collect()
 }
 
+/// The areas of the parts of a letter and of its outline.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Areas {
+    /// The part of the outline that the parts cover (0 to 1).
+    pub coverage: f64,
+    /// The area of the parts outside the outline, as a part of the area
+    /// of the outline.
+    pub outside: f64,
+    /// The part of the area of the parts that two or more parts cover.
+    pub overlap: f64,
+}
+
 /// The part of `outline` that the parts of a letter cover (0 to 1). `None`
 /// with no outline.
 pub fn coverage(parts: &[ObjectKind], outline: &Outline) -> Option<f64> {
+    areas(parts, outline).map(|a| a.coverage)
+}
+
+/// The fill letter of the character `c`: the outline of the source font
+/// as fills, as the converter makes it with the stitch type Fill. `None`
+/// if the source font does not have the character.
+pub fn fill_letter(font: &EmbFont, source: &Font, c: char) -> Option<EmbLetter> {
+    let g = source.glyph(c)?;
+    let s = font.cap_height_mm / source.cap_height;
+    let t = emb_geom::Transform::scale(s, s);
+    let mut parts = source.shapes(g).fill_parts();
+    for p in &mut parts {
+        p.transform(&t);
+        crate::embfont::round_part(p);
+    }
+    let advance_mm = font.letters.get(&c).map_or(source.advance(g) * s, |l| l.advance_mm);
+    (!parts.is_empty()).then_some(EmbLetter {
+        advance_mm,
+        parts,
+        fixed: false,
+        tuning: Vec::new(),
+    })
+}
+
+/// The areas of the parts of a letter and of `outline`. `None` with no
+/// outline.
+pub fn areas(parts: &[ObjectKind], outline: &Outline) -> Option<Areas> {
     let bounds = parts
         .iter()
         .filter_map(|p| p.control_bbox())
@@ -387,10 +478,10 @@ pub fn coverage(parts: &[ObjectKind], outline: &Outline) -> Option<f64> {
         return None;
     }
     let grid = Grid::new(bounds, CELL_MM, 2);
-    let mut cover = vec![false; grid.w * grid.h];
+    let mut cover = vec![0u8; grid.w * grid.h];
     for part in parts {
         for (c, m) in cover.iter_mut().zip(tune::part_mask(&grid, part)) {
-            *c |= m;
+            *c = c.saturating_add(u8::from(m));
         }
     }
     let glyph = tune::outline_mask(&grid, outline);
@@ -398,8 +489,14 @@ pub fn coverage(parts: &[ObjectKind], outline: &Outline) -> Option<f64> {
     if area == 0 {
         return None;
     }
-    let both = glyph.iter().zip(&cover).filter(|(g, c)| **g && **c).count();
-    Some(both as f64 / area as f64)
+    let both = glyph.iter().zip(&cover).filter(|(g, c)| **g && **c > 0).count();
+    let covered = cover.iter().filter(|c| **c > 0).count();
+    let twice = cover.iter().filter(|c| **c > 1).count();
+    Some(Areas {
+        coverage: both as f64 / area as f64,
+        outside: (covered - both) as f64 / area as f64,
+        overlap: twice as f64 / covered.max(1) as f64,
+    })
 }
 
 /// The narrowest column that sews well at the smallest size of `font`, in
@@ -416,13 +513,15 @@ pub fn narrow_mm(font: &EmbFont) -> f64 {
 /// The measures of a letter of `font` with the outline `outline` of the
 /// source font. `None` for a letter with no parts or no outline.
 pub fn letter_quality(font: &EmbFont, letter: &EmbLetter, outline: &Outline) -> Option<LetterQuality> {
-    let cover = coverage(&letter.parts, outline)?;
+    let areas = areas(&letter.parts, outline)?;
+    let cover = areas.coverage;
     let (small, large) = (
         font.min_height_mm / font.cap_height_mm.max(1e-6),
         font.max_height_mm / font.cap_height_mm.max(1e-6),
     );
-    if font.fill {
-        // A fill font: the widths of the strokes and of the holes.
+    let columns = letter.parts.iter().any(|p| matches!(p, ObjectKind::Satin { .. }));
+    if !columns {
+        // A fill letter: the widths of the strokes and of the holes.
         let widths = fill_widths(&letter.parts);
         let total: f64 = widths.strokes.iter().map(|w| w.1).sum();
         if total > 0.0 {
@@ -437,11 +536,19 @@ pub fn letter_quality(font: &EmbFont, letter: &EmbLetter, outline: &Outline) -> 
                 .iter()
                 .filter(|w| **w * small < NARROW * MIN_HOLE_MM)
                 .count();
+            // A fill does not sew well in a letter that is too small.
+            let too_small = font.min_height_mm < FILL_MIN_HEIGHT_MM - 1e-9;
             return Some(LetterQuality {
                 coverage: cover,
-                narrow: (thin / total + HOLE_CLOSED * closed as f64).min(1.0),
+                narrow: if too_small {
+                    1.0
+                } else {
+                    (thin / total + HOLE_CLOSED * closed as f64).min(1.0)
+                },
                 long: 0.0,
-                fill: false,
+                fill: !font.fill,
+                outside: areas.outside,
+                overlap: areas.overlap,
             });
         }
     }
@@ -467,6 +574,8 @@ pub fn letter_quality(font: &EmbFont, letter: &EmbLetter, outline: &Outline) -> 
         narrow: if fill { 0.0 } else { narrow / total },
         long: if fill { 0.0 } else { long / total },
         fill,
+        outside: areas.outside,
+        overlap: areas.overlap,
     })
 }
 
@@ -551,6 +660,8 @@ pub fn of_letters(rows: &[(char, LetterQuality)]) -> Option<Quality> {
         narrow: round(mean(&|q| q.narrow)),
         long: round(mean(&|q| q.long)),
         fills: round(mean(&|q| f64::from(u8::from(q.fill)))),
+        outside: round(mean(&|q| q.outside.min(1.0))),
+        overlap: round(mean(&|q| q.overlap)),
     })
 }
 
@@ -615,6 +726,8 @@ mod tests {
             narrow,
             long,
             fill: false,
+            outside: 0.0,
+            overlap: 0.0,
         };
         assert!((q(1.0, 0.0, 0.0).score() - 1.0).abs() < 1e-9);
         assert!((q(FULL, 0.0, 0.0).score() - 1.0).abs() < 1e-9);
@@ -626,6 +739,8 @@ mod tests {
             narrow: 0.0,
             long: 0.0,
             fill: true,
+            outside: 0.0,
+            overlap: 0.0,
         };
         assert_eq!(fill.score(), FILL_LETTER);
         // Narrow columns and long stitches take from the score.
@@ -634,6 +749,21 @@ mod tests {
         assert_eq!(q(1.0, 0.6, 0.0).score(), 0.0);
         // A better coverage is a better score.
         assert!(q(0.95, 0.0, 0.0).score() > q(0.9, 0.0, 0.0).score());
+        // Stitches outside the shape and two layers take from the score,
+        // after the part that each good letter has.
+        let more = |outside, overlap| LetterQuality {
+            outside,
+            overlap,
+            ..q(1.0, 0.0, 0.0)
+        };
+        assert!((more(OUTSIDE_FREE, OVERLAP_FREE).score() - 1.0).abs() < 1e-9);
+        assert!((more(OUTSIDE_FREE + 0.5 * OUTSIDE_ALL, 0.0).score() - 0.5).abs() < 1e-9);
+        assert!((more(0.0, OVERLAP_FREE + 0.5 * OVERLAP_ALL).score() - 0.5).abs() < 1e-9);
+        assert_eq!(more(0.5, 0.0).score(), 0.0);
+        assert_eq!(more(0.0, 0.9).score(), 0.0);
+        // A fill letter in a font of satin letters with a part too narrow.
+        let thin_fill = LetterQuality { narrow: 0.25, ..fill };
+        assert!((thin_fill.score() - 0.5 * FILL_LETTER).abs() < 1e-9);
         assert!(of_letters(&[]).is_none());
         let font = of_letters(&[('a', q(1.0, 0.0, 0.0)), ('b', q(0.91, 0.5, 0.0))]).unwrap();
         assert_eq!(font.score, 50);
@@ -689,6 +819,109 @@ mod tests {
         let q = of_letters(&rows).unwrap();
         assert_eq!(q.fills, 1.0);
         assert!(q.score < LIMIT, "{q:?}");
+        assert!(q.outside < 0.01 && q.overlap == 0.0, "{q:?}");
+        // In a font with small letters, a fill letter is too small.
+        fills.min_height_mm = 8.0;
+        let l = letter_quality(&fills, &fills.letters[&'I'], &outline(&fills, &source, 'I')).unwrap();
+        assert!(l.fill && l.narrow == 1.0 && l.score() == 0.0, "{l:?}");
+    }
+
+    fn satin(geometry: SatinGeometry) -> ObjectKind {
+        ObjectKind::Satin {
+            geometry,
+            params: emb_model::SatinParams::default(),
+        }
+    }
+
+    #[test]
+    fn the_areas_of_a_letter() {
+        // The outline: a bar 4 mm wide and 20 mm long.
+        let bar = vec![(
+            vec![
+                Point::new(0.0, 0.0),
+                Point::new(4.0, 0.0),
+                Point::new(4.0, 20.0),
+                Point::new(0.0, 20.0),
+            ],
+            Vec::new(),
+        )];
+        // One column on the bar.
+        let one = areas(&[satin(column(4.0, 20.0))], &bar).unwrap();
+        assert!(
+            one.coverage > 0.97 && one.outside < 0.02 && one.overlap < 0.01,
+            "{one:?}"
+        );
+        // The same column two times: all of it has two layers.
+        let two = areas(&[satin(column(4.0, 20.0)), satin(column(4.0, 20.0))], &bar).unwrap();
+        assert!(two.overlap > 0.97 && two.outside < 0.02, "{two:?}");
+        // A column 6 mm wide: its part outside is half the area of the bar.
+        let wide = areas(&[satin(column(6.0, 20.0))], &bar).unwrap();
+        assert!((wide.outside - 0.5).abs() < 0.05 && wide.coverage > 0.97, "{wide:?}");
+        // A column 2 mm wide covers half of the bar.
+        let half = areas(&[satin(column(2.0, 20.0))], &bar).unwrap();
+        assert!((half.coverage - 0.5).abs() < 0.05 && half.outside < 0.02, "{half:?}");
+        assert_eq!(coverage(&[satin(column(2.0, 20.0))], &bar), Some(half.coverage));
+        assert!(areas(&[satin(column(2.0, 20.0))], &[]).is_none());
+    }
+
+    #[test]
+    fn the_converter_keeps_the_better_of_columns_and_fill() {
+        let source = bundled::font("Anton", "Regular").unwrap();
+        let mut font = convert(&source, "Heavy", "", LetterStitch::Auto, &['H', 'I']);
+        let columns = |f: &EmbFont, c: char| {
+            f.letters[&c]
+                .parts
+                .iter()
+                .filter(|p| matches!(p, ObjectKind::Satin { .. }))
+                .count()
+        };
+        assert!(columns(&font, 'H') > 0 && columns(&font, 'I') > 0);
+        // A font for large letters: a fill sews well in it.
+        font.min_height_mm = 20.0;
+        font.max_height_mm = 40.0;
+        // Good letters stay columns.
+        assert!(font.clone().choose_fills(&source, &[]).is_empty());
+        // An "I" with a column on the left half of its stem: half of its
+        // shape has no stitches.
+        let shape = outline(&font, &source, 'I');
+        let b = BBox::from_points(shape[0].0.iter().copied()).unwrap();
+        let half = SatinGeometry {
+            rail_a: line(&[b.min, Point::new(b.min.x, b.max.y)]),
+            rail_b: line(&[Point::new(b.center().x, b.min.y), Point::new(b.center().x, b.max.y)]),
+            rungs: Vec::new(),
+        };
+        font.letters.get_mut(&'I').unwrap().parts = vec![satin(half)];
+        let before = letter_quality(&font, &font.letters[&'I'], &shape).unwrap();
+        assert_eq!(before.shape_score(), 0.0, "{before:?}");
+        // The fill letter takes its place; the "H" stays.
+        let mut best = font.clone();
+        assert_eq!(best.choose_fills(&source, &[]), vec!['I']);
+        assert_eq!(columns(&best, 'I'), 0);
+        assert!(columns(&best, 'H') > 0);
+        assert_eq!(best.letters[&'I'].advance_mm, font.letters[&'I'].advance_mm);
+        let after = letter_quality(&best, &best.letters[&'I'], &shape).unwrap();
+        assert!(
+            after.fill && after.score() > 0.4 && after.score() <= FILL_LETTER,
+            "{after:?}"
+        );
+        // A letter that a person corrected stays as it is.
+        assert!(font.clone().choose_fills(&source, &['I']).is_empty());
+        // A letter with its full shape stays columns when its columns are
+        // too narrow or too wide for the sizes of the font: a fill does
+        // not repair the size.
+        let mut wide = convert(&source, "Heavy", "", LetterStitch::Auto, &['H', 'I']);
+        wide.min_height_mm = 20.0;
+        wide.max_height_mm = 200.0;
+        let l = letter_quality(&wide, &wide.letters[&'I'], &shape).unwrap();
+        assert!(l.long > 0.9 && l.score() < 0.1 && l.shape_score() > 0.9, "{l:?}");
+        assert!(wide.choose_fills(&source, &[]).is_empty());
+        // In a font with small letters, a fill is not better.
+        let mut small = font.clone();
+        small.min_height_mm = 8.0;
+        assert!(small.choose_fills(&source, &[]).is_empty());
+        // A fill font has no columns to choose from.
+        let mut fills = convert(&source, "Heavy Fill", "", LetterStitch::Fill, &['H', 'I']);
+        assert!(fills.choose_fills(&source, &[]).is_empty());
     }
 
     fn fill(outer: BBox, holes: &[BBox]) -> ObjectKind {

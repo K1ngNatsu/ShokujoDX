@@ -71,6 +71,16 @@ Slab Fill, Rubik Mono One Fill y Shrikhand Fill. Son para texto grande, de
 claras. En **Letras > Fuentes**, **Para texto grande** las muestra.
 Consulte [Letras](lettering).
 
+**Una puntuación de calidad más estricta.** La puntuación de calidad de
+una fuente de bordado ahora también cuenta las puntadas fuera de las
+formas de las letras y los lugares con dos capas de puntadas. Algunas
+fuentes tienen una puntuación unos puntos más baja. Ninguna letra de las
+fuentes del programa ha cambiado. Cuando convierte una fuente con el tipo
+de puntada **Automático**, una letra cuyas columnas dejan abierta una
+parte de su forma pasa a ser un relleno, si la fuente es para letras
+grandes (desde 15 mm).
+Consulte [Letras](lettering).
+
 **Más motivos, patrones, sellos, bordes y clipart.** El programa tiene
 71 motivos (antes 15), 48 patrones de división programada (10), 39 sellos
 de relieve (8), 50 bordes decorativos (12) y 45 elementos de clipart (8).

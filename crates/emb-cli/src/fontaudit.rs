@@ -90,12 +90,15 @@ pub use emb_letter::quality::outline;
 /// The quality of a font in one line (ADR 0115).
 pub fn quality_line(q: &emb_letter::quality::Quality) -> String {
     format!(
-        "quality {}: cover {:.1} %, too narrow {:.1} %, too long {:.1} %, fill letters {:.1} %",
+        "quality {}: cover {:.1} %, too narrow {:.1} %, too long {:.1} %, fill letters {:.1} %, outside {:.1} %, two \
+         layers {:.1} %",
         q.score,
         q.coverage * 100.0,
         q.narrow * 100.0,
         q.long * 100.0,
-        q.fills * 100.0
+        q.fills * 100.0,
+        q.outside * 100.0,
+        q.overlap * 100.0
     )
 }
 
@@ -122,13 +125,52 @@ pub fn quality_table(font: &EmbFont, source: &Font) -> String {
     rows.sort_by(|a, b| a.1.score().total_cmp(&b.1.score()));
     for (c, l) in rows.iter().take(12).filter(|r| r.1.score() < 0.9) {
         out.push_str(&format!(
-            "  {:<5} score {:>3.0}: cover {:5.1} %, too narrow {:5.1} %, too long {:5.1} %{}\n",
+            "  {:<5} score {:>3.0}: cover {:5.1} %, too narrow {:5.1} %, too long {:5.1} %, outside {:5.1} %, two layers \
+             {:5.1} %{}\n",
             format!("{c:?}"),
             l.score() * 100.0,
             l.coverage * 100.0,
             l.narrow * 100.0,
             l.long * 100.0,
+            l.outside * 100.0,
+            l.overlap * 100.0,
             if l.fill { ", fill" } else { "" }
+        ));
+    }
+    out
+}
+
+/// The measures of each letter of `font` and of the fill letter of the
+/// same character, one line for each (a tab between the values): the
+/// character, `columns` or `fill` (what the letter is), then for the letter
+/// and for its fill letter: score, coverage, outside, two layers, too
+/// narrow, too long.
+pub fn letters_table(font: &EmbFont, source: &Font) -> String {
+    let mut out = String::new();
+    for (c, q) in emb_letter::quality::letters(font, source) {
+        let fill = emb_letter::quality::fill_letter(font, source, c)
+            .and_then(|l| emb_letter::quality::letter_quality(font, &l, &outline(font, source, c)));
+        let row = |q: &emb_letter::quality::LetterQuality| {
+            format!(
+                "{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}\t{:.3}",
+                q.score(),
+                q.coverage,
+                q.outside,
+                q.overlap,
+                q.narrow,
+                q.long
+            )
+        };
+        let is_fill = font.letters[&c]
+            .parts
+            .iter()
+            .all(|p| !matches!(p, ObjectKind::Satin { .. }));
+        out.push_str(&format!(
+            "{}\t{}\t{}\t{}\n",
+            c,
+            if is_fill { "fill" } else { "columns" },
+            row(&q),
+            fill.as_ref().map(row).unwrap_or_default()
         ));
     }
     out
@@ -453,5 +495,29 @@ mod tests {
         let json: serde_json::Value = serde_json::from_str(&proof(&font, Some(&source), &rows)).unwrap();
         assert_eq!(json["letters"].as_array().unwrap().len(), 4);
         assert!(json["letters"][0]["parts"][0]["rings"][0].as_array().unwrap().len() >= 4);
+    }
+
+    #[test]
+    fn the_table_of_the_letters_and_their_fill_letters() {
+        let source = emb_letter::bundled::font("Lato", "Bold").unwrap();
+        let chars: Vec<char> = "HI.".chars().collect();
+        let font = emb_letter::embfont::convert(&source, "Block Sans", "", LetterStitch::Auto, &chars);
+        let text = letters_table(&font, &source);
+        // One line for each letter (not for the mark): the character, what
+        // it is, six values of the letter and six of its fill letter.
+        let lines: Vec<Vec<&str>> = text.lines().map(|l| l.split('\t').collect()).collect();
+        assert_eq!(lines.len(), 2, "{text}");
+        for l in &lines {
+            assert_eq!((l.len(), l[1]), (14, "columns"), "{l:?}");
+            assert!(l[2..].iter().all(|v| v.parse::<f64>().is_ok()), "{l:?}");
+        }
+        // "I" is a good column; its fill letter is too small in this font.
+        let i = lines.iter().find(|l| l[0] == "I").unwrap();
+        assert!(
+            i[2].parse::<f64>().unwrap() > 0.9 && i[8].parse::<f64>().unwrap() == 0.0,
+            "{i:?}"
+        );
+        let line = quality_line(&font.quality.unwrap());
+        assert!(line.contains("outside") && line.contains("two layers"), "{line}");
     }
 }

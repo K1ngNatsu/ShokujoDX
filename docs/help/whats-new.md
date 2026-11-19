@@ -68,6 +68,15 @@ Rubik Mono One Fill and Shrikhand Fill. They are for large text, from
 columns. In **Lettering > Fonts**, **For large text** shows them.
 See [Lettering](lettering).
 
+**A stricter quality score.** The quality score of an embroidery font
+now also counts the stitches outside the shapes of the letters and the
+places with two layers of stitches. Some fonts have a score that is a few
+points lower. No letter of the fonts of the program changed. When you
+convert a font with the stitch type **Automatic**, a letter whose columns
+leave a part of its shape open becomes a fill, if the font is for large
+letters (from 15 mm).
+See [Lettering](lettering).
+
 **More motifs, patterns, stamps, borders and clipart.** The program has
 71 motifs (15 before), 48 program-split patterns (10), 39 carving stamps
 (8), 50 decorative borders (12) and 45 clipart items (8). Most of them

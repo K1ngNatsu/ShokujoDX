@@ -17,6 +17,10 @@ struct Quality {
     long: f64,
     #[serde(default)]
     fills: f64,
+    #[serde(default)]
+    outside: f64,
+    #[serde(default)]
+    overlap: f64,
 }
 
 /// The fields of a font file that the table needs.
@@ -48,8 +52,8 @@ fn main() {
         let head: Head = serde_json::from_slice(&text).unwrap_or_else(|e| panic!("{}: {e}", p.display()));
         if let Some(q) = head.quality {
             table.push_str(&format!(
-                "    ({:?}, crate::quality::Quality {{ score: {}, coverage: {:?}, narrow: {:?}, long: {:?}, fills: {:?} }}),\n",
-                head.family, q.score, q.coverage, q.narrow, q.long, q.fills
+                "    ({:?}, crate::quality::Quality {{ score: {}, coverage: {:?}, narrow: {:?}, long: {:?}, fills: {:?}, outside: {:?}, overlap: {:?} }}),\n",
+                head.family, q.score, q.coverage, q.narrow, q.long, q.fills, q.outside, q.overlap
             ));
         }
     }
