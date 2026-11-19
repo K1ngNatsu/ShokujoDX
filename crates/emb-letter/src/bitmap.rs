@@ -386,6 +386,7 @@ pub fn to_embfont(b: &BitmapFont, family: &str, stitch: LetterStitch) -> EmbFont
                 parts: Vec::new(),
                 fixed: false,
                 tuning: Vec::new(),
+                fill_parts: Vec::new(),
             },
         );
     }
@@ -416,6 +417,7 @@ pub fn to_embfont(b: &BitmapFont, family: &str, stitch: LetterStitch) -> EmbFont
                 parts,
                 fixed: false,
                 tuning: Vec::new(),
+                fill_parts: Vec::new(),
             },
         );
     }

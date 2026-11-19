@@ -11,6 +11,9 @@
 #   routed/    three fonts that are routed and not tuned, at their middle
 #              size (the fonts after ADR 0116)
 #   fill/      fill fonts at 15, 40 and 100 mm (ADR 0117)
+#   large/     fonts with satin letters at the largest size of their
+#              columns and above it, where their letters are fills
+#              (ADR 0120)
 #   shaped/    a word in Arabic, in Devanagari and in a script font
 #              (Milestone 6)
 #   content/   motifs, patterns, stamps, borders and clipart of the content
@@ -51,6 +54,9 @@ TUNED = [
 ]
 ROUTED = [("anton", "Anton"), ("archivo-black", "Archivo Black"), ("poppins", "Poppins")]
 FILL = [("slab-heavy-fill", "Slab Heavy Fill"), ("varsity-fill", "Varsity Fill")]
+# Fonts with satin letters for the test of the fill letters above the
+# largest size of their columns (ADR 0120).
+LARGE_FONTS = [("block-sans", "Block Sans"), ("poster-bold", "Poster Bold"), ("pacifico", "Pacifico")]
 
 # The texts of a sheet, the longest first: the tool takes the first one
 # that fits the hoop. None: the basic characters of the font.
@@ -72,6 +78,11 @@ def size_range(slug):
         text = f.read(4000)
     lo = float(re.search(r'"min_height_mm":([0-9.]+)', text).group(1))
     hi = float(re.search(r'"max_height_mm":([0-9.]+)', text).group(1))
+    # A font with fill letters for large lettering (ADR 0120) goes to
+    # 300 mm; its columns end where the fill letters start.
+    fills = re.search(r'"fill_letters":\{"from_mm":([0-9.]+)', text)
+    if fills:
+        hi = float(fills.group(1))
     return lo, hi
 
 
@@ -128,7 +139,7 @@ def main():
     if not os.path.isfile(EXE):
         sys.exit("build emb-cli first: cargo build --release -p emb-cli")
     work = tempfile.mkdtemp(prefix="emb-kit-")
-    rows = {"tuned": [], "routed": [], "fill": [], "shaped": [], "content": []}
+    rows = {"tuned": [], "routed": [], "fill": [], "large": [], "shaped": [], "content": []}
 
     def make(group, name, what, project):
         folder = os.path.join(kit, group)
@@ -156,6 +167,13 @@ def main():
         project = os.path.join(work, "%s small.embproj" % slug)
         text = sheet(slug, project, [lo, 40.0], ["RSaeg58", "RSag8", "RSa8"])
         make("fill", "%s small" % slug, '%s at %s and 40 mm: "%s"' % (family, text_of(lo), text), project)
+    for slug, family in LARGE_FONTS:
+        _, hi = size_range(slug)
+        above = round(hi * 1.15)
+        project = os.path.join(work, "%s switch.embproj" % slug)
+        text = sheet(slug, project, [hi, above], ["Rag", "Ra", "R"])
+        what = '%s at %s mm (satin columns) and at %s mm (fills): "%s"' % (family, text_of(hi), text_of(above), text)
+        make("large", "%s switch" % slug, what, project)
     project = os.path.join(work, "slab-heavy-fill large.embproj")
     text = sheet("slab-heavy-fill", project, [100.0], ["Ra", "R"])
     make("fill", "slab-heavy-fill large", 'Slab Heavy Fill at 100 mm: "%s"' % text, project)
@@ -247,6 +265,21 @@ large text and for heavy fonts.
 | The large letter | The 100 mm letter stays flat (no puckers), and its edge is where the worksheet shows it. |
 | Underlay | No underlay shows at the edge of a letter. |
 | The ten fonts | `embroidery-fonts-8` has each fill font at its smallest size. Which fonts are not good at this size? |
+
+## 3b. Large lettering in a font with satin letters (`large/`, ADR 0120)
+
+A font with satin letters also has each letter as a fill. Up to the
+largest size of its columns the letters are satin columns; above it they
+are fills, and the font goes to 300 mm. Each design has the same letters
+at the largest size of the columns and at a size 15 % above it.
+
+{large}
+
+| Check | Look for |
+| --- | --- |
+| The two sizes | Which of the two looks better: the large satin letters with their long, split stitches, or the fill letters? |
+| The place of the change | Is the change to fills at the right size? Must it be at a smaller size (where the satin stitches get loose) or at a larger one? |
+| The fill letters | The same checks as for the fill fonts: the edge, the holes, the narrow parts, no underlay at the edge. |
 
 ## 4. Shaped text (`shaped/`, Milestone 6)
 

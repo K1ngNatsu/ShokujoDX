@@ -63,6 +63,14 @@ Buchstaben gestickt werden. Die Qualitätswertung einer Füllschrift hat ein
 eigenes Maß (wie viel der Buchstaben bei der kleinsten Größe zu schmal für
 eine Füllung ist), deshalb zeigt **Sortieren nach > Qualität** die
 Füllschriften nach den anderen Stickschriften.
+Die anderen Stickschriften des Programms haben Satinbuchstaben, und jede
+von ihnen hat ihre Buchstaben auch als Füllungen. Bis zur größten Größe
+ihrer Satinsäulen stickt eine Schrift Satinbuchstaben. Über dieser Größe
+stickt sie ihre Füllbuchstaben; so reicht jede Schrift bis 300 mm, und
+ein Wort hat ein einheitliches Aussehen. Das Fenster Schriften zeigt die
+Größe des Wechsels. **Stichart** im Fenster Schrift wählt eine der beiden
+Varianten für den ganzen Text: **Satin** oder **Füllung**. Die Schriften
+für kleine Schrift haben nur Satinbuchstaben.
 
 Jede Stickschrift hat eine **Qualitätswertung** von 0 bis 100. Die Wertung
 sagt, wie gut sich die Buchstaben der Schrift sticken lassen. Die

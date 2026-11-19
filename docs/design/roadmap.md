@@ -341,12 +341,20 @@ owner started lane 5 on pictures alone (2026-11-19).
    reach:** the heavy fonts, which have most of the poor letters, have
    size ranges from 5 to 9 mm, where a fill does not sew well. See lane
    5b.
-   - **5b. Fill letters from a size** (M to L, proposed): each font with
+   - **5b. Fill letters from a size** (M to L): each font with
      satin letters keeps the fill letter of each character too, and the
      layout takes the fills from the size at which the columns are too
      wide. A word is then all satin or all fill, each font goes up to
      300 mm, and the ten fill fonts are needed only for fills at small
-     sizes. It changes the font format and the layout.
+     sizes. It changes the font format and the layout. **Done
+     (2026-11-19, ADR 0120), on pictures only:** 123 of the 137 fonts
+     have fill letters (not the fill fonts and the fonts for small
+     text). The change to fills is at the end of the size range that a
+     font had (25 to 206 mm), so lettering in that range sews as before;
+     the columns and the scores of all fonts are the same. Stitch type
+     in the Lettering window selects Satin or Fill for the whole text of
+     such a font. The font files of the program grew from 42 MB to
+     65 MB. The sew-out kit has three designs for it (`large/`).
 6. **Mitre corners in routed letters** (M): the route joins two columns
    that meet at a corner when the font is made, or the layout does it
    for two parts that sew one after the other.

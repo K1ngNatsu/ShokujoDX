@@ -271,8 +271,8 @@ fn letter_parts(
                 [(letter, ..)] => Some(*letter),
                 _ => None,
             };
-            let fixed = one.is_some_and(|letter| src.fixed(letter));
-            let mut tuning = one.map(|letter| src.tuning(letter)).unwrap_or_default();
+            let fixed = one.is_some_and(|letter| src.fixed(letter, stitch, scale));
+            let mut tuning = one.map(|letter| src.tuning(letter, stitch, scale)).unwrap_or_default();
             if l.mitre_corners && !fixed {
                 emb_model::mitre::join_parts(&mut parts);
             }

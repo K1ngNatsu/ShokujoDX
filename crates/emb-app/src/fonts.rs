@@ -23,6 +23,9 @@ struct Preview {
     font: FontRef,
     letters: Vec<Letter>,
     range: Option<(f64, f64)>,
+    /// Above this capital height the letters of the font sew as fills
+    /// (ADR 0120), in mm.
+    fills_from: Option<f64>,
     notes: String,
     /// The quality of an embroidery font (ADR 0115).
     quality: Option<emb_letter::quality::Quality>,
@@ -81,7 +84,8 @@ impl ConvertProgress {
 /// of the columns reach the corners of the outline and each letter gets
 /// its sew order with few trims, as the fonts of the program have (ADR
 /// 0113, 0116); with the stitch type Auto, a letter that is better as a
-/// fill becomes a fill (ADR 0119); then the quality score. `Err` if the
+/// fill becomes a fill (ADR 0119), and each letter gets its fill letter
+/// for large lettering (ADR 0120); then the quality score. `Err` if the
 /// user stopped it.
 pub fn convert_font(
     font: &emb_letter::Font,
@@ -115,6 +119,8 @@ pub fn convert_font(
         progress.step.store(STEP_SCORE, Relaxed);
         if stitch == LetterStitch::Auto {
             f.choose_fills(font, &[]);
+            // The fill letters for large lettering (ADR 0120).
+            f.add_fill_letters(font);
         }
         f.measure_quality(font);
     }
@@ -216,14 +222,15 @@ impl AppState {
         let src = any.source();
         let l = Lettering::new(PREVIEW_TEXT, font.clone(), 10.0, Point::new(0.0, 0.0));
         let letters = emb_letter::layout(&l, src);
-        let (notes, quality) = match &any {
-            emb_letter::AnyFont::Embroidery(e) => (e.notes.clone(), e.quality),
-            emb_letter::AnyFont::TrueType(t) => (t.copyright().unwrap_or_default(), None),
+        let (notes, quality, fills_from) = match &any {
+            emb_letter::AnyFont::Embroidery(e) => (e.notes.clone(), e.quality, e.fill_letters.map(|f| f.from_mm)),
+            emb_letter::AnyFont::TrueType(t) => (t.copyright().unwrap_or_default(), None, None),
         };
         Some(Preview {
             font: font.clone(),
             letters,
             range: src.size_range(LetterStitch::Auto),
+            fills_from,
             notes,
             quality,
         })
@@ -531,6 +538,15 @@ fn details(ui: &mut egui::Ui, st: &mut AppState) {
             "Size range: {}–{} mm (capital height)",
             &[&format!("{:.0}", lo), &format!("{:.0}", hi)],
         ));
+    }
+    if let Some(from) = p.fills_from {
+        ui.add(
+            egui::Label::new(crate::i18n::fill(
+                "Up to {} mm the letters sew as satin columns, above it as fills.",
+                &[&format!("{:.0}", from)],
+            ))
+            .wrap(),
+        );
     }
     match &p.quality {
         Some(q) => quality_ui(ui, q, fill),
@@ -894,7 +910,16 @@ mod tests {
                 .flat_map(|l| &l.parts)
                 .all(|k| matches!(k, ObjectKind::Fill { .. }))
         );
-        assert_eq!(p.range, Some((15.0, 300.0)));
+        assert_eq!((p.range, p.fills_from), (Some((15.0, 300.0)), None));
+        // A font with satin letters goes to 300 mm too: its letters are
+        // fills above the largest size of its columns (ADR 0120).
+        let block = st.preview_of(&FontRef::embroidery("Block Sans", "")).unwrap();
+        let from = block.fills_from.expect("fill letters");
+        assert!(
+            block.range.is_some_and(|r| r.1 == 300.0 && r.0 < from && from < 300.0),
+            "{:?}",
+            block.range
+        );
         assert!(
             p.quality
                 .is_some_and(|q| q.score >= emb_letter::quality::BUNDLE && q.long == 0.0)
@@ -956,6 +981,18 @@ mod tests {
                 .count()
         };
         assert_eq!((fills(&routed), fills(&plain)), (0, 0));
+        // With Automatic, each letter has its fill letter for large
+        // lettering; with Satin, the font has columns only.
+        assert!(routed.fill_letters.is_some() && plain.fill_letters.is_some());
+        assert!(
+            routed.letters[&'H']
+                .fill_parts
+                .iter()
+                .all(|p| matches!(p, ObjectKind::Fill { .. }))
+        );
+        assert!(!routed.letters[&'H'].fill_parts.is_empty());
+        let satin = convert_font(&font, "Satin", LetterStitch::Satin, true, &chars, &Default::default()).unwrap();
+        assert!(satin.fill_letters.is_none() && satin.letters[&'H'].fill_parts.is_empty());
         // A fill font has no route.
         let fill = convert_font(&font, "Fill", LetterStitch::Fill, true, &chars, &Default::default()).unwrap();
         assert!(fill.fill && fill.letters.values().all(|l| !l.fixed));

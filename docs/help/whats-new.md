@@ -77,6 +77,13 @@ leave a part of its shape open becomes a fill, if the font is for large
 letters (from 15 mm).
 See [Lettering](lettering).
 
+**Large lettering in each font.** Each embroidery font with satin
+letters now also has its letters as fills. Above the largest size of its
+satin columns, a font sews fill letters, so it goes up to 300 mm.
+**Stitch type** in the Lettering window selects satin or fill for the
+whole text.
+See [Lettering](lettering).
+
 **More motifs, patterns, stamps, borders and clipart.** The program has
 71 motifs (15 before), 48 program-split patterns (10), 39 carving stamps
 (8), 50 decorative borders (12) and 45 clipart items (8). Most of them

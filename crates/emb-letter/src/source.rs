@@ -46,12 +46,15 @@ pub trait LetterSource {
     fn size_range(&self, stitch: LetterStitch) -> Option<(f64, f64)>;
     /// The parts of the letter sew in the order of the source, each column
     /// from its start to its end (a letter that a person put in order).
-    fn fixed(&self, _letter: u32) -> bool {
+    /// `stitch` and `scale` are those of [`LetterSource::parts`]: the
+    /// answer is for the parts that it gives.
+    fn fixed(&self, _letter: u32, _stitch: LetterStitch, _scale: f64) -> bool {
         false
     }
     /// The settings that the source gives to each part of the letter, in
-    /// the order of the parts (empty: none).
-    fn tuning(&self, _letter: u32) -> Vec<PartTuning> {
+    /// the order of the parts (empty: none), for the parts that
+    /// [`LetterSource::parts`] gives with `stitch` and `scale`.
+    fn tuning(&self, _letter: u32, _stitch: LetterStitch, _scale: f64) -> Vec<PartTuning> {
         Vec::new()
     }
     /// The glyphs of one line of text, shaped (see [`crate::shape`]): the

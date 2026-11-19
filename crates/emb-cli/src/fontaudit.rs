@@ -114,7 +114,7 @@ pub fn quality_table(font: &EmbFont, source: &Font) -> String {
     out.push_str(&format!(
         " | range {}-{} mm, widths at 25 mm: 5 % {:.2}, 10 % {:.2}, 50 % {:.2}, 90 % {:.2}, 95 % {:.2}",
         font.min_height_mm,
-        font.max_height_mm,
+        font.column_max_mm(),
         w(0.05),
         w(0.1),
         w(0.5),
@@ -299,7 +299,7 @@ pub fn flags(a: &LetterAudit, font: &EmbFont) -> Vec<String> {
     }
     let (small, large) = (
         font.min_height_mm / font.cap_height_mm,
-        font.max_height_mm / font.cap_height_mm,
+        font.column_max_mm() / font.cap_height_mm,
     );
     if a.min_width_mm > 0.0 && a.min_width_mm * small < NARROW_MM {
         out.push("narrow".to_string());
@@ -320,7 +320,7 @@ pub fn table(font: &EmbFont, rows: &[LetterAudit], sizes: &[f64]) -> String {
         "{} ({}-{} mm): trims at {}\nletter parts fixed  cover outside overlap  width mm    trims  look at\n",
         font.family,
         font.min_height_mm,
-        font.max_height_mm,
+        font.column_max_mm(),
         sizes.iter().map(|s| format!("{s} mm")).collect::<Vec<_>>().join(", "),
     );
     for a in rows {
@@ -452,7 +452,7 @@ pub fn proof(font: &EmbFont, source: Option<&Font>, rows: &[LetterAudit]) -> Str
         "family": font.family,
         "cap_height": font.cap_height_mm,
         "min": font.min_height_mm,
-        "max": font.max_height_mm,
+        "max": font.column_max_mm(),
         "letters": letters,
     })
     .to_string()

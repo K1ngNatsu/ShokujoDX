@@ -83,6 +83,13 @@ einen Teil seiner Form offen lassen, zu einer Füllung, wenn die Schrift
 für große Buchstaben ist (ab 15 mm).
 Siehe [Schrift](lettering).
 
+**Große Schrift in jeder Schrift.** Jede Stickschrift mit
+Satinbuchstaben hat ihre Buchstaben jetzt auch als Füllungen. Über der
+größten Größe ihrer Satinsäulen stickt eine Schrift Füllbuchstaben und
+reicht so bis 300 mm. **Stichart** im Fenster Schrift wählt Satin oder
+Füllung für den ganzen Text.
+Siehe [Schrift](lettering).
+
 **Mehr Motive, Muster, Stempel, Ränder und Clipart.** Das Programm hat
 71 Motive (vorher 15), 48 Programmteilungs-Muster (10), 39 Prägestempel
 (8), 50 dekorative Ränder (12) und 45 Clipart-Elemente (8). Die meisten

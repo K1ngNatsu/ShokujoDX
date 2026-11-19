@@ -97,7 +97,11 @@ Usage:
       --stitch auto (the default): after the other steps, a letter whose
       columns leave a part of its shape open becomes a fill, if its fill
       letter has the better score (ADR 0119; only in a font with a
-      smallest size of 15 mm or more). --stitch satin keeps all columns.
+      smallest size of 15 mm or more). Then each letter with columns gets
+      its fill letter too, for lettering above the largest size of the
+      columns, and the size range goes to 300 mm (ADR 0120; not with
+      --small-text). --stitch satin keeps all columns and makes no fill
+      letters.
       --corrections <file>: apply the letter corrections of the file after
       the conversion (ADR 0112). A correction that does not apply is an
       error.
@@ -650,6 +654,11 @@ fn run(args: &[String]) -> Result<(), String> {
                 if !fills.is_empty() {
                     println!("fill letters: {} ({fills})", fills.chars().count());
                 }
+                // The fill letters for large lettering (ADR 0120).
+                let large = f.add_fill_letters(font);
+                if large > 0 {
+                    println!("fill letters for large sizes: {large}, above {} mm", f.column_max_mm());
+                }
             }
             // The quality of the letters as they are now (ADR 0115).
             if let Some(font) = &source_font {
@@ -676,7 +685,7 @@ fn run(args: &[String]) -> Result<(), String> {
             }
             let label = emb_letter::bundled::embroidery("Atkinson Hyperlegible");
             let sizes = if sheet_sizes.is_empty() {
-                emb_letter::sheet::sizes(f.size_range(emb_model::LetterStitch::Auto)).to_vec()
+                emb_letter::sheet::sizes(f.size_range(emb_model::LetterStitch::Satin)).to_vec()
             } else {
                 sheet_sizes
             };
@@ -759,7 +768,7 @@ fn run(args: &[String]) -> Result<(), String> {
                 );
             }
             let sizes = if sheet_sizes.is_empty() {
-                emb_letter::sheet::sizes(f.size_range(emb_model::LetterStitch::Auto)).to_vec()
+                emb_letter::sheet::sizes(f.size_range(emb_model::LetterStitch::Satin)).to_vec()
             } else {
                 sheet_sizes
             };

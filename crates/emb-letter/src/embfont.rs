@@ -61,7 +61,10 @@ pub fn check_letter(letter: &EmbLetter) -> Result<(), &'static str> {
     if !(letter.advance_mm.is_finite() && letter.advance_mm.abs() <= MAX_FONT_MM) {
         return Err("advance_mm");
     }
-    for part in &letter.parts {
+    if !letter.fill_parts.iter().all(|p| matches!(p, ObjectKind::Fill { .. })) {
+        return Err("fill_parts");
+    }
+    for part in letter.parts.iter().chain(&letter.fill_parts) {
         let rungs: &[(emb_geom::Point, emb_geom::Point)] = match part {
             ObjectKind::Satin { geometry, .. } => &geometry.rungs,
             ObjectKind::Fill { .. } | ObjectKind::Running { .. } => &[],
@@ -106,6 +109,23 @@ pub struct EmbLetter {
     /// The settings of each part, in the order of `parts` (empty: none).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tuning: Vec<PartTuning>,
+    /// The letter as fills (ADR 0120): the outline of the source font, for
+    /// the sizes at which the columns of `parts` are too wide
+    /// ([`EmbFont::fill_letters`]). Empty: the letter has `parts` only.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fill_parts: Vec<ObjectKind>,
+}
+
+/// The sizes of the fill letters of a font of satin letters (ADR 0120).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct FillSizes {
+    /// Above this capital height the letters sew as their fill letters
+    /// ([`EmbLetter::fill_parts`]), in mm: the largest size of the columns.
+    pub from_mm: f64,
+    /// The smallest capital height at which the fill letters sew well, in
+    /// mm (the smallest size of the fill font with the same letters,
+    /// ADR 0117). It is for lettering with the stitch type Fill.
+    pub min_mm: f64,
 }
 
 /// An embroidery font.
@@ -125,6 +145,12 @@ pub struct EmbFont {
     pub space_mm: f64,
     pub min_height_mm: f64,
     pub max_height_mm: f64,
+    /// The font has the fill letter of each letter with columns too
+    /// ([`EmbLetter::fill_parts`], ADR 0120): the layout uses the columns
+    /// up to `from_mm` and the fills above it, so the font goes up to
+    /// `max_height_mm` in one look. `None`: the letters have one shape.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fill_letters: Option<FillSizes>,
     /// The letters by character.
     pub letters: BTreeMap<char, EmbLetter>,
     /// Kerning of pairs of characters (two characters as the key), in mm at
@@ -189,6 +215,11 @@ impl EmbFont {
         if !size(self.max_height_mm, self.min_height_mm, MAX_RANGE_MM) {
             return Err("max_height_mm".into());
         }
+        if let Some(f) = &self.fill_letters
+            && !(size(f.from_mm, self.min_height_mm, self.max_height_mm) && size(f.min_mm, 0.1, MAX_RANGE_MM))
+        {
+            return Err("fill_letters".into());
+        }
         for (c, letter) in &self.letters {
             check_letter(letter).map_err(|what| format!("letters.{c}: {what}"))?;
         }
@@ -233,6 +264,7 @@ impl EmbFont {
                 parts: Vec::new(),
                 fixed: false,
                 tuning: Vec::new(),
+                fill_parts: Vec::new(),
             },
         );
         EmbFont {
@@ -246,6 +278,7 @@ impl EmbFont {
             space_mm: round(0.3 * DESIGN_CAP_MM),
             min_height_mm: crate::source::MIN_HEIGHT_MM,
             max_height_mm: crate::source::MAX_HEIGHT_MM,
+            fill_letters: None,
             letters,
             kerning: BTreeMap::new(),
             small_text: false,
@@ -298,7 +331,89 @@ impl EmbFont {
         let lo = (narrow_mm(self) / thin * self.cap_height_mm * 2.0).ceil() / 2.0;
         let hi = (LONG_MM / wide * self.cap_height_mm).floor();
         self.min_height_mm = self.min_height_mm.max(lo);
-        self.max_height_mm = self.max_height_mm.min(hi).max(self.min_height_mm);
+        match &mut self.fill_letters {
+            // The columns end where the fill letters start.
+            Some(f) => {
+                f.from_mm = f
+                    .from_mm
+                    .min(hi.max(crate::quality::FILL_MIN_HEIGHT_MM))
+                    .max(self.min_height_mm);
+            }
+            None => self.max_height_mm = self.max_height_mm.min(hi).max(self.min_height_mm),
+        }
+    }
+
+    /// The largest capital height at which the letters sew as columns, in
+    /// mm: where the fill letters start, or the end of the size range.
+    pub fn column_max_mm(&self) -> f64 {
+        self.fill_letters.map_or(self.max_height_mm, |f| f.from_mm)
+    }
+
+    /// Gives each letter with columns its fill letter too (ADR 0120): the
+    /// outline of `source`, the font that this font was converted from
+    /// ([`crate::quality::fill_letter`]). The columns keep their size
+    /// range, the fills start at its end (not below
+    /// [`crate::quality::FILL_MIN_HEIGHT_MM`]), and the range of the font
+    /// goes up to [`crate::source::MAX_HEIGHT_MM`]. Run it last, after the
+    /// size range of the columns is made. A fill font and a font for small
+    /// text get none. Returns the number of the fill letters.
+    pub fn add_fill_letters(&mut self, source: &Font) -> usize {
+        if self.fill || self.small_text || self.fill_letters.is_some() {
+            return 0;
+        }
+        let mut made = Vec::new();
+        for (c, letter) in &self.letters {
+            if letter.parts.iter().any(|p| matches!(p, ObjectKind::Satin { .. }))
+                && let Some(fill) = crate::quality::fill_letter(self, source, *c)
+            {
+                made.push((*c, fill.parts));
+            }
+        }
+        if made.is_empty() {
+            return 0;
+        }
+        let count = made.len();
+        for (c, parts) in made {
+            if let Some(letter) = self.letters.get_mut(&c) {
+                letter.fill_parts = parts;
+            }
+        }
+        // The smallest size of the fill letters: the start of the range of
+        // the fill font with these letters.
+        let mut twin = self.clone();
+        twin.fill = true;
+        twin.min_height_mm = crate::source::MIN_HEIGHT_MM;
+        twin.max_height_mm = crate::source::MAX_HEIGHT_MM;
+        for letter in twin.letters.values_mut() {
+            if !letter.fill_parts.is_empty() {
+                letter.parts = std::mem::take(&mut letter.fill_parts);
+            }
+        }
+        twin.fit_size_range();
+        let from_mm = self.max_height_mm.max(crate::quality::FILL_MIN_HEIGHT_MM);
+        self.max_height_mm = self.max_height_mm.max(crate::source::MAX_HEIGHT_MM);
+        self.fill_letters = Some(FillSizes {
+            from_mm,
+            min_mm: twin.min_height_mm.min(self.max_height_mm),
+        });
+        count
+    }
+
+    /// `true` if the letter sews as its fill letter at the scale `scale`
+    /// (mm for each unit of the font) with the stitch type `stitch` of the
+    /// lettering: Fill, or Automatic above the largest size of the
+    /// columns. A letter with no fill letter has one shape.
+    fn uses_fill(&self, letter: &EmbLetter, stitch: LetterStitch, scale: f64) -> bool {
+        if letter.fill_parts.is_empty() {
+            return false;
+        }
+        match stitch {
+            LetterStitch::Fill => true,
+            LetterStitch::Satin => false,
+            LetterStitch::Auto => self
+                .fill_letters
+                .is_some_and(|f| scale * self.cap_height_mm > f.from_mm + 1e-6),
+        }
     }
 
     /// Measures the quality of the font again ([`crate::quality::measure`]),
@@ -518,27 +633,40 @@ impl LetterSource for EmbFont {
         }
     }
 
-    /// The stored parts; an embroidery font keeps its own stitch types.
-    fn parts(&self, letter: u32, _stitch: LetterStitch, _scale: f64) -> Vec<ObjectKind> {
+    /// The stored parts; an embroidery font keeps its own stitch types. A
+    /// letter with a fill letter (ADR 0120) gives its fills for large
+    /// lettering ([`EmbFont::uses_fill`]).
+    fn parts(&self, letter: u32, stitch: LetterStitch, scale: f64) -> Vec<ObjectKind> {
         char::from_u32(letter)
             .and_then(|c| self.letters.get(&c))
-            .map(|l| l.parts.clone())
+            .map(|l| {
+                if self.uses_fill(l, stitch, scale) {
+                    l.fill_parts.clone()
+                } else {
+                    l.parts.clone()
+                }
+            })
             .unwrap_or_default()
     }
 
-    fn size_range(&self, _stitch: LetterStitch) -> Option<(f64, f64)> {
-        Some((self.min_height_mm, self.max_height_mm))
+    fn size_range(&self, stitch: LetterStitch) -> Option<(f64, f64)> {
+        Some(match (&self.fill_letters, stitch) {
+            (Some(f), LetterStitch::Satin) => (self.min_height_mm, f.from_mm),
+            (Some(f), LetterStitch::Fill) => (f.min_mm, self.max_height_mm.max(f.min_mm)),
+            _ => (self.min_height_mm, self.max_height_mm),
+        })
     }
 
-    fn fixed(&self, letter: u32) -> bool {
+    fn fixed(&self, letter: u32, stitch: LetterStitch, scale: f64) -> bool {
         char::from_u32(letter)
             .and_then(|c| self.letters.get(&c))
-            .is_some_and(|l| l.fixed)
+            .is_some_and(|l| l.fixed && !self.uses_fill(l, stitch, scale))
     }
 
-    fn tuning(&self, letter: u32) -> Vec<PartTuning> {
+    fn tuning(&self, letter: u32, stitch: LetterStitch, scale: f64) -> Vec<PartTuning> {
         char::from_u32(letter)
             .and_then(|c| self.letters.get(&c))
+            .filter(|l| !self.uses_fill(l, stitch, scale))
             .map(|l| l.tuning.clone())
             .unwrap_or_default()
     }
@@ -692,6 +820,7 @@ pub fn letter_from(objects: &[ObjectKind], frame: &LetterFrame) -> Option<EmbLet
         parts,
         fixed: frame.keep_order,
         tuning,
+        fill_parts: Vec::new(),
     })
 }
 
@@ -771,6 +900,7 @@ pub fn convert_with(
                 parts,
                 fixed: false,
                 tuning: Vec::new(),
+                fill_parts: Vec::new(),
             },
         );
         glyphs.push((c, g));
@@ -817,6 +947,7 @@ pub fn convert_with(
         space_mm: round(LetterSource::space(font) * scale),
         min_height_mm: min,
         max_height_mm: max,
+        fill_letters: None,
         letters,
         kerning,
         small_text,

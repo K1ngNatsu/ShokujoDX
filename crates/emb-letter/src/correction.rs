@@ -211,6 +211,7 @@ impl LetterCorrection {
             fixed: self.fixed.unwrap_or(self.parts.is_some() || self.has_steps()),
             parts,
             tuning,
+            fill_parts: letter.map(|l| l.fill_parts.clone()).unwrap_or_default(),
         })
     }
 }

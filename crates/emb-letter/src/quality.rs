@@ -458,6 +458,7 @@ pub fn fill_letter(font: &EmbFont, source: &Font, c: char) -> Option<EmbLetter> 
         parts,
         fixed: false,
         tuning: Vec::new(),
+        fill_parts: Vec::new(),
     })
 }
 
@@ -517,7 +518,7 @@ pub fn letter_quality(font: &EmbFont, letter: &EmbLetter, outline: &Outline) -> 
     let cover = areas.coverage;
     let (small, large) = (
         font.min_height_mm / font.cap_height_mm.max(1e-6),
-        font.max_height_mm / font.cap_height_mm.max(1e-6),
+        font.column_max_mm() / font.cap_height_mm.max(1e-6),
     );
     let columns = letter.parts.iter().any(|p| matches!(p, ObjectKind::Satin { .. }));
     if !columns {
@@ -831,6 +832,101 @@ mod tests {
             geometry,
             params: emb_model::SatinParams::default(),
         }
+    }
+
+    #[test]
+    fn a_font_has_fill_letters_for_large_lettering() {
+        use crate::source::LetterSource;
+        let source = bundled::font("Lato", "Bold").unwrap();
+        let chars = ['H', 'I', 'i'];
+        let mut font = convert(&source, "Block Sans", "", LetterStitch::Auto, &chars);
+        font.extend_ends(&source);
+        font.route();
+        font.measure_quality(&source);
+        let before = font.clone();
+        let (lo, hi) = (font.min_height_mm, font.max_height_mm);
+        assert!(hi > FILL_MIN_HEIGHT_MM && hi < 100.0, "{hi}");
+        // Each letter with columns gets its fill letter; the space has none.
+        assert_eq!(font.add_fill_letters(&source), 3);
+        assert!(font.letters[&' '].fill_parts.is_empty());
+        let sizes = font.fill_letters.unwrap();
+        assert_eq!((sizes.from_mm, font.column_max_mm()), (hi, hi));
+        assert_eq!(font.max_height_mm, crate::source::MAX_HEIGHT_MM);
+        assert!(sizes.min_mm >= FILL_MIN_HEIGHT_MM && sizes.min_mm < 40.0, "{sizes:?}");
+        // A second time: nothing more.
+        assert_eq!(font.add_fill_letters(&source), 0);
+        // The columns and the score are the same.
+        for c in chars {
+            assert_eq!(font.letters[&c].parts, before.letters[&c].parts);
+            assert!(
+                font.letters[&c]
+                    .fill_parts
+                    .iter()
+                    .all(|p| matches!(p, ObjectKind::Fill { .. }))
+            );
+        }
+        font.measure_quality(&source);
+        assert_eq!(font.quality, before.quality);
+        // The size range for each stitch type.
+        assert_eq!(font.size_range(LetterStitch::Auto), Some((lo, 300.0)));
+        assert_eq!(font.size_range(LetterStitch::Satin), Some((lo, hi)));
+        assert_eq!(font.size_range(LetterStitch::Fill), Some((sizes.min_mm, 300.0)));
+        // The size range of the columns stays when it is made again.
+        let mut again = font.clone();
+        again.fit_size_range();
+        assert_eq!(again, font);
+        // The letters by size: columns up to the largest size of the
+        // columns, fills above it. A routed letter is fixed; its fill
+        // letter is not.
+        let h = font.letter('H').unwrap();
+        let scale = |mm: f64| mm / font.cap_height_mm;
+        let fills = |parts: &[ObjectKind]| parts.iter().all(|p| matches!(p, ObjectKind::Fill { .. }));
+        for (stitch, mm, fill) in [
+            (LetterStitch::Auto, lo, false),
+            (LetterStitch::Auto, hi, false),
+            (LetterStitch::Auto, hi + 1.0, true),
+            (LetterStitch::Auto, 200.0, true),
+            (LetterStitch::Satin, 200.0, false),
+            (LetterStitch::Fill, lo, true),
+        ] {
+            let parts = font.parts(h, stitch, scale(mm));
+            assert_eq!(fills(&parts), fill, "{stitch:?} at {mm} mm");
+            assert_eq!(font.fixed(h, stitch, scale(mm)), !fill, "{stitch:?} at {mm} mm");
+        }
+        // The lettering: one look for the whole word, and a size range to
+        // 300 mm.
+        let word = |mm: f64| {
+            let mut l = emb_model::Lettering::new("Hi", font.font_ref(), mm, Point::ZERO);
+            crate::relayout(&mut l, &font);
+            l
+        };
+        let (small, large) = (word(hi), word(hi + 10.0));
+        assert!(small.letters.iter().all(|l| !fills(&l.parts) && l.fixed));
+        assert!(large.letters.iter().all(|l| fills(&l.parts) && !l.fixed));
+        assert_eq!(large.range_mm, Some((lo, 300.0)));
+        // The file keeps the fill letters.
+        let back = EmbFont::from_json(&font.to_json()).unwrap();
+        assert_eq!(back.fill_letters, font.fill_letters);
+        assert_eq!(back.letters[&'H'].fill_parts, font.letters[&'H'].fill_parts);
+        // A file of an earlier version has none, and reads as before.
+        let old = EmbFont::from_json(&before.to_json()).unwrap();
+        assert!(old.fill_letters.is_none() && old.size_range(LetterStitch::Auto) == Some((lo, hi)));
+        // A file with a wrong value is not a font.
+        let mut wrong = font.clone();
+        wrong.fill_letters = Some(crate::embfont::FillSizes {
+            from_mm: 1e9,
+            min_mm: 15.0,
+        });
+        assert!(EmbFont::from_json(&wrong.to_json()).is_err());
+        let mut wrong = font.clone();
+        let column = wrong.letters[&'I'].parts[0].clone();
+        wrong.letters.get_mut(&'I').unwrap().fill_parts.push(column);
+        assert!(EmbFont::from_json(&wrong.to_json()).is_err());
+        // A font for small text and a fill font get no fill letters.
+        let mut small_text = crate::embfont::convert_with(&source, "Small", "", LetterStitch::Auto, &chars, true);
+        assert_eq!(small_text.add_fill_letters(&source), 0);
+        let mut fill_font = convert(&source, "Fill", "", LetterStitch::Fill, &chars);
+        assert_eq!(fill_font.add_fill_letters(&source), 0);
     }
 
     #[test]

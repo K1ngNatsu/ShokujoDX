@@ -81,6 +81,13 @@ parte de su forma pasa a ser un relleno, si la fuente es para letras
 grandes (desde 15 mm).
 Consulte [Letras](lettering).
 
+**Letras grandes en cada fuente.** Cada fuente de bordado con letras de
+satén tiene ahora también sus letras como rellenos. Por encima del tamaño
+más grande de sus columnas de satén, una fuente borda letras de relleno,
+y así llega a 300 mm. **Tipo de puntada** en la ventana Letras selecciona
+satén o relleno para todo el texto.
+Consulte [Letras](lettering).
+
 **Más motivos, patrones, sellos, bordes y clipart.** El programa tiene
 71 motivos (antes 15), 48 patrones de división programada (10), 39 sellos
 de relieve (8), 50 bordes decorativos (12) y 45 elementos de clipart (8).

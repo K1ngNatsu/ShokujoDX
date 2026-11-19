@@ -68,7 +68,7 @@ fn use_font(font: &emb_letter::EmbFont, text: &str) -> (usize, usize) {
     let _ = emb_letter::quality::width_at(font, 0.1);
     let _ = emb_letter::quality::hole_width_at(font, 0.1);
     // The test sheet at the sizes of the range of the font.
-    let sizes = emb_letter::sheet::sizes(font.size_range(emb_model::LetterStitch::Auto));
+    let sizes = emb_letter::sheet::sizes(font.size_range(emb_model::LetterStitch::Satin));
     let sheet = emb_letter::sheet::sheet(
         font,
         None,

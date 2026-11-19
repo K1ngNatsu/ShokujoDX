@@ -1660,7 +1660,11 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, l: &Letter
     ui.checkbox(&mut n.kerning, tr("Kerning")).on_hover_text(tr(
         "Use the letter pairs of the font (for example \"AV\") to set the space between letters.",
     ));
-    if n.font.kind == FontKind::Embroidery {
+    // An embroidery font has one shape for each letter, but a font with
+    // fill letters for large lettering has two (ADR 0120).
+    let one_shape = n.font.kind == FontKind::Embroidery
+        && !matches!(st.fonts.get(&n.font), Some(emb_letter::AnyFont::Embroidery(e)) if e.fill_letters.is_some());
+    if one_shape {
         ui.weak(tr("The letters of an embroidery font keep their own stitch types."));
     } else {
         stitch_combo(ui, &mut n.stitch);

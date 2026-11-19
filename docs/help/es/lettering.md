@@ -60,6 +60,14 @@ se bordan. La puntuación de calidad de una fuente de relleno tiene su
 propia medida (qué parte de las letras es demasiado estrecha para un
 relleno en el tamaño más pequeño), por eso **Ordenar por > Calidad**
 muestra las fuentes de relleno después de las otras fuentes de bordado.
+Las demás fuentes de bordado del programa tienen letras de satén, y cada
+una tiene también sus letras como rellenos. Hasta el tamaño más grande de
+sus columnas de satén, una fuente borda letras de satén. Por encima de
+ese tamaño borda sus letras de relleno; así cada fuente llega a 300 mm y
+una palabra tiene un solo aspecto. La ventana Fuentes muestra el tamaño
+del cambio. **Tipo de puntada** en la ventana Letras selecciona una de
+las dos para todo el texto: **Satén** o **Relleno**. Las fuentes para
+texto pequeño solo tienen letras de satén.
 
 Cada fuente de bordado tiene una **puntuación de calidad** de 0 a 100. La
 puntuación dice lo bien que se bordan las letras de la fuente. La lista de

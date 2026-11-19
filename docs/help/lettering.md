@@ -57,6 +57,13 @@ set how the letters sew. The quality score of a fill font has its own
 measure (how much of the letters is too narrow for a fill at the smallest
 size), so **Sort by > Quality** shows the fill fonts after the other
 embroidery fonts.
+The other embroidery fonts of the program have satin letters, and each of
+them also has its letters as fills. Up to the largest size of its satin
+columns, a font sews satin letters. Above that size it sews its fill
+letters, so each font goes up to 300 mm and a word has one look. The
+Fonts window shows the size of the change. **Stitch type** in the
+Lettering window selects one of the two for the whole text: **Satin** or
+**Fill**. The fonts for small text have satin letters only.
 
 Each embroidery font has a **quality score** from 0 to 100. The score
 says how well the letters of the font sew. The font list shows it after

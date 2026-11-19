@@ -152,10 +152,13 @@ impl AppState {
         if self.font_sheet_window.sized_for.as_ref().is_some_and(|f| f.same(&font)) {
             return;
         }
-        let range = self
-            .fonts
-            .get(&font)
-            .and_then(|f| f.source().size_range(LetterStitch::Auto));
+        // The sheet of an embroidery font has the sizes of its columns: a
+        // font with fill letters for large lettering goes to 300 mm.
+        let stitch = match font.kind {
+            emb_model::FontKind::Embroidery => LetterStitch::Satin,
+            emb_model::FontKind::TrueType => LetterStitch::Auto,
+        };
+        let range = self.fonts.get(&font).and_then(|f| f.source().size_range(stitch));
         let s = sheet::sizes(range);
         let limit = self.sheet_hoop().map_or(OPEN_HEIGHT_MM, |(_, h)| h);
         let mut on = vec![s[0]];
@@ -416,11 +419,11 @@ mod tests {
         frame(&ctx, &mut st);
         let w = st.font_sheet_window.clone();
         let font = emb_letter::bundled::embroidery(emb_letter::bundled::DEFAULT_EMBROIDERY).unwrap();
-        assert_eq!(w.range, Some((font.min_height_mm, font.max_height_mm)));
+        assert_eq!(w.range, Some((font.min_height_mm, font.column_max_mm())));
         // The sizes of the font; the largest one gives a sheet that does
         // not fit the hoop, so it is off at the start.
         assert_eq!(w.sizes[0], (true, font.min_height_mm));
-        assert_eq!(w.sizes[2], (false, font.max_height_mm));
+        assert_eq!(w.sizes[2], (false, font.column_max_mm()));
         let Some((_, Ok(info))) = &w.info else {
             panic!("the size of the sheet: {:?}", w.info)
         };

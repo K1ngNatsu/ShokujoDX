@@ -857,6 +857,7 @@ pub fn route(letter: &EmbLetter, cap_mm: f64) -> (EmbLetter, Routed) {
             parts,
             fixed: true,
             tuning,
+            fill_parts: letter.fill_parts.clone(),
         },
         Routed { trims, runs, splits: 0 },
     )
@@ -1048,6 +1049,7 @@ mod tests {
             parts,
             fixed: false,
             tuning: Vec::new(),
+            fill_parts: Vec::new(),
         }
     }
 
