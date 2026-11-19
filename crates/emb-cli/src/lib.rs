@@ -6,6 +6,7 @@ pub mod bench;
 pub mod content;
 pub mod corpus;
 pub mod fontaudit;
+pub mod view;
 
 use std::path::Path;
 

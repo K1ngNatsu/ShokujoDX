@@ -164,7 +164,7 @@ pub fn args() -> Vec<std::ffi::OsString> {
 }
 
 /// The user folder file `name`.
-fn user_file(name: &str) -> Option<PathBuf> {
+pub(crate) fn user_file(name: &str) -> Option<PathBuf> {
     crate::about::user_folder().map(|d| d.join(name))
 }
 

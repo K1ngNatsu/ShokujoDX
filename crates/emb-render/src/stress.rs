@@ -1,5 +1,6 @@
-//! Synthetic stitch data to test how fast the canvas draws (test only; see
-//! `canvas::tests::mesh_build_timing`).
+//! Synthetic stitch data to test how fast the views draw: the canvas of
+//! the program (`canvas::tests::mesh_build_timing`, `--view-bench`) and the
+//! pictures (`emb-cli view-bench --stress`, ADR 0122).
 //!
 //! This is not real stitch generation. It makes tatami-like rows inside
 //! circles, with several colors, so the canvas has a realistic load.

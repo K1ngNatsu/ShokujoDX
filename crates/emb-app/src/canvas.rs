@@ -391,14 +391,15 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
         if waits {
             ui.ctx().request_repaint_after(std::time::Duration::from_millis(40));
         }
-        let mesh = if st.show_thread_look && st.settings.look.three_d {
-            let table = emb_render::thread3d::ShadeTable::new(st.settings.look.light);
-            thread_mesh_3d(rect, &st.view, &segs, st.show_jumps, &table)
-        } else if st.show_thread_look {
-            thread_mesh(rect, &st.view, &segs, st.show_jumps)
+        let look = if !st.show_thread_look {
+            MeshLook::Stitches
+        } else if st.settings.look.three_d {
+            MeshLook::Thread3d
         } else {
-            stitch_mesh(rect, &st.view, &segs, st.show_jumps).0
+            MeshLook::Thread
         };
+        let table = emb_render::thread3d::ShadeTable::new(st.settings.look.light);
+        let mesh = fitted_mesh(rect, &st.view, &segs, st.show_jumps, look, &table).0;
         painter.add(Shape::mesh(mesh));
         if st.show_density {
             crate::density::draw(&painter, ui.ctx(), rect, st);
@@ -724,6 +725,97 @@ pub fn stitch_mesh(rect: Rect, view: &CanvasView, segments: &[(Segment, Color32)
 /// Width of a thread in the Thread look view (mm).
 const THREAD_LOOK_MM: f64 = 0.45;
 
+/// The most vertices of the stitch mesh of one frame. egui-wgpu makes its
+/// vertex buffer two times larger when a frame needs more, and the
+/// graphics library allows at most 256 MB for one buffer (20 bytes for each
+/// vertex), so a mesh of more than 128 MB can stop the program. The view
+/// bench found this with 800,000 stitches in the 3D thread look (ADR 0122).
+pub const MAX_MESH_VERTICES: usize = 6_000_000;
+
+/// The meshes of the stitches, from the heaviest to the lightest.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MeshLook {
+    /// [`thread_mesh_3d`].
+    Thread3d,
+    /// [`thread_mesh`].
+    Thread,
+    /// [`stitch_mesh`].
+    Stitches,
+}
+
+impl MeshLook {
+    /// The most vertices of one stitch with its shadow.
+    fn vertices(self) -> usize {
+        match self {
+            MeshLook::Thread3d => 19,
+            MeshLook::Thread => 10,
+            MeshLook::Stitches => 4,
+        }
+    }
+
+    fn lighter(self) -> Option<MeshLook> {
+        match self {
+            MeshLook::Thread3d => Some(MeshLook::Thread),
+            MeshLook::Thread => Some(MeshLook::Stitches),
+            MeshLook::Stitches => None,
+        }
+    }
+}
+
+/// The mesh of the stitches in `look`, or in a lighter look if the mesh
+/// can have more than [`MAX_MESH_VERTICES`] vertices. If the stitches that
+/// show are too many for the lightest look too, it shows only each n-th
+/// stitch. Returns the mesh and its look.
+pub fn fitted_mesh(
+    rect: Rect,
+    view: &CanvasView,
+    segments: &[(Segment, Color32)],
+    show_jumps: bool,
+    look: MeshLook,
+    table: &emb_render::thread3d::ShadeTable,
+) -> (Mesh, MeshLook) {
+    fitted_mesh_with(rect, view, segments, show_jumps, look, table, MAX_MESH_VERTICES)
+}
+
+/// As [`fitted_mesh`], with a limit of `max` vertices.
+fn fitted_mesh_with(
+    rect: Rect,
+    view: &CanvasView,
+    segments: &[(Segment, Color32)],
+    show_jumps: bool,
+    mut look: MeshLook,
+    table: &emb_render::thread3d::ShadeTable,
+    max: usize,
+) -> (Mesh, MeshLook) {
+    let vis = view.visible(rect).expand(THREAD_LOOK_MM * 3.0);
+    let shows = |(s, _): &&(Segment, Color32)| {
+        !((s.a.x < vis.min.x && s.b.x < vis.min.x)
+            || (s.a.x > vis.max.x && s.b.x > vis.max.x)
+            || (s.a.y < vis.min.y && s.b.y < vis.min.y)
+            || (s.a.y > vis.max.y && s.b.y > vis.max.y))
+    };
+    let visible = segments.iter().filter(shows).count();
+    while visible * look.vertices() > max
+        && let Some(l) = look.lighter()
+    {
+        look = l;
+    }
+    let fewer: Vec<(Segment, Color32)>;
+    let segments = if visible * look.vertices() > max {
+        let step = (visible * look.vertices()).div_ceil(max);
+        fewer = segments.iter().filter(shows).step_by(step).copied().collect();
+        &fewer[..]
+    } else {
+        segments
+    };
+    let mesh = match look {
+        MeshLook::Thread3d => thread_mesh_3d(rect, view, segments, show_jumps, table),
+        MeshLook::Thread => thread_mesh(rect, view, segments, show_jumps),
+        MeshLook::Stitches => stitch_mesh(rect, view, segments, show_jumps).0,
+    };
+    (mesh, look)
+}
+
 /// The Thread look view (spec UX rule 4, "Thread preview"): each stitch is a
 /// thread with a light middle and dark edges, over a soft shadow. When a
 /// thread is narrower than 2 screen points, this is the normal stitch view.
@@ -1029,7 +1121,7 @@ mod tests {
     fn mesh_build_timing() {
         let r = Rect::from_min_size(Pos2::ZERO, Vec2::new(1600.0, 1000.0));
         for n in [10_000, 100_000, 500_000, 1_000_000] {
-            let segments: Vec<(Segment, Color32)> = emb_render::segments(&crate::stress::make(n))
+            let segments: Vec<(Segment, Color32)> = emb_render::segments(&emb_render::stress::make(n))
                 .into_iter()
                 .map(|s| (s, color32(s.color)))
                 .collect();
@@ -1058,7 +1150,7 @@ mod tests {
         let r = Rect::from_min_size(Pos2::ZERO, Vec2::new(1600.0, 1000.0));
         let table = emb_render::thread3d::ShadeTable::new(Default::default());
         for n in [10_000, 100_000] {
-            let segments: Vec<(Segment, Color32)> = emb_render::segments(&crate::stress::make(n))
+            let segments: Vec<(Segment, Color32)> = emb_render::segments(&emb_render::stress::make(n))
                 .into_iter()
                 .map(|s| (s, color32(s.color)))
                 .collect();
@@ -1083,6 +1175,52 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn a_mesh_that_is_too_large_gets_a_lighter_look() {
+        let r = rect();
+        let v = CanvasView {
+            center: Point::ZERO,
+            zoom: 8.0,
+        };
+        let table = emb_render::thread3d::ShadeTable::new(Default::default());
+        let seg = |x: f64| {
+            (
+                Segment {
+                    a: Point::new(x, -2.0),
+                    b: Point::new(x, 2.0),
+                    color: Rgb(120, 120, 120),
+                    kind: SegmentKind::Stitch,
+                },
+                Color32::GRAY,
+            )
+        };
+        // 100 stitches that show, and 100 far away.
+        let segs: Vec<_> = (0..100)
+            .map(|i| seg(-20.0 + 0.4 * f64::from(i)))
+            .chain((0..100).map(|i| seg(5000.0 + f64::from(i))))
+            .collect();
+        let fit = |max: usize| fitted_mesh_with(r, &v, &segs, false, MeshLook::Thread3d, &table, max);
+        let (m, look) = fit(10_000);
+        assert_eq!(look, MeshLook::Thread3d);
+        assert!(m.vertices.len() <= 1900, "{}", m.vertices.len());
+        assert_eq!(fit(1900).1, MeshLook::Thread3d, "the stitches far away do not count");
+        assert_eq!(fit(1000).1, MeshLook::Thread);
+        let (all, look) = fit(400);
+        assert_eq!(look, MeshLook::Stitches);
+        assert!((100..=400).contains(&all.vertices.len()), "{}", all.vertices.len());
+        // Too many for the lightest look: each second stitch.
+        let (m, look) = fit(200);
+        assert_eq!(look, MeshLook::Stitches);
+        assert!(m.vertices.len() <= 200 && m.vertices.len() < all.vertices.len());
+        assert!(
+            fitted_mesh(r, &v, &segs, false, MeshLook::Thread3d, &table)
+                .0
+                .vertices
+                .len()
+                > 1000
+        );
     }
 
     #[test]

@@ -68,6 +68,19 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
+      # The pictures of the reference set of the 3D view (ADR 0122). The
+      # test view_bench compares their hashes; the pictures are kept to
+      # look at.
+      - name: View bench
+        if: runner.os == 'Linux'
+        run: cargo run -p emb-cli -- view-bench --out target/view-bench
+
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'Linux'
+        with:
+          name: view-bench
+          path: target/view-bench
+
       # Engine crates must not depend on UI crates (docs/SPEC.md, rule 5) or
       # on C or C++ libraries (rule 9).
       - name: Engine crates have no UI and no C dependency

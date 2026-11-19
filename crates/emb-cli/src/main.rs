@@ -135,6 +135,24 @@ Usage:
       outside, the part with two layers, the part too narrow and the
       part too long of the letter, and the same six values of the fill
       letter of the character.
+  emb-cli view-bench [--out <folder>] [--stress] [--sew]
+      The bench of the 3D view (ADR 0122). Make the pictures of the
+      reference set (twelve small corpus designs, each for one thing that a
+      sew-out shows) at three zooms, in the flat and the 3D look, and print
+      the time and the data of each step. --out writes the 3D pictures, a
+      page that shows them (index.html), report.txt, hashes.txt and
+      changed.txt (the pictures that changed since the run before).
+      --stress also measures synthetic designs of 10,000, 100,000 and
+      1,000,000 stitches. --sew writes the files to sew the set to
+      <folder>/sew (the machine file, the project and the worksheet).
+  emb-cli view-compare <a.png> <b.png> <out.png> [--grid <cols>x<rows>]
+                       [--place <x>,<y>,<scale>[,<degrees>]]
+      Put two pictures side by side with their difference and print the
+      difference of the brightness (linear light) of each area of a grid
+      (8x8 by default) in percent. The second picture fills the frame of the
+      first one, or, with --place, goes there: its pixel (u, v) goes to
+      (x, y) plus scale times (u, v), turned clockwise. Use --place for a
+      photo of a sew-out.
   emb-cli content <out.json>
       Write the built-in library items as data: the motifs, the
       program-split patterns, the carving stamps, the decorative borders
@@ -266,6 +284,9 @@ fn run(args: &[String]) -> Result<(), String> {
     let (mut sheet_sizes, mut sheet_chars, mut sheet_row) = (Vec::new(), emb_letter::sheet::Characters::Basic, 180.0);
     let mut bench = emb_cli::bench::FolderSettings::default();
     let mut bench_out: Option<PathBuf> = None;
+    let (mut view_stress, mut view_sew) = (false, false);
+    let mut grid = (8u32, 8u32);
+    let mut place: Option<emb_render::compare::Placement> = None;
     let mut quote = emb_cli::QuoteOptions::default();
     // An order option on the command line; else the order of the design.
     let mut order_given = false;
@@ -399,6 +420,21 @@ fn run(args: &[String]) -> Result<(), String> {
                 script_inputs.insert(k, v);
             }
             "--out" => bench_out = Some(PathBuf::from(it.next().ok_or("--out needs a folder")?)),
+            "--stress" => view_stress = true,
+            "--sew" => view_sew = true,
+            "--grid" => {
+                let g = it.next().ok_or("--grid needs a size such as 8x8")?;
+                grid = g
+                    .split_once(['x', 'X'])
+                    .and_then(|(c, r)| Some((c.trim().parse().ok()?, r.trim().parse().ok()?)))
+                    .filter(|&(c, r): &(u32, u32)| (1..=64).contains(&c) && (1..=64).contains(&r))
+                    .ok_or_else(|| format!("--grid {g:?}: give columns x rows, each from 1 to 64"))?;
+            }
+            "--place" => {
+                place = Some(emb_render::compare::Placement::parse(
+                    it.next().ok_or("--place needs x,y,scale or x,y,scale,angle")?,
+                )?)
+            }
             "--width" | "--detail" | "--colors" | "--specks" | "--smooth" | "--denoise" => {
                 let v = it
                     .next()
@@ -855,6 +891,68 @@ fn run(args: &[String]) -> Result<(), String> {
         }
         ["fabrics"] => {
             print!("{}", emb_cli::fabric_list());
+            Ok(())
+        }
+        ["view-bench"] => {
+            let mut measures: Vec<emb_cli::view::Measure> = Vec::new();
+            for r in emb_cli::view::REFERENCE {
+                measures.push(emb_cli::view::run(&r, true));
+            }
+            let mut text = emb_cli::view::report(&measures);
+            if view_stress {
+                let stress: Vec<_> = emb_cli::view::STRESS
+                    .iter()
+                    .map(|&n| emb_cli::view::stress(n))
+                    .collect();
+                text.push_str(&emb_cli::view::report(&stress));
+            }
+            print!("{text}");
+            if let Some(out) = &bench_out {
+                let changed = emb_cli::view::write(out, &measures, &text)?;
+                println!(
+                    "wrote {} pictures to {} ({} changed)",
+                    measures.iter().map(|m| m.shots.len()).sum::<usize>(),
+                    out.display(),
+                    changed.len()
+                );
+                if view_sew {
+                    let sew = out.join("sew");
+                    emb_cli::view::write_sew_files(&sew)?;
+                    println!("wrote the files to sew the set to {}", sew.display());
+                }
+            } else if view_sew {
+                return Err("--sew needs --out <folder>".into());
+            }
+            Ok(())
+        }
+        ["view-compare", a, b, out] => {
+            let read = |p: &str| -> Result<emb_render::raster::Picture, String> {
+                let bytes = std::fs::read(p).map_err(|e| format!("{p}: {e}"))?;
+                let img = emb_art::decode_fit(&bytes, 16_384, 2 << 30).map_err(|e| format!("{p}: {e}"))?;
+                Ok(emb_render::raster::Picture {
+                    width: img.width(),
+                    height: img.height(),
+                    rgba: img.into_raw(),
+                })
+            };
+            let (pa, pb) = (read(a)?, read(b)?);
+            println!(
+                "{a}: {} x {} pixels; {b}: {} x {} pixels",
+                pa.width, pa.height, pb.width, pb.height
+            );
+            if place.is_none() {
+                let (ra, rb) = (
+                    f64::from(pa.width) / f64::from(pa.height),
+                    f64::from(pb.width) / f64::from(pb.height),
+                );
+                if (ra / rb - 1.0).abs() > 0.01 {
+                    eprintln!("warning: the pictures have different shapes; the second one is stretched (use --place)");
+                }
+            }
+            let c = emb_render::compare::compare(&pa, &pb, place, grid.0, grid.1);
+            print!("{}", c.report());
+            std::fs::write(out, c.picture.png()).map_err(|e| format!("{out}: {e}"))?;
+            println!("wrote {out}");
             Ok(())
         }
         ["bench"] | ["bench", _] => {

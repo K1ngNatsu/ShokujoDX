@@ -1,11 +1,12 @@
 # Plan: the 3D stitch view (phase P18, second part)
 
-Date: 2026-11-19 · Status: Proposed. The owner asked for a thorough
+Date: 2026-11-19 · Status: Started. The owner asked for a thorough
 upgrade of the engine of the 3D stitch view, and for this plan in phase
-P18 (2026-11-19). The owner reads the plan and selects the order of the
-milestones before the work starts. The first part of P18 (designs from
-other programs, `docs/design/p18-plan.md`) does not change; the owner
-decides which part starts first.
+P18 (2026-11-19). The first part of P18 (designs from other programs,
+`docs/design/p18-plan.md`) does not change. The owner started this part
+first, with Milestone 1 (2026-11-19). Milestone 1 is done except the
+sew-out of the reference set and the numbers of a small computer
+(`docs/design/p18-view-m1-report.md`, ADR 0122).
 
 ## Goal
 
@@ -169,6 +170,18 @@ Nothing in the view changes. The work gets its tools.
 **Exit test:** `emb-cli view-bench` runs in CI; the report of the
 milestone has the numbers of today and a picture of each fault next to
 its photo.
+
+**Done (2026-11-19, ADR 0122), except item 5.** The reference set is the
+twelve corpus designs `view-*`. `emb-cli view-bench` runs in CI (the
+test `tests/view_bench.rs` keeps a hash of each picture; on Linux CI
+also runs the command and keeps the pictures). `emb-cli view-compare`
+compares two pictures or a picture and a photo. `ShokujoDX --view-bench`
+measures the canvas with the renderer of the computer. The numbers of
+the development computer and of the software renderer are in
+`docs/design/p18-view-m1-report.md`. The bench found that a frame with
+more than about 340,000 stitches in the 3D thread look stopped the
+program; the canvas now uses a lighter mesh for such a frame. Open: the
+sew-out and its photos, and the numbers of a small computer.
 
 ## Milestone 2: light as light, and threads with a kind (M)
 

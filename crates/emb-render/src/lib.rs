@@ -14,9 +14,13 @@
 //! - [`cross_chart`]: the chart of a cross-stitch design; [`stone_sheet`]:
 //!   the rhinestone template on paper.
 //! - [`density`]: the layers of thread on each small square (density map).
+//! - [`compare`]: two pictures side by side with their difference, for the
+//!   developer; [`stress`]: large synthetic stitch lists to measure speed
+//!   (ADR 0122).
 #![forbid(unsafe_code)]
 
 pub mod barcode;
+pub mod compare;
 pub mod cross_chart;
 pub mod density;
 pub mod hooping_sheet;
@@ -27,6 +31,7 @@ pub mod product;
 pub mod raster;
 pub mod sheet;
 pub mod stone_sheet;
+pub mod stress;
 pub mod svg;
 pub mod template;
 pub mod thread3d;

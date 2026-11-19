@@ -44,7 +44,7 @@ Sizes are relative effort: S (days), M (one to two weeks), L (a month), XL (seve
 | 14. Sketch mode | Done (owner request, 2026-10-27): Milestones 1 (sketch model and constraint solver, ADR 0068), 2 (sketch mode in the app, ADR 0069), 3 (drawing help and sketch edits, ADR 0070), 4 (regions to embroidery, ADR 0075), 5 (objects that follow their sketch, ADR 0076) and 6 (parameters, splines and drawings to sketches, ADR 0078 and 0079). The owner's test in the app and the badge sew-outs on the Topaz 20 passed (owner, 2026-11-16). See `docs/design/p14-plan.md`. |
 | 16. Product view | Done in software (owner request, 2026-11-17): Milestones 1 (a realistic look, ADR 0101), 2 (other designs on the product, ADR 0102), 3 (front and back, ADR 0103), 4 (the product on the approval sheet, ADR 0104), 5 (better products, ADR 0105), 6 (two-tone products and swatches, ADR 0106), 7 (photos of the user's products, ADR 0107) and 8 (turntable view, ADR 0108); audit in "Audit of P16". Open: the exit tests of the eight milestones (owner, at the end of the phase). See `docs/design/product-plan.md`. |
 | 17. Polish and lettering | Accepted (owner, 2026-11-18); Milestones 1 (update check, ADR 0109), 2 (pictures of the windows, ADR 0110), 4 (font test sheet and letter corrections, ADR 0112), 5 (ten tuned fonts, ADR 0113), 6 (text shaping, ADR 0114) and 7 (quality score of the fonts, 55 fonts in the program and 68 in font packages, ADR 0115; then pen strokes in the stroke finder and routes for all fonts, ADR 0116, and ten fill fonts for large text, ADR 0117) and 8 (content families: 71 motifs, 48 split patterns, 39 stamps, 50 borders and 45 clipart items, ADR 0118) done in software, Milestone 3 set aside by the owner: eight milestones (update check, pictures of the windows, tests on an industrial machine, font test sheet and letter corrections, ten tuned fonts, text shaping, more fonts with a quality score, content families). See `docs/design/p17-plan.md`. |
-| 18. Designs from other programs, and the 3D stitch view | First part: accepted (owner, 2026-11-18), not started; after P17: eight milestones (the parts of a stitch file, runs and satin columns, fills, Recognize Objects, read Ink/Stitch files, write them and read its fonts, outlines with a stitch file, import helpers). See `docs/design/p18-plan.md`. Second part (owner request, 2026-11-19): a thorough upgrade of the engine of the 3D stitch view, proposed, not started: nine milestones (measures and a reference set, linear light and thread kinds, the surface with heights, the light on the surface, the canvas on tiles, the fabric, what is not thread, the viewer with tilt and light by hand, all pictures and quality settings). See `docs/design/p18-view-plan.md`. |
+| 18. Designs from other programs, and the 3D stitch view | First part: accepted (owner, 2026-11-18), not started; after P17: eight milestones (the parts of a stitch file, runs and satin columns, fills, Recognize Objects, read Ink/Stitch files, write them and read its fonts, outlines with a stitch file, import helpers). See `docs/design/p18-plan.md`. Second part (owner request, 2026-11-19): a thorough upgrade of the engine of the 3D stitch view, started first (owner, 2026-11-19); Milestone 1 (measures and a reference set) done except the sew-out (ADR 0122, `docs/design/p18-view-m1-report.md`): nine milestones (measures and a reference set, linear light and thread kinds, the surface with heights, the light on the surface, the canvas on tiles, the fabric, what is not thread, the viewer with tilt and light by hand, all pictures and quality settings). See `docs/design/p18-view-plan.md`. |
 | 19. Help and tutorials | Proposed (2026-11-18): nine milestones (pictures in the help, Show Me, guided lessons, the sew-out doctor, samples, ways to start, the help on the web, moving pictures, better answers); the owner selects them. See `docs/design/p19-plan.md`. |
 | 15. Browser version | Later (owner decision, 2026-11-16): not started. Start after the first feedback of users on the desktop program (about v0.4). See "P15. Browser version" below. |
 
@@ -281,7 +281,9 @@ the owner decides which become work.
 **The owner took the lanes in this order (2026-11-19):** 1 (the kit), 3
 (pictures in the lists), 4 (the route in the converter), 2 (development
 tools), then 5 to 8. Lane 5 and lane 6 were to wait for a sew-out; the
-owner started lane 5 on pictures alone (2026-11-19).
+owner started lane 5 on pictures alone (2026-11-19). After lane 6 the
+owner shelved lanes 7 and 8 and started the 3D stitch view (the second
+part of P18, 2026-11-19).
 
 **Lanes, the cheapest first.**
 
@@ -368,8 +370,10 @@ owner started lane 5 on pictures alone (2026-11-19).
    between the two strokes stay a stop and a start.
 7. **Embroidery fonts for Arabic and Devanagari** (L): converted fonts
    with a letter for each glyph of the font, routed and with a score.
+   **Shelved by the owner (2026-11-19).**
 8. **Clipart sets** (L): pictures with more detail by theme, as asset
    packages. They need drawing by hand or a source with a free license.
+   **Shelved by the owner (2026-11-19).**
 
 ## Audit of P16 (2026-11-18)
 
@@ -1331,7 +1335,7 @@ larger libraries of motifs, patterns, stamps, borders and clipart.
 
 **Exit:** the exit tests of the eight milestones in the plan.
 
-### P18. Designs from other programs, and the 3D stitch view (XL) — first part accepted, second part proposed, not started (`docs/design/p18-plan.md`, `docs/design/p18-view-plan.md`)
+### P18. Designs from other programs, and the 3D stitch view (XL) — first part accepted, not started; second part started (`docs/design/p18-plan.md`, `docs/design/p18-view-plan.md`)
 
 A machine file of another program becomes objects with stitch types
 (runs, satin columns, fills) that scale with their density; the program
@@ -1353,8 +1357,13 @@ the thread, shadows from the heights, threads with a kind and a
 thickness, fabrics with a surface, a canvas whose speed does not change
 with the number of stitches, a view from an angle with a light that the
 user moves, and the same engine for all pictures of the program. A
-picture needs no graphics card, as before. The owner decides which part
-of the phase starts first.
+picture needs no graphics card, as before. The owner started this part
+first (2026-11-19). Milestone 1 is done except the sew-out of the
+reference set and the numbers of a small computer: twelve reference
+designs, `emb-cli view-bench` in CI, a picture compare, and
+`ShokujoDX --view-bench` for the canvas (ADR 0122). The bench found that
+very large designs stopped the program in the 3D thread look; the canvas
+now uses a lighter mesh for such a frame.
 
 **Exit:** the exit tests of the nine milestones in
 `docs/design/p18-view-plan.md`; the last one is a test with users: a

@@ -84,6 +84,11 @@ satin columns, a font sews fill letters, so it goes up to 300 mm.
 whole text.
 See [Lettering](lettering).
 
+**Designs with very many stitches.** The program could stop when the
+canvas showed about 350,000 stitches or more at one time in the thread
+look. Now the canvas shows them in a simpler look at that zoom, and in
+the full look when you zoom in.
+
 **More motifs, patterns, stamps, borders and clipart.** The program has
 71 motifs (15 before), 48 program-split patterns (10), 39 carving stamps
 (8), 50 decorative borders (12) and 45 clipart items (8). Most of them

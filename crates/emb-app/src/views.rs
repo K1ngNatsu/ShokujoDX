@@ -218,12 +218,13 @@ pub fn other_design(ui: &mut egui::Ui, st: &mut AppState) {
             let s = o.view.scale();
             o.view.center -= emb_geom::Point::new(f64::from(d.x) / s, f64::from(d.y) / s);
         }
-        let mesh = if st.settings.look.three_d {
-            let table = emb_render::thread3d::ShadeTable::new(st.settings.look.light);
-            crate::canvas::thread_mesh_3d(rect, &o.view, segs, false, &table)
+        let look = if st.settings.look.three_d {
+            crate::canvas::MeshLook::Thread3d
         } else {
-            crate::canvas::thread_mesh(rect, &o.view, segs, false)
+            crate::canvas::MeshLook::Thread
         };
+        let table = emb_render::thread3d::ShadeTable::new(st.settings.look.light);
+        let mesh = crate::canvas::fitted_mesh(rect, &o.view, segs, false, look, &table).0;
         painter.with_clip_rect(rect).add(Shape::mesh(mesh));
     }
     st.other_design = Some(o);

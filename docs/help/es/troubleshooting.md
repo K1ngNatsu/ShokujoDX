@@ -188,4 +188,7 @@ El programa guarda copias de seguridad y las ofrece en el próximo inicio.
 Hay un informe de error en la carpeta `crashes` de los ajustes (**Ayuda >
 Acerca de** muestra dónde). Envíelo con sus comentarios. Un diseño con
 muchísimas puntadas o una imagen de fondo grande es más lento; oculte el
-aspecto del hilo mientras trabaja.
+aspecto del hilo mientras trabaja. Para medir la velocidad con la que el
+lienzo dibuja en su equipo, inicie `ShokujoDX.exe --view-bench`. Después
+de unos 40 segundos escribe `view-bench.txt` en la carpeta de
+configuración.

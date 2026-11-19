@@ -100,8 +100,6 @@ mod start;
 mod startup;
 mod stitch_types;
 mod stock;
-#[cfg(test)]
-mod stress;
 mod styles;
 mod tabs;
 mod teamnames;
@@ -111,6 +109,7 @@ mod threads;
 mod turntable;
 mod update;
 mod vectors;
+mod view_bench;
 mod viewing;
 mod views;
 mod viewtools;
@@ -131,6 +130,10 @@ const USAGE: &str = "Use: shokujodx [--lang <code>] [--kiosk | <file>]
   --version      write the version and stop
   --diagnose     write a report of the graphics adapters (diagnose.txt in
                  the settings folder) and stop
+  --view-bench[=<file>]
+                 measure how fast the canvas draws large designs (a window
+                 of its own), write the report (view-bench.txt in the
+                 settings folder, or the file given) and stop
   --renderer=<auto|gl|software>
                  draw with this renderer (the program selects one if this
                  is not given, and tries the next if one fails)
@@ -182,6 +185,10 @@ fn main() -> eframe::Result {
     if args.iter().any(|a| a == "--diagnose") {
         startup::diagnose();
         return Ok(());
+    }
+    // The speed of the canvas with the renderer of the arguments (ADR 0122).
+    if let Some(out) = view_bench::wanted(&args) {
+        return view_bench::run(startup::Start::from_args(&args).renderer, out);
     }
     // The renderer, and the start again with the next renderer if this one
     // fails (v0.3 plan, Stage 1).

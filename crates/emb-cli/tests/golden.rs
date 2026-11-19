@@ -24,9 +24,22 @@ fn golden(name: &str) {
     let tail = usize::from(se.end.is_some() && r.len() >= 2 && r[r.len() - 2].kind == jump);
     let lost = lead + tail;
     assert!(warnings.is_empty(), "{name}: {warnings:?}");
-    // The VP3 file reads back with the same records.
+    // The VP3 file reads back with the same records. VP3 starts each color
+    // block with a jump to its first point, and a stop is a color change in
+    // VP3: a stop or a color change that a stitch at another place follows
+    // (the stop of an appliqué with no trim) gets a jump when it is read.
+    let added = r
+        .windows(2)
+        .filter(|w| {
+            matches!(
+                w[0].kind,
+                emb_model::StitchKind::Stop | emb_model::StitchKind::ColorChange
+            ) && w[1].kind != jump
+                && w[1].pos != w[0].pos
+        })
+        .count();
     let back = emb_formats::vp3::read(&emb_formats::vp3::write(&s)).unwrap();
-    assert_eq!(back.records.len() + lost, s.records.len(), "{name}");
+    assert_eq!(back.records.len() + lost, s.records.len() + added, "{name}");
     // U01 and PEC (P8 Milestone 6) read back with the same stitches and colors.
     for ext in ["u01", "pec"] {
         let bytes = emb_formats::write_machine(ext, &s, name, "20260101000000").unwrap();
@@ -137,6 +150,78 @@ fn content_families() {
 #[test]
 fn content_clipart() {
     golden("content-clipart");
+}
+
+/// The reference set of the 3D view (ADR 0122).
+#[test]
+fn view_satin_angles() {
+    golden("view-satin-angles");
+}
+
+/// The reference set of the 3D view (ADR 0122).
+#[test]
+fn view_fill_border() {
+    golden("view-fill-border");
+}
+
+/// The reference set of the 3D view (ADR 0122).
+#[test]
+fn view_underlay() {
+    golden("view-underlay");
+}
+
+/// The reference set of the 3D view (ADR 0122).
+#[test]
+fn view_lettering() {
+    golden("view-lettering");
+}
+
+/// The reference set of the 3D view (ADR 0122).
+#[test]
+fn view_fill_over_fill() {
+    golden("view-fill-over-fill");
+}
+
+/// The reference set of the 3D view (ADR 0122).
+#[test]
+fn view_puff() {
+    golden("view-puff");
+}
+
+/// The reference set of the 3D view (ADR 0122).
+#[test]
+fn view_applique() {
+    golden("view-applique");
+}
+
+/// The reference set of the 3D view (ADR 0122).
+#[test]
+fn view_motif_fill() {
+    golden("view-motif-fill");
+}
+
+/// The reference set of the 3D view (ADR 0122).
+#[test]
+fn view_run() {
+    golden("view-run");
+}
+
+/// The reference set of the 3D view (ADR 0122).
+#[test]
+fn view_blend() {
+    golden("view-blend");
+}
+
+/// The reference set of the 3D view (ADR 0122).
+#[test]
+fn view_towel() {
+    golden("view-towel");
+}
+
+/// The reference set of the 3D view (ADR 0122).
+#[test]
+fn view_dark() {
+    golden("view-dark");
 }
 
 /// Arabic, Devanagari and ligatures (ADR 0114).

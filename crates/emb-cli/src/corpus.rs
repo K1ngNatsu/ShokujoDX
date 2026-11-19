@@ -12,7 +12,7 @@ use emb_model::{
     SatinGeometry, SatinParams, ThreadId,
 };
 
-pub const NAMES: [&str; 67] = [
+pub const NAMES: [&str; 79] = [
     "circle-fill",
     "satin-column",
     "s-curve",
@@ -80,6 +80,18 @@ pub const NAMES: [&str; 67] = [
     "content-families",
     "shaped-text",
     "content-clipart",
+    "view-satin-angles",
+    "view-fill-border",
+    "view-underlay",
+    "view-lettering",
+    "view-fill-over-fill",
+    "view-puff",
+    "view-applique",
+    "view-motif-fill",
+    "view-run",
+    "view-blend",
+    "view-towel",
+    "view-dark",
 ];
 
 const MACHINE: &str = "husqvarna_topaz20";
@@ -160,6 +172,18 @@ pub fn build(name: &str) -> Option<Design> {
         "cap-order" => cap_order(),
         "cutwork" => cutwork(),
         "sketch-badge" => sketch_badge(),
+        "view-satin-angles" => view_satin_angles(),
+        "view-fill-border" => view_fill_border(),
+        "view-underlay" => view_underlay(),
+        "view-lettering" => view_lettering(),
+        "view-fill-over-fill" => view_fill_over_fill(),
+        "view-puff" => view_puff(),
+        "view-applique" => view_applique(),
+        "view-motif-fill" => view_motif_fill(),
+        "view-run" => view_run(),
+        "view-blend" => view_blend(),
+        "view-towel" => view_towel(),
+        "view-dark" => view_dark(),
         _ => return None,
     };
     d.name = name.to_string();
@@ -167,6 +191,323 @@ pub fn build(name: &str) -> Option<Design> {
     d.hoop.selection = HoopSelection::Preset { id: HOOP.into() };
     fit_the_hoop(&mut d);
     Some(d)
+}
+
+/// A design of the reference set of the 3D view (P18 view plan, Milestone
+/// 1, ADR 0122) on natural white cotton. The designs are small, so the
+/// owner can sew them all, and each one shows one thing that a sew-out
+/// shows (`emb_cli::view::REFERENCE`).
+fn view_design() -> Design {
+    let mut d = Design::new("");
+    d.background = Some(Rgb(238, 234, 226));
+    d.fabric = Some("cotton".into());
+    d
+}
+
+/// Adds lettering in a bundled embroidery font, centered on `x` = 0.
+fn view_text(d: &mut Design, t: ThreadId, family: &str, text: &str, height: f64, y: f64) {
+    let font = emb_letter::bundled::embroidery(family).expect("bundled font");
+    let mut l = Lettering::new(text, emb_letter::LetterSource::font_ref(&font), height, p(0.0, y));
+    l.justify = Justify::Center;
+    emb_letter::relayout(&mut l, &font);
+    d.add_object(t, ObjectKind::Lettering(Box::new(l)));
+}
+
+/// Reference set: eight satin columns of one color at eight angles, from
+/// 0° to 157.5° in steps of 22.5°, in two rows. On a sew-out the light
+/// makes each column lighter or darker by its angle.
+fn view_satin_angles() -> Design {
+    let mut d = view_design();
+    let t = d.add_thread("Light Blue", Rgb(110, 150, 200));
+    for k in 0..8 {
+        let c = p(-45.0 + 30.0 * f64::from(k % 4), -15.0 + 30.0 * f64::from(k / 4));
+        let (s, co) = emb_geom::math::sin_cos_deg(22.5 * f64::from(k));
+        let line = Path::new()
+            .move_to(p(c.x - 11.0 * co, c.y - 11.0 * s))
+            .line_to(p(c.x + 11.0 * co, c.y + 11.0 * s));
+        satin(&mut d, t, SatinGeometry::from_centerline(&line, 5.0));
+    }
+    d
+}
+
+/// Reference set: a 44 mm circle of tatami with a satin border on its
+/// edge. On a sew-out the border is higher than the fill.
+fn view_fill_border() -> Design {
+    let mut d = view_design();
+    let gold = d.add_thread("Gold", Rgb(230, 170, 30));
+    let navy = d.add_thread("Navy", Rgb(25, 35, 90));
+    fill(&mut d, gold, Path::ellipse(Point::ZERO, 22.0, 22.0), Vec::new(), 45.0);
+    satin(
+        &mut d,
+        navy,
+        SatinGeometry::from_centerline(&Path::ellipse(Point::ZERO, 22.0, 22.0), 4.0),
+    );
+    d
+}
+
+/// Reference set: two satin columns and two fills of one color, with no
+/// underlay (left of each pair) and with two layers of underlay (right).
+/// Underlay lifts the stitches on it.
+fn view_underlay() -> Design {
+    let mut d = view_design();
+    let red = d.add_thread("Red", Rgb(200, 30, 45));
+    for (x, underlay) in [(-40.0, emb_model::Underlay::None), (-25.0, emb_model::Underlay::Double)] {
+        d.add_object(
+            red,
+            ObjectKind::Satin {
+                geometry: SatinGeometry::from_centerline(&Path::new().move_to(p(x, -25.0)).line_to(p(x, 25.0)), 6.0),
+                params: SatinParams {
+                    underlay,
+                    ..SatinParams::default()
+                },
+            },
+        );
+    }
+    for (x, underlay) in [(-10.0, emb_model::Underlay::None), (20.0, emb_model::Underlay::Double)] {
+        d.add_object(
+            red,
+            ObjectKind::Fill {
+                outer: Path::rect(BBox::new(p(x, -25.0), p(x + 22.0, 25.0))),
+                holes: Vec::new(),
+                params: FillParams {
+                    angle_deg: 0.0,
+                    underlay,
+                    ..FillParams::default()
+                },
+            },
+        );
+    }
+    d
+}
+
+/// Reference set: small text (Round Sans, 6 mm) and large letters (Soft
+/// Round, 60 mm). At 6 mm the stitches are short; at 60 mm the columns
+/// are wide.
+fn view_lettering() -> Design {
+    let mut d = view_design();
+    let navy = d.add_thread("Navy", Rgb(25, 35, 90));
+    view_text(&mut d, navy, "Round Sans", "Small text 6 mm", 6.0, -50.0);
+    view_text(&mut d, navy, "Soft Round", "Ag", 60.0, 22.0);
+    d
+}
+
+/// Reference set: a dense fill (rows 0.3 mm apart) over a fill. The thread
+/// of the top fill lies on the thread of the fill under it.
+fn view_fill_over_fill() -> Design {
+    let mut d = view_design();
+    let green = d.add_thread("Green", Rgb(40, 150, 80));
+    let white = d.add_thread("White", Rgb(245, 245, 240));
+    fill(
+        &mut d,
+        green,
+        Path::rect(BBox::new(p(-25.0, -25.0), p(25.0, 25.0))),
+        Vec::new(),
+        0.0,
+    );
+    d.add_object(
+        white,
+        ObjectKind::Fill {
+            outer: Path::ellipse(Point::ZERO, 16.0, 16.0),
+            holes: Vec::new(),
+            params: FillParams {
+                angle_deg: 90.0,
+                spacing_mm: 0.3,
+                ..FillParams::default()
+            },
+        },
+    );
+    d
+}
+
+/// Reference set: puff (ADR 0050): a word in Block Sans, 25 mm, and a
+/// straight puff column, over foam.
+fn view_puff() -> Design {
+    let mut d = view_design();
+    let red = d.add_thread("Red", Rgb(200, 30, 40));
+    let font = emb_letter::bundled::embroidery("Block Sans").expect("bundled font");
+    let mut l = Lettering::new("UP", emb_letter::LetterSource::font_ref(&font), 25.0, p(0.0, 0.0));
+    l.justify = Justify::Center;
+    l.satin.puff = true;
+    l.satin.spacing_mm = emb_model::object::PUFF_SPACING_MM;
+    emb_letter::relayout(&mut l, &font);
+    d.add_object(red, ObjectKind::Lettering(Box::new(l)));
+    d.add_object(
+        red,
+        ObjectKind::Satin {
+            geometry: SatinGeometry::from_centerline(&Path::new().move_to(p(-25.0, 15.0)).line_to(p(25.0, 15.0)), 6.0),
+            params: SatinParams {
+                puff: true,
+                spacing_mm: emb_model::object::PUFF_SPACING_MM,
+                ..SatinParams::default()
+            },
+        },
+    );
+    d
+}
+
+/// Reference set: an appliqué circle of blue fabric with its cover
+/// column, and a triple run over it.
+fn view_applique() -> Design {
+    let mut d = view_design();
+    let navy = d.add_thread("Navy", Rgb(25, 35, 90));
+    let gold = d.add_thread("Gold", Rgb(230, 170, 30));
+    d.add_object(
+        navy,
+        ObjectKind::Applique {
+            pieces: vec![AppliquePiece::new(Path::ellipse(Point::ZERO, 22.0, 22.0), Vec::new())],
+            params: AppliqueParams {
+                fabric: Some(Rgb(40, 110, 170)),
+                ..AppliqueParams::default()
+            },
+        },
+    );
+    d.add_object(
+        gold,
+        ObjectKind::Running {
+            path: Path::new().move_to(p(-15.0, 0.0)).line_to(p(15.0, 0.0)),
+            params: RunningParams {
+                repeats: 3,
+                ..RunningParams::default()
+            },
+        },
+    );
+    d
+}
+
+/// Reference set: a motif fill of hearts, 50 × 40 mm.
+fn view_motif_fill() -> Design {
+    let mut d = view_design();
+    let orange = d.add_thread("Orange", Rgb(240, 120, 30));
+    d.add_object(
+        orange,
+        ObjectKind::Fill {
+            outer: Path::rounded_rect(BBox::new(p(-25.0, -20.0), p(25.0, 20.0)), 6.0),
+            holes: Vec::new(),
+            params: FillParams {
+                angle_deg: 0.0,
+                ..FillParams::default().with_pattern(FillPattern::Motif {
+                    motif: emb_model::Motif::builtin("Heart").expect("built-in motif"),
+                    length_mm: 6.0,
+                    height_mm: 4.0,
+                    stagger: 0.5,
+                    gradient: 1.0,
+                    globe: false,
+                })
+            },
+        },
+    );
+    d
+}
+
+/// Reference set: runs: a single run, a triple run and a backstitch, each
+/// straight and 60 mm long, and a single run on a circle.
+fn view_run() -> Design {
+    let mut d = view_design();
+    let navy = d.add_thread("Navy", Rgb(25, 35, 90));
+    for (y, repeats, style) in [
+        (-25.0, 1, RunStyle::Run),
+        (-15.0, 3, RunStyle::Run),
+        (-5.0, 1, RunStyle::Backstitch),
+    ] {
+        d.add_object(
+            navy,
+            ObjectKind::Running {
+                path: Path::new().move_to(p(-30.0, y)).line_to(p(30.0, y)),
+                params: RunningParams {
+                    repeats,
+                    style,
+                    ..RunningParams::default()
+                },
+            },
+        );
+    }
+    d.add_object(
+        navy,
+        ObjectKind::Running {
+            path: Path::ellipse(p(0.0, 18.0), 14.0, 14.0),
+            params: RunningParams::default(),
+        },
+    );
+    d
+}
+
+/// Reference set: a blend of two colors (red to gold) in one fill area,
+/// 60 × 40 mm.
+fn view_blend() -> Design {
+    use emb_model::BlendRecord;
+    use emb_model::decor::blend_profile;
+    let mut d = view_design();
+    let red = d.add_thread("Red", Rgb(200, 30, 45));
+    let gold = d.add_thread("Gold", Rgb(230, 170, 30));
+    let rect = Path::rect(BBox::new(p(-30.0, -20.0), p(30.0, 20.0)));
+    for (t, start, end, underlay) in [
+        (red, 100.0, 10.0, emb_model::Underlay::Auto),
+        (gold, 10.0, 100.0, emb_model::Underlay::None),
+    ] {
+        let id = d.add_object(
+            t,
+            ObjectKind::Fill {
+                outer: rect.clone(),
+                holes: Vec::new(),
+                params: FillParams {
+                    angle_deg: 0.0,
+                    accordion: Some(blend_profile(start, end)),
+                    underlay,
+                    ..FillParams::default()
+                },
+            },
+        );
+        if let Some(o) = d.object_mut(id) {
+            o.group = Some(1);
+        }
+    }
+    d.blends = vec![BlendRecord { group: 1 }];
+    d
+}
+
+/// Reference set: names on a light blue towel (the fabric `towel`, with
+/// its changes to the objects): Block Sans at 20 mm and Round Sans at 8
+/// mm. On a towel, thin stitches sink into the loops.
+fn view_towel() -> Design {
+    let mut d = Design::new("");
+    d.background = Some(Rgb(200, 216, 232));
+    let navy = d.add_thread("Navy", Rgb(25, 35, 90));
+    view_text(&mut d, navy, "Block Sans", "Anna", 20.0, -2.0);
+    view_text(&mut d, navy, "Round Sans", "Joshua", 8.0, 16.0);
+    d.set_fabric(&emb_model::FabricCatalog::builtin(), Some("towel"), true);
+    d
+}
+
+/// Reference set: light and dark threads on black cotton: white letters
+/// (Block Sans, 20 mm), a white fill and a navy fill (dark on dark), in a
+/// gold triple run.
+fn view_dark() -> Design {
+    let mut d = view_design();
+    d.background = Some(Rgb(22, 22, 24));
+    let white = d.add_thread("White", Rgb(245, 245, 240));
+    let navy = d.add_thread("Navy", Rgb(25, 35, 90));
+    let gold = d.add_thread("Gold", Rgb(230, 170, 30));
+    view_text(&mut d, white, "Block Sans", "Ab", 20.0, -12.0);
+    for (t, x) in [(white, -26.0), (navy, 4.0)] {
+        fill(
+            &mut d,
+            t,
+            Path::rect(BBox::new(p(x, 0.0), p(x + 22.0, 22.0))),
+            Vec::new(),
+            45.0,
+        );
+    }
+    d.add_object(
+        gold,
+        ObjectKind::Running {
+            path: Path::rect(BBox::new(p(-34.0, -38.0), p(34.0, 28.0))),
+            params: RunningParams {
+                repeats: 3,
+                ..RunningParams::default()
+            },
+        },
+    );
+    d
 }
 
 /// The hoop field is upright: left to right is its short side. A design

@@ -173,3 +173,6 @@ The program saves backups and offers them at the next start. A crash
 report is in the `crashes` folder of the settings (**Help > About** shows
 where). Send it with your feedback. A design with very many stitches or a
 large backdrop picture is slower; hide the thread look while you work.
+To measure how fast the canvas draws on your computer, start
+`ShokujoDX.exe --view-bench`. After about 40 seconds it writes
+`view-bench.txt` in the settings folder.

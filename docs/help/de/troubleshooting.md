@@ -192,4 +192,7 @@ Das Programm speichert Sicherungen und bietet sie beim nächsten Start an.
 Ein Absturzbericht ist im Ordner `crashes` der Einstellungen (**Hilfe >
 Info** zeigt, wo). Senden Sie ihn mit Ihrer Rückmeldung. Ein Design mit
 sehr vielen Stichen oder einem großen Hintergrundbild ist langsamer;
-blenden Sie die Garnansicht aus, während Sie arbeiten.
+blenden Sie die Garnansicht aus, während Sie arbeiten. Um zu messen, wie
+schnell die Arbeitsfläche auf Ihrem Computer zeichnet, starten Sie
+`ShokujoDX.exe --view-bench`. Nach etwa 40 Sekunden schreibt es
+`view-bench.txt` in den Einstellungsordner.

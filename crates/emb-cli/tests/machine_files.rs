@@ -36,10 +36,23 @@ fn corpus_files_open_as_the_same_stitches() {
                 "{name}.{ext}"
             );
             // JEF has no trims; the plan trims at the long jumps that the reader made trims.
+            // A format with no stop writes a stop as a color change, and the
+            // plan trims at each color change: a stop with no trim before it
+            // (the stop of an appliqué) gets a trim.
+            let untrimmed = s
+                .records
+                .windows(2)
+                .filter(|w| w[1].kind == StitchKind::Stop && w[0].kind != StitchKind::Trim)
+                .count();
+            let added = if count(&file, StitchKind::Stop) < count(&s, StitchKind::Stop) {
+                untrimmed
+            } else {
+                0
+            };
             if ext != "jef" {
                 assert_eq!(
                     count(&again, StitchKind::Trim),
-                    count(&s, StitchKind::Trim),
+                    count(&s, StitchKind::Trim) + added,
                     "{name}.{ext}"
                 );
             }

@@ -88,6 +88,11 @@ y así llega a 300 mm. **Tipo de puntada** en la ventana Letras selecciona
 satén o relleno para todo el texto.
 Consulte [Letras](lettering).
 
+**Diseños con muchísimas puntadas.** El programa podía cerrarse cuando el
+lienzo mostraba unas 350 000 puntadas o más a la vez con el aspecto de
+hilo. Ahora el lienzo las muestra con un aspecto más simple con ese zoom,
+y con el aspecto completo cuando usted acerca el zoom.
+
 **Más motivos, patrones, sellos, bordes y clipart.** El programa tiene
 71 motivos (antes 15), 48 patrones de división programada (10), 39 sellos
 de relieve (8), 50 bordes decorativos (12) y 45 elementos de clipart (8).

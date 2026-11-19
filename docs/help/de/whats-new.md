@@ -90,6 +90,11 @@ reicht so bis 300 mm. **Stichart** im Fenster Schrift wählt Satin oder
 Füllung für den ganzen Text.
 Siehe [Schrift](lettering).
 
+**Designs mit sehr vielen Stichen.** Das Programm konnte abbrechen, wenn
+die Arbeitsfläche etwa 350.000 Stiche oder mehr auf einmal in der
+Garnansicht zeigte. Jetzt zeigt die Arbeitsfläche sie bei diesem Zoom
+einfacher, und vollständig, wenn Sie hineinzoomen.
+
 **Mehr Motive, Muster, Stempel, Ränder und Clipart.** Das Programm hat
 71 Motive (vorher 15), 48 Programmteilungs-Muster (10), 39 Prägestempel
 (8), 50 dekorative Ränder (12) und 45 Clipart-Elemente (8). Die meisten
