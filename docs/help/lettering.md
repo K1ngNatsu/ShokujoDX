@@ -88,6 +88,11 @@ font package **Fonts of earlier versions**.
 **Convert to embroidery font** makes an embroidery font from a TrueType
 font, with a name, a size range and a stitch type. Check that the license
 of the font lets you change it.
+With **Few trims**, the program finds the sew order of each letter, as
+the fonts of the program have it: the needle goes from one stroke to the
+next one under the stitches, and the columns reach the corners. This
+takes longer; a bar shows how far the conversion is, and **Stop** ends
+it.
 
 ## Arabic, Devanagari and ligatures
 

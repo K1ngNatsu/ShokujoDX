@@ -309,7 +309,15 @@ tools), then 5 to 8. Lane 5 and lane 6 wait for a sew-out.
    so they have no search.
 4. **The route in the converter of the program** (S to M): Convert runs
    the extension and the route as a background job with a progress
-   bar, so a font of the user is as good as a font of the tool.
+   bar, so a font of the user is as good as a font of the tool. **Done
+   (2026-11-19):** Lettering > Fonts > Convert has the setting **Few
+   trims** (on at the start, not for fill letters): the ends of the
+   columns, the route and the quality score, as `emb-cli font --extend
+   --route` makes them (`fonts::convert_font`). The window shows the
+   step and, for the route, a bar; **Stop** ends the conversion with no
+   font. A conversion with the route takes 3 to 16 s for the three
+   bundled TrueType fonts on the development computer (32 threads); a
+   computer with few threads needs longer.
 5. **The best of columns and fill for each letter** (M): the converter
    makes both for each letter and keeps the one with the better letter
    score. The score gets the measures that the audit of the fonts has

@@ -99,6 +99,11 @@ hinzu.
 **In Stickschrift umwandeln** erstellt eine Stickschrift aus einer
 TrueType-Schrift, mit einem Namen, einem Größenbereich und einer Stichart.
 Prüfen Sie, ob die Lizenz der Schrift Ihnen erlaubt, sie zu ändern.
+Mit **Wenige Fadenschnitte** findet das Programm die Stickreihenfolge
+jedes Buchstabens, wie die Schriften des Programms sie haben: Die Nadel
+geht unter den Stichen von einem Strich zum nächsten, und die Säulen
+reichen bis in die Ecken. Das dauert länger; ein Balken zeigt, wie weit
+die Umwandlung ist, und **Stopp** beendet sie.
 
 ## Arabisch, Devanagari und Ligaturen
 

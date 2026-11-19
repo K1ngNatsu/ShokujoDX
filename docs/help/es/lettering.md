@@ -93,6 +93,11 @@ su texto, añada el paquete de fuentes **Fonts of earlier versions**.
 **Convertir en fuente de bordado** crea una fuente de bordado a partir de
 una fuente TrueType, con un nombre, un rango de tamaños y un tipo de
 puntada. Compruebe que la licencia de la fuente le permite cambiarla.
+Con **Pocos cortes**, el programa busca el orden de bordado de cada
+letra, como lo tienen las fuentes del programa: la aguja pasa de un trazo
+al siguiente por debajo de las puntadas, y las columnas llegan a las
+esquinas. Esto tarda más; una barra muestra hasta dónde ha llegado la
+conversión, y **Parada** la termina.
 
 ## Árabe, devanagari y ligaduras
 

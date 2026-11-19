@@ -609,6 +609,10 @@ fn scenes() -> Vec<Scene> {
             st.families_window.choose(1);
         }));
     }
+    v.push(Scene::new("fonts window convert", View::Windows, |st, _| {
+        st.fonts_window.open = true;
+        st.fonts_window.open_convert(emb_model::FontRef::new("Lato", "Bold"));
+    }));
     v.push(Scene::new("fonts window fill fonts", View::Windows, |st, _| {
         st.fonts_window.open = true;
         st.fonts_window.large_text = true;

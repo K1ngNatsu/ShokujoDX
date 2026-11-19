@@ -34,6 +34,84 @@ struct ConvertForm {
     source: FontRef,
     name: String,
     stitch: LetterStitch,
+    /// Route the letters (few trims, ADR 0113). It takes longer.
+    route: bool,
+}
+
+/// The steps of a conversion.
+const STEP_LETTERS: usize = 0;
+const STEP_ENDS: usize = 1;
+const STEP_ROUTE: usize = 2;
+const STEP_SCORE: usize = 3;
+
+/// The progress of a conversion that runs in the background.
+#[derive(Debug, Default)]
+pub struct ConvertProgress {
+    /// The step that runs (`STEP_…`).
+    step: std::sync::atomic::AtomicUsize,
+    /// The letters that are routed, and the letters to route.
+    routed: std::sync::atomic::AtomicUsize,
+    to_route: std::sync::atomic::AtomicUsize,
+    /// The user stopped the conversion.
+    stop: std::sync::atomic::AtomicBool,
+}
+
+impl ConvertProgress {
+    /// What the conversion does now, and how far it is (0 to 1; `None`:
+    /// not known).
+    fn now(&self) -> (&'static str, Option<f32>) {
+        use std::sync::atomic::Ordering::Relaxed;
+        match self.step.load(Relaxed) {
+            STEP_LETTERS => (tr("Making the letters…"), None),
+            STEP_ENDS => (tr("Making the ends of the columns…"), None),
+            STEP_ROUTE => {
+                let (done, all) = (self.routed.load(Relaxed), self.to_route.load(Relaxed).max(1));
+                (
+                    tr("Finding the sew order of the letters…"),
+                    Some(done as f32 / all as f32),
+                )
+            }
+            _ => (tr("Measuring the quality…"), None),
+        }
+    }
+}
+
+/// Converts `font` to an embroidery font, as the Convert button does: the
+/// letters of `chars`; with `route` (and not for fill letters), the ends
+/// of the columns reach the corners of the outline and each letter gets
+/// its sew order with few trims, as the fonts of the program have (ADR
+/// 0113, 0116); then the quality score. `Err` if the user stopped it.
+pub fn convert_font(
+    font: &emb_letter::Font,
+    name: &str,
+    stitch: LetterStitch,
+    route: bool,
+    chars: &[char],
+    progress: &ConvertProgress,
+) -> Result<emb_letter::EmbFont, String> {
+    use std::sync::atomic::Ordering::Relaxed;
+    let stopped = || -> Result<(), String> {
+        if progress.stop.load(Relaxed) {
+            Err(tr("The conversion was stopped.").to_string())
+        } else {
+            Ok(())
+        }
+    };
+    progress.step.store(STEP_LETTERS, Relaxed);
+    let mut f = emb_letter::embfont::convert(font, name, "", stitch, chars);
+    stopped()?;
+    if route && !f.fill {
+        progress.step.store(STEP_ENDS, Relaxed);
+        f.extend_ends(font);
+        stopped()?;
+        progress.to_route.store(f.letters_to_route(), Relaxed);
+        progress.step.store(STEP_ROUTE, Relaxed);
+        f.route_until(&progress.routed, &progress.stop);
+        stopped()?;
+        progress.step.store(STEP_SCORE, Relaxed);
+        f.measure_quality(font);
+    }
+    Ok(f)
 }
 
 #[derive(Debug, Default)]
@@ -54,6 +132,8 @@ pub struct FontsWindow {
     form: Option<ConvertForm>,
     /// A conversion that runs in the background.
     job: Option<Receiver<Result<PathBuf, String>>>,
+    /// The progress of the conversion that runs.
+    progress: std::sync::Arc<ConvertProgress>,
 }
 
 impl FontsWindow {
@@ -61,6 +141,18 @@ impl FontsWindow {
     pub fn select(&mut self, font: FontRef) {
         self.selected = Some(font);
         self.form = None;
+    }
+
+    /// Shows the form to convert the TrueType font `font` (as the button
+    /// Convert to embroidery font does).
+    pub fn open_convert(&mut self, font: FontRef) {
+        self.form = Some(ConvertForm {
+            name: font.label(),
+            source: font.clone(),
+            stitch: LetterStitch::Auto,
+            route: true,
+        });
+        self.selected = Some(font);
     }
 }
 
@@ -470,6 +562,21 @@ fn convert_ui(ui: &mut egui::Ui, st: &mut AppState, sel: &FontRef) {
             ui.spinner();
             ui.label(tr("Converting…"));
         });
+        let (what, part) = st.fonts_window.progress.now();
+        ui.label(what);
+        if let Some(part) = part {
+            ui.add(egui::ProgressBar::new(part).desired_width(220.0).show_percentage());
+        }
+        if ui
+            .button(tr("Stop"))
+            .on_hover_text(tr("Stop the conversion. No font is made."))
+            .clicked()
+        {
+            st.fonts_window
+                .progress
+                .stop
+                .store(true, std::sync::atomic::Ordering::Relaxed);
+        }
         return;
     }
     let Some(form) = st.fonts_window.form.as_mut().filter(|f| f.source.same(sel)) else {
@@ -478,11 +585,7 @@ fn convert_ui(ui: &mut egui::Ui, st: &mut AppState, sel: &FontRef) {
             .on_hover_text(tr("Make an embroidery font from this font, with a size range."))
             .clicked()
         {
-            st.fonts_window.form = Some(ConvertForm {
-                source: sel.clone(),
-                name: sel.label(),
-                stitch: LetterStitch::Auto,
-            });
+            st.fonts_window.open_convert(sel.clone());
         }
         return;
     };
@@ -501,6 +604,16 @@ fn convert_ui(ui: &mut egui::Ui, st: &mut AppState, sel: &FontRef) {
             ui.selectable_value(&mut form.stitch, s, label);
         }
     });
+    ui.add_enabled(
+        form.stitch != LetterStitch::Fill,
+        egui::Checkbox::new(&mut form.route, tr("Few trims")),
+    )
+    .on_hover_text(tr(
+        "Find the sew order of each letter with the fewest trims: the needle goes from one stroke to the next \
+         one under the stitches, and the columns reach the corners. The conversion takes longer: some seconds on a fast computer, \
+         a minute or more on a slow one.",
+    ))
+    .on_disabled_hover_text(tr("A fill letter is one fill: it needs no sew order."));
     ui.add(
         egui::Label::new(
             egui::RichText::new(tr(
@@ -538,11 +651,20 @@ fn start_convert(st: &mut AppState, form: ConvertForm, dir: PathBuf) {
     let (tx, rx) = channel();
     st.fonts_window.job = Some(rx);
     st.fonts_window.form = None;
+    let progress = std::sync::Arc::new(ConvertProgress::default());
+    st.fonts_window.progress = progress.clone();
     std::thread::spawn(move || {
         let run = || -> Result<PathBuf, String> {
             std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
             let name = form.name.trim();
-            let f = emb_letter::embfont::convert(&font, name, "", form.stitch, &emb_letter::embfont::default_chars());
+            let f = convert_font(
+                &font,
+                name,
+                form.stitch,
+                form.route,
+                &emb_letter::embfont::default_chars(),
+                &progress,
+            )?;
             let path = dir.join(format!("{}.{}", file_name(name), emb_letter::embfont::FILE_EXTENSION));
             f.save(&path)?;
             Ok(path)
@@ -768,6 +890,52 @@ mod tests {
         };
         assert!(l.letters.iter().all(|x| !x.fixed));
         assert!(st.plan_view().plan.stitches.stitch_count() > 500);
+    }
+
+    #[test]
+    fn convert_routes_the_letters_and_can_stop() {
+        use std::sync::atomic::Ordering::Relaxed;
+        let font = emb_letter::bundled::font("Lato", "Bold").unwrap();
+        let chars = ['H', 'E', 'i'];
+        // With no route: the letters as the stroke finder made them.
+        let plain = convert_font(&font, "Plain", LetterStitch::Auto, false, &chars, &Default::default()).unwrap();
+        assert!(plain.letters.values().all(|l| !l.fixed));
+        // With the route: each letter is fixed, "H" has travel runs and no
+        // trim, and the font has a score.
+        let progress = ConvertProgress::default();
+        let routed = convert_font(&font, "Routed", LetterStitch::Auto, true, &chars, &progress).unwrap();
+        assert!(routed.letters.iter().all(|(c, l)| *c == ' ' || l.fixed));
+        let h = &routed.letters[&'H'];
+        assert!(
+            h.parts.iter().any(|p| matches!(p, ObjectKind::Running { .. })),
+            "travel runs"
+        );
+        assert_eq!((progress.routed.load(Relaxed), progress.to_route.load(Relaxed)), (3, 3));
+        assert_eq!(progress.step.load(Relaxed), STEP_SCORE);
+        assert!(routed.quality.is_some());
+        let trims = |f: &emb_letter::EmbFont| {
+            let mut d = emb_model::Design::new("");
+            let t = d.add_thread("Black", emb_model::Rgb(0, 0, 0));
+            let mut l = Lettering::new("H", emb_letter::LetterSource::font_ref(f), 20.0, Point::ZERO);
+            emb_letter::relayout(&mut l, f);
+            d.add_object(t, ObjectKind::Lettering(Box::new(l)));
+            emb_stitch::build_plan(&d, &emb_stitch::PlanOptions::default(), &mut Default::default())
+                .stitches
+                .trim_count()
+        };
+        assert!(trims(&routed) < trims(&plain), "{} {}", trims(&routed), trims(&plain));
+        // A fill font has no route.
+        let fill = convert_font(&font, "Fill", LetterStitch::Fill, true, &chars, &Default::default()).unwrap();
+        assert!(fill.fill && fill.letters.values().all(|l| !l.fixed));
+        // Stopped: no font.
+        let progress = ConvertProgress::default();
+        progress.stop.store(true, Relaxed);
+        assert!(convert_font(&font, "Stopped", LetterStitch::Auto, true, &chars, &progress).is_err());
+        // The text of each step.
+        for step in [STEP_LETTERS, STEP_ENDS, STEP_ROUTE, STEP_SCORE] {
+            progress.step.store(step, Relaxed);
+            assert!(!progress.now().0.is_empty());
+        }
     }
 
     #[test]

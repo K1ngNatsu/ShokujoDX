@@ -360,6 +360,27 @@ impl EmbFont {
     /// put in order stays as it is. Returns the trims and the runs of the
     /// routed letters.
     pub fn route(&mut self) -> crate::route::Routed {
+        self.route_until(&Default::default(), &Default::default())
+    }
+
+    /// The number of letters that [`EmbFont::route`] routes.
+    pub fn letters_to_route(&self) -> usize {
+        self.letters
+            .values()
+            .filter(|l| !l.fixed && !l.parts.is_empty())
+            .count()
+    }
+
+    /// [`EmbFont::route`] for a job with a progress bar and a Stop button:
+    /// `done` counts the letters that are routed, and with `stop` set no
+    /// more letters start (the letters that are not routed stay as they
+    /// are).
+    pub fn route_until(
+        &mut self,
+        done: &std::sync::atomic::AtomicUsize,
+        stop: &std::sync::atomic::AtomicBool,
+    ) -> crate::route::Routed {
+        use std::sync::atomic::Ordering;
         let cap = self.cap_height_mm;
         let mut todo: Vec<&mut EmbLetter> = self
             .letters
@@ -377,11 +398,15 @@ impl EmbFont {
                     scope.spawn(move || {
                         let mut sum = crate::route::Routed::default();
                         for letter in group.iter_mut() {
+                            if stop.load(Ordering::Relaxed) {
+                                break;
+                            }
                             let (mut routed, found) = crate::route::route_with_splits(letter, cap);
                             for p in &mut routed.parts {
                                 round_part(p);
                             }
                             **letter = routed;
+                            done.fetch_add(1, Ordering::Relaxed);
                             sum.trims += found.trims;
                             sum.runs += found.runs;
                             sum.splits += found.splits;
