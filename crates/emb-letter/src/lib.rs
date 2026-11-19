@@ -26,6 +26,7 @@ pub mod keyboard;
 pub mod layout;
 pub mod monogram;
 pub mod route;
+pub mod shape;
 pub mod sheet;
 pub mod source;
 pub mod stroke;
@@ -45,7 +46,7 @@ pub mod bundled {
     use super::{EmbFont, Font};
 
     /// (file name, bytes)
-    pub const FILES: [(&str, &[u8]); 5] = [
+    pub const FILES: [(&str, &[u8]); 7] = [
         (
             "Lato-Regular.ttf",
             include_bytes!("../../../data/fonts/Lato-Regular.ttf"),
@@ -63,7 +64,24 @@ pub mod bundled {
             "Graduate-Regular.ttf",
             include_bytes!("../../../data/fonts/Graduate-Regular.ttf"),
         ),
+        // P17 Milestone 6 (ADR 0114): a font for Arabic and a font for
+        // Devanagari, from the google/fonts repository (the commit of
+        // `tools/make-embroidery-fonts.py`), not changed. Both have Latin
+        // letters too.
+        (
+            "Tajawal-Bold.ttf",
+            include_bytes!("../../../data/fonts/Tajawal-Bold.ttf"),
+        ),
+        (
+            "Poppins-Bold.ttf",
+            include_bytes!("../../../data/fonts/Poppins-Bold.ttf"),
+        ),
     ];
+
+    /// The bundled font for Arabic text and the bundled font for
+    /// Devanagari text (family, style), in [`FILES`].
+    pub const ARABIC: (&str, &str) = ("Tajawal", "Bold");
+    pub const DEVANAGARI: (&str, &str) = ("Poppins", "Bold");
 
     /// The embroidery fonts in `data/fonts/embroidery/` (Modified Versions
     /// of OFL fonts, ADR 0016): (family, the JSON compressed by `build.rs`;

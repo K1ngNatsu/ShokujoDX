@@ -539,6 +539,32 @@ fn scenes() -> Vec<Scene> {
         let dialog = crate::lettering::LetteringDialog::new(emb_geom::Point::ZERO, "Name", font, 12.0);
         st.open_lettering_dialog(dialog);
     }));
+    // Text that needs shaping (ADR 0114): the text box shows the
+    // characters, and the canvas shows the shaped lettering.
+    v.push(Scene::new("lettering window arabic", View::Screen, |st, _| {
+        let (family, style) = emb_letter::bundled::ARABIC;
+        let font = emb_model::FontRef::new(family, style);
+        let text = "\u{0633}\u{0644}\u{0627}\u{0645}\u{0020}\u{0639}\u{0644}\u{064A}\u{0643}\u{0645}";
+        let dialog = crate::lettering::LetteringDialog::new(emb_geom::Point::ZERO, text, font, 20.0);
+        st.open_lettering_dialog(dialog);
+    }));
+    v.push(Scene::new("lettering window devanagari", View::Screen, |st, _| {
+        let (family, style) = emb_letter::bundled::DEVANAGARI;
+        let font = emb_model::FontRef::new(family, style);
+        let text = "\u{0928}\u{092E}\u{0938}\u{094D}\u{0924}\u{0947}";
+        let dialog = crate::lettering::LetteringDialog::new(emb_geom::Point::ZERO, text, font, 20.0);
+        st.open_lettering_dialog(dialog);
+    }));
+    v.push(Scene::new(
+        "lettering window missing letters",
+        View::Windows,
+        |st, _| {
+            let font = st.letter_font.clone();
+            let text = "\u{0633}\u{0644}\u{0627}\u{0645}\u{0020}\u{0639}\u{0644}\u{064A}\u{0643}\u{0645}";
+            let dialog = crate::lettering::LetteringDialog::new(emb_geom::Point::ZERO, text, font, 20.0);
+            st.open_lettering_dialog(dialog);
+        },
+    ));
     v.push(Scene::new("product window with a product", View::Windows, |st, ctx| {
         st.set_product(emb_model::ProductKind::ALL[0]);
         run_command(st, ctx, Cmd::ProductWindow);

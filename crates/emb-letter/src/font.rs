@@ -170,6 +170,12 @@ impl Font {
             .map_or(0.0, f64::from)
     }
 
+    /// The glyphs of one line of text, shaped with the tables of the font
+    /// (see [`crate::shape`]).
+    pub fn shape_line(&self, line: &str, kerning: bool) -> Option<Vec<crate::shape::ShapedGlyph>> {
+        crate::shape::shape_line(&self.data, self.index, line, kerning)
+    }
+
     /// The copyright notice of the font (name 0).
     pub fn copyright(&self) -> Option<String> {
         name(&self.face(), &[0])

@@ -54,6 +54,29 @@ las marca.
 una fuente TrueType, con un nombre, un rango de tamaños y un tipo de
 puntada. Compruebe que la licencia de la fuente le permite cambiarla.
 
+## Árabe, devanagari y ligaduras
+
+Con una fuente TrueType u OpenType, el programa da forma al texto como lo
+hace un procesador de textos:
+
+- **Ligaduras y letras unidas.** Una fuente con ligaduras hace una sola
+  letra de «fi» o «ff», y una fuente caligráfica usa las formas de sus
+  letras que se unen.
+- Las letras **árabes** se unen y tienen la forma que corresponde a su
+  lugar en la palabra. El texto va de derecha a izquierda, también en una
+  línea con palabras latinas o cifras, y se borda en el orden de lectura.
+- Las letras **devanagari** forman conjuntos, y un signo vocálico que se
+  escribe antes de su consonante va en ese lugar.
+
+Dos fuentes para estos sistemas de escritura vienen con el programa:
+**Tajawal** (árabe) y **Poppins** (devanagari). También puede usar una
+fuente de su equipo. Si la fuente no tiene un carácter de su texto, la
+ventana Letras muestra qué caracteres no tienen letra.
+
+Una ligadura, o una letra con sus signos, es una sola letra del rótulo: se
+mueve, se gira y se cambia como una. Las fuentes de bordado tienen una
+letra para cada carácter y no dan forma al texto.
+
 ## Hoja de prueba de fuente
 
 **Letras > Hoja de prueba de fuente** (o **Hoja de prueba** en la lista de

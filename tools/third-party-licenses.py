@@ -70,7 +70,7 @@ def bundled_data_lines():
     lines.append("")
     lines.append("Outline fonts (data/fonts)")
     lines.append("--------------------------")
-    lines.append("Anton, Graduate, Lato and Pacifico (SIL Open Font License 1.1),")
+    lines.append("Anton, Graduate, Lato, Pacifico, Poppins and Tajawal (SIL Open Font License 1.1),")
     lines.append("with the license text next to each font as <name>-OFL.txt.")
     lines.append("")
     lines.append("Thread color charts (data/threads)")

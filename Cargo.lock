@@ -1310,10 +1310,12 @@ dependencies = [
  "emb-geom",
  "emb-model",
  "flate2",
+ "harfrust",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
  "ttf-parser",
+ "unicode-bidi",
 ]
 
 [[package]]

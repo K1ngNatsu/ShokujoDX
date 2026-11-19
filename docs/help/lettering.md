@@ -2,7 +2,7 @@
 id: lettering
 title: Lettering and monograms
 group: design
-keywords: lettering, text, name, font, knockout, overlap, overlapping text, embroidery font, truetype, opentype, size range, small text, height, letter spacing, line spacing, kerning, align, baseline, arc, circle, line, envelope, lettering art, sew order, trims, jumps, letter, reshape, alphabet, bitmap font, monogram, initials, team names, names list, csv, keyboard designs, kiosk, shop, mitre, mitre corners, corner, bold, italic, underline, style, vertical, stacked, text direction, test sheet, font test, letter correction, correct a letter, stroke order
+keywords: lettering, text, name, font, knockout, overlap, overlapping text, embroidery font, truetype, opentype, size range, small text, height, letter spacing, line spacing, kerning, align, baseline, arc, circle, line, envelope, lettering art, sew order, trims, jumps, letter, reshape, alphabet, bitmap font, monogram, initials, team names, names list, csv, keyboard designs, kiosk, shop, mitre, mitre corners, corner, bold, italic, underline, style, vertical, stacked, text direction, test sheet, font test, letter correction, correct a letter, stroke order, arabic, devanagari, hindi, right to left, ligature, shaping, tajawal, poppins
 ---
 # Lettering and monograms
 
@@ -49,6 +49,29 @@ fonts first, and the font list of **Lettering > Fonts** marks them.
 **Convert to embroidery font** makes an embroidery font from a TrueType
 font, with a name, a size range and a stitch type. Check that the license
 of the font lets you change it.
+
+## Arabic, Devanagari and ligatures
+
+With a TrueType or OpenType font, the program shapes the text as a word
+processor does:
+
+- **Ligatures and joined letters.** A font with ligatures makes one letter
+  from "fi" or "ff", and a script font uses the forms of its letters that
+  join.
+- **Arabic** letters join and have the form for their place in the word.
+  The text goes from right to left, also in a line with Latin words or
+  digits, and it sews in reading order.
+- **Devanagari** letters make conjuncts, and a vowel sign that is written
+  before its consonant goes there.
+
+Two fonts for these writing systems come with the program: **Tajawal**
+(Arabic) and **Poppins** (Devanagari). You can also use a font of your
+computer. If the font does not have a character of your text, the
+Lettering window shows which characters have no letter.
+
+A ligature, or a letter with its marks, is one letter of the lettering:
+you move, turn and change it as one. The embroidery fonts have one letter
+for each character and do not shape the text.
 
 ## Font test sheet
 

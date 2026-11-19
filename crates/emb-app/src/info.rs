@@ -299,6 +299,12 @@ impl AppState {
             }) {
                 issue(Severity::Warning, text, r.first().map(|x| back.apply(x.pos)));
             }
+            if let Some(text) = d.object(id).and_then(|o| match &o.kind {
+                ObjectKind::Lettering(l) => l.missing_warning(),
+                _ => None,
+            }) {
+                issue(Severity::Warning, text, r.first().map(|x| back.apply(x.pos)));
+            }
             let dense = d.object(id).and_then(|o| match &o.kind {
                 ObjectKind::Fill { params, .. } => Some((
                     tr("Density too high: rows {} mm apart (normal 0.40 mm)"),

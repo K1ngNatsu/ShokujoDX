@@ -43,6 +43,12 @@ mit wenigen Fadenschnitten, und ihre Ecken und Punkte haben Stiche bis zum
 Rand. Die Schriftlisten zeigen sie zuerst. Schrift, die schon in einem
 Design ist, ändert sich, wenn Sie ihren Text oder ihre Schriftart ändern.
 
+**Mehr Schriftsysteme.** Mit einer TrueType- oder OpenType-Schrift formt
+die Schrift jetzt ihren Text: Ligaturen, die verbundenen Buchstaben von
+Schreibschriften, Arabisch (von rechts nach links) und Devanagari. Die
+Schriften Tajawal (Arabisch) und Poppins (Devanagari) kommen mit dem
+Programm. Siehe [Schrift](lettering).
+
 **Neue Versionen.** Das Programm kann Ihnen sagen, wenn eine neue Version
 verfügbar ist. Siehe [Optionen](options).
 

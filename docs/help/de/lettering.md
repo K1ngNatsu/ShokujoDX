@@ -55,6 +55,31 @@ von **Schrift > Schriften** kennzeichnet sie.
 TrueType-Schrift, mit einem Namen, einem Größenbereich und einer Stichart.
 Prüfen Sie, ob die Lizenz der Schrift Ihnen erlaubt, sie zu ändern.
 
+## Arabisch, Devanagari und Ligaturen
+
+Mit einer TrueType- oder OpenType-Schrift formt das Programm den Text so,
+wie es eine Textverarbeitung tut:
+
+- **Ligaturen und verbundene Buchstaben.** Eine Schrift mit Ligaturen macht
+  aus „fi“ oder „ff“ einen Buchstaben, und eine Schreibschrift verwendet die
+  Formen ihrer Buchstaben, die sich verbinden.
+- **Arabische** Buchstaben verbinden sich und haben die Form für ihren
+  Platz im Wort. Der Text läuft von rechts nach links, auch in einer Zeile
+  mit lateinischen Wörtern oder Ziffern, und er wird in Leserichtung
+  gestickt.
+- **Devanagari**-Buchstaben bilden Konjunkte, und ein Vokalzeichen, das vor
+  seinem Konsonanten geschrieben wird, steht dort.
+
+Zwei Schriften für diese Schriftsysteme kommen mit dem Programm: **Tajawal**
+(Arabisch) und **Poppins** (Devanagari). Sie können auch eine Schrift Ihres
+Computers verwenden. Wenn die Schrift ein Zeichen Ihres Textes nicht hat,
+zeigt das Fenster Schrift, welche Zeichen keinen Buchstaben haben.
+
+Eine Ligatur oder ein Buchstabe mit seinen Zeichen ist ein Buchstabe des
+Schriftzugs: Sie verschieben, drehen und ändern ihn als Ganzes. Die
+Stickschriften haben einen Buchstaben für jedes Zeichen und formen den Text
+nicht.
+
 ## Schrift-Testblatt
 
 **Schrift > Schrift-Testblatt** (oder **Testblatt** in der Schriftliste)

@@ -73,6 +73,19 @@ pub fn install(ctx: &egui::Context) {
 pub fn install_with(ctx: &egui::Context, cjk: bool) -> bool {
     let mut fonts = egui::FontDefinitions::default();
     egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+    // The bundled fonts for Arabic and Devanagari (ADR 0114) come after
+    // the program font: a text box shows these characters when the user
+    // types them.
+    for (name, file) in [("arabic", "Tajawal-Bold.ttf"), ("devanagari", "Poppins-Bold.ttf")] {
+        if let Some((_, bytes)) = emb_letter::bundled::FILES.iter().find(|(n, _)| *n == file) {
+            fonts
+                .font_data
+                .insert(name.into(), std::sync::Arc::new(egui::FontData::from_static(bytes)));
+            for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
+                fonts.families.entry(family).or_default().push(name.into());
+            }
+        }
+    }
     let mut found = !cjk;
     if cjk && let Some((bytes, index, lower)) = cjk_font() {
         fonts.font_data.insert(

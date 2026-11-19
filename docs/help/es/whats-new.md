@@ -42,6 +42,12 @@ cortes, y sus esquinas y puntos tienen puntadas hasta el borde. Las listas
 de fuentes las muestran primero. Las letras que ya están en un diseño
 cambian cuando cambia su texto o su fuente.
 
+**Más sistemas de escritura.** Con una fuente TrueType u OpenType, las
+letras ahora dan forma a su texto: ligaduras, las letras unidas de las
+fuentes caligráficas, árabe (de derecha a izquierda) y devanagari. Las
+fuentes Tajawal (árabe) y Poppins (devanagari) vienen con el programa.
+Consulte [Letras](lettering).
+
 **Versiones nuevas.** El programa puede avisarle cuando hay una versión
 nueva disponible. Consulte [Opciones](options).
 

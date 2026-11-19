@@ -15218,7 +15218,7 @@ font is next to each font as <name>-OFL.txt.
 
 Outline fonts (data/fonts)
 --------------------------
-Anton, Graduate, Lato and Pacifico (SIL Open Font License 1.1),
+Anton, Graduate, Lato, Pacifico, Poppins and Tajawal (SIL Open Font License 1.1),
 with the license text next to each font as <name>-OFL.txt.
 
 Thread color charts (data/threads)

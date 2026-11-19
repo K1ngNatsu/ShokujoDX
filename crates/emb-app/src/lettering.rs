@@ -523,6 +523,9 @@ pub struct LetteringDialog {
     original: Option<Box<Lettering>>,
     /// The font under the pointer in the font list: the canvas shows it.
     pub hover: Option<FontRef>,
+    /// The note about characters that the font does not have, for the
+    /// text and the font that it was made for.
+    missing: Option<(String, FontRef, Option<String>)>,
 }
 
 /// Makes the merge keys of the Lettering windows different.
@@ -542,6 +545,7 @@ impl LetteringDialog {
             key: MergeKey::new(format!("lettering-{}", NEXT_KEY.fetch_add(1, Ordering::Relaxed))),
             original: None,
             hover: None,
+            missing: None,
         }
     }
 
@@ -926,6 +930,23 @@ pub fn windows(ctx: &egui::Context, st: &mut AppState) {
         ui.weak(tr(
             "The canvas shows the lettering as you type. Point to a font in the list to see it.",
         ));
+        // Characters that the font does not have (for example Arabic text
+        // in a font with Latin letters only). The note is made again only
+        // after a change of the text or the font.
+        if d.missing
+            .as_ref()
+            .is_none_or(|(t, f, _)| *t != d.text || !f.same(&d.font))
+        {
+            let note = st.fonts.get(&d.font).and_then(|font| {
+                let mut l = Lettering::new(&d.text, d.font.clone(), d.height_mm, Point::ZERO);
+                emb_letter::relayout(&mut l, font.source());
+                l.missing_warning()
+            });
+            d.missing = Some((d.text.clone(), d.font.clone(), note));
+        }
+        if let Some((_, _, Some(text))) = &d.missing {
+            missing_note(ui, text);
+        }
         ui.separator();
         ui.horizontal(|ui| {
             let ok = ui
@@ -949,6 +970,22 @@ pub fn windows(ctx: &egui::Context, st: &mut AppState) {
         st.preview_lettering(&mut d);
         st.lettering_dialog = Some(d);
     }
+}
+
+/// The note for a text with characters that its font does not have, with
+/// the bundled fonts for Arabic and Devanagari text.
+fn missing_note(ui: &mut egui::Ui, text: &str) {
+    ui.add(egui::Label::new(egui::RichText::new(text).color(ui.visuals().warn_fg_color)).wrap());
+    ui.add(
+        egui::Label::new(
+            egui::RichText::new(crate::i18n::fill(
+                "Use a font that has these characters. {} has Arabic letters, and {} has Devanagari letters.",
+                &[&emb_letter::bundled::ARABIC.0, &emb_letter::bundled::DEVANAGARI.0],
+            ))
+            .weak(),
+        )
+        .wrap(),
+    );
 }
 
 /// "embroidery" or "TrueType", for lists.
@@ -1533,6 +1570,9 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, l: &Letter
         } else {
             ui.weak(text);
         }
+    }
+    if let Some(text) = l.missing_warning() {
+        missing_note(ui, &text);
     }
     slider(
         ui,

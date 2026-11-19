@@ -42,6 +42,11 @@ and their corners and dots have stitches to the edge. The font lists show
 them first. Lettering that is in a design changes when you change its
 text or its font.
 
+**More writing systems.** With a TrueType or OpenType font, lettering
+now shapes its text: ligatures, the joined letters of script fonts, Arabic
+(from right to left) and Devanagari. The fonts Tajawal (Arabic) and
+Poppins (Devanagari) come with the program. See [Lettering](lettering).
+
 **New versions.** The program can tell you when a new version is
 available. See [Options](options).
 

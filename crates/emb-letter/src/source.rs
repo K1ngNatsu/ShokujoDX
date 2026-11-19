@@ -6,6 +6,7 @@ use emb_model::{FontRef, LetterStitch, ObjectKind, PartTuning};
 
 use crate::embfont::EmbFont;
 use crate::font::Font;
+use crate::shape::ShapedGlyph;
 
 /// The narrowest satin column that sews well, in mm.
 pub const MIN_SATIN_MM: f64 = 1.2;
@@ -52,6 +53,14 @@ pub trait LetterSource {
     /// the order of the parts (empty: none).
     fn tuning(&self, _letter: u32) -> Vec<PartTuning> {
         Vec::new()
+    }
+    /// The glyphs of one line of text, shaped (see [`crate::shape`]): the
+    /// letters of the source for the line, with ligatures, the forms that
+    /// depend on the place of a letter, marks, and text from right to
+    /// left. `None`: the source has a letter for each character, and the
+    /// layout uses [`LetterSource::letter`] and [`LetterSource::kerning`].
+    fn shape(&self, _line: &str, _kerning: bool) -> Option<Vec<ShapedGlyph>> {
+        None
     }
 }
 
@@ -127,6 +136,10 @@ impl LetterSource for Font {
 
     fn size_range(&self, stitch: LetterStitch) -> Option<(f64, f64)> {
         size_range(self.stroke_ratio()?, stitch)
+    }
+
+    fn shape(&self, line: &str, kerning: bool) -> Option<Vec<ShapedGlyph>> {
+        self.shape_line(line, kerning)
     }
 }
 

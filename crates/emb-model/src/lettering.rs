@@ -785,6 +785,43 @@ impl Lettering {
         Some(text::place(template, &values))
     }
 
+    /// The characters of the text that have no letter: the font does not
+    /// have them. Each one time, in the order of the text. Spaces and
+    /// signs that are not seen are not in the list.
+    pub fn missing_characters(&self) -> Vec<char> {
+        let chars: Vec<char> = self.text.chars().collect();
+        let mut has = vec![false; chars.len()];
+        for letter in &self.letters {
+            let n = letter.text.chars().count();
+            for slot in has.iter_mut().skip(letter.index).take(n) {
+                *slot = true;
+            }
+        }
+        // Signs with no shape: they join or part letters, or set a direction.
+        let unseen = |c: char| matches!(c, '\u{200B}'..='\u{200F}' | '\u{2028}'..='\u{202E}' | '\u{2060}'..='\u{2069}' | '\u{FEFF}');
+        let mut out: Vec<char> = Vec::new();
+        for (c, _) in chars.iter().zip(&has).filter(|(_, has)| !**has) {
+            if !(c.is_whitespace() || c.is_control() || unseen(*c) || out.contains(c)) {
+                out.push(*c);
+            }
+        }
+        out
+    }
+
+    /// A text for the design checks if the font has no letters for some
+    /// characters of the text.
+    pub fn missing_warning(&self) -> Option<String> {
+        let missing = self.missing_characters();
+        if missing.is_empty() {
+            return None;
+        }
+        let list: Vec<String> = missing.iter().take(12).map(char::to_string).collect();
+        Some(text::fill(
+            "The font {} has no letters for: {}",
+            &[&self.font.label(), &list.join(" ")],
+        ))
+    }
+
     /// The lines of the text.
     pub fn lines(&self) -> Vec<&str> {
         self.text.split('\n').collect()
@@ -870,6 +907,38 @@ mod tests {
             l.size_warning().as_deref(),
             Some("Lettering 6.0 mm is smaller than the size range of Lato Bold (8–40 mm)")
         );
+    }
+
+    #[test]
+    fn the_characters_with_no_letter() {
+        let mut l = Lettering::new(
+            "ab ab
+cd",
+            FontRef::new("Lato", "Bold"),
+            10.0,
+            Point::ZERO,
+        );
+        let letter = |text: &str, index: usize| Letter {
+            text: text.into(),
+            index,
+            parts: vec![square(0.0)],
+            ..Default::default()
+        };
+        // The font has "a" and the ligature "cd", but no "b".
+        l.set_letters(vec![letter("a", 0), letter("a", 3), letter("cd", 6)]);
+        assert_eq!(l.missing_characters(), vec!['b']);
+        let warning = l.missing_warning().unwrap();
+        assert!(warning.contains("Lato Bold") && warning.ends_with(": b"), "{warning}");
+        // All characters have a letter: no warning. Spaces and line breaks
+        // are not characters with a letter.
+        l.set_letters(vec![
+            letter("a", 0),
+            letter("b", 1),
+            letter("a", 3),
+            letter("b", 4),
+            letter("cd", 6),
+        ]);
+        assert!(l.missing_characters().is_empty() && l.missing_warning().is_none());
     }
 
     #[test]

@@ -5,16 +5,76 @@
 use emb_geom::{BBox, Point, Transform};
 use emb_model::{Justify, Letter, Lettering, ObjectKind, PartTuning};
 
+use crate::shape::ShapedGlyph;
 use crate::source::LetterSource;
 use crate::style;
+
+/// A glyph of a letter: the letter of the source, and its place from the
+/// start of the letter of the text, in the units of the source.
+type Glyph = (u32, f64, f64);
 
 /// A letter on a straight line before justification.
 struct Placed {
     index: usize,
-    c: char,
-    letter: u32,
+    /// The characters of the letter: one, or more for a ligature or a
+    /// base with its marks.
+    text: String,
+    glyphs: Vec<Glyph>,
     x: f64,
     advance: f64,
+}
+
+/// The letters of a line from its shaped glyphs (see [`crate::shape`]):
+/// one letter for each cluster, in visual order, with the width of the
+/// line. `base` is the index in the text of the first character of the
+/// line.
+fn shaped_line(
+    l: &Lettering,
+    glyphs: &[ShapedGlyph],
+    line: &str,
+    base: usize,
+    scale: f64,
+    bold_w: f64,
+) -> (Vec<Placed>, f64) {
+    let chars: Vec<char> = line.chars().collect();
+    let mut starts: Vec<usize> = glyphs.iter().map(|g| g.cluster).collect();
+    starts.sort_unstable();
+    starts.dedup();
+    let mut placed = Vec::new();
+    // The pen in the units of the source, and the space that the spacing,
+    // the kerning by hand and the made bold add, in mm.
+    let (mut pen, mut extra) = (0.0, 0.0);
+    let mut i = 0;
+    while i < glyphs.len() {
+        let cluster = glyphs[i].cluster;
+        let group: Vec<&ShapedGlyph> = glyphs[i..].iter().take_while(|g| g.cluster == cluster).collect();
+        i += group.len();
+        let index = base + cluster;
+        extra += l.edit(index).map_or(0.0, |e| e.kern_mm);
+        let width: f64 = group.iter().map(|g| g.advance).sum();
+        let end = starts.iter().find(|s| **s > cluster).copied().unwrap_or(chars.len());
+        placed.push(Placed {
+            index,
+            text: chars[cluster.min(chars.len())..end.min(chars.len())].iter().collect(),
+            // Glyph 0 is the sign for a character that the font does not
+            // have: it does not sew.
+            glyphs: group
+                .iter()
+                .filter(|g| g.letter != 0)
+                .map(|g| (g.letter, g.x - pen, g.y))
+                .collect(),
+            x: pen * scale + extra,
+            advance: width * scale + 2.0 * bold_w,
+        });
+        pen += width;
+        extra += 2.0 * bold_w + l.letter_spacing_mm;
+    }
+    let width = if placed.is_empty() {
+        0.0
+    } else {
+        (pen * scale + extra - l.letter_spacing_mm).max(0.0)
+    };
+    (placed, width)
 }
 
 /// The letters of `l` in lettering space (see `emb_model::lettering`). The
@@ -45,39 +105,48 @@ pub fn layout_with_box(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> (Ve
     for (line_no, line) in l.text.split('\n').enumerate() {
         let y = line_no as f64 * line_step;
         let mut placed: Vec<Placed> = Vec::new();
-        let mut x = 0.0;
-        let mut prev: Option<u32> = None;
-        for c in line.chars() {
-            let i = index;
-            index += 1;
-            x += l.edit(i).map_or(0.0, |e| e.kern_mm);
-            let Some(g) = src.letter(c) else {
-                // No letter: a space (if it is one) or nothing.
-                if c.is_whitespace() {
-                    x += src.space() * scale + l.letter_spacing_mm;
+        let width = if let Some(glyphs) = src.shape(line, l.kerning) {
+            // The source shapes the line: ligatures, joined forms, marks,
+            // text from right to left.
+            let (shaped, width) = shaped_line(l, &glyphs, line, index, scale, bold_w);
+            placed = shaped;
+            index += line.chars().count();
+            width
+        } else {
+            let mut x = 0.0;
+            let mut prev: Option<u32> = None;
+            for c in line.chars() {
+                let i = index;
+                index += 1;
+                x += l.edit(i).map_or(0.0, |e| e.kern_mm);
+                let Some(g) = src.letter(c) else {
+                    // No letter: a space (if it is one) or nothing.
+                    if c.is_whitespace() {
+                        x += src.space() * scale + l.letter_spacing_mm;
+                    }
+                    prev = None;
+                    continue;
+                };
+                if l.kerning
+                    && let Some(p) = prev
+                {
+                    x += src.kerning(p, g) * scale;
                 }
-                prev = None;
-                continue;
-            };
-            if l.kerning
-                && let Some(p) = prev
-            {
-                x += src.kerning(p, g) * scale;
+                let advance = src.advance(g) * scale + 2.0 * bold_w;
+                placed.push(Placed {
+                    index: i,
+                    text: c.to_string(),
+                    glyphs: vec![(g, 0.0, 0.0)],
+                    x,
+                    advance,
+                });
+                x += advance + l.letter_spacing_mm;
+                prev = Some(g);
             }
-            let advance = src.advance(g) * scale + 2.0 * bold_w;
-            placed.push(Placed {
-                index: i,
-                c,
-                letter: g,
-                x,
-                advance,
-            });
-            x += advance + l.letter_spacing_mm;
-            prev = Some(g);
-        }
+            (x - l.letter_spacing_mm).max(0.0)
+        };
         // The line break.
         index += 1;
-        let width = (x - l.letter_spacing_mm).max(0.0);
         let shift = match (l.justify, path_length) {
             (Justify::Left, _) => 0.0,
             (Justify::Center, None) => -width / 2.0,
@@ -88,13 +157,16 @@ pub fn layout_with_box(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> (Ve
         // The underline goes from the start of the first letter to the end
         // of the last one.
         let line_span = placed
-            .first()
-            .zip(placed.last())
-            .map(|(a, b)| (a.x + shift, b.x + shift + b.advance));
+            .iter()
+            .map(|p| (p.x + shift, p.x + shift + p.advance))
+            .reduce(|a, b| (a.0.min(b.0), a.1.max(b.1)));
+        // The letters sew in the order of the text: text from right to
+        // left sews from its right end.
+        placed.sort_by_key(|p| p.index);
         for p in placed {
             let edit = l.edit(p.index);
-            let text = p.c.to_string();
-            let (mut parts, fixed, tuning) = letter_parts(l, src, p.letter, &text, edit, scale);
+            let text = p.text;
+            let (mut parts, fixed, tuning) = letter_parts(l, src, &p.glyphs, &text, edit, scale);
             if parts.is_empty() {
                 continue;
             }
@@ -165,7 +237,7 @@ pub fn layout_with_box(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> (Ve
 fn letter_parts(
     l: &Lettering,
     src: &(impl LetterSource + ?Sized),
-    letter: u32,
+    glyphs: &[Glyph],
     text: &str,
     edit: Option<&emb_model::LetterEdit>,
     scale: f64,
@@ -181,13 +253,26 @@ fn letter_parts(
         }
         None => {
             let stitch = edit.and_then(|e| e.stitch).unwrap_or(l.stitch);
-            let mut parts = src.parts(letter, stitch, scale);
-            for q in &mut parts {
-                q.transform(&Transform::scale(scale, scale));
+            let mut parts = Vec::new();
+            for &(glyph, dx, dy) in glyphs {
+                let mut of_glyph = src.parts(glyph, stitch, scale);
+                let mut t = Transform::scale(scale, scale);
+                if dx != 0.0 || dy != 0.0 {
+                    t = t.then(Transform::translate(dx * scale, dy * scale));
+                }
+                for q in &mut of_glyph {
+                    q.transform(&t);
+                }
+                parts.extend(of_glyph);
             }
-            // A letter that a person put in order keeps its joins.
-            let fixed = src.fixed(letter);
-            let mut tuning = src.tuning(letter);
+            // A letter that a person put in order keeps its joins. The
+            // order and the settings are for one letter of the source.
+            let one = match glyphs {
+                [(letter, ..)] => Some(*letter),
+                _ => None,
+            };
+            let fixed = one.is_some_and(|letter| src.fixed(letter));
+            let mut tuning = one.map(|letter| src.tuning(letter)).unwrap_or_default();
             if l.mitre_corners && !fixed {
                 emb_model::mitre::join_parts(&mut parts);
             }
@@ -274,7 +359,7 @@ fn stacked(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> Vec<Letter> {
         for (i, c, g, advance, base) in column {
             let edit = l.edit(i);
             let text = c.to_string();
-            let (mut parts, fixed, tuning) = letter_parts(l, src, g, &text, edit, scale);
+            let (mut parts, fixed, tuning) = letter_parts(l, src, &[(g, 0.0, 0.0)], &text, edit, scale);
             if parts.is_empty() {
                 continue;
             }
@@ -334,6 +419,82 @@ mod tests {
 
     fn lettering(text: &str) -> Lettering {
         Lettering::new(text, FontRef::new("Lato", "Bold"), 20.0, Point::new(0.0, 0.0))
+    }
+
+    #[test]
+    fn a_ligature_is_one_letter_of_the_text() {
+        let f = bundled::font("Lato", "Bold").unwrap();
+        let letters = layout(&lettering("office"), &f);
+        let texts: Vec<&str> = letters.iter().map(|x| x.text.as_str()).collect();
+        assert_eq!(texts, ["o", "ffi", "c", "e"]);
+        // Each letter has the index of its first character.
+        assert_eq!(letters.iter().map(|x| x.index).collect::<Vec<_>>(), [0, 1, 4, 5]);
+        // The ligature is one glyph: narrower than its three letters.
+        let width = |text: &str| bbox(&layout(&lettering(text), &f)).width();
+        assert!(width("ffi") < width("f") * 2.6, "{} {}", width("ffi"), width("f"));
+        // Kerning by hand before the letter after the ligature moves it
+        // and the letters after it.
+        let mut l = lettering("office");
+        l.edit_mut(4).kern_mm = 3.0;
+        let moved = layout(&l, &f);
+        let x = |v: &[Letter], i: usize| bbox(&v[i..=i]).min.x;
+        assert!((x(&moved, 1) - x(&letters, 1)).abs() < 1e-9);
+        assert!((x(&moved, 2) - x(&letters, 2) - 3.0).abs() < 1e-9);
+        assert!((x(&moved, 3) - x(&letters, 3) - 3.0).abs() < 1e-9);
+        // Letter spacing is between the letters of the text, not in the
+        // ligature.
+        let mut l = lettering("office");
+        l.letter_spacing_mm = 2.0;
+        let spaced = layout(&l, &f);
+        assert!((x(&spaced, 3) - x(&letters, 3) - 6.0).abs() < 1e-9);
+        // With no kerning, "AV" is wider.
+        let mut l = lettering("AV");
+        let kerned = bbox(&layout(&l, &f)).width();
+        l.kerning = false;
+        assert!(bbox(&layout(&l, &f)).width() > kerned + 0.3);
+        // A character that the font does not have sews nothing, and the
+        // other letters stay.
+        let with = layout(&lettering("a\u{0633}b"), &f);
+        assert_eq!(with.iter().map(|x| x.text.as_str()).collect::<Vec<_>>(), ["a", "b"]);
+    }
+
+    #[test]
+    fn text_from_right_to_left_sews_in_reading_order() {
+        let (family, style) = bundled::ARABIC;
+        let f = bundled::font(family, style).unwrap();
+        // "salam": seen, lam, alef, meem.
+        let l = Lettering::new(
+            "\u{0633}\u{0644}\u{0627}\u{0645}",
+            f.font_ref(),
+            20.0,
+            Point::new(0.0, 0.0),
+        );
+        let letters = layout(&l, &f);
+        // Three letters (lam and alef are one), in the order of the text.
+        assert_eq!(letters.iter().map(|x| x.index).collect::<Vec<_>>(), [0, 1, 3]);
+        assert_eq!(letters[1].text.chars().count(), 2);
+        // The first letter of the text is at the right, and the line
+        // starts at the origin.
+        let x = |i: usize| bbox(&letters[i..=i]).min.x;
+        assert!(x(0) > x(1) && x(1) > x(2), "{} {} {}", x(0), x(1), x(2));
+        assert!(x(2) >= -1.0 && x(2) < 3.0, "{}", x(2));
+        // A Devanagari word: one letter for each cluster.
+        let (family, style) = bundled::DEVANAGARI;
+        let f = bundled::font(family, style).unwrap();
+        let l = Lettering::new(
+            "\u{0915}\u{094D}\u{0937}\u{0924}\u{094D}\u{0930}\u{093F}\u{092F}",
+            f.font_ref(),
+            20.0,
+            Point::new(0.0, 0.0),
+        );
+        let letters = layout(&l, &f);
+        assert_eq!(letters.iter().map(|x| x.index).collect::<Vec<_>>(), [0, 3, 7]);
+        assert_eq!(letters[1].text.chars().count(), 4);
+        assert!(x_of(&letters, 0) < x_of(&letters, 1) && x_of(&letters, 1) < x_of(&letters, 2));
+    }
+
+    fn x_of(letters: &[Letter], i: usize) -> f64 {
+        bbox(&letters[i..=i]).min.x
     }
 
     #[test]

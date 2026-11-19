@@ -1,6 +1,6 @@
 # Plan: polish and lettering (phase P17)
 
-Date: 2026-11-18 · Status: Accepted (owner, 2026-11-18). Milestones 1 (ADR 0109), 2 (ADR 0110), 4 (ADR 0112) and 5 (ADR 0113) done in software; Milestone 3 is set aside by the owner (2026-11-18). The owner checks the exit test of Milestone 1 with the next release and sews the test sheets of Milestones 4 and 5.
+Date: 2026-11-18 · Status: Accepted (owner, 2026-11-18). Milestones 1 (ADR 0109), 2 (ADR 0110), 4 (ADR 0112), 5 (ADR 0113) and 6 (ADR 0114) done in software; Milestone 3 is set aside by the owner (2026-11-18). The owner checks the exit test of Milestone 1 with the next release, sews the test sheets of Milestones 4 and 5, and sews the three words of Milestone 6.
 
 ## Goal
 
@@ -335,6 +335,48 @@ An ADR records the library (rule 9: no C library).
 **Exit test:** a test text in Arabic, in Devanagari and in a Latin script
 font with ligatures gives the glyphs of a reference shaping; the owner
 sews one word of each.
+
+**Done in software (2026-11-18, ADR 0114).**
+
+- **Shaping** (`emb_letter::shape`): `unicode-bidi` gives the runs of a
+  line and their directions, and `harfrust` (a port of HarfBuzz in Rust,
+  no C code) gives the glyphs. Both were in the dependency tree already.
+  A TrueType or OpenType font shapes its text; an embroidery font has one
+  letter for each character, as before.
+- **Layout:** one letter of the lettering for each cluster (a ligature, a
+  conjunct, a base with its marks), so the changes of single letters work
+  as before. The stroke finder works on each shaped glyph. Text from
+  right to left sews in reading order.
+- **Two bundled fonts** (OFL, with their license texts): Tajawal Bold for
+  Arabic and Poppins Bold for Devanagari. The text boxes of the program
+  show these characters with them.
+- **Characters with no letter:** the Lettering window, Object Properties
+  and the design checks say which characters the font does not have, and
+  name the two fonts.
+- **Tests:** the glyphs of "salam" (Tajawal), "kshatriya" (Poppins),
+  "office tt" (Pacifico: a ligature and two forms of "t") and "office"
+  (Lato: the ligature "ffi") are in a test; other tests check the joined
+  forms, the direction, digits in Arabic text, a line with two
+  directions, the conjuncts and the place of the vowel sign.
+
+Checked: an Arabic sentence and a Devanagari sentence were sewn in
+software in the two fonts, and the stitches read correctly. The Lettering
+window was looked at with Arabic and Devanagari text (ADR 0110).
+
+**Left open:**
+
+- **The reference** is the output of `harfrust` for the bundled fonts,
+  written down after a check by eye. The library passes the test suite of
+  HarfBuzz; no run of HarfBuzz itself was compared.
+- **No sew-out.** The owner sews one word of each (the exit test).
+- A reader of Arabic and a reader of Hindi must check the look.
+- The Windows program is about 2.3 MB larger.
+- The embroidery fonts (also the tuned ones) do not shape; stacked text
+  does not shape; there is no option to turn ligatures off.
+- The font test sheet has no character set for Arabic or Devanagari
+  (use My text).
+- Other writing systems that the library knows (Hebrew, Thai, other
+  Indic scripts) work with a font of the computer; they were not checked.
 
 ## Milestone 7: more fonts, with a quality score (M)
 
