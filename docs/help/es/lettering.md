@@ -185,9 +185,10 @@ Seleccione las letras. Propiedades del objeto tiene:
   ella. Una esquina aguda, como arriba de una «A», y un trazo que termina
   en otro trazo, como en «T», no cambian. Las puntadas quedan dentro de la
   forma de la letra: una esquina que no puede girar dentro de ella queda
-  como un final y un comienzo. Una fuente de bordado del programa o de un
-  paquete de fuentes da las esquinas de sus letras: este ajuste es para
-  las fuentes TrueType y para las fuentes que usted convierte.
+  como un final y un comienzo. Las letras de una fuente de bordado del
+  programa o de un paquete de fuentes se bordan en el orden de la fuente:
+  allí, el ajuste une una esquina solo donde sus dos trazos se bordan uno
+  tras otro, así que algunas esquinas quedan como un final y un comienzo.
 
 ## Negrita, cursiva y subrayado
 

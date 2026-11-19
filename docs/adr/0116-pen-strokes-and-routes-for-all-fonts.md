@@ -89,7 +89,8 @@ in the route, and a table of pen strokes for each letter (templates).
   routed letter (ADR 0113), so it does nothing for the embroidery fonts of
   the program and of the packages. It stays for TrueType fonts and for
   fonts that the user converts. The setting is not available when all the
-  letters of the lettering are fixed.
+  letters of the lettering are fixed. (ADR 0121 changes this: a corner of
+  a routed letter joins where its two strokes sew one after the other.)
 - **Twelve fonts of the packages** have a score of 85 or more now (Mali,
   Barlow, Rubik Mono One, Neucha, Machine Sans, Barlow Semi Condensed,
   Khand, Humanist Sans, Game Sans, Wide Heavy, Shadows Into Light, Cabin

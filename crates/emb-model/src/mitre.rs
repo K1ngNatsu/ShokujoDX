@@ -11,10 +11,13 @@
 //! - [`close`]: a column whose end meets its start as a ring.
 //! - [`join_parts`]: all the corners of a list of satin parts (the parts of
 //!   a letter, or the selected columns).
+//! - [`join_in_order`]: the corners of parts that sew in a set order (a
+//!   routed letter, ADR 0121).
 
 use emb_geom::region::ring_contains;
 use emb_geom::{Path, Point, math};
 
+use crate::lettering::PartTuning;
 use crate::object::{ObjectKind, SatinGeometry};
 
 /// The ends of two columns meet if their middles are nearer than this many
@@ -560,6 +563,53 @@ pub fn join_parts(parts: &mut Vec<ObjectKind>) {
     }
 }
 
+/// Joins the corners of parts that sew in their order, each column from
+/// its start to its end (a letter with a set order, ADR 0112 and 0113).
+/// Two satin parts that sew one after the other become one column with a
+/// mitre corner if the end of the first one meets the start of the second
+/// one at a corner. The joined column sews from the start of the first
+/// part to the end of the second part, so the order and the directions of
+/// the other parts stay, and the letter needs no new trim. No column
+/// becomes a ring: a ring starts at the place nearest the needle, not at
+/// the place of the route.
+///
+/// The joined column has the settings of the part that sews first.
+/// `tuning` has the settings of each part (as many as the parts, or
+/// none): the settings of the second part go with it. Returns the number
+/// of the corners that are joined.
+pub fn join_in_order(parts: &mut Vec<ObjectKind>, tuning: &mut Vec<PartTuning>) -> usize {
+    let col = |k: &ObjectKind| match k {
+        ObjectKind::Satin { geometry, .. } => Col::of(geometry),
+        _ => None,
+    };
+    let tuned = tuning.len() == parts.len();
+    let (mut joined, mut i) = (0, 0);
+    while i + 1 < parts.len() {
+        let made = col(&parts[i]).zip(col(&parts[i + 1])).and_then(|(first, second)| {
+            let ((p, wp), (q, wq)) = (end_of(&first, true), end_of(&second, false));
+            if p.distance(q) <= MEET * wp.max(wq) {
+                join_cols(first, second)
+            } else {
+                None
+            }
+        });
+        match made {
+            Some(c) => {
+                if let ObjectKind::Satin { geometry, .. } = &mut parts[i] {
+                    *geometry = c.geometry(false);
+                }
+                parts.remove(i + 1);
+                if tuned {
+                    tuning.remove(i + 1);
+                }
+                joined += 1;
+            }
+            None => i += 1,
+        }
+    }
+    joined
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -607,6 +657,69 @@ mod tests {
                 .iter()
                 .any(|(x, y)| x.distance(p(0.0, 20.0)) < 1e-6 && y.distance(p(2.0, 18.0)) < 1e-6)
         );
+    }
+
+    #[test]
+    fn parts_in_a_set_order_join_only_one_after_the_other() {
+        let (stem, foot) = l_shape();
+        let satin = |g: &SatinGeometry| ObjectKind::Satin {
+            geometry: g.clone(),
+            params: SatinParams::default(),
+        };
+        // The stem ends at the corner and the foot starts there: one
+        // column, from the start of the stem to the end of the foot, with
+        // the settings of the stem.
+        let mut parts = vec![satin(&stem), satin(&foot)];
+        let mut tuning = vec![
+            PartTuning {
+                pull_mm: 0.3,
+                ..Default::default()
+            },
+            PartTuning::default(),
+        ];
+        assert_eq!(join_in_order(&mut parts, &mut tuning), 1);
+        assert_eq!((parts.len(), tuning.len()), (1, 1));
+        assert_eq!(tuning[0].pull_mm, 0.3);
+        let ObjectKind::Satin { geometry, .. } = &parts[0] else {
+            panic!("a column")
+        };
+        assert_eq!(Some(geometry), join(&stem, &foot).as_ref());
+        let (first, last) = (
+            geometry.rail_a.points().next().unwrap(),
+            geometry.rail_a.points().last().unwrap(),
+        );
+        assert!(
+            first.y.abs() < 1e-6 && (last.x - 12.0).abs() < 1e-6,
+            "{first:?} {last:?}"
+        );
+        // No settings: none are made.
+        let mut parts = vec![satin(&stem), satin(&foot)];
+        let mut none = Vec::new();
+        assert_eq!(join_in_order(&mut parts, &mut none), 1);
+        assert!(none.is_empty());
+        // The foot sews first: it ends away from the corner. The order and
+        // the directions stay, so the corner stays a lap.
+        let mut parts = vec![satin(&foot), satin(&stem)];
+        assert_eq!(join_in_order(&mut parts, &mut Vec::new()), 0);
+        assert_eq!(parts.len(), 2);
+        // The stem sews up: it ends at its top, not at the corner.
+        let up = column(p(0.0, 20.0), p(0.0, 0.0), p(2.0, 20.0), p(2.0, 0.0));
+        let mut parts = vec![satin(&up), satin(&foot)];
+        assert_eq!(join_in_order(&mut parts, &mut Vec::new()), 0);
+        // A travel run between the two columns: they do not sew one after
+        // the other.
+        let run = ObjectKind::Running {
+            path: Path::new().move_to(p(1.0, 19.0)).line_to(p(1.0, 10.0)),
+            params: Default::default(),
+        };
+        let mut parts = vec![satin(&stem), run, satin(&foot)];
+        assert_eq!(join_in_order(&mut parts, &mut Vec::new()), 0);
+        assert_eq!(parts.len(), 3);
+        // Three sides of a square in order: two corners, one column.
+        let top = column(p(12.0, 20.0), p(12.0, 8.0), p(10.0, 20.0), p(10.0, 8.0));
+        let mut parts = vec![satin(&stem), satin(&foot), satin(&top)];
+        assert_eq!(join_in_order(&mut parts, &mut Vec::new()), 2);
+        assert_eq!(parts.len(), 1);
     }
 
     #[test]

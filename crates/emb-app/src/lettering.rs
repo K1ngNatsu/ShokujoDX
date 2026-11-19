@@ -1687,18 +1687,10 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, l: &Letter
     if satins > 0 {
         ui.separator();
         ui.strong(tr("Satin"));
-        // The letters of a routed font are fixed (ADR 0113): the font
-        // gives their corners.
-        let from_font = n.letters.iter().all(|l| l.fixed || l.text.is_empty());
-        ui.add_enabled(
-            !from_font,
-            egui::Checkbox::new(&mut n.mitre_corners, tr("Mitre corners")),
-        )
-        .on_hover_text(tr(
+        // In a routed font (ADR 0113) a corner joins where its two strokes
+        // sew one after the other (ADR 0121).
+        ui.checkbox(&mut n.mitre_corners, tr("Mitre corners")).on_hover_text(tr(
             "Columns that meet at a corner sew as one column that turns. Off: one column stops and the next column starts over it.",
-        ))
-        .on_disabled_hover_text(tr(
-            "The letters of this font have their corners from the font. This setting does not change them.",
         ));
         let mut row = |ui: &mut egui::Ui,
                        label: &str,

@@ -273,8 +273,14 @@ fn letter_parts(
             };
             let fixed = one.is_some_and(|letter| src.fixed(letter, stitch, scale));
             let mut tuning = one.map(|letter| src.tuning(letter, stitch, scale)).unwrap_or_default();
-            if l.mitre_corners && !fixed {
-                emb_model::mitre::join_parts(&mut parts);
+            if l.mitre_corners {
+                if fixed {
+                    // The order of the font stays: only parts that sew one
+                    // after the other join (ADR 0121).
+                    emb_model::mitre::join_in_order(&mut parts, &mut tuning);
+                } else {
+                    emb_model::mitre::join_parts(&mut parts);
+                }
             }
             // The settings are for the parts as the font has them.
             if tuning.len() != parts.len() || tuning.iter().all(PartTuning::is_empty) {

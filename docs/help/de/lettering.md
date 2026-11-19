@@ -197,9 +197,11 @@ Wählen Sie die Schrift aus. Die Objekteigenschaften haben:
   spitze Ecke, wie oben an einem „A“, und ein Strich, der an einem anderen
   Strich endet, wie in „T“, ändern sich nicht. Die Stiche bleiben in der
   Form des Buchstabens: Eine Ecke, die darin nicht umbiegen kann, bleibt
-  ein Aufhören und Anfangen. Eine Stickschrift des Programms oder eines
-  Schriftpakets gibt die Ecken ihrer Buchstaben vor: Diese Einstellung
-  ist für TrueType-Schriften und für Schriften, die Sie selbst umwandeln.
+  ein Aufhören und Anfangen. Die Buchstaben einer Stickschrift des
+  Programms oder eines Schriftpakets werden in der Reihenfolge der
+  Schrift gestickt: Dort verbindet die Einstellung eine Ecke nur, wenn
+  ihre beiden Striche nacheinander gestickt werden; manche Ecken bleiben
+  deshalb ein Aufhören und Anfangen.
 
 ## Fett, kursiv und unterstrichen
 

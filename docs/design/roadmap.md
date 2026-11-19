@@ -165,6 +165,7 @@ help and the numbers in the documents.
 
 - The Mitre Corners setting does nothing for the embroidery fonts of the
   program and of the packages (a routed letter is fixed, ADR 0116).
+  Lane 6 of the review changed this (ADR 0121).
 - Twelve fonts of the packages have a score of 85 or more, and fifteen
   fonts of the program have less (the lowest: 71). The owner left the
   fonts where they are.
@@ -357,7 +358,14 @@ owner started lane 5 on pictures alone (2026-11-19).
      65 MB. The sew-out kit has three designs for it (`large/`).
 6. **Mitre corners in routed letters** (M): the route joins two columns
    that meet at a corner when the font is made, or the layout does it
-   for two parts that sew one after the other.
+   for two parts that sew one after the other. **Done (2026-11-19, ADR 0121), on
+   pictures only:** the layout joins two columns of a routed letter that
+   sew one after the other and meet at a corner (`mitre::join_in_order`),
+   so the route stays and no letter gets a new trim. With the setting on,
+   a routed font has about as many mitre corners as a font with no route
+   (Varsity 24 of 25, Anton 9 of 9, Block Sans 5 of 9). The check box is
+   there for each font again. The corners where the route sews something
+   between the two strokes stay a stop and a start.
 7. **Embroidery fonts for Arabic and Devanagari** (L): converted fonts
    with a letter for each glyph of the font, routed and with a score.
 8. **Clipart sets** (L): pictures with more detail by theme, as asset

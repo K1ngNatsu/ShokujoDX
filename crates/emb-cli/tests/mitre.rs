@@ -133,18 +133,62 @@ fn check(font: &dyn emb_letter::LetterSource, name: &str) {
     );
 }
 
+/// The trims of a design.
+fn trims(d: Design) -> usize {
+    stitches(&Input::Design(Box::new(d)), None).unwrap().0.trim_count()
+}
+
 #[test]
 fn mitred_embroidery_font_letters_stay_in_their_footprint() {
-    // A font as the converter makes it, with no route: the corner option
-    // does not change the letters of a routed font (ADR 0113), and the
-    // embroidery fonts of the program are routed (ADR 0116).
+    // A font as the converter makes it, with no route: all its corners
+    // can join.
     let source = emb_letter::bundled::font("Anton", "Regular").expect("bundled font");
     let chars: Vec<char> = TEXT.chars().collect();
     let f = emb_letter::embfont::convert(&source, "Anton", "", emb_model::LetterStitch::Auto, &chars);
     check(&f, "Anton");
-    // A routed font: no change.
-    let f = emb_letter::bundled::embroidery("Anton").expect("bundled embroidery font");
-    assert_eq!(part_count(&design(&f, true)), part_count(&design(&f, false)));
+}
+
+#[test]
+fn mitred_letters_of_a_routed_font_keep_their_route() {
+    // The embroidery fonts of the program are routed (ADR 0116): their
+    // letters sew in the order of the font. A corner is mitred where its
+    // two strokes sew one after the other (ADR 0121). The stitches stay
+    // in the letters, and no letter gets a new trim.
+    for name in ["Anton", "Varsity", "Block Sans"] {
+        let f = emb_letter::bundled::embroidery(name).expect("bundled embroidery font");
+        check(&f, name);
+        assert!(trims(design(&f, true)) <= trims(design(&f, false)), "{name}");
+        // The letters are still fixed, and a travel run is still a run.
+        let d = design(&f, true);
+        let ObjectKind::Lettering(l) = &d.objects()[0].kind else {
+            unreachable!()
+        };
+        assert!(l.letters.iter().all(|x| x.fixed || x.parts.is_empty()), "{name}");
+        assert!(l.parts().any(|p| matches!(p, ObjectKind::Running { .. })), "{name}");
+    }
+    // All letters and digits of four fonts: not more trims with the
+    // setting on than with it off.
+    let text = "ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789";
+    for name in ["Block Sans", "Varsity", "Pacifico", "Geo Slab"] {
+        let f = emb_letter::bundled::embroidery(name).expect("bundled embroidery font");
+        let of = |mitre: bool| {
+            let mut d = Design::new("");
+            let t = d.add_thread("Navy", Rgb(25, 40, 100));
+            let mut l = Lettering::new(
+                text,
+                emb_letter::LetterSource::font_ref(&f),
+                20.0,
+                Point::new(0.0, 10.0),
+            );
+            l.mitre_corners = mitre;
+            emb_letter::relayout(&mut l, &f);
+            d.add_object(t, ObjectKind::Lettering(Box::new(l)));
+            d
+        };
+        let (lapped, mitred) = (of(false), of(true));
+        assert!(part_count(&mitred) < part_count(&lapped), "{name}");
+        assert!(trims(mitred) <= trims(lapped), "{name}");
+    }
 }
 
 #[test]

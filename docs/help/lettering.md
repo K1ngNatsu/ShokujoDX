@@ -176,9 +176,10 @@ Select the lettering. Object Properties has:
   the next column starts over it. A sharp corner, as at the top of an "A",
   and a stroke that ends on another stroke, as in "T", do not change. The
   stitches stay in the shape of the letter: a corner that cannot turn in
-  it stays as a stop and a start. An embroidery font of the program or of
-  a font package gives the corners of its letters: this setting is for
-  TrueType fonts and for fonts that you convert.
+  it stays as a stop and a start. The letters of an embroidery font of the
+  program or of a font package sew in the order of the font: there, the
+  setting joins a corner only where its two strokes sew one after the
+  other, so some corners stay a stop and a start.
 
 ## Bold, italic and underline
 
