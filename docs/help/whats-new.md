@@ -35,6 +35,13 @@ letters of a font at some sizes, to sew and to look at. In **Lettering >
 Alphabets** you can correct a letter of an embroidery font: its sew order,
 its shape and its settings. See [Lettering](lettering).
 
+**Tuned fonts.** Ten embroidery fonts are tuned: Block Sans, Friendly
+Serif, Pacifico, Atkinson Hyperlegible, Varsity, Bebas Neue, Soft Round,
+Geo Slab, Brush Hand and Vintage Script. Their letters sew with few trims,
+and their corners and dots have stitches to the edge. The font lists show
+them first. Lettering that is in a design changes when you change its
+text or its font.
+
 **New versions.** The program can tell you when a new version is
 available. See [Options](options).
 

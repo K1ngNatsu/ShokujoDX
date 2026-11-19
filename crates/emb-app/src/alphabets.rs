@@ -936,7 +936,9 @@ mod tests {
     #[test]
     fn correct_a_letter_of_a_bundled_font() {
         let (mut st, dir) = state("fix");
-        let font = FontRef::embroidery("Block Sans", "");
+        // A font that is not tuned: its letters are as the converter made
+        // them.
+        let font = FontRef::embroidery("Anton", "");
         let before = st.embroidery_font(&font).unwrap().letters[&'H'].clone();
         let n = before.parts.len();
         assert!(n >= 3 && !before.fixed && before.tuning.is_empty());
@@ -992,7 +994,7 @@ mod tests {
         let all: Vec<_> = st.doc.design().objects().iter().map(|o| o.id).collect();
         st.selection.set_all(all);
         st.save_correction(&font, 'H').unwrap();
-        let file = dir.join("corrections").join("block-sans.json");
+        let file = dir.join("corrections").join("anton.json");
         assert!(file.is_file());
         assert_eq!(st.corrected_letters(&font), vec!['H']);
         let after = st.embroidery_font(&font).unwrap().letters[&'H'].clone();
@@ -1023,6 +1025,7 @@ mod tests {
         assert_eq!(params.underlay, emb_model::Underlay::Heavy);
         assert!((params.pull_compensation_mm - l.satin.pull_compensation_mm - 0.1).abs() < 1e-9);
         // The window shows the corrected letters.
+        st.alphabets_window.fix_font = font.clone();
         st.alphabets_window.open = true;
         let ctx = egui::Context::default();
         let mut out = ctx.run_ui(egui::RawInput::default(), |ui| window(ui.ctx(), &mut st));

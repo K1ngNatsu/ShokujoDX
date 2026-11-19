@@ -44,6 +44,12 @@ o **Para texto pequeño** (fuentes de bordado para letras desde 4 mm de
 alto). **Usar para las letras seleccionadas** cambia la fuente de la
 selección.
 
+Diez de las fuentes de bordado son fuentes **afinadas**. Sus letras se
+bordan con pocos cortes: la aguja pasa de un trazo al siguiente por debajo
+de las puntadas. Cada una de sus letras se revisó. Las listas de fuentes
+muestran primero las fuentes afinadas, y la lista de **Letras > Fuentes**
+las marca.
+
 **Convertir en fuente de bordado** crea una fuente de bordado a partir de
 una fuente TrueType, con un nombre, un rango de tamaños y un tipo de
 puntada. Compruebe que la licencia de la fuente le permite cambiarla.

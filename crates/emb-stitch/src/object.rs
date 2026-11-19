@@ -660,6 +660,61 @@ fn satin_ends(k: &ObjectKind) -> Option<(Point, Point)> {
     (a0.distance(a1) > 1e-6).then(|| (a0.midpoint(b0), a1.midpoint(b1)))
 }
 
+/// The start edge and the end edge of a part that has them: the ends of
+/// the two rails of a satin column, or the ends of an open line of run
+/// stitches (each as an edge with no length).
+fn part_edges(k: &ObjectKind) -> Option<((Point, Point), (Point, Point))> {
+    match k {
+        ObjectKind::Satin { geometry, .. } => {
+            let ends = |path: &emb_geom::Path| {
+                let pts: Vec<Point> = path.points().collect();
+                Some((*pts.first()?, *pts.last()?))
+            };
+            let ((a0, a1), (b0, b1)) = (ends(&geometry.rail_a)?, ends(&geometry.rail_b)?);
+            (a0.distance(a1) > 1e-6).then_some(((a0, b0), (a1, b1)))
+        }
+        _ => part_ends(k).map(|(a, b)| ((a, a), (b, b))),
+    }
+}
+
+/// The shortest stitch of a travel run in a fixed letter, in mm.
+const MIN_TRAVEL_MM: f64 = 0.4;
+
+/// Takes out the points of `points` that are nearer than `min` to the
+/// point before them. The first and the last point stay.
+fn thin_points(points: &mut Vec<Point>, min: f64) {
+    if points.len() < 3 {
+        return;
+    }
+    let last = points[points.len() - 1];
+    let mut out = vec![points[0]];
+    for &p in &points[1..points.len() - 1] {
+        let near_last = p.distance(last) < min;
+        if out.last().is_some_and(|q| q.distance(p) >= min) && !near_last {
+            out.push(p);
+        }
+    }
+    out.push(last);
+    *points = out;
+}
+
+/// The points of the edges `a` and `b` that are nearest to each other
+/// (from steps along each edge).
+fn nearest_points(a: (Point, Point), b: (Point, Point)) -> (Point, Point) {
+    const STEPS: usize = 16;
+    let along = |e: (Point, Point), i: usize| e.0.lerp(e.1, i as f64 / STEPS as f64);
+    let mut best = (f64::MAX, a.0, b.0);
+    for i in 0..=STEPS {
+        for j in 0..=STEPS {
+            let (p, q) = (along(a, i), along(b, j));
+            if p.distance(q) < best.0 {
+                best = (p.distance(q), p, q);
+            }
+        }
+    }
+    (best.1, best.2)
+}
+
 /// The start and the end of a part that has them: a satin column with two
 /// ends, or an open line of run stitches.
 fn part_ends(k: &ObjectKind) -> Option<(Point, Point)> {
@@ -867,11 +922,30 @@ struct LetterSewer<'a> {
 impl LetterSewer<'_> {
     /// Sews `part` from `from` (to `exit`). `unsewn` are the parts that sew
     /// from now on, `part` too: with `smart`, their stitches can cover a
-    /// connection.
-    fn sew(&mut self, part: &ObjectKind, from: Point, exit: Option<Point>, unsewn: &[&ObjectKind], smart: bool) {
+    /// connection. `joined`: a part of a fixed letter, with `true` if it
+    /// joins the part before it with no trim.
+    fn sew(
+        &mut self,
+        part: &ObjectKind,
+        from: Point,
+        exit: Option<Point>,
+        unsewn: &[&ObjectKind],
+        smart: bool,
+        joined: Option<bool>,
+    ) {
         let Ok(mut st) = stitch_kind(part, from, exit) else {
             return;
         };
+        let fixed = joined.is_some();
+        let joined = joined == Some(true);
+        // A travel run of a fixed letter turns in the columns that hide it.
+        // At a small size two turns are near, and each turn is a needle
+        // point: the points that are too near go.
+        if fixed && matches!(part, ObjectKind::Running { .. }) {
+            for run in &mut st.runs {
+                thin_points(&mut run.points, MIN_TRAVEL_MM);
+            }
+        }
         if let Some(first) = st.runs.first_mut()
             && !self.runs.is_empty()
             && let Some(&p) = first.points.first()
@@ -881,11 +955,20 @@ impl LetterSewer<'_> {
                 let areas: Vec<Vec<Vec<Point>>> = unsewn.iter().map(|k| part_area(k)).collect();
                 hidden(self.needle, p, &areas)
             };
-            first.link = if short || (smart && covered()) {
+            first.link = if short || joined || (smart && covered()) {
                 RunLink::Travel
             } else {
                 self.long_gap
             };
+            // In a fixed letter, a part starts where the part before it
+            // ends: the first needle point is the same place again.
+            if fixed
+                && first.link == RunLink::Travel
+                && p.distance(self.needle) < MIN_TRAVEL_MM
+                && first.points.len() > 1
+            {
+                first.points.remove(0);
+            }
         }
         if let Some(p) = st.runs.last().and_then(|r| r.points.last()) {
             self.needle = *p;
@@ -937,6 +1020,9 @@ fn lettering_runs(l: &emb_model::Lettering, entry: Point, exit: Option<Point>) -
             // end. A part with no ends starts near the needle and ends
             // near the start of the next part.
             let last = letter.parts.len().saturating_sub(1);
+            // The end edge of the part before in this letter, if it has
+            // ends.
+            let mut anchor: Option<(Point, Point)> = None;
             for (k, part) in letter.parts.iter().enumerate() {
                 let ends = part_ends(part);
                 let from = ends.map_or(w.needle, |(a, _)| a);
@@ -947,7 +1033,23 @@ fn lettering_runs(l: &emb_model::Lettering, entry: Point, exit: Option<Point>) -
                     None
                 });
                 let unsewn: Vec<&ObjectKind> = letter.parts[k..].iter().collect();
-                w.sew(part, from, to, &unsewn, true);
+                // The font joins the end of the part before with the start
+                // of this part: the two edges are near, or the parts that
+                // sew from now on cover the way between them. The needle
+                // is on the end edge of the column before, and the first
+                // stitch is on the start edge of this column: a travel
+                // stitch along an edge lies on the end stitches of its
+                // column, so it does not show.
+                let edges = part_edges(part);
+                let joined = anchor.zip(edges).is_some_and(|(a, (s, _))| {
+                    let (p, q) = nearest_points(a, s);
+                    p.distance(q) <= l.trim_over_mm || {
+                        let areas: Vec<Vec<Vec<Point>>> = unsewn.iter().map(|k| part_area(k)).collect();
+                        hidden(p, q, &areas)
+                    }
+                });
+                w.sew(part, from, to, &unsewn, true, Some(joined));
+                anchor = edges.map(|(_, b)| b);
             }
             continue;
         }
@@ -957,7 +1059,7 @@ fn lettering_runs(l: &emb_model::Lettering, entry: Point, exit: Option<Point>) -
             for (k, &(pi, from, end)) in plan.iter().enumerate() {
                 let unsewn: Vec<&ObjectKind> = plan[k..].iter().map(|&(i, _, _)| &letter.parts[i]).collect();
                 let to = if k == last { end.or(target) } else { end };
-                w.sew(&letter.parts[pi], from, to, &unsewn, true);
+                w.sew(&letter.parts[pi], from, to, &unsewn, true, None);
             }
             continue;
         }
@@ -973,7 +1075,7 @@ fn lettering_runs(l: &emb_model::Lettering, entry: Point, exit: Option<Point>) -
                 .unwrap_or(0);
             let part = left.remove(i);
             let last = left.is_empty() && n + 1 == seq.len();
-            w.sew(part, needle, if last { exit } else { None }, &[], false);
+            w.sew(part, needle, if last { exit } else { None }, &[], false, None);
         }
     }
     w.runs
@@ -1290,6 +1392,56 @@ mod tests {
         let mut l = two_columns(true);
         l.order = emb_model::LetterOrder::Closest;
         assert_eq!(ends(&l), (first, last));
+    }
+
+    #[test]
+    fn a_fixed_letter_joins_parts_along_the_end_of_a_column() {
+        // A column 6 mm wide from the bottom to the top, a travel run that
+        // starts on its end edge 2.5 mm from the middle, and a column that
+        // starts where the run ends.
+        let column = |from: (f64, f64), to: (f64, f64), width: f64| ObjectKind::Satin {
+            geometry: emb_model::SatinGeometry::from_centerline(
+                &Path::new()
+                    .move_to(Point::new(from.0, from.1))
+                    .line_to(Point::new(to.0, to.1)),
+                width,
+            ),
+            params: Default::default(),
+        };
+        let run = ObjectKind::Running {
+            path: Path::new()
+                .move_to(Point::new(2.5, -20.0))
+                .line_to(Point::new(2.5, -23.0))
+                .line_to(Point::new(12.0, -23.0)),
+            params: RunningParams::default(),
+        };
+        let mut l = emb_model::Lettering::new("L", Default::default(), 10.0, Point::ZERO);
+        l.letters = vec![emb_model::Letter {
+            text: "L".into(),
+            parts: vec![
+                column((0.0, 0.0), (0.0, -20.0), 6.0),
+                run,
+                // The run goes under this column, which sews after it.
+                column((12.0, -23.0), (-3.0, -23.0), 6.0),
+            ],
+            fixed: true,
+            ..Default::default()
+        }];
+        let trims = |l: &emb_model::Lettering| {
+            lettering_runs(l, Point::ZERO, None)
+                .iter()
+                .skip(1)
+                .filter(|r| r.link == RunLink::Trim)
+                .count()
+        };
+        assert_eq!(trims(&l), 0);
+        // A run that starts away from the end of the column needs a trim.
+        if let ObjectKind::Running { path, .. } = &mut l.letters[0].parts[1] {
+            *path = Path::new()
+                .move_to(Point::new(9.0, -12.0))
+                .line_to(Point::new(12.0, -23.0));
+        }
+        assert_eq!(trims(&l), 1);
     }
 
     #[test]

@@ -25,11 +25,13 @@ pub mod grid;
 pub mod keyboard;
 pub mod layout;
 pub mod monogram;
+pub mod route;
 pub mod sheet;
 pub mod source;
 pub mod stroke;
 pub mod style;
 pub mod teamnames;
+pub mod tune;
 
 pub use embfont::{EmbFont, EmbLetter};
 pub use font::{Font, FontError, face_count, face_names};
@@ -183,6 +185,23 @@ pub mod bundled {
         ),
     ];
 
+    /// The tuned fonts of [`EMBROIDERY`] (P17 Milestone 5, ADR 0113): their
+    /// letters are routed (few trims, travel under the strokes), and each
+    /// letter was checked on proof pictures. The font lists show them
+    /// first. `tools/make-embroidery-fonts.py` has the same list.
+    pub const TUNED: [&str; 10] = [
+        "Block Sans",
+        "Friendly Serif",
+        "Pacifico",
+        "Atkinson Hyperlegible",
+        "Varsity",
+        "Bebas Neue",
+        "Soft Round",
+        "Geo Slab",
+        "Brush Hand",
+        "Vintage Script",
+    ];
+
     /// The text (JSON) of the bundled embroidery font `i` of [`EMBROIDERY`].
     pub fn embroidery_text(i: usize) -> Option<std::sync::Arc<str>> {
         use std::io::Read;
@@ -329,6 +348,11 @@ mod tests {
                 .count()
                 >= 3
         );
+        // The tuned fonts are the fonts of the list.
+        for (family, _) in bundled::EMBROIDERY {
+            let tuned = bundled::embroidery(family).is_some_and(|f| f.tuned);
+            assert_eq!(tuned, bundled::TUNED.contains(&family), "{family}");
+        }
         assert!(bundled::embroidery(bundled::DEFAULT_EMBROIDERY).is_some());
         assert_eq!(bundled::fonts().len(), bundled::FILES.len());
     }

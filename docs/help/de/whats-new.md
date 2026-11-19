@@ -36,6 +36,13 @@ Buchstaben einer Schrift in mehreren Größen, zum Sticken und Ansehen. In
 korrigieren: seine Stickreihenfolge, seine Form und seine Einstellungen.
 Siehe [Schrift](lettering).
 
+**Abgestimmte Schriften.** Zehn Stickschriften sind abgestimmt: Block
+Sans, Friendly Serif, Pacifico, Atkinson Hyperlegible, Varsity, Bebas Neue,
+Soft Round, Geo Slab, Brush Hand und Vintage Script. Ihre Buchstaben sticken
+mit wenigen Fadenschnitten, und ihre Ecken und Punkte haben Stiche bis zum
+Rand. Die Schriftlisten zeigen sie zuerst. Schrift, die schon in einem
+Design ist, ändert sich, wenn Sie ihren Text oder ihre Schriftart ändern.
+
 **Neue Versionen.** Das Programm kann Ihnen sagen, wenn eine neue Version
 verfügbar ist. Siehe [Optionen](options).
 

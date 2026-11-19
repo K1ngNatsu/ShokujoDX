@@ -45,6 +45,12 @@ den Größenbereich sehen, und **Alle**, **Stickerei**, **TrueType** oder
 **Für kleine Schrift** zeigen (Stickschriften für Buchstaben ab 4 mm Höhe).
 **Für die ausgewählte Schrift verwenden** ändert die Schrift der Auswahl.
 
+Zehn der Stickschriften sind **abgestimmte** Schriften. Ihre Buchstaben
+sticken mit wenigen Fadenschnitten: Die Nadel geht unter den Stichen von
+einem Strich zum nächsten. Jeder ihrer Buchstaben wurde geprüft. Die
+Schriftlisten zeigen die abgestimmten Schriften zuerst, und die Schriftliste
+von **Schrift > Schriften** kennzeichnet sie.
+
 **In Stickschrift umwandeln** erstellt eine Stickschrift aus einer
 TrueType-Schrift, mit einem Namen, einem Größenbereich und einer Stichart.
 Prüfen Sie, ob die Lizenz der Schrift Ihnen erlaubt, sie zu ändern.

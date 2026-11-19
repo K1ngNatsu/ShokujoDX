@@ -4,6 +4,7 @@
 
 pub mod bench;
 pub mod corpus;
+pub mod fontaudit;
 
 use std::path::Path;
 

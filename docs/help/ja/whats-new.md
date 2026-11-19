@@ -35,6 +35,12 @@ keywords: 新機能, 新しい, 変更点, バージョン, アップデート, 
 では、刺しゅうフォントの文字を修正できます: 縫い順、形、設定。
 [文字](lettering) を参照してください。
 
+**調整済みのフォント。** 10 個の刺しゅうフォントを調整しました: Block Sans、
+Friendly Serif、Pacifico、Atkinson Hyperlegible、Varsity、Bebas Neue、Soft
+Round、Geo Slab、Brush Hand、Vintage Script。文字は少ない糸切りで縫われ、角や
+点は端までステッチが入ります。フォントの一覧では先に表示されます。すでに
+デザインにある文字は、テキストやフォントを変更したときに変わります。
+
 **新しいバージョン。** 新しいバージョンが利用可能になると、プログラムが
 お知らせできます。[オプション](options) を参照してください。
 

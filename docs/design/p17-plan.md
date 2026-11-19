@@ -1,6 +1,6 @@
 # Plan: polish and lettering (phase P17)
 
-Date: 2026-11-18 · Status: Accepted (owner, 2026-11-18). Milestones 1 (ADR 0109), 2 (ADR 0110) and 4 (ADR 0112) done in software; Milestone 3 is set aside by the owner (2026-11-18). The owner checks the exit test of Milestone 1 with the next release and sews the test sheet of Milestone 4.
+Date: 2026-11-18 · Status: Accepted (owner, 2026-11-18). Milestones 1 (ADR 0109), 2 (ADR 0110), 4 (ADR 0112) and 5 (ADR 0113) done in software; Milestone 3 is set aside by the owner (2026-11-18). The owner checks the exit test of Milestone 1 with the next release and sews the test sheets of Milestones 4 and 5.
 
 ## Goal
 
@@ -237,6 +237,86 @@ Ten fonts are as good as fonts that a person digitized.
 
 **Exit test (owner):** the test sheet of each of the ten fonts sews
 correctly on the Topaz 20 and on the Tajima, at the three sizes.
+
+**Done in software (2026-11-18, ADR 0113).**
+
+An audit (`emb-cli font-audit`) and proof pictures of each letter
+(`tools/font-proof.py`) showed where the converted fonts are not as good
+as fonts that a person digitized. The faults were the same in each font,
+so the converter got four new steps, and the font tool uses them for the
+ten fonts:
+
+1. **Ends of columns reach the corners.** An end goes on into a part of
+   the outline with no stitches. An end that turns to the stroke that it
+   meets (the top of "N", the corners of "Z") goes on straight.
+2. **Round dots** get a column to their edge.
+3. **Each letter is routed:** the order and the directions of its parts
+   with the fewest trims, with travel runs under the strokes that sew
+   later. A stroke is cut at a junction or a crossing where that saves a
+   trim (the stem of "H" at its bar, one stroke of "X").
+4. **Script letters join:** a letter ends at the end of its last stroke
+   and starts where the last stroke of the letter before it ends.
+
+The ten fonts, before and after (the trims in the 81 basic letters, each
+sewn alone at the middle size of the font; the trims in the sentence "The
+Quick Brown Fox Jumps over the lazy dog 0123456789" at the middle size,
+with the trims between its 45 letters):
+
+| Font | Kind | Outline covered | Trims in 81 letters | Trims in the sentence |
+|---|---|---|---|---|
+| Block Sans | block sans | 97.1 % to 98.8 % | 93 to 11 | 92 to 45 |
+| Friendly Serif | serif | 96.5 % to 97.8 % | 194 to 30 | 135 to 52 |
+| Pacifico | script | 97.1 % to 98.1 % | 114 to 10 | 115 to 30 |
+| Atkinson Hyperlegible | small text | 97.0 % to 98.2 % | 99 to 12 | 93 to 46 |
+| Varsity | athletic | 98.5 % to 98.9 % | 194 to 32 | 159 to 56 |
+| Bebas Neue | narrow | 97.9 % to 98.7 % | 102 to 9 | 102 to 44 |
+| Soft Round | round | 97.8 % to 98.8 % | 78 to 12 | 84 to 46 |
+| Geo Slab | slab | 96.0 % to 97.6 % | 160 to 15 | 119 to 45 |
+| Brush Hand | brush | 96.0 % to 97.5 % | 123 to 18 | 115 to 52 |
+| Vintage Script | monogram | 97.3 % to 98.3 % | 106 to 10 | 93 to 32 |
+| All ten | | | 1263 to 159 | 1107 to 448 |
+
+The trims that stay in the letters are between parts that do not touch
+(the dot of "i", the two parts of ":" and of "="), and in letters with
+many small serifs. In the sentence, the fonts with separate letters keep
+one trim for each gap between two letters; the scripts keep the trims at
+the spaces, between the digits and at some capitals.
+
+Each of the 81 basic letters of each font was looked at on a proof
+picture after the last change of the converter. What the pictures still
+show is in "Left open" below.
+
+The Fonts window marks the ten fonts as **tuned**, and the font lists
+show them first (`bundled::TUNED`).
+
+**Left open:**
+
+- **No sew-out.** The proof is pictures and measures. The owner sews the
+  test sheets (the exit test). The cuts of columns (a seam in the stem of
+  "H") and the travel runs under narrow columns at the smallest size are
+  the first things to look at.
+- **No hand correction yet.** No font has a correction file: all changes
+  are steps of the converter, so the other twenty fonts can get them too
+  (Milestone 7). A letter that a sew-out shows as wrong gets a correction
+  (Milestone 4).
+- Letters with more than eight parts (serif letters with many small
+  parts, letters with accents) get a simple route, not the search of all
+  orders.
+- The letters with accents and the other characters after the basic set
+  have the same steps, but they were not all looked at.
+- **What the proof pictures still show:** the "m" of Brush Hand is ten
+  parts that do not touch (7 trims), and its "&" and "@" have parts with
+  no stitches. The "x" and the "1" of Geo Slab have small parts with no
+  stitches. The serif letters "H", "K", "X" and "m" of Friendly Serif and
+  Varsity keep 1 to 5 trims.
+- **Keyboard designs** take the parts of a letter as single objects, so
+  the stitch engine joins them as objects, not as a routed letter. The
+  sample "KDC" has 14 trims (12 before): the order of the font is not the
+  best order for single objects.
+- **Fat Face Serif** was the first monogram font. Its hairlines and ball
+  ends do not convert well (many letters with less than 90 % of the
+  outline), so it is not a tuned font; Vintage Script is the monogram
+  font.
 
 ## Milestone 6: text shaping (M)
 

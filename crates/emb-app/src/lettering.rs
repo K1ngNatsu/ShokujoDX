@@ -45,6 +45,8 @@ pub enum FontSource {
 pub struct FontEntry {
     pub font: FontRef,
     pub source: FontSource,
+    /// A tuned embroidery font (ADR 0113): the lists show it first.
+    pub tuned: bool,
 }
 
 /// The fonts that lettering can use.
@@ -210,6 +212,9 @@ impl Default for FontLibrary {
             .map(|(i, (family, _))| FontEntry {
                 font: FontRef::embroidery(family, ""),
                 source: FontSource::EmbBundled(i),
+                tuned: emb_letter::bundled::TUNED
+                    .iter()
+                    .any(|t| t.eq_ignore_ascii_case(family)),
             })
             .collect();
         entries.extend(
@@ -221,6 +226,7 @@ impl Default for FontLibrary {
                     Some(FontEntry {
                         font: FontRef::new(&family, &style),
                         source: FontSource::Bundled(i),
+                        tuned: false,
                     })
                 }),
         );
@@ -238,6 +244,7 @@ impl Default for FontLibrary {
         if let Some(dir) = user_fonts_dir() {
             lib.add_user_fonts(&dir);
         }
+        lib.sort();
         lib
     }
 }
@@ -278,12 +285,19 @@ impl FontLibrary {
         }
     }
 
-    /// Embroidery fonts first, then by name.
+    /// `true` for a tuned embroidery font.
+    pub fn is_tuned(&self, font: &FontRef) -> bool {
+        self.entries.iter().any(|e| e.tuned && e.font.same(font))
+    }
+
+    /// Embroidery fonts first (the tuned ones before the others), then by
+    /// name.
     fn sort(&mut self) {
         self.entries.sort_by(|a, b| {
             let key = |e: &FontEntry| {
                 (
                     e.font.kind != FontKind::Embroidery,
+                    !e.tuned,
                     e.font.family.to_lowercase(),
                     e.font.style.clone(),
                 )
@@ -311,6 +325,7 @@ impl FontLibrary {
         self.entries.push(FontEntry {
             font: r.clone(),
             source: FontSource::EmbFile(path.to_path_buf()),
+            tuned: f.tuned,
         });
         self.loaded.insert(r.clone(), AnyFont::Embroidery(Arc::new(f)));
         self.sort();
@@ -472,6 +487,7 @@ pub fn scan(dirs: &[PathBuf]) -> Vec<FontEntry> {
                     out.push(FontEntry {
                         font: FontRef::new(&family, &style),
                         source: FontSource::File(path.clone(), face),
+                        tuned: false,
                     });
                 }
             }

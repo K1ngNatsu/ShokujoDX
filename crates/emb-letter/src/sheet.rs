@@ -77,6 +77,23 @@ impl Characters {
     }
 }
 
+/// The characters of `set`, in the order of a sheet (the characters of a
+/// text in the order of the text, each one time).
+pub fn characters(set: &Characters) -> Vec<char> {
+    match set {
+        Characters::Text(text) => {
+            let mut v: Vec<char> = Vec::new();
+            for c in text.chars().filter(|c| !c.is_whitespace()) {
+                if !v.contains(&c) {
+                    v.push(c);
+                }
+            }
+            v
+        }
+        set => set.set(),
+    }
+}
+
 /// The smallest, the middle and the largest size of a font with the size
 /// range `range`, in mm. The middle is the size with the same ratio to
 /// both ends (for 6 to 54 mm: 18 mm), rounded to 0.5 mm.

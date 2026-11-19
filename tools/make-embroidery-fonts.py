@@ -61,6 +61,26 @@ FONTS = [
 ]
 
 
+# The tuned fonts (P17 Milestone 5, ADR 0113; the same list as
+# emb_letter::bundled::TUNED). The converter makes the ends of their columns
+# reach the corners of the outline (--extend) and routes each letter: the
+# order of its parts with the fewest trims, with travel runs under the parts
+# that sew later (--route). After a change of the converter, look at the
+# proof pictures of these fonts again (emb-cli font-audit --proof).
+TUNED = {
+    "block-sans",
+    "friendly-serif",
+    "pacifico",
+    "atkinson-hyperlegible",
+    "varsity",
+    "bebas-neue",
+    "soft-round",
+    "geo-slab",
+    "brush-hand",
+    "vintage-script",
+}
+
+
 def main():
     gfonts = sys.argv[1]
     only = set(sys.argv[2:])
@@ -76,6 +96,8 @@ def main():
             ofl = os.path.join(gfonts, "ofl", source, "OFL.txt")
         out = os.path.join(OUT, slug + ".embfont")
         cmd = [exe, "font", src, out, "--name", family] + (["--small-text"] if small else [])
+        if slug in TUNED:
+            cmd += ["--extend", "--route", "--tuned"]
         fixes = os.path.join(OUT, "corrections", slug + ".json")
         if os.path.isfile(fixes):
             cmd += ["--corrections", fixes]

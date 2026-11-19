@@ -135,8 +135,10 @@ fn check(font: &dyn emb_letter::LetterSource, name: &str) {
 
 #[test]
 fn mitred_embroidery_font_letters_stay_in_their_footprint() {
-    let f = emb_letter::bundled::embroidery("Block Sans").expect("bundled embroidery font");
-    check(&f, "Block Sans");
+    // A font that is not tuned: the corner option does not change the
+    // letters of a tuned font (ADR 0113).
+    let f = emb_letter::bundled::embroidery("Anton").expect("bundled embroidery font");
+    check(&f, "Anton");
 }
 
 #[test]

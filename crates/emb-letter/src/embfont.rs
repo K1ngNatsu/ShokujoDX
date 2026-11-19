@@ -80,6 +80,10 @@ pub struct EmbFont {
     /// A font for small text (letters 4 to 6 mm high, P11 Milestone 2).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub small_text: bool,
+    /// A tuned font (P17 Milestone 5, ADR 0113): its letters are routed
+    /// and each one was checked.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub tuned: bool,
     #[serde(skip)]
     kern: HashMap<(char, char), f64>,
 }
@@ -137,6 +141,7 @@ impl EmbFont {
             letters,
             kerning: BTreeMap::new(),
             small_text: false,
+            tuned: false,
             kern: HashMap::new(),
         }
     }
@@ -155,6 +160,84 @@ impl EmbFont {
         self.letters.remove(&c);
         self.kerning.retain(|k, _| !k.contains(c));
         self.index();
+    }
+
+    /// Makes the ends of the columns longer where the outline of the
+    /// source font has a part with no stitches ([`crate::tune::extend_ends`]).
+    /// `source` is the font that this font was converted from. Returns the
+    /// number of ends that changed.
+    pub fn extend_ends(&mut self, source: &Font) -> usize {
+        let s = self.cap_height_mm / source.cap_height;
+        let scale = |r: &Vec<emb_geom::Point>| -> Vec<emb_geom::Point> {
+            r.iter().map(|p| emb_geom::Point::new(p.x * s, p.y * s)).collect()
+        };
+        let cap = self.cap_height_mm;
+        let mut changed = 0;
+        for (c, letter) in &mut self.letters {
+            let Some(g) = source.glyph(*c) else { continue };
+            let outline: Vec<_> = source
+                .shapes(g)
+                .fills
+                .iter()
+                .map(|(outer, holes)| (scale(outer), holes.iter().map(scale).collect::<Vec<_>>()))
+                .collect();
+            let n = crate::tune::round_parts(&mut letter.parts, &outline, cap)
+                + crate::tune::extend_ends(&mut letter.parts, &outline, cap);
+            if n > 0 {
+                for p in &mut letter.parts {
+                    round_part(p);
+                }
+            }
+            changed += n;
+        }
+        changed
+    }
+
+    /// Routes each letter that is not fixed ([`crate::route::route`]):
+    /// the order and the directions of its parts with the fewest trims, and
+    /// travel runs under the parts that sew later. A letter that a person
+    /// put in order stays as it is. Returns the trims and the runs of the
+    /// routed letters.
+    pub fn route(&mut self) -> crate::route::Routed {
+        let cap = self.cap_height_mm;
+        let mut todo: Vec<&mut EmbLetter> = self
+            .letters
+            .values_mut()
+            .filter(|l| !l.fixed && !l.parts.is_empty())
+            .collect();
+        // The letters do not depend on each other: one thread for each
+        // group of them.
+        let threads = std::thread::available_parallelism().map_or(1, |n| n.get()).min(16);
+        let size = todo.len().div_ceil(threads).max(1);
+        let found: Vec<crate::route::Routed> = std::thread::scope(|scope| {
+            let jobs: Vec<_> = todo
+                .chunks_mut(size)
+                .map(|group| {
+                    scope.spawn(move || {
+                        let mut sum = crate::route::Routed::default();
+                        for letter in group.iter_mut() {
+                            let (mut routed, found) = crate::route::route_with_splits(letter, cap);
+                            for p in &mut routed.parts {
+                                round_part(p);
+                            }
+                            **letter = routed;
+                            sum.trims += found.trims;
+                            sum.runs += found.runs;
+                            sum.splits += found.splits;
+                        }
+                        sum
+                    })
+                })
+                .collect();
+            jobs.into_iter().filter_map(|j| j.join().ok()).collect()
+        });
+        found
+            .into_iter()
+            .fold(crate::route::Routed::default(), |a, b| crate::route::Routed {
+                trims: a.trims + b.trims,
+                runs: a.runs + b.runs,
+                splits: a.splits + b.splits,
+            })
     }
 
     fn index(&mut self) {
@@ -505,6 +588,7 @@ pub fn convert_with(
         letters,
         kerning,
         small_text,
+        tuned: false,
         kern: HashMap::new(),
     };
     f.index();

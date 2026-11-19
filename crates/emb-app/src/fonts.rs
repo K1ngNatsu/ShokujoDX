@@ -242,7 +242,12 @@ fn list(ui: &mut egui::Ui, st: &mut AppState) {
     egui::ScrollArea::vertical().id_salt("font_list").show(ui, |ui| {
         for f in entries {
             let on = st.fonts_window.selected.as_ref().is_some_and(|s| s.same(&f));
-            let r = ui.selectable_label(on, format!("{}  ·  {}", f.label(), kind_name(f.kind)));
+            let mut text = format!("{}  ·  {}", f.label(), kind_name(f.kind));
+            if st.fonts.is_tuned(&f) {
+                text.push_str("  ·  ");
+                text.push_str(tr("tuned"));
+            }
+            let r = ui.selectable_label(on, text);
             if r.clicked() {
                 st.fonts_window.selected = Some(f);
                 st.fonts_window.form = None;
@@ -276,6 +281,11 @@ fn details(ui: &mut egui::Ui, st: &mut AppState) {
     });
     if is_small_text(st, &sel) {
         ui.label(tr("For small text: letters from 4 mm high."));
+    }
+    if st.fonts.is_tuned(&sel) {
+        ui.label(tr(
+            "Tuned: the letters sew with few trims, and each letter was checked.",
+        ));
     }
     let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 90.0), egui::Sense::hover());
     ui.painter().rect_filled(rect, 4.0, ui.visuals().extreme_bg_color);
@@ -474,7 +484,8 @@ mod tests {
         // Below the size range of the font: a warning in the design checks.
         // No warning of the object (the density map can list the joins of
         // the satin letters; ADR 0044).
-        assert!(st.design_info().issues.iter().all(|i| i.object.is_none()));
+        let issues = st.design_info().issues.clone();
+        assert!(issues.iter().all(|i| i.object.is_none()), "{issues:#?}");
         small.height_mm = 4.0;
         assert!(relayout(&mut st, &mut small));
         st.doc.edit("Smaller", |d| {

@@ -92,12 +92,26 @@ Usage:
       --corrections <file>: apply the letter corrections of the file after
       the conversion (ADR 0112). A correction that does not apply is an
       error.
+      --extend: make the ends of the columns longer where the outline of
+      the font has no stitches after them (the corners of N and Z).
+      --route: after that, give each letter the order of its parts with
+      the fewest trims, with travel runs under the parts that sew later
+      (ADR 0113).
+      --tuned: mark the font as a tuned font (the font lists show it
+      first).
   emb-cli font-sheet <font.embfont> <out.embproj> [--sizes <mm>,<mm>,...]
                      [--chars basic|all|capitals|lowercase|digits|accented]
                      [--text <text>] [--row <mm>] [--corrections <file>]
       Write the test sheet of an embroidery font: its letters at its
       smallest, middle and largest size (or at --sizes), in rows not
-      wider than --row (180 mm), with the size at each group.";
+      wider than --row (180 mm), with the size at each group.
+  emb-cli font-audit <font.embfont> [--source <font.ttf>] [--chars ...]
+                     [--sizes <mm>,...] [--corrections <file>] [--proof <out.json>]
+      Print the measures of each letter of an embroidery font: how much of
+      the outline of the source font its parts cover, how much is outside
+      it or covered two times, the narrowest and widest column, and the
+      trims in the letter at each size. --proof writes the geometry of the
+      letters for proof pictures.";
 
 /// The files of `emb-cli library`.
 struct LibraryFiles<'a> {
@@ -215,6 +229,10 @@ fn run(args: &[String]) -> Result<(), String> {
     let (mut name, mut style, mut stitch) = (None, String::new(), emb_model::LetterStitch::Auto);
     let mut small_text = false;
     let mut corrections: Option<PathBuf> = None;
+    let mut route_letters = false;
+    let mut extend_ends = false;
+    let mut tuned_font = false;
+    let (mut audit_source, mut audit_proof): (Option<PathBuf>, Option<PathBuf>) = (None, None);
     let (mut sheet_sizes, mut sheet_chars, mut sheet_row) = (Vec::new(), emb_letter::sheet::Characters::Basic, 180.0);
     let mut bench = emb_cli::bench::FolderSettings::default();
     let mut bench_out: Option<PathBuf> = None;
@@ -263,6 +281,11 @@ fn run(args: &[String]) -> Result<(), String> {
             "--style" => style = it.next().ok_or("--style needs a style name")?.clone(),
             "--small-text" => small_text = true,
             "--corrections" => corrections = Some(PathBuf::from(it.next().ok_or("--corrections needs a file")?)),
+            "--route" => route_letters = true,
+            "--extend" => extend_ends = true,
+            "--tuned" => tuned_font = true,
+            "--source" => audit_source = Some(PathBuf::from(it.next().ok_or("--source needs a font file")?)),
+            "--proof" => audit_proof = Some(PathBuf::from(it.next().ok_or("--proof needs a file")?)),
             "--sizes" => {
                 sheet_sizes = it
                     .next()
@@ -560,18 +583,30 @@ fn run(args: &[String]) -> Result<(), String> {
                 emb_letter::bitmap::to_embfont(&faces[0], &name, stitch)
             } else {
                 let font = emb_letter::Font::from_bytes(bytes, 0).map_err(|e| format!("{input}: {e}"))?;
-                emb_letter::embfont::convert_with(
+                let mut f = emb_letter::embfont::convert_with(
                     &font,
                     &name,
                     &style,
                     stitch,
                     &emb_letter::embfont::default_chars(),
                     small_text,
-                )
+                );
+                if extend_ends {
+                    println!("extended: {} ends of columns", f.extend_ends(&font));
+                }
+                f
             };
             let mut f = f;
+            f.tuned = tuned_font;
             if let Some(file) = &corrections {
                 println!("{}", correct(&mut f, file)?);
+            }
+            if route_letters {
+                let found = f.route();
+                println!(
+                    "routed: {} trims in the letters, {} travel runs, {} columns cut at a junction",
+                    found.trims, found.runs, found.splits
+                );
             }
             f.save(Path::new(output))?;
             println!(
@@ -614,6 +649,43 @@ fn run(args: &[String]) -> Result<(), String> {
                 b.width(),
                 b.height()
             );
+            Ok(())
+        }
+        ["font-audit", input] => {
+            use emb_letter::LetterSource;
+            let mut f = emb_letter::EmbFont::load(Path::new(input))?;
+            if let Some(file) = &corrections {
+                println!("{}", correct(&mut f, file)?);
+            }
+            let source = match &audit_source {
+                Some(p) => {
+                    let bytes = std::fs::read(p).map_err(|e| format!("{}: {e}", p.display()))?;
+                    Some(emb_letter::Font::from_bytes(bytes, 0).map_err(|e| format!("{}: {e}", p.display()))?)
+                }
+                None => None,
+            };
+            if let Some(source) = source.as_ref().filter(|_| extend_ends) {
+                println!("extended: {} ends of columns", f.extend_ends(source));
+            }
+            if route_letters {
+                let found = f.route();
+                println!(
+                    "routed: {} trims in the letters, {} travel runs, {} columns cut at a junction",
+                    found.trims, found.runs, found.splits
+                );
+            }
+            let sizes = if sheet_sizes.is_empty() {
+                emb_letter::sheet::sizes(f.size_range(emb_model::LetterStitch::Auto)).to_vec()
+            } else {
+                sheet_sizes
+            };
+            let chars = emb_letter::sheet::characters(&sheet_chars);
+            let rows = emb_cli::fontaudit::audit(&f, source.as_ref(), &chars, &sizes);
+            print!("{}", emb_cli::fontaudit::table(&f, &rows, &sizes));
+            if let Some(p) = &audit_proof {
+                std::fs::write(p, emb_cli::fontaudit::proof(&f, source.as_ref(), &rows))
+                    .map_err(|e| format!("{}: {e}", p.display()))?;
+            }
             Ok(())
         }
         ["quote", input] => {

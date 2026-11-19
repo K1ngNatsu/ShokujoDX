@@ -41,6 +41,11 @@ size range, and show **All**, **Embroidery**, **TrueType** or **For small
 text** (embroidery fonts for letters from 4 mm high). **Use for the
 selected lettering** changes the font of the selection.
 
+Ten of the embroidery fonts are **tuned** fonts. Their letters sew with
+few trims: the needle goes from one stroke to the next one under the
+stitches. Each letter of them was checked. The font lists show the tuned
+fonts first, and the font list of **Lettering > Fonts** marks them.
+
 **Convert to embroidery font** makes an embroidery font from a TrueType
 font, with a name, a size range and a stitch type. Check that the license
 of the font lets you change it.
