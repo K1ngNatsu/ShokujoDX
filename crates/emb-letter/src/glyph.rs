@@ -246,9 +246,11 @@ mod tests {
 
     #[test]
     fn a_lost_stroke_gets_a_satin_and_the_letter_stays_satin() {
-        // The first pass loses the stem of these letters where it meets the
-        // bowl or the curve; Auto made them fill letters in satin fonts.
-        for (family, c) in [("Anton", 'p'), ("Anton", 'q'), ("Pacifico", 'p'), ("Pacifico", 'u')] {
+        // The first pass loses a stroke of these characters (the tail of
+        // the comma, a stem of the pilcrow); Auto made them fill letters in
+        // satin fonts. It finds the stems of "p", "q" and "u" now (the
+        // stroke finder goes on along the pen stroke at a junction).
+        for (family, c) in [("Lato", ','), ("Lato", '\u{b6}'), ("Pacifico", '\u{b6}')] {
             let (first, shapes) = passes(family, c);
             assert!(
                 first.coverage < AUTO_MIN_COVERAGE,
@@ -263,6 +265,23 @@ mod tests {
                 "{family} {c}: coverage {:.2}",
                 shapes.strokes.coverage
             );
+        }
+    }
+
+    #[test]
+    fn a_stem_goes_on_through_a_junction() {
+        // The first pass lost the stem of these letters where it meets the
+        // bowl or the curve. It finds it now: the direction of a stroke at
+        // a junction is from a longer part of the stroke, and a stroke goes
+        // on into a stroke of the same width first.
+        for (family, c) in [("Anton", 'p'), ("Anton", 'q'), ("Pacifico", 'p'), ("Pacifico", 'u')] {
+            let (first, shapes) = passes(family, c);
+            assert!(
+                first.coverage >= AUTO_MIN_COVERAGE,
+                "{family} {c}: coverage {:.2}",
+                first.coverage
+            );
+            assert_eq!(shapes.strokes.satins, first.satins, "{family} {c}");
         }
     }
 

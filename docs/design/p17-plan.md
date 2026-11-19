@@ -456,6 +456,39 @@ before).
 - The test sheets of Milestone 5 use the size range: Brush Hand, Pacifico
   and the other fonts of the table have other sizes now.
 
+### After Milestone 7: pen strokes, and routes for all fonts
+
+**Done in software (2026-11-18, ADR 0116).** The owner asked for letters
+that sew as a pen writes them (a trial in three steps).
+
+- **Strokes.** The stroke finder takes the direction of a stroke at a
+  junction from a longer part of the stroke, a stroke goes on into the
+  line of the same width, and a sharp corner of the outline cuts a stroke
+  that turns there by 50 degrees or more.
+- **Writing order.** Between routes with the same trims, the route takes
+  the one whose stems sew down and whose bars sew to the right.
+- **All 127 fonts are routed** (`--extend --route`), not only the ten
+  tuned fonts. The mean score goes from 78.8 to 82.3; 52 fonts have 85 or
+  more (40 before); the lowest score of a font of the program is 71. The
+  letters and digits of all fonts have 683 trims at 15 mm (9,889 before).
+- The Windows program is 70.2 MB (69.2 MB before): the routed letters
+  have travel runs and more columns.
+- **Stroke templates** (a table of the pen strokes of each letter) were
+  tried and gave no gain: they are not in the program.
+
+**Left open:**
+
+- No sew-out of the new letters.
+- The Mitre Corners setting does nothing for the routed fonts.
+- Twelve fonts of the packages have a score of 85 or more now, and Fat
+  Face Serif is at the limit: they keep their places until the owner
+  decides.
+- Heavy serif fonts (Slab Heavy 59, Fat Face Serif 65) still have letters
+  whose serifs and strokes are one shape with no clear columns.
+- What the proof pictures of the tuned fonts still show: the "m" of Brush
+  Hand has 6 trims; the "x" of Geo Slab covers 89 % of its outline; "M",
+  "W" and "N" of some fonts have one trim more than before.
+
 ## Milestone 8: content families (M)
 
 The libraries of motifs and patterns are large enough for daily work.

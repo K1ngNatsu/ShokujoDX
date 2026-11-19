@@ -305,6 +305,8 @@ pub mod bundled {
     /// letters are routed (few trims, travel under the strokes), and each
     /// letter was checked on proof pictures. The font lists show them
     /// first. `tools/make-embroidery-fonts.py` has the same list.
+    /// The other fonts are routed too (ADR 0116), but their letters were
+    /// not looked at one by one.
     pub const TUNED: [&str; 10] = [
         "Block Sans",
         "Friendly Serif",

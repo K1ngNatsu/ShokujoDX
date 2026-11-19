@@ -15,15 +15,22 @@
 # others are in the font packages, which the user gets from the page of the
 # release and adds with File > My Assets > Import a package.
 #
+# Routed letters (ADR 0113, ADR 0116): the converter makes the ends of the
+# columns of each font reach the corners of the outline (--extend) and
+# routes each letter: the order of its parts with the fewest trims, with
+# travel runs under the parts that sew later (--route).
+#
 # Letter corrections (ADR 0112): if data/fonts/embroidery/corrections/<name>.json
 # is there, the converter applies it after the conversion, so a corrected
 # letter stays corrected. A correction that does not apply stops the tool:
 # correct the file (the letter of the new conversion has other parts).
 #
-# Use:  python tools/make-embroidery-fonts.py <google-fonts-folder> [name ...]
+# Use:  python tools/make-embroidery-fonts.py <google-fonts-folder> [--jobs N] [name ...]
 #       (<google-fonts-folder>/ofl/<folder>/<file>.ttf; build emb-cli first:
-#       cargo build --release -p emb-cli)
+#       cargo build --release -p emb-cli; --jobs: the number of fonts that
+#       the tool makes at the same time, half of the processors if not given)
 
+import concurrent.futures
 import os
 import re
 import shutil
@@ -199,11 +206,10 @@ BELOW_LIMIT = "earlier"
 
 
 # The tuned fonts (P17 Milestone 5, ADR 0113; the same list as
-# emb_letter::bundled::TUNED). The converter makes the ends of their columns
-# reach the corners of the outline (--extend) and routes each letter: the
-# order of its parts with the fewest trims, with travel runs under the parts
-# that sew later (--route). After a change of the converter, look at the
-# proof pictures of these fonts again (emb-cli font-audit --proof).
+# emb_letter::bundled::TUNED): each letter of their basic set was looked at
+# on proof pictures, and the font lists show them first (--tuned). After a
+# change of the converter, look at the proof pictures of these fonts again
+# (emb-cli font-audit --proof).
 TUNED = {
     "block-sans",
     "friendly-serif",
@@ -259,44 +265,65 @@ def write_package(name, title, about):
     print("wrote %s: %d fonts, %.1f MB" % (path, len(rows), os.path.getsize(path) / 1e6))
 
 
+def make_font(exe, gfonts, row):
+    """Makes one font. Gives the text that the converter printed and an
+    error text (empty if the font is made)."""
+    slug, family, source, ttf, small, pack = row
+    if source == "repo":
+        src = os.path.join(ROOT, "data", "fonts", ttf)
+        ofl = os.path.join(ROOT, "data", "fonts", ttf.split("-")[0] + "-OFL.txt")
+    else:
+        src = os.path.join(gfonts, "ofl", source, ttf)
+        ofl = os.path.join(gfonts, "ofl", source, "OFL.txt")
+    folder = os.path.join(WORK, pack) if pack else OUT
+    os.makedirs(folder, exist_ok=True)
+    out = os.path.join(folder, slug + ".embfont")
+    cmd = [exe, "font", src, out, "--name", family] + (["--small-text"] if small else [])
+    cmd += ["--extend", "--route"]
+    if slug in TUNED:
+        cmd += ["--tuned"]
+    fixes = os.path.join(OUT, "corrections", slug + ".json")
+    if os.path.isfile(fixes):
+        cmd += ["--corrections", fixes]
+    done = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
+    if done.returncode != 0:
+        return "", done.stderr.strip() or done.stdout.strip()
+    text = done.stdout.strip()
+    score = re.search("^quality ([0-9]+):", done.stdout, flags=re.M)
+    if not score:
+        return text, "%s: the converter gave no quality score" % slug
+    if int(score.group(1)) < LIMIT and pack != BELOW_LIMIT:
+        os.remove(out)
+        return text, "%s: the score %s is below the limit %d" % (slug, score.group(1), LIMIT)
+    shutil.copyfile(ofl, os.path.join(folder, slug + "-OFL.txt"))
+    return text, ""
+
+
 def main():
-    gfonts = sys.argv[1]
-    only = set(sys.argv[2:])
+    args = sys.argv[1:]
+    jobs = max(1, (os.cpu_count() or 2) // 2)
+    if "--jobs" in args:
+        at = args.index("--jobs")
+        jobs = max(1, int(args[at + 1]))
+        del args[at : at + 2]
+    gfonts = args[0]
+    only = set(args[1:])
     exe = os.path.join(ROOT, "target", "release", "emb-cli.exe" if os.name == "nt" else "emb-cli")
-    packs = set()
-    for slug, family, source, ttf, small, pack in FONTS:
-        if only and slug not in only:
-            continue
-        if source == "repo":
-            src = os.path.join(ROOT, "data", "fonts", ttf)
-            ofl = os.path.join(ROOT, "data", "fonts", ttf.split("-")[0] + "-OFL.txt")
-        else:
-            src = os.path.join(gfonts, "ofl", source, ttf)
-            ofl = os.path.join(gfonts, "ofl", source, "OFL.txt")
-        folder = os.path.join(WORK, pack) if pack else OUT
-        os.makedirs(folder, exist_ok=True)
-        out = os.path.join(folder, slug + ".embfont")
-        cmd = [exe, "font", src, out, "--name", family] + (["--small-text"] if small else [])
-        if slug in TUNED:
-            cmd += ["--extend", "--route", "--tuned"]
-        fixes = os.path.join(OUT, "corrections", slug + ".json")
-        if os.path.isfile(fixes):
-            cmd += ["--corrections", fixes]
-        done = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
-        if done.returncode != 0:
-            sys.exit(done.stderr.strip() or done.stdout.strip())
-        print(done.stdout.strip())
-        score = re.search("^quality ([0-9]+):", done.stdout, flags=re.M)
-        if not score:
-            sys.exit("%s: the converter gave no quality score" % slug)
-        if int(score.group(1)) < LIMIT and pack != BELOW_LIMIT:
-            os.remove(out)
-            sys.exit("%s: the score %s is below the limit %d" % (slug, score.group(1), LIMIT))
-        shutil.copyfile(ofl, os.path.join(folder, slug + "-OFL.txt"))
-        if pack:
-            packs.add(pack)
+    rows = [f for f in FONTS if not only or f[0] in only]
+    # The converter routes a font in 30 to 90 seconds, most of it on one
+    # processor: some fonts at the same time.
+    with concurrent.futures.ThreadPoolExecutor(jobs) as pool:
+        results = list(pool.map(lambda row: make_font(exe, gfonts, row), rows))
+    errors = []
+    for text, error in results:
+        if text:
+            print(text)
+        if error:
+            errors.append(error)
+    if errors:
+        sys.exit(chr(10).join(errors))
     for name, title, about in PACKS:
-        if name in packs:
+        if any(f[5] == name for f in rows):
             write_package(name, title, about)
 
 

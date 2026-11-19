@@ -41,10 +41,11 @@ size range, and show **All**, **Embroidery**, **TrueType** or **For small
 text** (embroidery fonts for letters from 4 mm high). **Use for the
 selected lettering** changes the font of the selection.
 
-Ten of the embroidery fonts are **tuned** fonts. Their letters sew with
-few trims: the needle goes from one stroke to the next one under the
-stitches. Each letter of them was checked. The font lists show the tuned
-fonts first, and the font list of **Lettering > Fonts** marks them.
+The letters of the embroidery fonts of the program sew with few trims:
+the needle goes from one stroke to the next one under the stitches. Ten
+of the fonts are **tuned** fonts: each letter of them was checked. The
+font lists show the tuned fonts first, and the font list of **Lettering >
+Fonts** marks them.
 
 Each embroidery font has a **quality score** from 0 to 100. The score
 says how well the letters of the font sew. The font list shows it after
@@ -146,7 +147,9 @@ Select the lettering. Object Properties has:
   the next column starts over it. A sharp corner, as at the top of an "A",
   and a stroke that ends on another stroke, as in "T", do not change. The
   stitches stay in the shape of the letter: a corner that cannot turn in
-  it stays as a stop and a start.
+  it stays as a stop and a start. An embroidery font of the program or of
+  a font package gives the corners of its letters: this setting is for
+  TrueType fonts and for fonts that you convert.
 
 ## Bold, italic and underline
 

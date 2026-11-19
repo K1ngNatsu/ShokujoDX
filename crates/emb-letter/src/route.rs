@@ -56,6 +56,11 @@ const TAIL_END: f64 = 12.0;
 /// letter before is on the left and the next letter on the right, and
 /// travel in the letter is under its columns.
 const FLOW: f64 = 1.5;
+/// A stroke that sews 1 mm against the direction of writing is as good as
+/// a route with this much more travel, in mm. A pen makes a stroke down,
+/// or to the right (a stroke that is more level than upright). The trims
+/// come first: this is a choice between routes with the same trims.
+const PEN: f64 = 0.5;
 
 /// What [`route`] found.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -341,6 +346,18 @@ impl Router {
         }
     }
 
+    /// The cost of the direction of a mode (see [`PEN`]): how far the stroke
+    /// goes up (Y is down), or to the left if it is more level than
+    /// upright. A part with no ends has no direction.
+    fn pen(&self, m: Mode) -> f64 {
+        let Some((a, b)) = self.pieces[m.0].ends else {
+            return 0.0;
+        };
+        let v = if m.1 { a - b } else { b - a };
+        let against = if v.y.abs() >= v.x.abs() { -v.y } else { -v.x };
+        PEN * against.max(0.0)
+    }
+
     /// The cell is in a part of `unsewn`.
     fn covered(&self, idx: usize, unsewn: u32) -> bool {
         self.pieces
@@ -624,7 +641,7 @@ impl Router {
             let open = (0..modes.len()).filter(|j| sewn & (1 << modes[*j].0) == 0);
             let next = match at {
                 None => open.min_by(|a, b| {
-                    let d = |j: usize| self.start(modes[j], entry).distance(entry);
+                    let d = |j: usize| self.start(modes[j], entry).distance(entry) + self.pen(modes[j]);
                     d(*a).total_cmp(&d(*b))
                 }),
                 Some((point, edge)) => open
@@ -723,7 +740,7 @@ pub fn route(letter: &EmbLetter, cap_mm: f64) -> (EmbLetter, Routed) {
                 Some(p) => p.distance(start),
                 None => FLOW * (start.x - entry.x),
             };
-            best[1 << m.0][j] = Some((0, cost, usize::MAX, start));
+            best[1 << m.0][j] = Some((0, cost + r.pen(*m), usize::MAX, start));
         }
         for mask in 1..size {
             for i in 0..modes.len() {
@@ -746,7 +763,7 @@ pub fn route(letter: &EmbLetter, cap_mm: f64) -> (EmbLetter, Routed) {
                         modes.len() + mask
                     };
                     let link = r.link_of(from_key, from_edge, *m, unsewn);
-                    let cost = (t0 + u32::from(link.trim), d0 + link.length);
+                    let cost = (t0 + u32::from(link.trim), d0 + link.length + r.pen(*m));
                     let next = mask | (1 << m.0);
                     let better = best[next][j].is_none_or(|b| cost.0 < b.0 || (cost.0 == b.0 && cost.1 < b.1 - 1e-9));
                     if better {
@@ -1159,11 +1176,16 @@ mod tests {
             }
         );
         assert_eq!(after.parts.len(), 2);
-        // One part: no change but the fixed order.
-        let one = letter(vec![column((2.0, 0.0), (2.0, -25.0), 4.0)]);
+        // One part that sews down: no change but the fixed order.
+        let one = letter(vec![column((2.0, -25.0), (2.0, 0.0), 4.0)]);
         let (after, found) = route(&one, 25.0);
         assert_eq!(found, Routed::default());
         assert!(after.fixed && after.parts == one.parts);
+        // One part that sews up: it sews down, as a pen makes the stroke.
+        let up = letter(vec![column((2.0, 0.0), (2.0, -25.0), 4.0)]);
+        let (after, _) = route(&up, 25.0);
+        let (start, end) = part_ends(&after.parts[0]).unwrap();
+        assert!(start.y < end.y, "{start:?} {end:?}");
         // One part from the right to the left: it sews to the right, where
         // the next letter is.
         let back = letter(vec![column((18.0, -2.0), (2.0, -2.0), 4.0)]);

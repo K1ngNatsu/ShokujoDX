@@ -45,11 +45,12 @@ den Größenbereich sehen, und **Alle**, **Stickerei**, **TrueType** oder
 **Für kleine Schrift** zeigen (Stickschriften für Buchstaben ab 4 mm Höhe).
 **Für die ausgewählte Schrift verwenden** ändert die Schrift der Auswahl.
 
-Zehn der Stickschriften sind **abgestimmte** Schriften. Ihre Buchstaben
-sticken mit wenigen Fadenschnitten: Die Nadel geht unter den Stichen von
-einem Strich zum nächsten. Jeder ihrer Buchstaben wurde geprüft. Die
-Schriftlisten zeigen die abgestimmten Schriften zuerst, und die Schriftliste
-von **Schrift > Schriften** kennzeichnet sie.
+Die Buchstaben der Stickschriften des Programms sticken mit wenigen
+Fadenschnitten: Die Nadel geht unter den Stichen von einem Strich zum
+nächsten. Zehn der Schriften sind **abgestimmte** Schriften: Jeder ihrer
+Buchstaben wurde geprüft. Die Schriftlisten zeigen die abgestimmten
+Schriften zuerst, und die Schriftliste von **Schrift > Schriften**
+kennzeichnet sie.
 
 Jede Stickschrift hat eine **Qualitätswertung** von 0 bis 100. Die Wertung
 sagt, wie gut sich die Buchstaben der Schrift sticken lassen. Die
@@ -164,7 +165,9 @@ Wählen Sie die Schrift aus. Die Objekteigenschaften haben:
   spitze Ecke, wie oben an einem „A“, und ein Strich, der an einem anderen
   Strich endet, wie in „T“, ändern sich nicht. Die Stiche bleiben in der
   Form des Buchstabens: Eine Ecke, die darin nicht umbiegen kann, bleibt
-  ein Aufhören und Anfangen.
+  ein Aufhören und Anfangen. Eine Stickschrift des Programms oder eines
+  Schriftpakets gibt die Ecken ihrer Buchstaben vor: Diese Einstellung
+  ist für TrueType-Schriften und für Schriften, die Sie selbst umwandeln.
 
 ## Fett, kursiv und unterstrichen
 

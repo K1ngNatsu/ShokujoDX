@@ -35,12 +35,16 @@ letters of a font at some sizes, to sew and to look at. In **Lettering >
 Alphabets** you can correct a letter of an embroidery font: its sew order,
 its shape and its settings. See [Lettering](lettering).
 
-**Tuned fonts.** Ten embroidery fonts are tuned: Block Sans, Friendly
-Serif, Pacifico, Atkinson Hyperlegible, Varsity, Bebas Neue, Soft Round,
-Geo Slab, Brush Hand and Vintage Script. Their letters sew with few trims,
-and their corners and dots have stitches to the edge. The font lists show
-them first. Lettering that is in a design changes when you change its
-text or its font.
+**Letters with few trims.** The letters of all the embroidery fonts of
+the program are made again. The program finds the strokes of a letter as
+a pen writes them: a stroke goes on through a junction, and it stops at a
+sharp corner. The letters sew with few trims (the needle goes from one
+stroke to the next one under the stitches), and their corners and dots
+have stitches to the edge. Ten fonts are **tuned**, and each letter of
+them was checked: Block Sans, Friendly Serif, Pacifico, Atkinson
+Hyperlegible, Varsity, Bebas Neue, Soft Round, Geo Slab, Brush Hand and
+Vintage Script. The font lists show them first. Lettering that is in a
+design changes when you change its text or its font.
 
 **More writing systems.** With a TrueType or OpenType font, lettering
 now shapes its text: ligatures, the joined letters of script fonts, Arabic

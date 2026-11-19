@@ -936,12 +936,14 @@ mod tests {
     #[test]
     fn correct_a_letter_of_a_bundled_font() {
         let (mut st, dir) = state("fix");
-        // A font that is not tuned: its letters are as the converter made
-        // them.
+        // A font of the program: its letters are routed (ADR 0116), with
+        // no settings of their own. The first part of this letter is a
+        // column.
         let font = FontRef::embroidery("Anton", "");
         let before = st.embroidery_font(&font).unwrap().letters[&'H'].clone();
         let n = before.parts.len();
-        assert!(n >= 3 && !before.fixed && before.tuning.is_empty());
+        assert!(n >= 3 && before.fixed && before.tuning.is_empty());
+        assert!(matches!(before.parts[0], ObjectKind::Satin { .. }));
         // Place the letter: its objects are in the design, selected,
         // between four guides.
         st.alphabets_window.height_mm = 40.0;
@@ -1018,7 +1020,7 @@ mod tests {
         let ObjectKind::Lettering(l) = &st.doc.design().objects()[0].kind else {
             panic!()
         };
-        assert!(l.letters[0].fixed && !l.letters[1].fixed);
+        assert!(l.letters[0].fixed);
         let ObjectKind::Satin { params, .. } = &l.letters[0].parts[n - 1] else {
             panic!("a column")
         };

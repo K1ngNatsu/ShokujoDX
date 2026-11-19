@@ -35,12 +35,17 @@ letras de una fuente en varios tamaños, para bordarlo y verlo. En **Letras >
 Alfabetos** puede corregir una letra de una fuente de bordado: su orden de
 bordado, su forma y sus ajustes. Consulte [Letras](lettering).
 
-**Fuentes afinadas.** Diez fuentes de bordado están afinadas: Block Sans,
-Friendly Serif, Pacifico, Atkinson Hyperlegible, Varsity, Bebas Neue, Soft
-Round, Geo Slab, Brush Hand y Vintage Script. Sus letras se bordan con pocos
-cortes, y sus esquinas y puntos tienen puntadas hasta el borde. Las listas
-de fuentes las muestran primero. Las letras que ya están en un diseño
-cambian cuando cambia su texto o su fuente.
+**Letras con pocos cortes.** Las letras de todas las fuentes de bordado
+del programa se hicieron de nuevo. El programa encuentra los trazos de una
+letra como los escribe una pluma: un trazo sigue a través de una unión, y
+termina en una esquina aguda. Las letras se bordan con pocos cortes (la
+aguja pasa de un trazo al siguiente por debajo de las puntadas), y sus
+esquinas y puntos tienen puntadas hasta el borde. Diez fuentes están
+**afinadas**, y cada una de sus letras se revisó: Block Sans, Friendly
+Serif, Pacifico, Atkinson Hyperlegible, Varsity, Bebas Neue, Soft Round,
+Geo Slab, Brush Hand y Vintage Script. Las listas de fuentes las muestran
+primero. Las letras que ya están en un diseño cambian cuando cambia su
+texto o su fuente.
 
 **Más sistemas de escritura.** Con una fuente TrueType u OpenType, las
 letras ahora dan forma a su texto: ligaduras, las letras unidas de las

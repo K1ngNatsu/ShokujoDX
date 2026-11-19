@@ -377,9 +377,7 @@ fn details(ui: &mut egui::Ui, st: &mut AppState) {
         ui.label(tr("For small text: letters from 4 mm high."));
     }
     if st.fonts.is_tuned(&sel) {
-        ui.label(tr(
-            "Tuned: the letters sew with few trims, and each letter was checked.",
-        ));
+        ui.label(tr("Tuned: each letter of this font was checked."));
     }
     let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 90.0), egui::Sense::hover());
     ui.painter().rect_filled(rect, 4.0, ui.visuals().extreme_bg_color);
@@ -649,11 +647,15 @@ mod tests {
                 assert!(String::from_utf8_lossy(&license.1).contains("SIL OPEN FONT LICENSE"));
                 assert!(font.notes.contains("Converted from"), "{name}: {file}");
                 let q = font.quality.unwrap_or_else(|| panic!("{name}: {file} has no score"));
+                // A font keeps its place when a change of the converter
+                // changes its score (ADR 0116): a font of a package can
+                // have a score of BUNDLE or more, and a font of earlier
+                // versions can come to the limit.
                 if name == "earlier" {
-                    assert!(q.score < LIMIT, "{file}: {q:?}");
+                    assert!(q.score < BUNDLE, "{file}: {q:?}");
                     assert!(emb_letter::bundled::EARLIER.contains(&font.family.as_str()), "{file}");
                 } else {
-                    assert!(q.score >= LIMIT && q.score < BUNDLE, "{file}: {q:?}");
+                    assert!(q.score >= LIMIT, "{file}: {q:?}");
                 }
                 assert!(
                     emb_letter::bundled::embroidery(&font.family).is_none(),

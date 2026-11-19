@@ -39,11 +39,45 @@ const SPUR_REACH: f64 = 1.5;
 /// Junctions nearer than this many half-widths are one junction.
 const JOIN: f64 = 0.8;
 /// Two edges at a junction continue as one stroke when the angle between
-/// them is at least this (degrees).
+/// them is at least this (degrees), as a pen goes on through a crossing.
 const STRAIGHT_DEG: f64 = 140.0;
+/// The direction of an edge at a junction is the direction of its part
+/// from this many half-widths of the junction to [`TANGENT_TO`] half-widths
+/// (along the edge; a short edge: from a quarter of it to its end). At the
+/// junction, the middle line of an edge bends to the middle of the
+/// junction: the two halves of a serif on a stem leave it as a "V", not
+/// as one line. Far from the junction, a curved stroke has another
+/// direction (the hook of an "f").
+const TANGENT_FROM: f64 = 0.5;
+const TANGENT_TO: f64 = 2.0;
+/// Two edges with different widths continue as one stroke less well: the
+/// angle between them counts as this much less (degrees) for an edge with
+/// no width, in proportion (a pen does not change its width in a crossing).
+const WIDTH_DEG: f64 = 30.0;
 /// A stroke is cut where it turns more than this (degrees) over about
 /// three half-widths.
 const CORNER_DEG: f64 = 70.0;
+/// A stroke is also cut where it turns more than this (degrees) and the
+/// outline has a corner on the outer side of the turn. The middle line of
+/// a stroke with a square corner on its outside and a round one on its
+/// inside turns about 70 degrees there, a little more or a little less:
+/// with the first limit alone, a "D" was cut at its corners and a "B" of
+/// the same font was not.
+const CORNER_AT_OUTLINE_DEG: f64 = 50.0;
+/// The outline has a corner where it turns more than this (degrees) over
+/// [`OUTLINE_CORNER_SPAN`] of the capital height before and after a point.
+const OUTLINE_CORNER_DEG: f64 = 55.0;
+const OUTLINE_CORNER_SPAN: f64 = 0.03;
+/// A corner of the outline is at a turn of a stroke if it is at most this
+/// many half-widths from the middle line there, on the outer side of the
+/// turn, and its two sides go along the stroke before and after the turn
+/// (at most [`OUTLINE_CORNER_ALONG_DEG`] degrees off). The corners of the
+/// end of a stroke have one side across the stroke: they are not at a turn.
+const OUTLINE_CORNER_REACH: f64 = 2.1;
+const OUTLINE_CORNER_ALONG_DEG: f64 = 30.0;
+
+/// A corner of the outline: the point and the directions of its two sides.
+type Corner = (Point, Point, Point);
 /// Rail points are at most this many half-widths from the middle line.
 const MAX_REACH: f64 = 1.6;
 /// A stroke that ends where another stroke goes through goes into it this
@@ -344,40 +378,60 @@ impl Graph {
         false
     }
 
-    /// The direction in which a half-edge leaves its node.
-    fn direction(&self, h: Half) -> Option<Point> {
+    /// The direction in which a half-edge leaves its node, and the point
+    /// of the edge where the direction is taken (for its width): the
+    /// direction of the edge away from the junction, where the junction
+    /// does not bend its middle line.
+    fn direction(&self, h: Half) -> Option<(Point, Point)> {
         let pts = self.points_from(h);
         let node = &self.nodes[self.edges[h.0].ends[h.1]];
-        let want = (2.0 * node.r).min(0.5 * length(&pts)).max(1e-9);
-        let mut d = 0.0;
-        let mut at = *pts.last()?;
+        let len = length(&pts);
+        let from = (TANGENT_FROM * node.r).min(0.25 * len);
+        let to = (TANGENT_TO * node.r).min(len).max(from + 1e-9);
+        let (mut d, mut a, mut b) = (0.0, pts[0], *pts.last()?);
+        let mut found = false;
         for w in pts.windows(2) {
             d += w[0].distance(w[1]);
-            if d >= want {
-                at = w[1];
+            if !found && d >= from {
+                a = w[1];
+                found = true;
+            }
+            if d >= to {
+                b = w[1];
                 break;
             }
         }
-        (at - node.pos).normalized().or_else(|| (at - pts[0]).normalized())
+        let dir = (b - a)
+            .normalized()
+            .or_else(|| (b - node.pos).normalized())
+            .or_else(|| (b - pts[0]).normalized())?;
+        Some((dir, a.midpoint(b)))
     }
 
-    /// At each junction, links the pairs of half-edges that continue most straight.
-    fn links(&self) -> HashMap<Half, Half> {
+    /// At each junction, links the pairs of half-edges that continue most
+    /// straight, with widths that are about the same.
+    fn links(&self, radius_at: &dyn Fn(Point) -> f64) -> HashMap<Half, Half> {
         let mut link = HashMap::new();
-        let cos_min = emb_geom::math::cos(emb_geom::math::to_radians(STRAIGHT_DEG));
         for n in 0..self.nodes.len() {
             let hs = self.halves(n);
             if hs.len() < 3 {
                 continue;
             }
-            let dirs: Vec<Option<Point>> = hs.iter().map(|&h| self.direction(h)).collect();
+            let dirs: Vec<Option<(Point, f64)>> = hs
+                .iter()
+                .map(|&h| self.direction(h).map(|(d, at)| (d, radius_at(at))))
+                .collect();
             let mut pairs = Vec::new();
             for i in 0..hs.len() {
                 for j in i + 1..hs.len() {
-                    if let (Some(a), Some(b)) = (dirs[i], dirs[j]) {
-                        let c = a.dot(b);
-                        if c <= cos_min {
-                            pairs.push((c, i, j));
+                    if let (Some((a, ra)), Some((b, rb))) = (dirs[i], dirs[j]) {
+                        // The angle between the two edges (180: one line),
+                        // less for a change of the width.
+                        let angle = emb_geom::math::to_degrees(emb_geom::math::atan2(a.cross(b).abs(), a.dot(b)));
+                        let same = ra.min(rb) / ra.max(rb).max(1e-9);
+                        let angle = angle - WIDTH_DEG * (1.0 - same);
+                        if angle >= STRAIGHT_DEG {
+                            pairs.push((-angle, i, j));
                         }
                     }
                 }
@@ -398,8 +452,8 @@ impl Graph {
 
     /// The strokes: chains of linked edges, with a flag for each end that is
     /// a free line end (not a junction).
-    fn chains(&self) -> Vec<Raw> {
-        let link = self.links();
+    fn chains(&self, radius_at: &dyn Fn(Point) -> f64) -> Vec<Raw> {
+        let link = self.links(radius_at);
         let mut done = vec![false; self.edges.len()];
         let mut out = Vec::new();
         for (i, e) in self.edges.iter().enumerate() {
@@ -508,37 +562,62 @@ fn nearest(line: &[Point], p: Point) -> (Point, f64) {
 /// first half of the stroke that is in another stroke (an extended end can
 /// go across the other stroke and out again), so a short stroke keeps most
 /// of its length. Returns the number of points that went.
+///
+/// With `own` (the half-width of the stroke; 0: none), a point is in
+/// another stroke only if the stroke is in it with its whole width there:
+/// the two ends of the line across the stroke are both that near to the
+/// middle line of the other stroke. A stroke that leaves another stroke at
+/// a small angle (a diagonal of "M" at its stem) then keeps its start: a
+/// cut at its middle line would leave the outer part of its width with no
+/// stitches.
 fn trim_start_out_of(
     pts: &mut Vec<Point>,
     others: &[(&[Point], Option<f64>)],
     radius_at: &dyn Fn(Point) -> f64,
     step: f64,
+    own: f64,
 ) -> usize {
     if others.is_empty() || pts.len() < 2 {
         return 0;
     }
-    let inside = |p: Point| {
+    let inside = |p: Point, along: Point| {
+        let across = along.normalized().map(|u| Point::new(-u.y, u.x) * own);
         others.iter().any(|(l, r)| {
-            let (q, d) = nearest(l, p);
-            d < (1.0 - JOIN_OVERLAP) * r.unwrap_or_else(|| radius_at(q))
+            let near = |p: Point| {
+                let (q, d) = nearest(l, p);
+                d < (1.0 - JOIN_OVERLAP) * r.unwrap_or_else(|| radius_at(q))
+            };
+            match across.filter(|_| own > 0.0) {
+                Some(n) => near(p + n) && near(p - n),
+                None => near(p),
+            }
         })
     };
     let half = 0.5 * length(pts);
     let step = step.max(1e-9);
+    // The direction of the stroke at its start, over about its width.
+    let ahead = |k: usize| {
+        let mut j = k + 1;
+        while j + 1 < pts.len() && pts[j].distance(pts[k]) < own.max(step) {
+            j += 1;
+        }
+        pts[j] - pts[k]
+    };
     // Samples of the first half: the segment, the point and whether it is in.
-    let mut samples: Vec<(usize, Point, bool)> = vec![(0, pts[0], inside(pts[0]))];
+    let mut samples: Vec<(usize, Point, bool)> = vec![(0, pts[0], inside(pts[0], ahead(0)))];
     let mut walked = 0.0;
     'walk: for k in 0..pts.len() - 1 {
         let (a, b) = (pts[k], pts[k + 1]);
         let d = a.distance(b);
         let n = (d / step).ceil().max(1.0) as usize;
+        let along = ahead(k);
         for s in 1..=n {
             let t = s as f64 / n as f64;
             if walked + d * t > half {
                 break 'walk;
             }
             let p = a.lerp(b, t);
-            samples.push((k, p, inside(p)));
+            samples.push((k, p, inside(p, along)));
         }
         walked += d;
     }
@@ -648,9 +727,63 @@ struct Piece {
     hold: [f64; 2],
 }
 
-/// Cuts a stroke where it turns more than [`CORNER_DEG`].
+/// The corners of the outline: the points where it turns more than
+/// [`OUTLINE_CORNER_DEG`] over a short length (a curve of the font is many
+/// short lines with small turns, and has none).
+fn outline_corners(rings: &[Vec<Point>], cap_height: f64) -> Vec<Corner> {
+    let span = (OUTLINE_CORNER_SPAN * cap_height).max(1e-9);
+    let cos_max = emb_geom::math::cos(emb_geom::math::to_radians(OUTLINE_CORNER_DEG));
+    let mut out: Vec<(f64, Corner)> = Vec::new();
+    for ring in rings {
+        let n = ring.len();
+        if n < 3 {
+            continue;
+        }
+        // The point of the ring at the distance `span` from point `i`, in
+        // the direction `step` (1 or n - 1).
+        let away = |i: usize, step: usize| -> Point {
+            let (mut j, mut left) = (i, span);
+            for _ in 0..n {
+                let next = (j + step) % n;
+                let d = ring[j].distance(ring[next]);
+                if d >= left {
+                    return ring[j].lerp(ring[next], left / d.max(1e-12));
+                }
+                left -= d;
+                j = next;
+            }
+            ring[j]
+        };
+        for (i, &at) in ring.iter().enumerate() {
+            let (a, b) = (at - away(i, n - 1), away(i, 1) - at);
+            if let (Some(a), Some(b)) = (a.normalized(), b.normalized())
+                && a.dot(b) < cos_max
+            {
+                out.push((a.dot(b), (at, a, b)));
+            }
+        }
+    }
+    // The sharpest point of each corner.
+    out.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let mut corners: Vec<Corner> = Vec::new();
+    for (_, c) in out {
+        if corners.iter().all(|k| k.0.distance(c.0) > span) {
+            corners.push(c);
+        }
+    }
+    corners
+}
+
+/// Cuts a stroke where it turns more than [`CORNER_DEG`], or more than
+/// [`CORNER_AT_OUTLINE_DEG`] at one of the `corners` of the outline.
 /// Returns the point indices of each piece.
-fn cut_corners(p: &[Point], closed: bool, free: [bool; 2], reach: f64) -> Vec<(Vec<usize>, bool, [bool; 2])> {
+fn cut_corners(
+    p: &[Point],
+    closed: bool,
+    free: [bool; 2],
+    reach: f64,
+    corners: &[Corner],
+) -> Vec<(Vec<usize>, bool, [bool; 2])> {
     let n = p.len();
     if n < 5 {
         return vec![((0..n).collect(), closed, free)];
@@ -658,9 +791,28 @@ fn cut_corners(p: &[Point], closed: bool, free: [bool; 2], reach: f64) -> Vec<(V
     let spacing = length(p) / (n - 1) as f64;
     let k = ((reach / spacing.max(1e-9)).round() as usize).clamp(1, n / 4 + 1);
     let cos_max = emb_geom::math::cos(emb_geom::math::to_radians(CORNER_DEG));
+    let cos_at_corner = emb_geom::math::cos(emb_geom::math::to_radians(CORNER_AT_OUTLINE_DEG));
+    let cos_along = emb_geom::math::cos(emb_geom::math::to_radians(OUTLINE_CORNER_ALONG_DEG));
+    // `reach` is 1.5 half-widths of the stroke.
+    let near = OUTLINE_CORNER_REACH * reach / 1.5;
     let at = |i: isize| -> Point { p[i.rem_euclid(n as isize) as usize] };
     let mut turn = vec![1.0f64; n];
+    // The turn is at a corner of the outline on its outer side.
+    let mut cornered = vec![false; n];
+    // The point of the stroke nearest to each corner: a corner is at a
+    // turn only if the turn is the part of the stroke nearest to it. In a
+    // heavy "S", the corners of the two ends are near the turns of its
+    // middle, but they are nearer to the ends.
+    let nearest_to: Vec<usize> = corners
+        .iter()
+        .map(|c| {
+            (0..n)
+                .min_by(|&x, &y| p[x].distance(c.0).total_cmp(&p[y].distance(c.0)))
+                .unwrap_or(0)
+        })
+        .collect();
     for (i, t) in turn.iter_mut().enumerate() {
+        let here = p[i];
         let i = i as isize;
         if !closed && (i < k as isize || i + (k as isize) >= n as isize) {
             continue;
@@ -668,11 +820,27 @@ fn cut_corners(p: &[Point], closed: bool, free: [bool; 2], reach: f64) -> Vec<(V
         let (a, b) = (at(i) - at(i - k as isize), at(i + k as isize) - at(i));
         if let (Some(a), Some(b)) = (a.normalized(), b.normalized()) {
             *t = a.dot(b);
+            // `b - a` points to the inner side of the turn.
+            let inward = b - a;
+            // The outline can go the other way than the stroke.
+            let along = |x: Point, y: Point| x.dot(a).abs() >= cos_along && y.dot(b).abs() >= cos_along;
+            cornered[i as usize] = *t < cos_at_corner
+                && corners
+                    .iter()
+                    .zip(&nearest_to)
+                    .any(|(&(c, side_a, side_b), &at_stroke)| {
+                        let apart = at_stroke.abs_diff(i as usize);
+                        let apart = if closed { apart.min(n - apart) } else { apart };
+                        c.distance(here) <= near
+                            && apart <= k
+                            && (c - here).dot(inward) < 0.0
+                            && (along(side_a, side_b) || along(side_b, side_a))
+                    });
         }
     }
     // Local minima of the cosine below the limit, at least 2k apart.
     let mut cuts: Vec<usize> = Vec::new();
-    let mut order: Vec<usize> = (0..n).filter(|&i| turn[i] < cos_max).collect();
+    let mut order: Vec<usize> = (0..n).filter(|&i| turn[i] < cos_max || cornered[i]).collect();
     order.sort_by(|&a, &b| turn[a].total_cmp(&turn[b]));
     for i in order {
         let near = cuts.iter().any(|&c| {
@@ -793,7 +961,7 @@ pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
             break;
         }
     }
-    let raws = graph.chains();
+    let raws = graph.chains(&radius_at);
 
     // Parts of the shape with almost no middle line get a stroke along their long axis.
     let (label, count) = parts(&g);
@@ -832,6 +1000,16 @@ pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
     let mut out = Strokes::default();
     let mut cover = vec![false; g.inside.len()];
     let lines: Vec<Vec<Point>> = raws.iter().map(|r| r.pts.clone()).collect();
+    let corners = outline_corners(rings, cap_height);
+    // The middle half-width of each stroke. At a junction the half-width
+    // of the shape is the half-width of the widest stroke there; a thin
+    // stroke (a serif) that goes through keeps its own.
+    let middle = |r: &Raw| -> f64 {
+        let mut v: Vec<f64> = r.pts.iter().map(|&p| r.r_fix.unwrap_or_else(|| radius_at(p))).collect();
+        v.sort_by(f64::total_cmp);
+        v.get(v.len() / 2).copied().unwrap_or(cell).max(cell)
+    };
+    let middles: Vec<f64> = raws.iter().map(middle).collect();
     // The pieces of all strokes: the stroke, its fixed half-width, its
     // middle half-width and the piece.
     let mut all: Vec<(usize, Option<f64>, f64, Piece)> = Vec::new();
@@ -859,12 +1037,12 @@ pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
                         && l[0].distance(at) > r
                         && l[l.len() - 1].distance(at) > r
                 })
-                .map(|(_, l)| (l.as_slice(), None))
+                .map(|(j, l)| (l.as_slice(), Some(middles[j].min(r))))
                 .collect();
             if end == 1 {
                 raw.pts.reverse();
             }
-            trim_start_out_of(&mut raw.pts, &through, &radius_at, cell);
+            trim_start_out_of(&mut raw.pts, &through, &radius_at, cell, middles[i]);
             if end == 1 {
                 raw.pts.reverse();
             }
@@ -878,7 +1056,7 @@ pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
         // Find the corners on a smoothed line, then smooth each piece alone,
         // so that the pieces stay straight up to the corner.
         let smoothed = smooth(&raw.pts, raw.closed, win);
-        let mut pieces: Vec<Piece> = cut_corners(&smoothed, raw.closed, raw.free, 1.5 * r_med)
+        let mut pieces: Vec<Piece> = cut_corners(&smoothed, raw.closed, raw.free, 1.5 * r_med, &corners)
             .into_iter()
             .map(|(idx, closed, free)| {
                 let p: Vec<Point> = idx.iter().map(|&i| raw.pts[i]).collect();
@@ -913,7 +1091,7 @@ pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
                 if piece.closed || piece.ext[0] > 0 {
                     continue;
                 }
-                let gone = trim_start_out_of(&mut piece.pts, &[(&before, None)], &radius_at, cell);
+                let gone = trim_start_out_of(&mut piece.pts, &[(&before, None)], &radius_at, cell, 0.0);
                 piece.ext[1] = piece.ext[1].saturating_sub(gone).max(1);
             }
         }
@@ -937,16 +1115,33 @@ pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
             .map(|(_, _, r, p)| (p.pts.clone(), *r))
             .collect();
         let earlier: Vec<(&[Point], Option<f64>)> = earlier.iter().map(|(l, r)| (l.as_slice(), Some(*r))).collect();
+        let r_med = all[k].2;
+        // The cut is for the extended part of the end. A stroke that goes
+        // through a junction (the foot of an "L" with a serif on the other
+        // side of its stem) is in the other stroke at the junction, far
+        // from its end: it keeps its end. So a cut longer than the
+        // extended part and the half-width of the stroke is not made.
+        let cut = |pts: &mut Vec<Point>, extended: usize| -> usize {
+            let mut trial = pts.clone();
+            let gone = trim_start_out_of(&mut trial, &earlier, &radius_at, cell, 0.0);
+            let most = length(&pts[..=extended.min(pts.len() - 1)]) + r_med;
+            if gone > 0 && length(pts) - length(&trial) <= most {
+                *pts = trial;
+                gone
+            } else {
+                0
+            }
+        };
         let piece = &mut all[k].3;
         if piece.ext[0] > 0 {
-            let gone = trim_start_out_of(&mut piece.pts, &earlier, &radius_at, cell);
+            let gone = cut(&mut piece.pts, piece.ext[0]);
             piece.ext[0] = piece.ext[0].saturating_sub(gone);
             piece.ext[1] = piece.ext[1].saturating_sub(gone).max(piece.ext[0] + 1);
         }
         let n = piece.pts.len();
         if piece.ext[1] < n {
             piece.pts.reverse();
-            let gone = trim_start_out_of(&mut piece.pts, &earlier, &radius_at, cell);
+            let gone = cut(&mut piece.pts, n - piece.ext[1]);
             piece.pts.reverse();
             // The tail extension had `n - ext[1]` points; `gone` of them went.
             let tail = (n - piece.ext[1]).saturating_sub(gone);
@@ -1148,6 +1343,61 @@ mod tests {
             Point::new(x1, y1),
             Point::new(x0, y1),
         ]
+    }
+
+    /// A stroke of the width `w` along the line from `a` through `b` to
+    /// `c`. `round`: the outer side of the turn at `b` is an arc, not a
+    /// sharp corner.
+    fn bent(a: Point, b: Point, c: Point, w: f64, round: bool) -> Vec<Point> {
+        let side = |p: Point, q: Point| {
+            let d = (q - p).normalized().unwrap();
+            Point::new(-d.y, d.x) * (w / 2.0)
+        };
+        let (n1, n2) = (side(a, b), side(b, c));
+        // Where the two edges of one side meet.
+        let m = (n1 + n2) * 0.5;
+        let meet = |s: f64| b + m * (s * (w / 2.0) * (w / 2.0) / m.dot(m));
+        // The outer side of the turn is the left side if the line turns
+        // to the right.
+        let left_is_outer = (b - a).cross(c - b) < 0.0;
+        let corner = |s: f64, from: Point, to: Point| -> Vec<Point> {
+            if !round || (s > 0.0) != left_is_outer {
+                return vec![meet(s)];
+            }
+            (0..=8)
+                .map(|i| {
+                    let v = from.lerp(to, i as f64 / 8.0).normalized().unwrap();
+                    b + v * (w / 2.0)
+                })
+                .collect()
+        };
+        let mut out = vec![a + n1];
+        out.extend(corner(1.0, n1, n2));
+        out.extend([c + n2, c - n2]);
+        out.extend(corner(-1.0, n2 * -1.0, n1 * -1.0));
+        out.push(a - n1);
+        out
+    }
+
+    #[test]
+    fn a_turn_at_a_corner_of_the_outline_is_a_cut() {
+        let turn = |deg: f64, round: bool| {
+            let a = emb_geom::math::to_radians(deg);
+            let c = Point::new(400.0 + 400.0 * emb_geom::math::cos(a), -400.0 * emb_geom::math::sin(a));
+            let ring = bent(Point::new(0.0, 0.0), Point::new(400.0, 0.0), c, 90.0, round);
+            strokes(&[ring], 700.0)
+        };
+        // The middle line of a bent stroke turns less than its edges (it
+        // goes round the turn), so this turn is not a corner for
+        // CORNER_DEG. With a sharp corner of the outline on its outer
+        // side, the pen stopped there: two columns. With a round outer
+        // side, the pen went on: one column.
+        let sharp = turn(75.0, false);
+        assert_eq!(sharp.satins.len(), 2);
+        assert!(sharp.coverage > 0.9, "{}", sharp.coverage);
+        assert_eq!(turn(75.0, true).satins.len(), 1);
+        // A small turn is no cut, also at a sharp corner of the outline.
+        assert_eq!(turn(40.0, false).satins.len(), 1);
     }
 
     #[test]

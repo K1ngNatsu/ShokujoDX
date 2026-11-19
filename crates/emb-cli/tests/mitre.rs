@@ -135,10 +135,16 @@ fn check(font: &dyn emb_letter::LetterSource, name: &str) {
 
 #[test]
 fn mitred_embroidery_font_letters_stay_in_their_footprint() {
-    // A font that is not tuned: the corner option does not change the
-    // letters of a tuned font (ADR 0113).
-    let f = emb_letter::bundled::embroidery("Anton").expect("bundled embroidery font");
+    // A font as the converter makes it, with no route: the corner option
+    // does not change the letters of a routed font (ADR 0113), and the
+    // embroidery fonts of the program are routed (ADR 0116).
+    let source = emb_letter::bundled::font("Anton", "Regular").expect("bundled font");
+    let chars: Vec<char> = TEXT.chars().collect();
+    let f = emb_letter::embfont::convert(&source, "Anton", "", emb_model::LetterStitch::Auto, &chars);
     check(&f, "Anton");
+    // A routed font: no change.
+    let f = emb_letter::bundled::embroidery("Anton").expect("bundled embroidery font");
+    assert_eq!(part_count(&design(&f, true)), part_count(&design(&f, false)));
 }
 
 #[test]

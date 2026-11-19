@@ -44,11 +44,11 @@ o **Para texto pequeño** (fuentes de bordado para letras desde 4 mm de
 alto). **Usar para las letras seleccionadas** cambia la fuente de la
 selección.
 
-Diez de las fuentes de bordado son fuentes **afinadas**. Sus letras se
-bordan con pocos cortes: la aguja pasa de un trazo al siguiente por debajo
-de las puntadas. Cada una de sus letras se revisó. Las listas de fuentes
-muestran primero las fuentes afinadas, y la lista de **Letras > Fuentes**
-las marca.
+Las letras de las fuentes de bordado del programa se bordan con pocos
+cortes: la aguja pasa de un trazo al siguiente por debajo de las puntadas.
+Diez de las fuentes son fuentes **afinadas**: cada una de sus letras se
+revisó. Las listas de fuentes muestran primero las fuentes afinadas, y la
+lista de **Letras > Fuentes** las marca.
 
 Cada fuente de bordado tiene una **puntuación de calidad** de 0 a 100. La
 puntuación dice lo bien que se bordan las letras de la fuente. La lista de
@@ -154,7 +154,9 @@ Seleccione las letras. Propiedades del objeto tiene:
   ella. Una esquina aguda, como arriba de una «A», y un trazo que termina
   en otro trazo, como en «T», no cambian. Las puntadas quedan dentro de la
   forma de la letra: una esquina que no puede girar dentro de ella queda
-  como un final y un comienzo.
+  como un final y un comienzo. Una fuente de bordado del programa o de un
+  paquete de fuentes da las esquinas de sus letras: este ajuste es para
+  las fuentes TrueType y para las fuentes que usted convierte.
 
 ## Negrita, cursiva y subrayado
 

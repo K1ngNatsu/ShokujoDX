@@ -359,30 +359,33 @@ fn a_turned_hoop_puts_the_bar_on_the_long_side() {
 
 /// P4 Milestone 4 exit test: the name in a bridge envelope sews with fewer
 /// trims in closest-join order than in text order (the default). This is
-/// for a font that is not tuned: the stitch engine finds the order of the
-/// parts of its letters. The letters of a tuned font have their order
-/// (ADR 0113), and it has fewer trims than the closest-join order had.
+/// for a font with no route (a font as the converter of the program makes
+/// it): the stitch engine finds the order of the parts of its letters. The
+/// letters of a routed font have their order (ADR 0113), and it has fewer
+/// trims than the closest-join order had.
 #[test]
 fn closest_join_saves_trims() {
-    let trims = |order, family: Option<&str>| {
+    let trims = |order, font: Option<&emb_letter::EmbFont>| {
         let mut d = corpus::lettering_bridge(order);
-        if let Some(family) = family {
-            let font = emb_letter::bundled::embroidery(family).expect("bundled font");
+        if let Some(font) = font {
             let id = d.objects()[0].id;
             if let Some(emb_model::ObjectKind::Lettering(l)) = d.object_mut(id).map(|o| &mut o.kind) {
-                l.font = emb_letter::LetterSource::font_ref(&font);
-                emb_letter::relayout(l, &font);
+                l.font = emb_letter::LetterSource::font_ref(font);
+                emb_letter::relayout(l, font);
             }
         }
         stitches(&Input::Design(Box::new(d)), None).unwrap().0.trim_count()
     };
+    let source = emb_letter::bundled::font("Graduate", "Regular").expect("bundled font");
+    let chars: Vec<char> = "Joshua".chars().collect();
+    let plain = emb_letter::embfont::convert(&source, "Plain", "", emb_model::LetterStitch::Auto, &chars);
     let (text, closest) = (
-        trims(emb_model::LetterOrder::Text, Some("Slab Round")),
-        trims(emb_model::LetterOrder::Closest, Some("Slab Round")),
+        trims(emb_model::LetterOrder::Text, Some(&plain)),
+        trims(emb_model::LetterOrder::Closest, Some(&plain)),
     );
     assert!(closest * 3 < text * 2, "closest {closest}, text {text}");
-    // Varsity is a tuned font: 20 trims in text order and 12 in closest-join
-    // order before it was tuned.
+    // Varsity is a routed font: 20 trims in text order and 12 in closest-join
+    // order before it was routed.
     let (text, closest) = (
         trims(emb_model::LetterOrder::Text, None),
         trims(emb_model::LetterOrder::Closest, None),
