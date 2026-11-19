@@ -47,6 +47,8 @@ pub struct FontEntry {
     pub source: FontSource,
     /// A tuned embroidery font (ADR 0113): the lists show it first.
     pub tuned: bool,
+    /// A fill font (ADR 0117): all its letters sew as fills.
+    pub fill: bool,
     /// The quality score of an embroidery font, 0 to 100 (ADR 0115).
     /// `None`: not measured (a TrueType font, an alphabet made by hand).
     pub score: Option<u8>,
@@ -218,6 +220,7 @@ impl Default for FontLibrary {
                 tuned: emb_letter::bundled::TUNED
                     .iter()
                     .any(|t| t.eq_ignore_ascii_case(family)),
+                fill: i >= emb_letter::bundled::P17_EMBROIDERY,
                 score: emb_letter::bundled::quality(family).map(|q| q.score),
             })
             .collect();
@@ -231,6 +234,7 @@ impl Default for FontLibrary {
                         font: FontRef::new(&family, &style),
                         source: FontSource::Bundled(i),
                         tuned: false,
+                        fill: false,
                         score: None,
                     })
                 }),
@@ -295,6 +299,11 @@ impl FontLibrary {
         self.entries.iter().any(|e| e.tuned && e.font.same(font))
     }
 
+    /// `true` for a fill font (ADR 0117).
+    pub fn is_fill(&self, font: &FontRef) -> bool {
+        self.entries.iter().any(|e| e.fill && e.font.same(font))
+    }
+
     /// The quality score of an embroidery font (ADR 0115), if it has one.
     pub fn score(&self, font: &FontRef) -> Option<u8> {
         self.entries.iter().find(|e| e.font.same(font)).and_then(|e| e.score)
@@ -336,6 +345,7 @@ impl FontLibrary {
             font: r.clone(),
             source: FontSource::EmbFile(path.to_path_buf()),
             tuned: f.tuned,
+            fill: f.fill,
             score: f.quality.map(|q| q.score),
         });
         self.loaded.insert(r.clone(), AnyFont::Embroidery(Arc::new(f)));
@@ -499,6 +509,7 @@ pub fn scan(dirs: &[PathBuf]) -> Vec<FontEntry> {
                         font: FontRef::new(&family, &style),
                         source: FontSource::File(path.clone(), face),
                         tuned: false,
+                        fill: false,
                         score: None,
                     });
                 }

@@ -572,6 +572,12 @@ fn scenes() -> Vec<Scene> {
         st.fonts_window.by_quality = true;
         st.fonts_window.select(emb_model::FontRef::embroidery("Brush Hand", ""));
     }));
+    v.push(Scene::new("fonts window fill fonts", View::Windows, |st, _| {
+        st.fonts_window.open = true;
+        st.fonts_window.large_text = true;
+        st.fonts_window
+            .select(emb_model::FontRef::embroidery("Slab Heavy Fill", ""));
+    }));
     v.push(Scene::new("product window with a product", View::Windows, |st, ctx| {
         st.set_product(emb_model::ProductKind::ALL[0]);
         run_command(st, ctx, Cmd::ProductWindow);

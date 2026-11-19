@@ -31,7 +31,7 @@ Hay dos tipos de fuentes:
 - Las **fuentes de bordado** tienen letras de bordado ya hechas. Se bordan
   mejor. Cada una tiene un **rango de tamaños** (la altura de las
   mayúsculas): la lista de fuentes lo muestra, y Propiedades del objeto
-  avisa cuando el texto está fuera del rango. Con el programa vienen 55
+  avisa cuando el texto está fuera del rango. Con el programa vienen 65
   fuentes de bordado.
 - Fuentes **TrueType** y OpenType del ordenador. El programa crea las
   letras a partir de sus contornos: satén para los trazos estrechos,
@@ -39,16 +39,27 @@ Hay dos tipos de fuentes:
   **Relleno**.
 
 **Letras > Fuentes** abre la lista de fuentes: busque, vea una vista
-previa y el rango de tamaños, y muestre **Todo**, **Bordado**, **TrueType**
-o **Para texto pequeño** (fuentes de bordado para letras desde 4 mm de
-alto). **Usar para las letras seleccionadas** cambia la fuente de la
-selección.
+previa y el rango de tamaños, y muestre **Todo**, **Bordado**,
+**TrueType**, **Para texto pequeño** (fuentes de bordado para letras desde
+4 mm de alto) o **Para texto grande** (las fuentes de relleno). **Usar
+para las letras seleccionadas** cambia la fuente de la selección.
 
 Las letras de las fuentes de bordado del programa se bordan con pocos
 cortes: la aguja pasa de un trazo al siguiente por debajo de las puntadas.
 Diez de las fuentes son fuentes **afinadas**: cada una de sus letras se
 revisó. Las listas de fuentes muestran primero las fuentes afinadas, y la
 lista de **Letras > Fuentes** las marca.
+
+Diez de las fuentes de bordado son **fuentes de relleno**. Sus nombres
+terminan en «Fill», por ejemplo Slab Heavy Fill. Cada letra de una fuente
+de relleno se borda como un relleno, no como columnas de satén, de modo
+que toda la forma de una letra gruesa tiene puntadas. Use las fuentes de
+relleno para texto grande: su rango de tamaños empieza en 15 mm o más y
+llega a 300 mm. Los ajustes de **Relleno** de las letras determinan cómo
+se bordan. La puntuación de calidad de una fuente de relleno tiene su
+propia medida (qué parte de las letras es demasiado estrecha para un
+relleno en el tamaño más pequeño), por eso **Ordenar por > Calidad**
+muestra las fuentes de relleno después de las otras fuentes de bordado.
 
 Cada fuente de bordado tiene una **puntuación de calidad** de 0 a 100. La
 puntuación dice lo bien que se bordan las letras de la fuente. La lista de

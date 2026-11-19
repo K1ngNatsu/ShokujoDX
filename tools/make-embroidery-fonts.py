@@ -18,7 +18,8 @@
 # Routed letters (ADR 0113, ADR 0116): the converter makes the ends of the
 # columns of each font reach the corners of the outline (--extend) and
 # routes each letter: the order of its parts with the fewest trims, with
-# travel runs under the parts that sew later (--route).
+# travel runs under the parts that sew later (--route). The fill fonts
+# (ADR 0117) are not routed.
 #
 # Letter corrections (ADR 0112): if data/fonts/embroidery/corrections/<name>.json
 # is there, the converter applies it after the conversion, so a corrected
@@ -108,6 +109,18 @@ FONTS = [
     ("barlow-condensed", "Barlow Condensed", "barlowcondensed", "BarlowCondensed-Bold.ttf", False, None),
     ("angle-sans", "Angle Sans", "quantico", "Quantico-Bold.ttf", False, None),
     ("balsamiq-sans", "Balsamiq Sans", "balsamiqsans", "BalsamiqSans-Bold.ttf", False, None),
+    # The fill fonts (ADR 0117, see FILL): the same source fonts as the
+    # fonts with their names, with all letters as fills.
+    ("block-sans-fill", "Block Sans Fill", "repo", "Lato-Bold.ttf", False, None),
+    ("varsity-fill", "Varsity Fill", "repo", "Graduate-Regular.ttf", False, None),
+    ("anton-fill", "Anton Fill", "repo", "Anton-Regular.ttf", False, None),
+    ("archivo-black-fill", "Archivo Black Fill", "archivoblack", "ArchivoBlack-Regular.ttf", False, None),
+    ("slab-heavy-fill", "Slab Heavy Fill", "alfaslabone", "AlfaSlabOne-Regular.ttf", False, None),
+    ("poster-heavy-fill", "Poster Heavy Fill", "bowlbyone", "BowlbyOne-Regular.ttf", False, None),
+    ("giant-round-fill", "Giant Round Fill", "titanone", "TitanOne-Regular.ttf", False, None),
+    ("funky-slab-fill", "Funky Slab Fill", "rammettoone", "RammettoOne-Regular.ttf", False, None),
+    ("rubik-mono-one-fill", "Rubik Mono One Fill", "rubikmonoone", "RubikMonoOne-Regular.ttf", False, None),
+    ("shrikhand-fill", "Shrikhand Fill", "shrikhand", "Shrikhand-Regular.ttf", False, None),
     # P17 Milestone 7: the font packages (a score from the limit to 84).
     ("barlow-semi-condensed", "Barlow Semi Condensed", "barlowsemicondensed", "BarlowSemiCondensed-Bold.ttf", False, "sans"),
     ("humanist-sans", "Humanist Sans", "ptsans", "PT_Sans-Web-Bold.ttf", False, "sans"),
@@ -224,6 +237,23 @@ TUNED = {
 }
 
 
+# The fill fonts (ADR 0117): the converter makes all their letters as
+# fills (--stitch fill), for large text and for heavy fonts whose letters
+# have no clear columns. They have no route: a letter is one fill, or a few.
+FILL = {
+    "block-sans-fill",
+    "varsity-fill",
+    "anton-fill",
+    "archivo-black-fill",
+    "slab-heavy-fill",
+    "poster-heavy-fill",
+    "giant-round-fill",
+    "funky-slab-fill",
+    "rubik-mono-one-fill",
+    "shrikhand-fill",
+}
+
+
 def write_package(name, title, about):
     """Writes the zip file of a package from the fonts in WORK. The same
     fonts give the same bytes (no dates, the files in the order of their
@@ -279,7 +309,10 @@ def make_font(exe, gfonts, row):
     os.makedirs(folder, exist_ok=True)
     out = os.path.join(folder, slug + ".embfont")
     cmd = [exe, "font", src, out, "--name", family] + (["--small-text"] if small else [])
-    cmd += ["--extend", "--route"]
+    if slug in FILL:
+        cmd += ["--stitch", "fill"]
+    else:
+        cmd += ["--extend", "--route"]
     if slug in TUNED:
         cmd += ["--tuned"]
     fixes = os.path.join(OUT, "corrections", slug + ".json")

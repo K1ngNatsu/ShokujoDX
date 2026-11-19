@@ -489,6 +489,31 @@ that sew as a pen writes them (a trial in three steps).
   Hand has 6 trims; the "x" of Geo Slab covers 89 % of its outline; "M",
   "W" and "N" of some fonts have one trim more than before.
 
+### After Milestone 7: fill fonts
+
+**Done in software (2026-11-19, ADR 0117).** The owner asked for a section
+of fonts whose letters are fills, for the heavy fonts that the stroke
+finder cannot make as columns.
+
+- **A fill font** (`EmbFont::fill`): all its letters are fills. The
+  converter makes it with the stitch type Fill.
+- **Its size range and its score** come from the local width of its
+  letters and the width of their holes: the range starts where 5 % of
+  the area is narrower than 2 mm or 10 % of the holes are narrower than
+  1 mm, and not below 15 mm; it ends at 300 mm.
+- **Ten fill fonts are in the program** (65 embroidery fonts now): Block
+  Sans Fill, Varsity Fill, Anton Fill, Archivo Black Fill, Slab Heavy
+  Fill, Poster Heavy Fill, Giant Round Fill, Funky Slab Fill, Rubik Mono
+  One Fill and Shrikhand Fill, with scores of 99 and 100.
+- **The Fonts window** marks them and has the filter For large text.
+
+**Left open:**
+
+- No sew-out of a fill font.
+- A fill letter has no satin border.
+- The twelve fonts of the packages with a score of 85 or more are still
+  in the packages.
+
 ## Milestone 8: content families (M)
 
 The libraries of motifs and patterns are large enough for daily work.

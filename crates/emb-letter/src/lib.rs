@@ -91,9 +91,10 @@ pub mod bundled {
     /// example Bold Script: Lobster). The first nine came in P4 and P10,
     /// the next ones in P11 Milestone 2 (the first four of them for small
     /// text), and the fonts from [`P11_EMBROIDERY`] in P17 Milestone 7
-    /// (ADR 0115). Each one has a quality score of
+    /// (ADR 0115). The fonts from [`P17_EMBROIDERY`] are the fill fonts
+    /// (ADR 0117). Each one has a quality score of
     /// [`crate::quality::LIMIT`] or more ([`quality`]).
-    pub const EMBROIDERY: [(&str, &[u8]); 55] = [
+    pub const EMBROIDERY: [(&str, &[u8]); 65] = [
         (
             "Block Sans",
             include_bytes!(concat!(env!("OUT_DIR"), "/block-sans.embfont.z")),
@@ -299,6 +300,47 @@ pub mod bundled {
             "Balsamiq Sans",
             include_bytes!(concat!(env!("OUT_DIR"), "/balsamiq-sans.embfont.z")),
         ),
+        // The fill fonts (ADR 0117).
+        (
+            "Block Sans Fill",
+            include_bytes!(concat!(env!("OUT_DIR"), "/block-sans-fill.embfont.z")),
+        ),
+        (
+            "Varsity Fill",
+            include_bytes!(concat!(env!("OUT_DIR"), "/varsity-fill.embfont.z")),
+        ),
+        (
+            "Anton Fill",
+            include_bytes!(concat!(env!("OUT_DIR"), "/anton-fill.embfont.z")),
+        ),
+        (
+            "Archivo Black Fill",
+            include_bytes!(concat!(env!("OUT_DIR"), "/archivo-black-fill.embfont.z")),
+        ),
+        (
+            "Slab Heavy Fill",
+            include_bytes!(concat!(env!("OUT_DIR"), "/slab-heavy-fill.embfont.z")),
+        ),
+        (
+            "Poster Heavy Fill",
+            include_bytes!(concat!(env!("OUT_DIR"), "/poster-heavy-fill.embfont.z")),
+        ),
+        (
+            "Giant Round Fill",
+            include_bytes!(concat!(env!("OUT_DIR"), "/giant-round-fill.embfont.z")),
+        ),
+        (
+            "Funky Slab Fill",
+            include_bytes!(concat!(env!("OUT_DIR"), "/funky-slab-fill.embfont.z")),
+        ),
+        (
+            "Rubik Mono One Fill",
+            include_bytes!(concat!(env!("OUT_DIR"), "/rubik-mono-one-fill.embfont.z")),
+        ),
+        (
+            "Shrikhand Fill",
+            include_bytes!(concat!(env!("OUT_DIR"), "/shrikhand-fill.embfont.z")),
+        ),
     ];
 
     /// The tuned fonts of [`EMBROIDERY`] (P17 Milestone 5, ADR 0113): their
@@ -352,6 +394,12 @@ pub mod bundled {
     /// one). Four fonts of earlier versions are not in the program now:
     /// their quality score is below the limit (ADR 0115); [`EARLIER`].
     pub const P11_EMBROIDERY: usize = 26;
+    /// The number of bundled embroidery fonts before the fill fonts (ADR
+    /// 0117; [`crate::EmbFont::fill`]). The fonts from this one are the
+    /// fill fonts: the same source fonts as the fonts with their names
+    /// (Block Sans Fill: Block Sans), with all letters as fills, for large
+    /// text. The corpus design `embroidery-fonts-8` shows them.
+    pub const P17_EMBROIDERY: usize = 55;
 
     /// The embroidery fonts of earlier versions that are not in the program
     /// now, because their quality score is below
@@ -362,6 +410,14 @@ pub mod bundled {
     /// The quality scores of the fonts of [`EMBROIDERY`], from their files
     /// (`build.rs` makes the table).
     const QUALITY: &[(&str, crate::quality::Quality)] = include!(concat!(env!("OUT_DIR"), "/embroidery_quality.rs"));
+
+    /// `true` for a bundled fill font (ADR 0117), with no read of the font.
+    pub fn is_fill(family: &str) -> bool {
+        EMBROIDERY
+            .iter()
+            .position(|(f, _)| f.eq_ignore_ascii_case(family))
+            .is_some_and(|i| i >= P17_EMBROIDERY)
+    }
 
     /// The quality of a bundled embroidery font, with no read of the font.
     pub fn quality(family: &str) -> Option<crate::quality::Quality> {
@@ -456,6 +512,41 @@ mod tests {
         }
     }
 
+    #[test]
+    fn the_fill_fonts_are_the_last_fonts_of_the_list() {
+        for (i, (family, _)) in bundled::EMBROIDERY.iter().enumerate() {
+            let font = bundled::embroidery(family).unwrap();
+            assert_eq!(font.fill, i >= bundled::P17_EMBROIDERY, "{family}");
+            assert_eq!(font.fill, bundled::is_fill(family), "{family}");
+            if !font.fill {
+                continue;
+            }
+            // A fill font: fills only, no route, a range for large text.
+            assert!(family.ends_with(" Fill"), "{family}");
+            assert!(!font.tuned && !font.small_text, "{family}");
+            for (c, letter) in &font.letters {
+                assert!(!letter.fixed, "{family} {c:?}");
+                assert!(
+                    letter
+                        .parts
+                        .iter()
+                        .all(|p| matches!(p, emb_model::ObjectKind::Fill { .. })),
+                    "{family} {c:?}"
+                );
+            }
+            assert!(font.min_height_mm >= quality::FILL_MIN_HEIGHT_MM, "{family}");
+            assert_eq!(font.max_height_mm, source::MAX_HEIGHT_MM, "{family}");
+            // The font with the same name and columns is in the program or
+            // in a package.
+            let plain = family.trim_end_matches(" Fill");
+            assert!(
+                bundled::embroidery(plain).is_some() || bundled::EARLIER.contains(&plain) || plain.contains(' '),
+                "{family}"
+            );
+        }
+        assert_eq!(bundled::EMBROIDERY.len() - bundled::P17_EMBROIDERY, 10);
+    }
+
     /// The exit test of P17 Milestone 7: each bundled font has a quality
     /// score of the limit or more. The table of the scores is the scores
     /// in the font files.
@@ -477,7 +568,7 @@ mod tests {
             assert!(q.score >= quality::BUNDLE, "{family}: {q:?}");
         }
         assert_eq!(bundled::quality("no such font"), None);
-        assert_eq!(bundled::EMBROIDERY.len(), 55);
+        assert_eq!(bundled::EMBROIDERY.len(), 65);
     }
 
     /// The score in a font file is the score of the font as it is. The

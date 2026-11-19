@@ -55,7 +55,7 @@ Schreibschriften, Arabisch (von rechts nach links) und Devanagari. Die
 Schriften Tajawal (Arabisch) und Poppins (Devanagari) kommen mit dem
 Programm. Siehe [Schrift](lettering).
 
-**Mehr Schriften, mit einer Qualitätswertung.** Das Programm hat 55
+**Mehr Schriften, mit einer Qualitätswertung.** Das Programm hat 65
 Stickschriften (vorher 30), und die Schriftpakete auf der Seite des
 Programms haben 68 weitere. Jede Stickschrift hat eine Qualitätswertung von
 0 bis 100: **Schrift > Schriften** zeigt sie und kann nach ihr sortieren.
@@ -64,6 +64,14 @@ Striche bei der kleinsten Größe nicht zu schmal sind. Vier Schriften mit
 einer niedrigen Wertung (Slab Heavy, Fat Face Serif, Shrikhand und Great
 Vibes) sind jetzt im Schriftpaket **Fonts of earlier versions**. Ein Design,
 das eine von ihnen hat, bleibt, wie es ist.
+
+**Füllschriften.** Zehn der Stickschriften haben Buchstaben, die als
+Füllungen gestickt werden: Block Sans Fill, Varsity Fill, Anton Fill,
+Archivo Black Fill, Slab Heavy Fill, Poster Heavy Fill, Giant Round Fill,
+Funky Slab Fill, Rubik Mono One Fill und Shrikhand Fill. Sie sind für große
+Schrift, von 15 mm bis 300 mm, und für fette Buchstaben, deren Formen keine
+klaren Säulen haben. In **Schrift > Schriften** zeigt **Für große Schrift**
+sie. Siehe [Schrift](lettering).
 
 **Neue Versionen.** Das Programm kann Ihnen sagen, wenn eine neue Version
 verfügbar ist. Siehe [Optionen](options).

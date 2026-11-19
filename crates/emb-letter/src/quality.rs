@@ -14,6 +14,12 @@
 //!   narrow to sew well at the smallest size of the font.
 //! - **Long:** the part of the length of the satin columns whose stitches
 //!   are too long at the largest size of the font.
+//!
+//! A fill font ([`crate::EmbFont::fill`], ADR 0117) has no columns. Its
+//! narrow measure is the part of the area of a letter that is too narrow
+//! for a fill at the smallest size, and each hole that
+//! is too narrow to stay open counts as [`HOLE_CLOSED`]. It has no long
+//! stitches: the rows of a fill have stitches of a set length.
 
 use emb_geom::{BBox, Path, Point};
 use emb_model::{ObjectKind, SatinGeometry};
@@ -21,9 +27,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::embfont::{EmbFont, EmbLetter};
 use crate::font::Font;
-use crate::grid::Grid;
+use crate::grid::{self, Grid};
 use crate::sheet::{Characters, characters};
-use crate::source::{MIN_SATIN_MM, SMALL_TEXT_MIN_SATIN_MM};
+use crate::source::{MIN_FILL_MM, MIN_SATIN_MM, SMALL_TEXT_MIN_SATIN_MM};
 use crate::tune::{self, Outline};
 
 /// The cell of the coverage grid, in mm at the design size of the font.
@@ -37,6 +43,25 @@ const STEP_MM: f64 = 0.25;
 /// (the bar of an "e") are about three quarters of its stems, so they are
 /// not too narrow.
 pub const NARROW: f64 = 2.0 / 3.0;
+/// The cell of the grid that measures the widths of fill letters, in mm at
+/// the design size of the font.
+const FILL_CELL_MM: f64 = 0.25;
+/// The narrowest hole of a fill letter that stays open, in mm. The pull of
+/// the stitches and the width of the thread close a narrower hole.
+pub const MIN_HOLE_MM: f64 = 1.0;
+/// A hole of a fill letter that is too narrow at the smallest size counts
+/// as this part of the letter too narrow: the letter is harder to read.
+pub const HOLE_CLOSED: f64 = 0.15;
+/// The size range of a fill font leaves at most this part of the area of
+/// its letters narrower than [`MIN_FILL_MM`] at its smallest size. It is
+/// smaller than [`RANGE_TAIL`]: the hairlines of a serif font are a small
+/// part of its area (5 to 10 %), and the tips of the sharp corners, which
+/// are narrow at each size, are less than 1 % of the area of a heavy font.
+pub const FILL_TAIL: f64 = 0.05;
+/// No size range of a fill font starts below this capital height, in mm.
+/// A smaller letter has few rows of stitches and a rough edge; satin
+/// letters look better there.
+pub const FILL_MIN_HEIGHT_MM: f64 = 15.0;
 /// A satin stitch longer than this is too long, in mm: the longest stitch
 /// of the common machine formats is 12.1 mm, and a longer stitch is loose.
 pub const LONG_MM: f64 = 12.0;
@@ -101,7 +126,8 @@ pub struct LetterQuality {
     pub coverage: f64,
     pub narrow: f64,
     pub long: f64,
-    /// The letter has no satin column.
+    /// The letter has no satin column, in a font of satin letters. The
+    /// letters of a fill font do not have this mark.
     pub fill: bool,
 }
 
@@ -214,6 +240,120 @@ pub fn column_widths(g: &SatinGeometry, step: f64) -> Vec<(f64, f64)> {
     out
 }
 
+/// The local width of each inside cell of `g`, in cells: the diameter of
+/// the largest circle in the area that has the cell in it (0 outside).
+fn local_width(g: &Grid) -> Vec<f64> {
+    let d = grid::distance(g);
+    let mut radius = vec![0.0f64; d.len()];
+    for (idx, &here) in d.iter().enumerate() {
+        if here <= 0.0 {
+            continue;
+        }
+        let (i, j) = (idx % g.w, idx / g.w);
+        // The circle of a cell is in the circle of a neighbor that is
+        // one step farther from the edge: such a cell draws no circle.
+        let slope = g.neighbors(idx).any(|n| {
+            let step = if n % g.w != i && n / g.w != j {
+                std::f64::consts::SQRT_2
+            } else {
+                1.0
+            };
+            d[n] >= here + step - 1e-6
+        });
+        if slope {
+            continue;
+        }
+        let reach = here.ceil() as isize;
+        for dj in -reach..=reach {
+            let b = j as isize + dj;
+            if b < 0 || b as usize >= g.h {
+                continue;
+            }
+            for di in -reach..=reach {
+                let a = i as isize + di;
+                if a < 0 || a as usize >= g.w || ((di * di + dj * dj) as f64) >= here * here {
+                    continue;
+                }
+                let k = b as usize * g.w + a as usize;
+                if radius[k] < here {
+                    radius[k] = here;
+                }
+            }
+        }
+    }
+    radius
+        .iter()
+        .zip(&d)
+        .map(|(r, d)| {
+            if *d > 0.0 {
+                // The distance is from the center of a cell to the center
+                // of the nearest outside cell.
+                (2.0 * r.max(*d) - 1.0).max(1.0)
+            } else {
+                0.0
+            }
+        })
+        .collect()
+}
+
+/// The widths of the fill parts of a letter, in the units of the parts
+/// (mm at the design size of the font).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct FillWidths {
+    /// The strokes: (local width, area with this width). The local width
+    /// of a place is the diameter of the largest circle in the letter that
+    /// has the place in it.
+    pub strokes: Vec<(f64, f64)>,
+    /// The width of each hole: the diameter of the largest circle in it.
+    pub holes: Vec<f64>,
+}
+
+/// The widths of the strokes and of the holes of the fill parts of
+/// `parts`.
+pub fn fill_widths(parts: &[ObjectKind]) -> FillWidths {
+    let fills: Vec<&ObjectKind> = parts.iter().filter(|p| matches!(p, ObjectKind::Fill { .. })).collect();
+    let Some(bounds) = fills.iter().filter_map(|p| p.control_bbox()).reduce(BBox::union) else {
+        return FillWidths::default();
+    };
+    let mut g = Grid::new(bounds, FILL_CELL_MM, 2);
+    for part in &fills {
+        let mask = tune::part_mask(&g, part);
+        for (cell, m) in g.inside.iter_mut().zip(mask) {
+            *cell |= m;
+        }
+    }
+    let area = g.inside.clone();
+    let strokes = local_width(&g)
+        .into_iter()
+        .filter(|w| *w > 0.0)
+        .map(|w| (w * FILL_CELL_MM, FILL_CELL_MM * FILL_CELL_MM))
+        .collect();
+    let mut holes = Vec::new();
+    for part in &fills {
+        let ObjectKind::Fill { holes: rings, .. } = part else {
+            continue;
+        };
+        for ring in rings {
+            let pts: Vec<Vec<Point>> = ring.flatten(0.05).into_iter().map(|pl| pl.points).collect();
+            let mut mask = vec![false; g.w * g.h];
+            grid::fill_into(&g, &pts, &mut mask);
+            // A part in the hole (an island) is not hole.
+            for (m, a) in mask.iter_mut().zip(&area) {
+                *m &= !*a;
+            }
+            g.inside = mask;
+            let far = grid::distance(&g).into_iter().fold(0.0, f64::max);
+            // A hole with no cell center in it is narrower than a cell.
+            holes.push(if far > 0.0 {
+                (2.0 * far - 1.0).max(1.0) * FILL_CELL_MM
+            } else {
+                0.5 * FILL_CELL_MM
+            });
+        }
+    }
+    FillWidths { strokes, holes }
+}
+
 /// The outline of the letter `c` of the source font, in mm at the design
 /// size of `font`: outer rings with their holes.
 pub fn outline(font: &EmbFont, source: &Font, c: char) -> Vec<(Vec<Point>, Vec<Vec<Point>>)> {
@@ -281,6 +421,30 @@ pub fn letter_quality(font: &EmbFont, letter: &EmbLetter, outline: &Outline) -> 
         font.min_height_mm / font.cap_height_mm.max(1e-6),
         font.max_height_mm / font.cap_height_mm.max(1e-6),
     );
+    if font.fill {
+        // A fill font: the widths of the strokes and of the holes.
+        let widths = fill_widths(&letter.parts);
+        let total: f64 = widths.strokes.iter().map(|w| w.1).sum();
+        if total > 0.0 {
+            let thin: f64 = widths
+                .strokes
+                .iter()
+                .filter(|w| w.0 * small < NARROW * MIN_FILL_MM)
+                .map(|w| w.1)
+                .sum();
+            let closed = widths
+                .holes
+                .iter()
+                .filter(|w| **w * small < NARROW * MIN_HOLE_MM)
+                .count();
+            return Some(LetterQuality {
+                coverage: cover,
+                narrow: (thin / total + HOLE_CLOSED * closed as f64).min(1.0),
+                long: 0.0,
+                fill: false,
+            });
+        }
+    }
     let limit = narrow_mm(font);
     let (mut total, mut narrow, mut long) = (0.0, 0.0, 0.0);
     for part in &letter.parts {
@@ -329,20 +493,38 @@ pub fn letters(font: &EmbFont, source: &Font) -> Vec<(char, LetterQuality)> {
         .collect()
 }
 
-/// The widths of the columns of the measured letters of `font`, in mm at
-/// the design size: the width below which `part` (0 to 1) of the length of
-/// the columns is. `None` with no column.
-pub fn width_at(font: &EmbFont, part: f64) -> Option<f64> {
-    let mut all: Vec<(f64, f64)> = measured()
+/// The widths of the holes of the measured letters of a fill font, in mm
+/// at the design size: the width below which `part` (0 to 1) of the holes
+/// are. `None` with no hole.
+pub fn hole_width_at(font: &EmbFont, part: f64) -> Option<f64> {
+    let mut all: Vec<f64> = measured()
         .into_iter()
         .filter_map(|c| font.letters.get(&c))
-        .flat_map(|l| l.parts.iter())
-        .filter_map(|p| match p {
-            ObjectKind::Satin { geometry, .. } => Some(column_widths(geometry, STEP_MM)),
-            _ => None,
-        })
-        .flatten()
+        .flat_map(|l| fill_widths(&l.parts).holes)
         .collect();
+    all.sort_by(f64::total_cmp);
+    let at = ((part * all.len() as f64).floor() as usize).min(all.len().checked_sub(1)?);
+    Some(all[at])
+}
+
+/// The widths of the columns of the measured letters of `font`, in mm at
+/// the design size: the width below which `part` (0 to 1) of the length of
+/// the columns is. For a fill font: the local width below which `part` of
+/// the area of its fill letters is. `None` with no column.
+pub fn width_at(font: &EmbFont, part: f64) -> Option<f64> {
+    let letters = measured().into_iter().filter_map(|c| font.letters.get(&c));
+    let mut all: Vec<(f64, f64)> = if font.fill {
+        letters.flat_map(|l| fill_widths(&l.parts).strokes).collect()
+    } else {
+        letters
+            .flat_map(|l| l.parts.iter())
+            .filter_map(|p| match p {
+                ObjectKind::Satin { geometry, .. } => Some(column_widths(geometry, STEP_MM)),
+                _ => None,
+            })
+            .flatten()
+            .collect()
+    };
     all.sort_by(|a, b| a.0.total_cmp(&b.0));
     let total: f64 = all.iter().map(|x| x.1).sum();
     let mut sum = 0.0;
@@ -497,13 +679,110 @@ mod tests {
         thin.small_text = true;
         assert!((narrow_mm(&thin) - 0.8 * 2.0 / 3.0).abs() < 1e-9);
 
-        // A letter that sews as a fill counts as a fill letter.
-        let fills = convert(&source, "Fills", "", LetterStitch::Fill, &chars);
+        // A letter that sews as a fill in a font of satin letters counts
+        // as a fill letter.
+        let mut fills = convert(&source, "Fills", "", LetterStitch::Fill, &chars);
+        assert!(fills.fill, "the converter marks a fill font");
+        fills.fill = false;
         let rows = letters(&fills, &source);
         assert!(rows.iter().all(|r| r.1.fill && r.1.coverage > 0.97), "{rows:?}");
         let q = of_letters(&rows).unwrap();
         assert_eq!(q.fills, 1.0);
         assert!(q.score < LIMIT, "{q:?}");
+    }
+
+    fn fill(outer: BBox, holes: &[BBox]) -> ObjectKind {
+        ObjectKind::Fill {
+            outer: Path::rect(outer),
+            holes: holes.iter().map(|h| Path::rect(*h)).collect(),
+            params: emb_model::FillParams::default(),
+        }
+    }
+
+    fn rect(x0: f64, y0: f64, x1: f64, y1: f64) -> BBox {
+        BBox::new(Point::new(x0, y0), Point::new(x1, y1))
+    }
+
+    #[test]
+    fn the_widths_of_fill_letters() {
+        // A bar 5 mm wide and 20 mm long, with a square hole of 2 mm.
+        let w = fill_widths(&[fill(rect(0.0, 0.0, 5.0, 20.0), &[rect(1.5, 9.0, 3.5, 11.0)])]);
+        let area: f64 = w.strokes.iter().map(|x| x.1).sum();
+        assert!((area - 96.0).abs() < 3.0, "{area}");
+        // Most of the bar is 5 mm wide. Next to the hole it is 1.5 mm
+        // wide, and the tips of the corners are narrow.
+        let part = |from: f64, to: f64| -> f64 {
+            w.strokes
+                .iter()
+                .filter(|x| x.0 >= from && x.0 < to)
+                .map(|x| x.1)
+                .sum::<f64>()
+                / area
+        };
+        assert!(part(4.5, 5.5) > 0.8, "{}", part(4.5, 5.5));
+        assert!(part(1.0, 2.0) > 0.03 && part(1.0, 2.0) < 0.12, "{}", part(1.0, 2.0));
+        assert!(part(0.0, 1.0) < 0.02, "{}", part(0.0, 1.0));
+        assert_eq!(w.holes.len(), 1);
+        assert!((w.holes[0] - 2.0).abs() < 0.3, "{:?}", w.holes);
+        // Parts that are not fills have no widths.
+        assert_eq!(fill_widths(&[]), FillWidths::default());
+    }
+
+    #[test]
+    fn the_quality_of_a_fill_font() {
+        let source = bundled::font("Anton", "Regular").unwrap();
+        let chars: Vec<char> = "HILoae38".chars().collect();
+        let font = convert(&source, "Heavy Fill", "", LetterStitch::Fill, &chars);
+        assert!(font.fill);
+        // The range starts at the smallest size of fill fonts and has no
+        // largest size of its own.
+        assert_eq!(
+            (font.min_height_mm, font.max_height_mm),
+            (FILL_MIN_HEIGHT_MM, crate::source::MAX_HEIGHT_MM)
+        );
+        let rows = letters(&font, &source);
+        assert_eq!(rows.len(), chars.len());
+        for (c, l) in &rows {
+            assert!(!l.fill && l.long == 0.0 && l.coverage > 0.97, "{c}: {l:?}");
+            assert!(l.narrow < 0.1 && l.score() > 0.8, "{c}: {l:?}");
+        }
+        let q = font.quality.unwrap();
+        assert!(q.score >= BUNDLE && q.fills == 0.0 && q.long == 0.0, "{q:?}");
+        // A size at which the strokes are too narrow for a fill, and the
+        // holes close.
+        let mut small = font.clone();
+        small.min_height_mm = 2.0;
+        let l = letter_quality(&small, &small.letters[&'I'], &outline(&small, &source, 'I')).unwrap();
+        assert!(l.narrow > 0.99, "{l:?}");
+        let (o, i) = (
+            letter_quality(&font, &font.letters[&'o'], &outline(&font, &source, 'o')).unwrap(),
+            letter_quality(&small, &small.letters[&'o'], &outline(&small, &source, 'o')).unwrap(),
+        );
+        assert!(o.narrow < HOLE_CLOSED && i.narrow >= 0.99, "{o:?} {i:?}");
+        // A font with thin strokes has a range that starts higher: 5 % of
+        // the area of its letters can be narrower than 2 mm.
+        let thin = bundled::font("Lato", "Regular").unwrap();
+        let thin = convert(&thin, "Thin Fill", "", LetterStitch::Fill, &chars);
+        assert!(thin.min_height_mm > 18.0, "{}", thin.min_height_mm);
+        let w = width_at(&thin, FILL_TAIL).unwrap() * thin.min_height_mm / thin.cap_height_mm;
+        assert!((MIN_FILL_MM - 0.1..MIN_FILL_MM + 0.3).contains(&w), "{w}");
+        // A hole that is too narrow counts for the letter.
+        small.min_height_mm = FILL_MIN_HEIGHT_MM;
+        let mut holed = small.letters[&'I'].clone();
+        let Some(b) = holed.parts[0].control_bbox() else {
+            panic!()
+        };
+        let c = b.center();
+        if let ObjectKind::Fill { holes, .. } = &mut holed.parts[0] {
+            holes.push(Path::rect(rect(c.x - 0.4, c.y - 0.4, c.x + 0.4, c.y + 0.4)));
+        }
+        let plain = letter_quality(&small, &small.letters[&'I'], &outline(&small, &source, 'I')).unwrap();
+        let with_hole = letter_quality(&small, &holed, &outline(&small, &source, 'I')).unwrap();
+        assert!(
+            with_hole.narrow >= plain.narrow + HOLE_CLOSED,
+            "{plain:?} {with_hole:?}"
+        );
+        assert_eq!(hole_width_at(&small, 0.0), hole_width_at(&font, 0.0));
     }
 
     #[test]

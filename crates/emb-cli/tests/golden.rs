@@ -121,6 +121,12 @@ fn embroidery_fonts_7() {
     golden("embroidery-fonts-7");
 }
 
+/// The fill fonts (ADR 0117).
+#[test]
+fn embroidery_fonts_8() {
+    golden("embroidery-fonts-8");
+}
+
 #[test]
 fn lettering_circle() {
     golden("lettering-circle");

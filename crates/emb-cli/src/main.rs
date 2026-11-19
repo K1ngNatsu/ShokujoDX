@@ -87,6 +87,9 @@ Usage:
       the largest size), to an embroidery font (ADR 0016, 0021).
       --small-text: a font for letters 4 to 6 mm high (satin columns from
       0.8 mm).
+      --stitch fill: a fill font (ADR 0117). All its letters are fills, for
+      large text and for heavy fonts. Its size range starts at 15 mm, or
+      higher if its strokes or the holes of its letters are narrow.
       Check that the license of the font lets you do this; an OFL font
       with a Reserved Font Name needs a new --name.
       The font gets a quality score from 0 to 100 (ADR 0115), and its

@@ -33,7 +33,7 @@ Es gibt zwei Arten von Schriften:
 - **Stickschriften** haben fertige Stickbuchstaben. Sie sticken sich am
   besten. Jede hat einen **Größenbereich** (die Höhe der Großbuchstaben):
   Die Schriftliste zeigt ihn, und die Objekteigenschaften warnen, wenn der
-  Text außerhalb des Bereichs ist. 55 Stickschriften kommen mit dem
+  Text außerhalb des Bereichs ist. 65 Stickschriften kommen mit dem
   Programm.
 - **TrueType**- und OpenType-Schriften des Computers. Das Programm
   erstellt die Buchstaben aus ihren Umrissen: Satin für schmale Striche,
@@ -41,9 +41,10 @@ Es gibt zwei Arten von Schriften:
   **Füllung**.
 
 **Schrift > Schriften** öffnet die Schriftliste: Suchen, eine Vorschau und
-den Größenbereich sehen, und **Alle**, **Stickerei**, **TrueType** oder
-**Für kleine Schrift** zeigen (Stickschriften für Buchstaben ab 4 mm Höhe).
-**Für die ausgewählte Schrift verwenden** ändert die Schrift der Auswahl.
+den Größenbereich sehen, und **Alle**, **Stickerei**, **TrueType**,
+**Für kleine Schrift** (Stickschriften für Buchstaben ab 4 mm Höhe) oder
+**Für große Schrift** (die Füllschriften) zeigen. **Für die ausgewählte
+Schrift verwenden** ändert die Schrift der Auswahl.
 
 Die Buchstaben der Stickschriften des Programms sticken mit wenigen
 Fadenschnitten: Die Nadel geht unter den Stichen von einem Strich zum
@@ -51,6 +52,17 @@ nächsten. Zehn der Schriften sind **abgestimmte** Schriften: Jeder ihrer
 Buchstaben wurde geprüft. Die Schriftlisten zeigen die abgestimmten
 Schriften zuerst, und die Schriftliste von **Schrift > Schriften**
 kennzeichnet sie.
+
+Zehn der Stickschriften sind **Füllschriften**. Ihre Namen enden mit
+„Fill“, zum Beispiel Slab Heavy Fill. Jeder Buchstabe einer Füllschrift
+wird als Füllung gestickt, nicht als Satinsäulen, sodass die ganze Form
+eines fetten Buchstabens Stiche hat. Verwenden Sie die Füllschriften für
+große Schrift: Ihr Größenbereich beginnt bei 15 mm oder mehr und geht bis
+300 mm. Die Einstellungen **Füllung** der Schrift legen fest, wie die
+Buchstaben gestickt werden. Die Qualitätswertung einer Füllschrift hat ein
+eigenes Maß (wie viel der Buchstaben bei der kleinsten Größe zu schmal für
+eine Füllung ist), deshalb zeigt **Sortieren nach > Qualität** die
+Füllschriften nach den anderen Stickschriften.
 
 Jede Stickschrift hat eine **Qualitätswertung** von 0 bis 100. Die Wertung
 sagt, wie gut sich die Buchstaben der Schrift sticken lassen. Die

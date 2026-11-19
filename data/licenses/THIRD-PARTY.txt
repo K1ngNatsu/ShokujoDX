@@ -15210,7 +15210,7 @@ Bundled data in ShokujoDX
 
 Embroidery fonts (data/fonts/embroidery)
 ----------------------------------------
-The program bundles 55 embroidery fonts. Each font is
+The program bundles 65 embroidery fonts. Each font is
 made from an open font (under the SIL Open Font License 1.1) and
 converted to the .embfont format of the program. A font with a
 Reserved Font Name has a new name. The license text of the source

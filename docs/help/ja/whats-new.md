@@ -51,7 +51,7 @@ Soft Round、Geo Slab、Brush Hand、Vintage Script。フォントの一覧で�
 (アラビア文字)と Poppins(デーヴァナーガリー文字)が付属します。
 [文字](lettering) を参照してください。
 
-**フォントの追加と品質スコア。** プログラムの刺しゅうフォントは 55 に
+**フォントの追加と品質スコア。** プログラムの刺しゅうフォントは 65 に
 なりました(以前は 30)。プログラムのページのフォントパッケージには、
 さらに 68 あります。刺しゅうフォントにはそれぞれ 0 から 100 の品質
 スコアがあり、**文字 > フォント**で表示と並べ替えができます。一部の
@@ -60,6 +60,14 @@ Soft Round、Geo Slab、Brush Hand、Vintage Script。フォントの一覧で�
 Heavy、Fat Face Serif、Shrikhand、Great Vibes)は、フォントパッケージ
 **Fonts of earlier versions** に移りました。これらのフォントを使った
 デザインは、そのまま残ります。
+
+**フィルフォント。** 刺しゅうフォントのうち 10 個は、文字をフィルで縫い
+ます: Block Sans Fill、Varsity Fill、Anton Fill、Archivo Black Fill、Slab
+Heavy Fill、Poster Heavy Fill、Giant Round Fill、Funky Slab Fill、Rubik Mono
+One Fill、Shrikhand Fill。15 mm から 300 mm の大きい文字と、形にはっきり
+したコラムがない太い文字のためのフォントです。**文字 > フォント**の
+**大きい文字用**で表示します。
+[文字](lettering) を参照してください。
 
 **新しいバージョン。** 新しいバージョンが利用可能になると、プログラムが
 お知らせできます。[オプション](options) を参照してください。

@@ -84,6 +84,12 @@ pub struct EmbFont {
     /// and each one was checked.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub tuned: bool,
+    /// A fill font (ADR 0117): the converter made all its letters as
+    /// fills. It is for large text and for heavy fonts, whose letters
+    /// have no clear columns. Its score and its size range come from the
+    /// widths of the strokes and of the holes of its letters.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub fill: bool,
     /// The quality score of the font (P17 Milestone 7, ADR 0115). The
     /// converter makes it, because it needs the font that this font was
     /// converted from. `None`: not measured (an alphabet made by hand, a
@@ -148,6 +154,7 @@ impl EmbFont {
             kerning: BTreeMap::new(),
             small_text: false,
             tuned: false,
+            fill: false,
             quality: None,
             kern: HashMap::new(),
         }
@@ -162,8 +169,30 @@ impl EmbFont {
     /// [`crate::quality::RANGE_TAIL`] of the length of the columns is too
     /// narrow at the smallest size, and at most that part is too long at
     /// the largest size. It never gets larger.
+    ///
+    /// The range of a fill font (ADR 0117) starts where at most
+    /// [`crate::quality::FILL_TAIL`] of the area of its letters is
+    /// narrower than [`crate::source::MIN_FILL_MM`] and at most
+    /// [`crate::quality::RANGE_TAIL`] of its holes are narrower than
+    /// [`crate::quality::MIN_HOLE_MM`], and not below
+    /// [`crate::quality::FILL_MIN_HEIGHT_MM`].
     pub fn fit_size_range(&mut self) {
         use crate::quality::{LONG_MM, RANGE_TAIL, narrow_mm, width_at};
+        if self.fill {
+            use crate::quality::{FILL_MIN_HEIGHT_MM, FILL_TAIL, MIN_HOLE_MM, hole_width_at};
+            let size = |limit: f64, width: Option<f64>| -> f64 {
+                match width {
+                    Some(w) if w > 0.0 => (limit / w * self.cap_height_mm * 2.0).ceil() / 2.0,
+                    _ => 0.0,
+                }
+            };
+            let lo = size(crate::source::MIN_FILL_MM, width_at(self, FILL_TAIL))
+                .max(size(MIN_HOLE_MM, hole_width_at(self, RANGE_TAIL)))
+                .max(FILL_MIN_HEIGHT_MM);
+            self.min_height_mm = self.min_height_mm.max(lo);
+            self.max_height_mm = self.max_height_mm.max(self.min_height_mm);
+            return;
+        }
         let (Some(thin), Some(wide)) = (width_at(self, RANGE_TAIL), width_at(self, 1.0 - RANGE_TAIL)) else {
             return;
         };
@@ -626,6 +655,7 @@ pub fn convert_with(
         kerning,
         small_text,
         tuned: false,
+        fill: stitch == LetterStitch::Fill,
         quality: None,
         kern: HashMap::new(),
     };

@@ -30,22 +30,33 @@ There are two kinds of fonts:
 
 - **Embroidery fonts** have ready-made embroidery letters. They sew best.
   Each has a **size range** (the capital height): the font list shows it,
-  and Object Properties warns when the text is out of the range. 55
+  and Object Properties warns when the text is out of the range. 65
   embroidery fonts come with the program.
 - **TrueType** and OpenType fonts of the computer. The program makes the
   letters from their outlines: satin for narrow strokes, fill for wide
   ones (**Automatic**), or all **Satin** or all **Fill**.
 
 **Lettering > Fonts** opens the font list: search, see a preview and the
-size range, and show **All**, **Embroidery**, **TrueType** or **For small
-text** (embroidery fonts for letters from 4 mm high). **Use for the
-selected lettering** changes the font of the selection.
+size range, and show **All**, **Embroidery**, **TrueType**, **For small
+text** (embroidery fonts for letters from 4 mm high) or **For large text**
+(the fill fonts). **Use for the selected lettering** changes the font of
+the selection.
 
 The letters of the embroidery fonts of the program sew with few trims:
 the needle goes from one stroke to the next one under the stitches. Ten
 of the fonts are **tuned** fonts: each letter of them was checked. The
 font lists show the tuned fonts first, and the font list of **Lettering >
 Fonts** marks them.
+
+Ten of the embroidery fonts are **fill fonts**. Their names end with
+"Fill", for example Slab Heavy Fill. Each letter of a fill font sews as a
+fill, not as satin columns, so the full shape of a heavy letter has
+stitches. Use the fill fonts for large text: their size range starts at
+15 mm or more and goes to 300 mm. The **Fill** settings of the lettering
+set how the letters sew. The quality score of a fill font has its own
+measure (how much of the letters is too narrow for a fill at the smallest
+size), so **Sort by > Quality** shows the fill fonts after the other
+embroidery fonts.
 
 Each embroidery font has a **quality score** from 0 to 100. The score
 says how well the letters of the font sew. The font list shows it after

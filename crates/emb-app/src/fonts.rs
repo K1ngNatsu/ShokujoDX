@@ -44,6 +44,8 @@ pub struct FontsWindow {
     kind: Option<FontKind>,
     /// Show only the embroidery fonts for small text (P11 Milestone 2).
     small_text: bool,
+    /// Show only the fill fonts (ADR 0117).
+    pub large_text: bool,
     /// The list is in the order of the quality scores, the best first
     /// (ADR 0115); else in the order of the font library.
     pub by_quality: bool,
@@ -224,6 +226,9 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
             ui.selectable_value(&mut w.kind, Some(FontKind::TrueType), tr("TrueType"));
             ui.checkbox(&mut w.small_text, tr("For small text"))
                 .on_hover_text(tr("Embroidery fonts for letters from 4 mm high."));
+            ui.checkbox(&mut w.large_text, tr("For large text")).on_hover_text(tr(
+                "Fill fonts: the letters sew as fills, not as satin columns. For letters from 15 mm high.",
+            ));
             if !st.fonts.scanned {
                 ui.weak(tr("Finding the fonts of this computer…"));
             }
@@ -273,6 +278,9 @@ fn list(ui: &mut egui::Ui, st: &mut AppState) {
     } else {
         entries
     };
+    if st.fonts_window.large_text {
+        entries.retain(|f| st.fonts.is_fill(f));
+    }
     if st.fonts_window.by_quality {
         by_quality(&mut entries, &st.fonts);
     }
@@ -283,6 +291,10 @@ fn list(ui: &mut egui::Ui, st: &mut AppState) {
             if st.fonts.is_tuned(&f) {
                 text.push_str("  ·  ");
                 text.push_str(tr("tuned"));
+            }
+            if st.fonts.is_fill(&f) {
+                text.push_str("  ·  ");
+                text.push_str(tr("fill"));
             }
             let score = st.fonts.score(&f);
             if let Some(score) = score {
@@ -300,10 +312,19 @@ fn list(ui: &mut egui::Ui, st: &mut AppState) {
 }
 
 /// Puts the fonts in the order of their quality scores, the best first; the
-/// fonts with no score (the TrueType fonts) come last. Fonts with the same
-/// score keep their order.
+/// fonts with no score (the TrueType fonts) come last. The fill fonts (ADR
+/// 0117) come after the fonts with satin letters: their score has other
+/// measures, and it is high for each of them. Fonts with the same score
+/// keep their order.
 fn by_quality(fonts: &mut [FontRef], library: &crate::lettering::FontLibrary) {
-    fonts.sort_by_key(|f| std::cmp::Reverse(library.score(f).map_or(-1, i32::from)));
+    fonts.sort_by_key(|f| {
+        let score = library.score(f);
+        (
+            score.is_none(),
+            library.is_fill(f),
+            std::cmp::Reverse(score.map_or(-1, i32::from)),
+        )
+    });
 }
 
 /// What a quality score says, in one sentence (ADR 0115).
@@ -318,8 +339,8 @@ pub fn quality_text(score: u8) -> &'static str {
 }
 
 /// The quality of an embroidery font: the score, what it says, and the
-/// three measures behind it.
-fn quality_ui(ui: &mut egui::Ui, q: &emb_letter::quality::Quality) {
+/// measures behind it (`fill`: the measures of a fill font, ADR 0117).
+fn quality_ui(ui: &mut egui::Ui, q: &emb_letter::quality::Quality, fill: bool) {
     let color = if q.passes() {
         ui.visuals().text_color()
     } else {
@@ -335,19 +356,21 @@ fn quality_ui(ui: &mut egui::Ui, q: &emb_letter::quality::Quality) {
     });
     ui.add(egui::Label::new(quality_text(q.score)).wrap());
     let pct = |v: f64| format!("{:.0}", v * 100.0);
-    ui.add(
-        egui::Label::new(
-            egui::RichText::new(crate::i18n::fill(
-                "The stitches cover {} % of the shapes of the letters. At the smallest size, {} % of the \
-                 columns are too narrow. At the largest size, {} % of the columns have stitches that are \
-                 too long.",
-                &[&pct(q.coverage), &pct(q.narrow), &pct(q.long)],
-            ))
-            .small()
-            .weak(),
+    let measures = if fill {
+        crate::i18n::fill(
+            "The stitches cover {} % of the shapes of the letters. At the smallest size, {} % of the \
+             area of the letters is too narrow for a fill.",
+            &[&pct(q.coverage), &pct(q.narrow)],
         )
-        .wrap(),
-    );
+    } else {
+        crate::i18n::fill(
+            "The stitches cover {} % of the shapes of the letters. At the smallest size, {} % of the \
+             columns are too narrow. At the largest size, {} % of the columns have stitches that are \
+             too long.",
+            &[&pct(q.coverage), &pct(q.narrow), &pct(q.long)],
+        )
+    };
+    ui.add(egui::Label::new(egui::RichText::new(measures).small().weak()).wrap());
 }
 
 /// True for an embroidery font for small text.
@@ -379,6 +402,12 @@ fn details(ui: &mut egui::Ui, st: &mut AppState) {
     if st.fonts.is_tuned(&sel) {
         ui.label(tr("Tuned: each letter of this font was checked."));
     }
+    let fill = st.fonts.is_fill(&sel);
+    if fill {
+        ui.label(tr(
+            "Fill font: the letters sew as fills. For large text and for heavy letters.",
+        ));
+    }
     let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 90.0), egui::Sense::hover());
     ui.painter().rect_filled(rect, 4.0, ui.visuals().extreme_bg_color);
     draw_letters(ui.painter(), rect, &p.letters, ui.visuals().text_color());
@@ -389,7 +418,7 @@ fn details(ui: &mut egui::Ui, st: &mut AppState) {
         ));
     }
     match &p.quality {
-        Some(q) => quality_ui(ui, q),
+        Some(q) => quality_ui(ui, q, fill),
         None if sel.kind == FontKind::Embroidery => {
             ui.weak(tr(
                 "No quality score: this version of the program did not convert the font.",
@@ -569,8 +598,15 @@ mod tests {
         by_quality(&mut all, &st.fonts);
         let scores: Vec<Option<u8>> = all.iter().map(|f| st.fonts.score(f)).collect();
         assert_eq!(all[0].family, "Varsity");
-        assert!(scores.windows(2).all(|w| w[0] >= w[1]), "{scores:?}");
         assert!(scores.last().unwrap().is_none());
+        // The fill fonts are a group of their own after the fonts with
+        // satin letters, the best first in each group.
+        let first_fill = all.iter().position(|f| st.fonts.is_fill(f)).unwrap();
+        assert_eq!(first_fill, emb_letter::bundled::P17_EMBROIDERY);
+        assert!(all[first_fill..all.len() - 1].iter().all(|f| st.fonts.is_fill(f)));
+        for group in [&scores[..first_fill], &scores[first_fill..]] {
+            assert!(group.windows(2).all(|w| w[0] >= w[1]), "{scores:?}");
+        }
         // The three texts of a score.
         let texts = [quality_text(90), quality_text(70), quality_text(50)];
         assert!(texts[0] != texts[1] && texts[1] != texts[2]);
@@ -695,6 +731,43 @@ mod tests {
         let files = crate::assets::files_in(AssetKind::Fonts, &dir);
         assert_eq!(files.len(), 6, "{files:?}");
         std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn the_fill_fonts_show_with_the_filter_for_large_text() {
+        let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        let fill = FontRef::embroidery("Slab Heavy Fill", "");
+        assert!(st.fonts.is_fill(&fill) && !st.fonts.is_tuned(&fill));
+        assert!(!st.fonts.is_fill(&FontRef::embroidery("Block Sans", "")));
+        assert!(!st.fonts.is_fill(&FontRef::new("Lato", "Bold")));
+        assert_eq!(st.fonts.entries.iter().filter(|e| e.fill).count(), 10);
+        // The preview: fills, a range from 15 mm, a score.
+        let p = st.preview_of(&fill).unwrap();
+        assert!(
+            p.letters
+                .iter()
+                .flat_map(|l| &l.parts)
+                .all(|k| matches!(k, ObjectKind::Fill { .. }))
+        );
+        assert_eq!(p.range, Some((15.0, 300.0)));
+        assert!(
+            p.quality
+                .is_some_and(|q| q.score >= emb_letter::quality::BUNDLE && q.long == 0.0)
+        );
+        // The window with the filter draws only the fill fonts.
+        st.fonts_window.open = true;
+        st.fonts_window.large_text = true;
+        st.fonts_window.select(fill.clone());
+        let ctx = egui::Context::default();
+        let mut out = ctx.run_ui(egui::RawInput::default(), |ui| window(ui.ctx(), &mut st));
+        out.textures_delta.clear();
+        // Lettering in a fill font sews, and its letters are not fixed.
+        st.add_lettering(LetteringDialog::new(Point::new(0.0, 0.0), "Ab", fill, 40.0));
+        let ObjectKind::Lettering(l) = &st.doc.design().objects()[0].kind else {
+            panic!()
+        };
+        assert!(l.letters.iter().all(|x| !x.fixed));
+        assert!(st.plan_view().plan.stitches.stitch_count() > 500);
     }
 
     #[test]
