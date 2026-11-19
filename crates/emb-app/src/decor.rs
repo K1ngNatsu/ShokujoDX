@@ -581,7 +581,7 @@ mod tests {
         };
         let first = made(&h);
         assert!(
-            first >= 1 && first <= crate::item_pictures::FramePictures::IN_A_FRAME,
+            (1..=crate::item_pictures::FramePictures::IN_A_FRAME).contains(&first),
             "{first}"
         );
         for _ in 0..20 {
