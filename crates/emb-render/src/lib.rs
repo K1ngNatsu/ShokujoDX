@@ -16,7 +16,8 @@
 //! - [`density`]: the layers of thread on each small square (density map).
 //! - [`light`]: colors mix in linear light (ADR 0123).
 //! - [`strand`], [`surface`]: the stitches laid on the fabric with their
-//!   heights, in tiles, and its first light (ADR 0124).
+//!   heights, in tiles and zoom levels (ADR 0124, 0125); [`sheen`]: the
+//!   light on the surface (ADR 0125).
 //! - [`compare`]: two pictures side by side with their difference, for the
 //!   developer; [`stress`]: large synthetic stitch lists to measure speed
 //!   (ADR 0122).
@@ -33,6 +34,7 @@ pub mod pdf;
 pub mod photo;
 pub mod product;
 pub mod raster;
+pub mod sheen;
 pub mod sheet;
 pub mod stone_sheet;
 pub mod strand;

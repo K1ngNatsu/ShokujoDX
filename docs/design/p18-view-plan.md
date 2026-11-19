@@ -8,7 +8,9 @@ first, with Milestone 1 (2026-11-19). Milestone 1 is done except the
 sew-out of the reference set and the numbers of a small computer
 (`docs/design/p18-view-m1-report.md`, ADR 0122). Milestone 2 is done
 (`docs/design/p18-view-m2-report.md`, ADR 0123). Milestone 3 is done
-(`docs/design/p18-view-m3-report.md`, ADR 0124).
+(`docs/design/p18-view-m3-report.md`, ADR 0124). Milestone 4 is done
+except the compare with the photos (`docs/design/p18-view-m4-report.md`,
+ADR 0125).
 
 ## Goal
 
@@ -299,6 +301,18 @@ brightness of each area of each design is the same within 3 % at each
 zoom level; the developer's compare of each reference picture with its
 photo is in the report, and the owner says of each one if it is "like
 the sew-out", "near" or "not like it".
+
+**Done (2026-11-19, ADR 0125), except the photos.** `emb_render::sheen`
+lights the surface: diffuse light, a highlight on fibers 35° from the
+thread (the twist), shadows and gaps from the heights, the plies, and a
+tone curve above white; `Surface::half` makes the zoom levels (threads
+and fabric apart, the spread of the directions), and the shadows and the
+diffuse light are made at the detail and halved. The eight satin columns
+have eight values at least 1.6 % apart (their order waits for the
+photo); the light of each area of each reference design is within 1.8 %
+at each zoom level (after the tone curve within 3 %, except a white
+dense fill, 5.3 %). The surface and its light for 100,000 stitches at 10
+pixels for each mm take 0.29 s (`docs/design/p18-view-m4-report.md`).
 
 ## Milestone 5: the canvas on tiles (L)
 

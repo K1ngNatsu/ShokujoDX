@@ -288,7 +288,7 @@ pub fn run(r: &Reference, flat: bool) -> Measure {
             ms,
             bytes: surface.bytes(),
         });
-        let (p, ms) = timed(|| emb_render::surface::light(&surface, &Default::default(), fabric));
+        let (p, ms) = timed(|| emb_render::sheen::light(&surface, &Default::default(), fabric));
         steps.push(Step {
             name: format!("light {}", z.name),
             ms,
@@ -351,7 +351,7 @@ pub fn stress(n: usize) -> Measure {
         bytes: surface.bytes(),
     });
     let fabric = Some((STRESS_FABRIC, emb_render::thread3d::Weave::Plain));
-    let (p, ms) = timed(|| emb_render::surface::light(&surface, &Default::default(), fabric));
+    let (p, ms) = timed(|| emb_render::sheen::light(&surface, &Default::default(), fabric));
     steps.push(Step {
         name: "light 10/mm".into(),
         ms,

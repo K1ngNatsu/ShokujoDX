@@ -12,7 +12,9 @@
 //! The second picture fills the frame of the first one, or it goes where a
 //! [`Placement`] puts it (a photo, which the developer scales and turns by
 //! hand). A pixel of the first picture that the second one does not cover
-//! is not counted.
+//! is not counted. When the second picture fills the frame (a picture of
+//! the same area at another zoom), the brightness of each of its areas is
+//! the mean of its own pixels there.
 
 use emb_geom::math;
 
@@ -155,6 +157,49 @@ impl Comparison {
     }
 }
 
+/// `p` with `factor` times fewer pixels on each side: each pixel is the
+/// mean of the light of the pixels under it (in linear light; the last
+/// row and column take the pixels that are left). A picture of a design at
+/// a large zoom, made smaller this way, has the brightness that a picture
+/// at the small zoom must have (the exit test of Milestone 4 of the view).
+pub fn smaller(p: &Picture, factor: u32) -> Picture {
+    let f = factor.max(1);
+    let (w, h) = (p.width.div_ceil(f), p.height.div_ceil(f));
+    let lin = linear_table();
+    let mut rgba = vec![0u8; (w * h * 4) as usize];
+    for y in 0..h {
+        for x in 0..w {
+            let mut sum = [0.0f64; 4];
+            let mut n = 0.0;
+            for sy in y * f..((y + 1) * f).min(p.height) {
+                for sx in x * f..((x + 1) * f).min(p.width) {
+                    let i = ((sy * p.width + sx) * 4) as usize;
+                    let a = f64::from(p.rgba[i + 3]) / 255.0;
+                    for k in 0..3 {
+                        sum[k] += lin[p.rgba[i + k] as usize] * a;
+                    }
+                    sum[3] += a;
+                    n += 1.0;
+                }
+            }
+            let o = ((y * w + x) * 4) as usize;
+            for k in 0..3 {
+                rgba[o + k] = if sum[3] > 0.0 {
+                    crate::light::to_srgb(sum[k] / sum[3])
+                } else {
+                    0
+                };
+            }
+            rgba[o + 3] = (sum[3] / n * 255.0).round() as u8;
+        }
+    }
+    Picture {
+        width: w,
+        height: h,
+        rgba,
+    }
+}
+
 /// The linear value of each 8-bit sRGB value.
 fn linear_table() -> [f64; 256] {
     let mut t = [0.0; 256];
@@ -258,6 +303,25 @@ pub fn compare(a: &Picture, b: &Picture, place: Option<Placement>, cols: u32, ro
             }
         }
     }
+    // With no placement, the second picture is the same area: the mean of
+    // each area comes from its own pixels, not from samples between them
+    // (a sample between a light and a dark pixel mixes the numbers of the
+    // screen, which is darker than the mix of their light).
+    let own: Option<Vec<(f64, u64)>> = place.is_none().then(|| {
+        let mut own = vec![(0.0f64, 0u64); (cols * rows) as usize];
+        let (bw, bh) = (b.width as usize, b.height as usize);
+        for y in 0..bh {
+            for x in 0..bw {
+                let i = (y * bw + x) * 4;
+                let px = [b.rgba[i], b.rgba[i + 1], b.rgba[i + 2], b.rgba[i + 3]];
+                let c = (x * cols as usize / bw).min(cols as usize - 1);
+                let r = (y * rows as usize / bh).min(rows as usize - 1);
+                let s = &mut own[r * cols as usize + c];
+                *s = (s.0 + luminance(&lin, px), s.1 + 1);
+            }
+        }
+        own
+    });
     let areas: Vec<Area> = sums
         .iter()
         .enumerate()
@@ -265,7 +329,11 @@ pub fn compare(a: &Picture, b: &Picture, place: Option<Placement>, cols: u32, ro
             col: k as u32 % cols,
             row: k as u32 / cols,
             a: if n > 0 { sa / n as f64 } else { 0.0 },
-            b: if n > 0 { sb / n as f64 } else { 0.0 },
+            b: match &own {
+                Some(own) if own[k].1 > 0 => own[k].0 / own[k].1 as f64,
+                _ if n > 0 => sb / n as f64,
+                _ => 0.0,
+            },
             pixels: n,
         })
         .collect();
@@ -467,6 +535,23 @@ mod tests {
         let c = compare(&a, &photo, Some(small), 4, 4);
         assert_eq!(c.areas.iter().filter(|x| x.pixels > 0).count(), 4);
         assert!(c.report().contains("      -"), "{}", c.report());
+    }
+
+    #[test]
+    fn a_smaller_picture_keeps_the_light() {
+        // Black and white stripes one pixel wide: half the light.
+        let mut p = flat(4, 2, [0, 0, 0, 255]);
+        for y in 0..2 {
+            for x in [1, 3] {
+                let i = (y * 4 + x) * 4;
+                p.rgba[i..i + 3].copy_from_slice(&[255, 255, 255]);
+            }
+        }
+        let s = smaller(&p, 2);
+        assert_eq!((s.width, s.height), (2, 1));
+        assert_eq!(&s.rgba[..4], &[188, 188, 188, 255]);
+        // A width that is not a multiple: the last column has one pixel.
+        assert_eq!(smaller(&flat(5, 5, [9, 9, 9, 255]), 2).width, 3);
     }
 
     #[test]

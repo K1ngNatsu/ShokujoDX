@@ -26,18 +26,18 @@
 //!    depends only on the laid stitches, so the same input gives the same
 //!    bytes on each system and with each number of processors.
 //!
-//! [`light`] makes a picture of a surface with the light of the 3D thread
-//! look of today on the directions of the surface (the first light of the
-//! milestone). The light of Milestone 4 replaces it.
+//! A surface for a small zoom is made at [`DETAIL_PX_PER_MM`] or more and
+//! halved ([`Surface::half`], the zoom levels of Milestone 4, ADR 0125).
+//! [`crate::sheen::light`] makes its picture.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use emb_geom::{BBox, Point};
 use emb_model::{Rgb, ThreadKind};
 
-use crate::raster::{Areas, Picture};
+use crate::raster::Areas;
 use crate::strand::Strand;
-use crate::thread3d::{Lighting, Weave, fabric_value, lit, shine_of};
+use crate::thread3d::Lighting;
 
 /// The cell of the grid on which the stitches are laid, mm.
 pub const CELL_MM: f64 = 0.1;
@@ -57,6 +57,23 @@ pub const PRESS: f64 = 0.15;
 pub const PIECE_MM: f64 = 0.3;
 /// The side of a tile, pixels.
 pub const TILE: u32 = 256;
+/// A surface is made with at least this many pixels for each mm (a 40
+/// weight thread is 6.4 pixels wide), and halved for a smaller zoom.
+pub const DETAIL_PX_PER_MM: f64 = 16.0;
+/// The most pixels of the surface that is halved (16 bytes each): a very
+/// large design at a small zoom gets less detail.
+const MAX_DETAIL_PIXELS: u64 = 8_000_000;
+/// The small changes of each thread: of its width and of its brightness
+/// (each from −1 to 1 times this, from the place of the stitch).
+const VARY_WIDTH: f64 = 0.06;
+const VARY_BRIGHTNESS: f64 = 0.04;
+/// The length of one turn of the plies along a thread, mm.
+const PLY_PITCH_MM: f64 = 0.35;
+/// The gaps: a pixel lower than the mean of the heights round it (in this
+/// radius, mm) is darker, up to `GAP_DARK` at `GAP_DEPTH_MM` lower.
+const GAP_RADIUS_MM: f64 = 0.3;
+const GAP_DARK: f64 = 0.35;
+const GAP_DEPTH_MM: f64 = 0.15;
 
 /// The materials of a pixel.
 pub mod material {
@@ -216,6 +233,19 @@ impl Grid {
     }
 }
 
+/// Two values from −1 to 1 from the place of a stitch: the same stitch
+/// gets the same values on each system.
+fn vary(a: Point, b: Point) -> [f32; 2] {
+    let mut h: u64 = 0x9E37_79B9_7F4A_7C15;
+    for v in [a.x, a.y, b.x, b.y] {
+        h ^= (v * 100.0).round() as i64 as u64;
+        h = h.wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        h ^= h >> 31;
+    }
+    let one = |x: u64| ((x & 0xFFFF) as f32 / 65535.0) * 2.0 - 1.0;
+    [one(h), one(h >> 16)]
+}
+
 /// `true` if `p` is inside the rings (even-odd).
 fn inside(rings: &[Vec<Point>], p: Point) -> bool {
     let mut odd = false;
@@ -242,8 +272,11 @@ struct LaidStrand {
     thick: f64,
     color: Rgb,
     material: u8,
-    /// The direction of the thread, 0 to 255 for 0° to 180°.
-    angle: u8,
+    /// The direction of the thread: the vector of two times its angle,
+    /// times 127.
+    axis: [i8; 2],
+    /// The small changes of its width and its brightness, −1 to 1.
+    vary: [f32; 2],
     /// The heights of its middle line: `z[start..start + n]`, `step` mm apart.
     start: usize,
     n: usize,
@@ -351,9 +384,9 @@ pub fn lay(strands: &[Strand], areas: &Areas) -> Laid {
             let t = ts[k];
             z.push((u + thick * along(t.min(len - t), RISE_MM)) as f32);
         }
-        let angle = {
-            let a = emb_geom::math::atan2(dir.1, dir.0).rem_euclid(std::f64::consts::PI);
-            ((a / std::f64::consts::PI * 256.0) as u32).min(255) as u8
+        let axis = {
+            let a2 = 2.0 * emb_geom::math::atan2(dir.1, dir.0);
+            [emb_geom::math::cos(a2), emb_geom::math::sin(a2)].map(|v| (v * 127.0).round() as i8)
         };
         laid.push(LaidStrand {
             a: s.a,
@@ -363,7 +396,8 @@ pub fn lay(strands: &[Strand], areas: &Areas) -> Laid {
             thick,
             color: s.color,
             material: thread_material(s.kind),
-            angle,
+            axis,
+            vary: vary(s.a, s.b),
             start,
             n,
             step,
@@ -429,18 +463,51 @@ impl Laid {
             + self.grid.height.len() * 5
     }
 
-    /// The surface of the area `area` at `px_per_mm` (step 2).
+    /// The surface of the area `area` at `px_per_mm` (step 2). It is made
+    /// at [`DETAIL_PX_PER_MM`] or more and halved to `px_per_mm` (the zoom
+    /// levels, ADR 0125), so a pixel of a small zoom has the mean of the
+    /// pixels under it.
     pub fn surface(&self, area: BBox, px_per_mm: f64) -> Surface {
+        self.surface_in(area, px_per_mm, &Lighting::default())
+    }
+
+    /// As [`Laid::surface`], with the shadows of the threads for the light
+    /// `lighting` (made at the detail and halved, as the other values).
+    pub fn surface_in(&self, area: BBox, px_per_mm: f64, lighting: &Lighting) -> Surface {
         let width = ((area.width() * px_per_mm).ceil() as u32).clamp(1, 16_384);
         let height = ((area.height() * px_per_mm).ceil() as u32).clamp(1, 16_384);
+        let mut k = 0u32;
+        while px_per_mm * f64::from(1u32 << k) < DETAIL_PX_PER_MM - 1e-9
+            && (width << (k + 1)) <= 16_384
+            && (height << (k + 1)) <= 16_384
+            && u64::from(width << (k + 1)) * u64::from(height << (k + 1)) <= MAX_DETAIL_PIXELS
+        {
+            k += 1;
+        }
+        let mut s = self.raster(
+            area.min,
+            px_per_mm * f64::from(1u32 << k),
+            width << k,
+            height << k,
+            lighting,
+        );
+        for _ in 0..k {
+            s = s.half();
+        }
+        s
+    }
+
+    /// The surface at `ppm` with the size `width` × `height` pixels from
+    /// `min`, with no halving.
+    fn raster(&self, min: Point, ppm: f64, width: u32, height: u32, lighting: &Lighting) -> Surface {
         let (tx, ty) = (width.div_ceil(TILE), height.div_ceil(TILE));
         // The stitches of each tile, in sew order.
         let mut lists: Vec<Vec<u32>> = vec![Vec::new(); (tx * ty) as usize];
-        let to_px = |v: f64, min: f64| (v - min) * px_per_mm;
+        let to_px = |v: f64, m: f64| (v - m) * ppm;
         for (i, s) in self.strands.iter().enumerate() {
-            let b = s.bbox.expand(1.0 / px_per_mm);
-            let (x0, x1) = (to_px(b.min.x, area.min.x), to_px(b.max.x, area.min.x));
-            let (y0, y1) = (to_px(b.min.y, area.min.y), to_px(b.max.y, area.min.y));
+            let b = s.bbox.expand(1.0 / ppm);
+            let (x0, x1) = (to_px(b.min.x, min.x), to_px(b.max.x, min.x));
+            let (y0, y1) = (to_px(b.min.y, min.y), to_px(b.max.y, min.y));
             if x1 < 0.0 || y1 < 0.0 || x0 >= f64::from(width) || y0 >= f64::from(height) {
                 continue;
             }
@@ -453,58 +520,33 @@ impl Laid {
                 }
             }
         }
-        let count = (tx * ty) as usize;
-        let next = AtomicUsize::new(0);
-        let workers = std::thread::available_parallelism().map_or(1, usize::from).min(count);
-        let mut made: Vec<(usize, Tile)> = std::thread::scope(|scope| {
-            let handles: Vec<_> = (0..workers)
-                .map(|_| {
-                    scope.spawn(|| {
-                        let mut out = Vec::new();
-                        loop {
-                            let k = next.fetch_add(1, Ordering::Relaxed);
-                            if k >= count {
-                                break out;
-                            }
-                            let (cx, cy) = (k as u32 % tx, k as u32 / tx);
-                            let (x0, y0) = (cx * TILE, cy * TILE);
-                            let (w, h) = (TILE.min(width - x0), TILE.min(height - y0));
-                            out.push((k, self.tile(area.min, px_per_mm, x0, y0, w, h, &lists[k])));
-                        }
-                    })
-                })
-                .collect();
-            handles
-                .into_iter()
-                .flat_map(|h| h.join().expect("a tile thread does not stop with an error"))
-                .collect()
+        let tiles = in_parallel((tx * ty) as usize, |k| {
+            let (cx, cy) = (k as u32 % tx, k as u32 / tx);
+            let (x0, y0) = (cx * TILE, cy * TILE);
+            let (w, h) = (TILE.min(width - x0), TILE.min(height - y0));
+            self.tile(min, ppm, x0, y0, w, h, &lists[k])
         });
-        made.sort_by_key(|(k, _)| *k);
-        Surface {
+        let area = BBox::new(
+            min,
+            Point::new(min.x + f64::from(width) / ppm, min.y + f64::from(height) / ppm),
+        );
+        let mut s = Surface {
             area,
-            px_per_mm,
+            px_per_mm: ppm,
             width,
             height,
             tiles_x: tx,
-            tiles: made.into_iter().map(|(_, t)| t).collect(),
-        }
+            tiles,
+            light: *lighting,
+        };
+        s.finish();
+        s
     }
 
     /// One tile: the pixels `x0..x0 + w`, `y0..y0 + h` of the surface.
     #[allow(clippy::too_many_arguments)]
     fn tile(&self, min: Point, ppm: f64, x0: u32, y0: u32, w: u32, h: u32, ids: &[u32]) -> Tile {
-        let n = (w * h) as usize;
-        let mut t = Tile {
-            x0,
-            y0,
-            w,
-            h,
-            height: vec![0.0; n],
-            color: vec![[0; 3]; n],
-            angle: vec![0; n],
-            material: vec![material::FABRIC; n],
-            cover: vec![0; n],
-        };
+        let mut t = Tile::new(x0, y0, w, h);
         let center =
             |px: u32, py: u32| Point::new(min.x + (f64::from(px) + 0.5) / ppm, min.y + (f64::from(py) + 0.5) / ppm);
         for (rings, c) in &self.pieces {
@@ -523,7 +565,13 @@ impl Laid {
         for &i in ids {
             let s = &self.strands[i as usize];
             let z = &self.z[s.start..s.start + s.n];
-            let r_px = s.half * ppm;
+            // Small changes of each thread (ADR 0125): its width and its
+            // brightness, from its place.
+            let half = s.half * (1.0 + VARY_WIDTH * f64::from(s.vary[0]));
+            let shade = 1.0 + VARY_BRIGHTNESS * f64::from(s.vary[1]);
+            let color =
+                [s.color.0, s.color.1, s.color.2].map(|c| (f64::from(c) * shade).round().clamp(0.0, 255.0) as u8);
+            let r_px = half * ppm;
             let b = s.bbox.expand(1.0 / ppm);
             let px0 = (((b.min.x - min.x) * ppm).floor().max(0.0) as u32).max(x0) - x0;
             let px1 = ((((b.max.x - min.x) * ppm).ceil().max(0.0)) as u32).min(x0 + w).max(x0) - x0;
@@ -541,7 +589,8 @@ impl Laid {
                     if cover <= 0.0 {
                         continue;
                     }
-                    let across = ((ry * s.dir.0 - rx * s.dir.1).abs() / s.half).min(1.0);
+                    let side = (ry * s.dir.0 - rx * s.dir.1) / half;
+                    let across = side.abs().min(1.0);
                     let zc = s.middle(z, along);
                     let hz = zc * ((1.0 - across * across).sqrt() as f32);
                     let k = (py * w + px) as usize;
@@ -551,15 +600,133 @@ impl Laid {
                     t.cover[k] = ((1.0 - open) * 255.0).round() as u8;
                     if hz >= t.height[k] {
                         t.height[k] = hz;
-                        t.color[k] = [s.color.0, s.color.1, s.color.2];
-                        t.angle[k] = s.angle;
+                        t.color[k] = color;
+                        t.axis[k] = s.axis;
                         t.material[k] = s.material;
+                        // The twist of the plies: a pattern along the
+                        // thread, slanted across it.
+                        let p = emb_geom::math::sin(std::f64::consts::TAU * (along / PLY_PITCH_MM + 0.6 * side));
+                        t.ply[k] = (p * 127.0).round() as i8;
                     }
                 }
             }
         }
         t
     }
+}
+
+/// How long a shadow can be, mm.
+const SHADOW_MAX_MM: f64 = 4.0;
+/// A part this far above the line to the light makes a full shadow, mm (a
+/// softer shadow for less).
+const SHADOW_SOFT_MM: f64 = 0.08;
+
+/// The shadow at the pixel (`x`, `y`) of heights `at` (`w` × `h` pixels at
+/// `ppm`; the highest point `top`) in the light `l`: 0 in the light, 1 in
+/// full shadow. The line from the pixel to the light goes up at the
+/// height of the light; a part above it puts the pixel in its shadow.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn shadow_at(
+    at: &impl Fn(i64, i64) -> f64,
+    w: i64,
+    h: i64,
+    x: i64,
+    y: i64,
+    l: &Lighting,
+    ppm: f64,
+    top: f64,
+) -> f64 {
+    let v = l.vector();
+    let flat = (v[0] * v[0] + v[1] * v[1]).sqrt();
+    if flat < 1e-6 || l.strength <= 0.0 {
+        return 0.0;
+    }
+    let (ux, uy) = (v[0] / flat, v[1] / flat);
+    let rise = v[2] / flat / ppm;
+    let h0 = at(x, y);
+    let steps = ((top - h0) / rise).min(SHADOW_MAX_MM * ppm).ceil().max(0.0) as i64;
+    let mut dark: f64 = 0.0;
+    for k in 1..=steps {
+        let (px, py) = (x as f64 + 0.5 + ux * k as f64, y as f64 + 0.5 + uy * k as f64);
+        if px < 0.0 || py < 0.0 || px >= w as f64 || py >= h as f64 {
+            break;
+        }
+        let over = at(px as i64, py as i64) - (h0 + rise * k as f64);
+        dark = dark.max(over / SHADOW_SOFT_MM);
+        if dark >= 1.0 {
+            return 1.0;
+        }
+    }
+    dark.clamp(0.0, 1.0)
+}
+
+/// Runs `f` for `0..count` on all processors and gives the results in
+/// order.
+fn in_parallel<T: Send>(count: usize, f: impl Fn(usize) -> T + Sync) -> Vec<T> {
+    let next = AtomicUsize::new(0);
+    let workers = std::thread::available_parallelism()
+        .map_or(1, usize::from)
+        .min(count)
+        .max(1);
+    let mut made: Vec<(usize, T)> = std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..workers)
+            .map(|_| {
+                scope.spawn(|| {
+                    let mut out = Vec::new();
+                    loop {
+                        let k = next.fetch_add(1, Ordering::Relaxed);
+                        if k >= count {
+                            break out;
+                        }
+                        out.push((k, f(k)));
+                    }
+                })
+            })
+            .collect();
+        handles
+            .into_iter()
+            .flat_map(|h| h.join().expect("a thread of the surface does not stop with an error"))
+            .collect()
+    });
+    made.sort_by_key(|(k, _)| *k);
+    made.into_iter().map(|(_, t)| t).collect()
+}
+
+/// The sum of the values of a row or a column in a window of `2r + 1`.
+fn box_sum(src: &[f32], n: usize, stride: usize, r: usize, out: &mut [f32]) {
+    let mut acc = 0.0f64;
+    for k in 0..n.min(r + 1) {
+        acc += f64::from(src[k * stride]);
+    }
+    for k in 0..n {
+        out[k * stride] = acc as f32;
+        if k + r + 1 < n {
+            acc += f64::from(src[(k + r + 1) * stride]);
+        }
+        if k >= r {
+            acc -= f64::from(src[(k - r) * stride]);
+        }
+    }
+}
+
+/// The mean of the values in a square of `2r + 1` (fewer at the edges).
+fn box_mean(src: &[f32], w: usize, h: usize, r: usize) -> Vec<f32> {
+    let mut rows = vec![0.0f32; w * h];
+    for y in 0..h {
+        box_sum(&src[y * w..(y + 1) * w], w, 1, r, &mut rows[y * w..(y + 1) * w]);
+    }
+    let mut out = vec![0.0f32; w * h];
+    for x in 0..w {
+        box_sum(&rows[x..], h, w, r, &mut out[x..]);
+    }
+    for y in 0..h {
+        let ny = (y + r + 1).min(h) - y.saturating_sub(r);
+        for x in 0..w {
+            let nx = (x + r + 1).min(w) - x.saturating_sub(r);
+            out[y * w + x] /= (nx * ny) as f32;
+        }
+    }
+    out
 }
 
 /// A tile of a surface: for each pixel, row by row.
@@ -571,31 +738,78 @@ pub struct Tile {
     pub h: u32,
     /// The height of the top, mm.
     pub height: Vec<f32>,
+    /// The mean direction of the surface (the normal, x, y and z times
+    /// 127; at a small zoom shorter than 1).
+    pub normal: Vec<[i8; 3]>,
     /// The color of the thread or the piece on top.
     pub color: Vec<[u8; 3]>,
-    /// The direction of the thread on top, 0 to 255 for 0° to 180°.
-    pub angle: Vec<u8>,
+    /// The direction of the thread on top, as the vector of two times its
+    /// angle times 127: shorter where threads of more directions mix (the
+    /// spread of the directions at a small zoom).
+    pub axis: Vec<[i8; 2]>,
     /// What is on top ([`material`]).
     pub material: Vec<u8>,
     /// The part of the pixel that threads or pieces cover, 0 to 255 (the
     /// union of the parts of each thread).
     pub cover: Vec<u8>,
+    /// The light that the gaps let in, 0 to 255 (a gap between stitches or
+    /// a needle hole is darker).
+    pub open: Vec<u8>,
+    /// The twist of the plies at the pixel, −127 to 127.
+    pub ply: Vec<i8>,
+    /// The shadow at the pixel in the light of the surface, 0 (in the
+    /// light) to 255 (in full shadow).
+    pub shadow: Vec<u8>,
+    /// The diffuse light at the pixel in the light of the surface, as a
+    /// factor from 0 (0) to 2 (255).
+    pub diffuse: Vec<u8>,
+    /// The light of the fabric in the light of the surface (its gaps and
+    /// its shadow), 0 to 255. At a small zoom it is the mean over the part
+    /// that the threads do not cover; the values above are the means over
+    /// the part that they cover.
+    pub fabric_shade: Vec<u8>,
+}
+
+impl Tile {
+    fn new(x0: u32, y0: u32, w: u32, h: u32) -> Tile {
+        let n = (w * h) as usize;
+        Tile {
+            x0,
+            y0,
+            w,
+            h,
+            height: vec![0.0; n],
+            normal: vec![[0, 0, 127]; n],
+            color: vec![[0; 3]; n],
+            axis: vec![[0; 2]; n],
+            material: vec![material::FABRIC; n],
+            cover: vec![0; n],
+            open: vec![255; n],
+            ply: vec![0; n],
+            shadow: vec![0; n],
+            diffuse: vec![128; n],
+            fabric_shade: vec![255; n],
+        }
+    }
 }
 
 /// The surface of an area at a zoom: tiles of [`TILE`] pixels, row by row.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Surface {
+    /// The area of the pixels (at least the area asked for).
     pub area: BBox,
     pub px_per_mm: f64,
     pub width: u32,
     pub height: u32,
     pub tiles_x: u32,
     pub tiles: Vec<Tile>,
+    /// The light of the shadows of the surface.
+    pub light: Lighting,
 }
 
 impl Surface {
     /// The tile of the pixel (`x`, `y`) and the index of the pixel in it.
-    fn at(&self, x: u32, y: u32) -> (&Tile, usize) {
+    pub fn at(&self, x: u32, y: u32) -> (&Tile, usize) {
         let t = &self.tiles[((y / TILE) * self.tiles_x + x / TILE) as usize];
         (t, ((y - t.y0) * t.w + (x - t.x0)) as usize)
     }
@@ -609,74 +823,172 @@ impl Surface {
         t.height[i]
     }
 
-    /// The size of the data, bytes (10 for each pixel).
-    pub fn bytes(&self) -> usize {
-        self.tiles.iter().map(|t| t.height.len() * 10).sum()
+    /// The highest point of the surface, mm.
+    pub fn max_height(&self) -> f32 {
+        self.tiles
+            .iter()
+            .flat_map(|t| t.height.iter().copied())
+            .fold(0.0, f32::max)
     }
-}
 
-/// The picture of a surface with the light of today on the directions of
-/// the surface (ADR 0124): each pixel of thread has the light of its
-/// normal and the highlight of its kind; the threads mix with the fabric
-/// in linear light where they cover a part of the pixel. `fabric`: the
-/// color and the weave under the threads, else a transparent background.
-pub fn light(s: &Surface, lighting: &Lighting, fabric: Option<(Rgb, Weave)>) -> Picture {
-    let (w, h) = (s.width as usize, s.height as usize);
-    let mut rgba = vec![0u8; w * h * 4];
-    let d = 2.0 / s.px_per_mm;
-    let rows_per = h
-        .div_ceil(std::thread::available_parallelism().map_or(1, usize::from))
-        .max(1);
-    std::thread::scope(|scope| {
-        for (band, chunk) in rgba.chunks_mut(rows_per * w * 4).enumerate() {
-            scope.spawn(move || {
-                for (r, row) in chunk.chunks_mut(w * 4).enumerate() {
-                    let y = (band * rows_per + r) as i64;
-                    for x in 0..w {
-                        let px = &mut row[x * 4..x * 4 + 4];
-                        let xi = x as i64;
-                        let (t, i) = s.at(x as u32, y as u32);
-                        let under = fabric.map(|(c, weave)| {
-                            let (mx, my) = (
-                                s.area.min.x + (x as f64 + 0.5) / s.px_per_mm,
-                                s.area.min.y + (y as f64 + 0.5) / s.px_per_mm,
-                            );
-                            lit(c, (fabric_value(weave, mx, my), 0.0))
-                        });
-                        let cover = f64::from(t.cover[i]) / 255.0;
-                        if cover <= 0.0 {
-                            match under {
-                                Some(c) => px.copy_from_slice(&[c[0], c[1], c[2], 255]),
-                                None => px.copy_from_slice(&[0, 0, 0, 0]),
-                            }
-                            continue;
-                        }
-                        let dzdx = f64::from(s.height(xi + 1, y) - s.height(xi - 1, y)) / d;
-                        let dzdy = f64::from(s.height(xi, y + 1) - s.height(xi, y - 1)) / d;
-                        let len = (dzdx * dzdx + dzdy * dzdy + 1.0).sqrt();
-                        let n = [-dzdx / len, -dzdy / len, 1.0 / len];
-                        let (f, shine) = lighting.shade_normal(n);
-                        let shine = kind_of(t.material[i]).map_or(0.0, |k| shine * shine_of(k));
-                        let [r, g, b] = t.color[i];
-                        let c = lit(Rgb(r, g, b), (f, shine));
-                        match under {
-                            Some(u) => {
-                                let m = |k: usize| crate::light::mix(c[k], u[k], cover);
-                                px.copy_from_slice(&[m(0), m(1), m(2), 255]);
-                            }
-                            None => {
-                                px.copy_from_slice(&[c[0], c[1], c[2], (cover * 255.0).round() as u8]);
+    /// The size of the data, bytes (20 for each pixel).
+    pub fn bytes(&self) -> usize {
+        self.tiles.iter().map(|t| t.height.len() * 20).sum()
+    }
+
+    /// The normals, the gaps and the shadows, from the heights (after the
+    /// tiles), on all processors.
+    fn finish(&mut self) {
+        let (w, h) = (self.width as usize, self.height as usize);
+        let mut flat = vec![0.0f32; w * h];
+        for t in &self.tiles {
+            for row in 0..t.h as usize {
+                let src = &t.height[row * t.w as usize..(row + 1) * t.w as usize];
+                let at = (t.y0 as usize + row) * w + t.x0 as usize;
+                flat[at..at + t.w as usize].copy_from_slice(src);
+            }
+        }
+        let r = ((GAP_RADIUS_MM * self.px_per_mm).round() as usize).max(1);
+        let around = box_mean(&flat, w, h, r);
+        let d = 2.0 / self.px_per_mm;
+        let (flat, around) = (&flat, &around);
+        let at = move |x: i64, y: i64| {
+            f64::from(flat[y.clamp(0, h as i64 - 1) as usize * w + x.clamp(0, w as i64 - 1) as usize])
+        };
+        let top = f64::from(flat.iter().copied().fold(0.0, f32::max));
+        let (light, ppm) = (self.light, self.px_per_mm);
+        let per = self
+            .tiles
+            .len()
+            .div_ceil(std::thread::available_parallelism().map_or(1, usize::from))
+            .max(1);
+        std::thread::scope(|scope| {
+            for chunk in self.tiles.chunks_mut(per) {
+                scope.spawn(move || {
+                    for t in chunk {
+                        for row in 0..t.h {
+                            for col in 0..t.w {
+                                let (x, y) = (i64::from(t.x0 + col), i64::from(t.y0 + row));
+                                let k = (row * t.w + col) as usize;
+                                let dzdx = (at(x + 1, y) - at(x - 1, y)) / d;
+                                let dzdy = (at(x, y + 1) - at(x, y - 1)) / d;
+                                let len = (dzdx * dzdx + dzdy * dzdy + 1.0).sqrt();
+                                t.normal[k] = [-dzdx / len, -dzdy / len, 1.0 / len].map(|v| (v * 127.0).round() as i8);
+                                let depth = (f64::from(around[y as usize * w + x as usize]) - at(x, y)).max(0.0);
+                                let open = 1.0 - GAP_DARK * (depth / GAP_DEPTH_MM).min(1.0);
+                                t.open[k] = (open * 255.0).round() as u8;
+                                let dark = shadow_at(&at, w as i64, h as i64, x, y, &light, ppm, top);
+                                t.shadow[k] = (dark * 255.0).round() as u8;
+                                let shade = open * (1.0 - crate::sheen::SHADOW_DARK * dark);
+                                t.fabric_shade[k] = (shade * 255.0).round() as u8;
+                                let n = [-dzdx / len, -dzdy / len, 1.0 / len];
+                                let lit = crate::sheen::diffuse(n, light.vector());
+                                t.diffuse[k] = (lit / 2.0 * 255.0).round().clamp(0.0, 255.0) as u8;
                             }
                         }
                     }
+                });
+            }
+        });
+    }
+
+    /// The zoom level with half the pixels on each side: each pixel has the
+    /// mean height, slope, gaps and plies of the four pixels under it, the
+    /// mean color of their threads (in linear light), the part that they
+    /// cover, the mean of their thread directions (shorter where they
+    /// differ) and the material that covers most of them (ADR 0125).
+    pub fn half(&self) -> Surface {
+        let (width, height) = (self.width.div_ceil(2), self.height.div_ceil(2));
+        let (tx, ty) = (width.div_ceil(TILE), height.div_ceil(TILE));
+        let tiles = in_parallel((tx * ty) as usize, |k| {
+            let (cx, cy) = (k as u32 % tx, k as u32 / tx);
+            let (x0, y0) = (cx * TILE, cy * TILE);
+            let mut t = Tile::new(x0, y0, TILE.min(width - x0), TILE.min(height - y0));
+            for row in 0..t.h {
+                for col in 0..t.w {
+                    let (x, y) = (2 * (x0 + col), 2 * (y0 + row));
+                    let mut n = 0.0f64;
+                    // The light of the threads is the mean over the part that
+                    // they cover; the light of the fabric over the rest.
+                    let (mut hs, mut cov, mut open, mut ply, mut dark) = (0.0f64, 0.0f64, 0.0f64, 0.0f64, 0.0f64);
+                    let (mut lit, mut bare, mut fabric) = (0.0f64, 0.0f64, 0.0f64);
+                    let mut plain = [0.0f64; 5];
+                    let mut normal = [0.0f64; 3];
+                    let mut lin = [0.0f64; 3];
+                    let mut axis = [0.0f64; 2];
+                    let mut mats: [(u8, f64); 4] = [(0, 0.0); 4];
+                    for (j, (dx, dy)) in [(0, 0), (1, 0), (0, 1), (1, 1)].into_iter().enumerate() {
+                        if x + dx >= self.width || y + dy >= self.height {
+                            continue;
+                        }
+                        let (s, i) = self.at(x + dx, y + dy);
+                        let c = f64::from(s.cover[i]) / 255.0;
+                        n += 1.0;
+                        hs += f64::from(s.height[i]);
+                        cov += c;
+                        let values = [s.open[i], s.shadow[i], s.diffuse[i], s.fabric_shade[i]].map(f64::from);
+                        open += c * values[0];
+                        dark += c * values[1];
+                        lit += c * values[2];
+                        ply += c * f64::from(s.ply[i]);
+                        bare += 1.0 - c;
+                        fabric += (1.0 - c) * values[3];
+                        for (p, v) in plain.iter_mut().zip(values.iter().chain([f64::from(s.ply[i])].iter())) {
+                            *p += v;
+                        }
+                        for (a, v) in normal.iter_mut().zip(s.normal[i]) {
+                            *a += c * f64::from(v);
+                        }
+                        for (a, v) in lin.iter_mut().zip(s.color[i]) {
+                            *a += c * crate::light::to_linear(v);
+                        }
+                        for (a, v) in axis.iter_mut().zip(s.axis[i]) {
+                            *a += c * f64::from(v);
+                        }
+                        mats[j] = (s.material[i], c);
+                    }
+                    let i = (row * t.w + col) as usize;
+                    t.height[i] = (hs / n) as f32;
+                    t.cover[i] = (cov / n * 255.0).round() as u8;
+                    if cov > 0.0 {
+                        t.normal[i] = normal.map(|v| (v / cov).round() as i8);
+                        t.open[i] = (open / cov).round() as u8;
+                        t.shadow[i] = (dark / cov).round() as u8;
+                        t.diffuse[i] = (lit / cov).round() as u8;
+                        t.ply[i] = (ply / cov).round() as i8;
+                    } else {
+                        t.open[i] = (plain[0] / n).round() as u8;
+                        t.shadow[i] = (plain[1] / n).round() as u8;
+                        t.diffuse[i] = (plain[2] / n).round() as u8;
+                        t.ply[i] = (plain[4] / n).round() as i8;
+                    }
+                    t.fabric_shade[i] = if bare > 0.0 { fabric / bare } else { plain[3] / n }.round() as u8;
+                    if cov > 0.0 {
+                        t.color[i] = lin.map(|v| crate::light::to_srgb(v / cov));
+                        t.axis[i] = axis.map(|v| (v / cov).round() as i8);
+                        // The material that covers most.
+                        let mut best = (material::FABRIC, -1.0);
+                        for (m, _) in mats {
+                            let sum: f64 = mats.iter().filter(|(x, _)| *x == m).map(|(_, c)| c).sum();
+                            if sum > best.1 {
+                                best = (m, sum);
+                            }
+                        }
+                        t.material[i] = best.0;
+                    }
                 }
-            });
+            }
+            t
+        });
+        Surface {
+            area: self.area,
+            px_per_mm: self.px_per_mm / 2.0,
+            width,
+            height,
+            tiles_x: tx,
+            tiles,
+            light: self.light,
         }
-    });
-    Picture {
-        width: s.width,
-        height: s.height,
-        rgba,
     }
 }
 
@@ -827,33 +1139,45 @@ mod tests {
         }
         // The same again: the same bytes.
         assert_eq!(big, laid.surface(big.area, 20.0));
-        assert!(big.bytes() == 600 * 240 * 10);
+        assert!(big.bytes() == 600 * 240 * 20);
     }
 
     #[test]
-    fn the_light_comes_from_the_top_left_and_matte_thread_has_no_highlight() {
-        let one = |kind| {
-            let laid = lay(
-                &[Strand {
-                    kind,
-                    ..strand((0.0, 0.0), (10.0, 0.0))
-                }],
-                &[],
-            );
-            let s = laid.surface(BBox::new(Point::new(0.0, -1.0), Point::new(10.0, 1.0)), 40.0);
-            light(&s, &Lighting::default(), Some((Rgb(250, 250, 250), Weave::Smooth)))
+    fn a_zoom_level_has_the_means_of_the_level_under_it() {
+        let s: Vec<Strand> = (0..10)
+            .map(|k| strand((0.0, 0.5 * k as f64), (6.0, 0.5 * k as f64 + 0.3)))
+            .collect();
+        let fine = lay(&s, &[]).surface(BBox::new(Point::new(0.0, 0.0), Point::new(6.0, 5.0)), 16.0);
+        let half = fine.half();
+        assert_eq!((half.width, half.height, half.px_per_mm), (48, 40, 8.0));
+        let (t, i) = half.at(10, 10);
+        let four: Vec<(&Tile, usize)> = [(20, 20), (21, 20), (20, 21), (21, 21)]
+            .iter()
+            .map(|&(x, y)| fine.at(x, y))
+            .collect();
+        let mean_h = four.iter().map(|(t, i)| t.height[*i]).sum::<f32>() / 4.0;
+        assert!((t.height[i] - mean_h).abs() < 1e-6);
+        let mean_cover = four.iter().map(|(t, i)| f64::from(t.cover[*i])).sum::<f64>() / 4.0;
+        assert!((f64::from(t.cover[i]) - mean_cover).abs() <= 0.5);
+        // All stitches go one way: the direction keeps its length.
+        let a = t.axis[i];
+        let len = (f64::from(a[0]).powi(2) + f64::from(a[1]).powi(2)).sqrt();
+        assert!(len > 120.0, "{a:?}");
+        // A smaller zoom from a surface that is too small for its detail.
+        let small = lay(&s, &[]).surface(BBox::new(Point::new(0.0, 0.0), Point::new(6.0, 5.0)), 2.0);
+        assert_eq!((small.width, small.height, small.px_per_mm), (12, 10, 2.0));
+    }
+
+    #[test]
+    fn the_gaps_are_darker() {
+        // Two stitches with a gap between them.
+        let s = [strand((0.0, 0.0), (6.0, 0.0)), strand((6.0, 0.5), (0.0, 0.5))];
+        let surf = lay(&s, &[]).surface(BBox::new(Point::new(0.0, -1.0), Point::new(6.0, 1.5)), 32.0);
+        let open = |y_mm: f64| {
+            let (t, i) = surf.at(96, ((y_mm + 1.0) * 32.0) as u32);
+            t.open[i]
         };
-        let p = one(ThreadKind::Polyester);
-        let at = |p: &Picture, x: u32, y: u32| p.rgba[((y * p.width + x) * 4) as usize];
-        // The thread is from y = 32 to 48 (pixels); its upper edge faces the light.
-        assert!(
-            at(&p, 200, 35) > at(&p, 200, 45) + 30,
-            "{} {}",
-            at(&p, 200, 35),
-            at(&p, 200, 45)
-        );
-        assert_eq!(at(&p, 200, 5), at(&one(ThreadKind::Cotton), 200, 5), "the fabric");
-        let green = |p: &Picture| p.rgba.chunks(4).map(|c| c[1]).filter(|&g| g < 200).max().unwrap();
-        assert!(green(&p) > green(&one(ThreadKind::Cotton)) + 20);
+        assert!(open(0.25) < open(0.0), "{} {}", open(0.25), open(0.0));
+        assert_eq!(open(-0.9), 255);
     }
 }

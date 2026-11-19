@@ -82,3 +82,82 @@ fn the_surface_has_the_heights_of_a_sew_out() {
         assert!(h < puff - 0.5, "{}: {h} (puff {puff})", r.name);
     }
 }
+
+/// The light of the whole design at the zoom of 16 pixels for each mm and
+/// at the levels halved from it (8, 4 and 2 pixels for each mm).
+fn levels(name: &str) -> Vec<emb_render::sheen::Light> {
+    let d = emb_cli::corpus::build(name).unwrap();
+    let laid = view::lay_design(&d);
+    let fabric = d.background.zip(emb_cli::picture_look(&d, false).fabric);
+    let plan = emb_cli::plan(&d, &emb_cli::plan_options(&d, None).unwrap());
+    let all = emb_render::bounds(&emb_render::segments(&plan.stitches))
+        .unwrap()
+        .expand(2.4);
+    let mut s = laid.surface(all, 16.0);
+    let mut out = Vec::new();
+    for _ in 0..4 {
+        out.push(emb_render::sheen::light_values(&s, &Default::default(), fabric));
+        s = s.half();
+    }
+    out
+}
+
+/// The exit test of Milestone 4 of the view (ADR 0125): the mean light of
+/// each area of each design of the reference set is the same within 3 % at
+/// each zoom level (the light before the tone curve).
+#[test]
+fn the_zoom_levels_keep_the_light() {
+    for name in view::REFERENCE.iter().map(|r| r.name) {
+        let l = levels(name);
+        for (k, small) in l.iter().enumerate().skip(1) {
+            let big = l[0].smaller(1 << k);
+            assert_eq!((big.width, big.height), (small.width, small.height));
+            for gy in 0..4u32 {
+                for gx in 0..4u32 {
+                    let (x0, x1) = (gx * small.width / 4, (gx + 1) * small.width / 4);
+                    let (y0, y1) = (gy * small.height / 4, (gy + 1) * small.height / 4);
+                    let (a, b) = (big.mean(x0, y0, x1, y1), small.mean(x0, y0, x1, y1));
+                    let rel = (b - a) / a.max(0.01);
+                    assert!(rel.abs() < 0.03, "{name}, level {k}, area {gx},{gy}: {a:.4} and {b:.4}");
+                }
+            }
+        }
+    }
+}
+
+/// The exit test of Milestone 4 of the view: the eight satin columns of the
+/// reference set have eight brightness values (at least 1 % apart), and a
+/// column whose stitches go across the light is lighter than one whose
+/// stitches go toward it. The photo of the sew-out gives their order.
+#[test]
+fn the_eight_satin_angles_have_eight_brightness_values() {
+    use emb_geom::Point;
+    let d = emb_cli::corpus::build("view-satin-angles").unwrap();
+    let laid = view::lay_design(&d);
+    let plan = emb_cli::plan(&d, &emb_cli::plan_options(&d, None).unwrap());
+    let all = emb_render::bounds(&emb_render::segments(&plan.stitches))
+        .unwrap()
+        .expand(2.4);
+    let s = laid.surface(all, 8.0);
+    let fabric = d.background.zip(emb_cli::picture_look(&d, false).fabric);
+    let l = emb_render::sheen::light_values(&s, &Default::default(), fabric);
+    let out = d.output_transform();
+    let values: Vec<f64> = (0..8)
+        .map(|k| {
+            let c = out.apply(Point::new(
+                -45.0 + 30.0 * f64::from(k % 4),
+                -15.0 + 30.0 * f64::from(k / 4),
+            ));
+            let (x, y) = (((c.x - s.area.min.x) * 8.0) as u32, ((c.y - s.area.min.y) * 8.0) as u32);
+            l.mean(x - 10, y - 10, x + 10, y + 10)
+        })
+        .collect();
+    let mut sorted = values.clone();
+    sorted.sort_by(f64::total_cmp);
+    for p in sorted.windows(2) {
+        assert!(p[1] > p[0] * 1.01, "{values:?}");
+    }
+    // The column at 0° has its stitches across the light (from the top
+    // left), the column at 90° has them toward it.
+    assert!(values[0] > 1.2 * values[4], "{values:?}");
+}
