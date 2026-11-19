@@ -104,6 +104,18 @@ sobre la tela. Los diseños grandes también se mueven y se amplían más
 rápido. **Ver > Aspecto de hilo > Superficie fina** lo desactiva en un
 equipo lento. Consulte [Comprobar un diseño](checking).
 
+**La tela en el aspecto 3D.** La tela bajo las puntadas tiene una
+superficie a su tamaño real: los hilos de un tafetán o de una sarga, las
+mallas de un tejido de punto, las celdas del piqué, los rizos de una
+toalla, el pelo del forro polar, el fieltro y el grano del cuero, con la
+luz del aspecto de hilo. Cada agujero de aguja es una pequeña hendidura,
+mayor en el cuero. En una toalla o un forro polar sin recubrimiento, las
+puntadas finas se hunden en el pelo: la casilla **Recubrimiento** del
+panel Estilos lo define. Una tela puede tener un **Segundo color** (los
+hilos claros de un denim, la segunda fibra de una tela jaspeada). La
+vista de producto muestra la misma tela. Consulte [Telas, estilos y
+plantillas](fabrics-and-styles).
+
 **Diseños con muchísimas puntadas.** El programa podía cerrarse cuando el
 lienzo mostraba unas 350 000 puntadas o más a la vez con el aspecto de
 hilo. Ahora el lienzo las muestra con un aspecto más simple con ese zoom,

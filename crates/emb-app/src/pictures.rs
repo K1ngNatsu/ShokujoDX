@@ -504,6 +504,13 @@ fn scenes() -> Vec<Scene> {
         v.push(Scene::new(format!("panel {tab:?}"), View::Screen, move |st, _| {
             st.select_all();
             st.focus_tab = Some(tab);
+            // A fabric with a topping, so the Topping check box shows.
+            if tab == Tab::Styles {
+                let fabrics = st.fabrics.clone();
+                st.doc.edit("Fabric", |d| {
+                    d.set_fabric(&fabrics, Some("towel"), false);
+                });
+            }
         }));
     }
     v.push(Scene::new("start page", View::Screen, |st, _| st.show_start_page()));

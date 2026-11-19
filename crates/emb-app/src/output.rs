@@ -336,7 +336,7 @@ pub fn sheet_data(design: &Design, stitches: &StitchDesign, c: Catalogs, files: 
         d.set_thread_use(stitches, f.thickness_mm);
         d.fabric = Some(f.name.clone());
         d.backing = Some(f.backing.clone());
-        d.topping = f.topping.clone();
+        d.topping = f.topping.clone().filter(|_| !design.no_topping);
     }
     d.fabric_areas = sheet::fabric_areas(design);
     (d.stones, d.stone_counts) = sheet::stones_of(design);
@@ -479,7 +479,7 @@ pub fn write_files(
             three_d: !profile.flat_picture,
             ..Default::default()
         }
-        .picture_look(design.fabric.as_deref());
+        .picture_look(Some(emb_render::fabric::FabricLook::of(&c.fabrics.of(design), design)));
         let pic = emb_render::raster::picture_look(
             &data.segments,
             &sheet::picture_areas(design),

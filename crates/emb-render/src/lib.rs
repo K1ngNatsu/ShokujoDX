@@ -10,7 +10,9 @@
 //! - [`product`]: the product under the design and the virtual decoration picture.
 //! - [`template`]: the hoop template at full size; [`hooping_sheet`]: the
 //!   order and places of the hoopings of a large design.
-//! - [`thread3d`]: the 3D thread look (light, shade, shadows, fabric textures).
+//! - [`thread3d`]: the 3D thread look (light, shade, shadows).
+//! - [`fabric`]: the fabric under the stitches: a relief for each weave,
+//!   its light, its pile and its needle holes (ADR 0127).
 //! - [`cross_chart`]: the chart of a cross-stitch design; [`stone_sheet`]:
 //!   the rhinestone template on paper.
 //! - [`density`]: the layers of thread on each small square (density map).
@@ -27,6 +29,7 @@ pub mod barcode;
 pub mod compare;
 pub mod cross_chart;
 pub mod density;
+pub mod fabric;
 pub mod hooping_sheet;
 pub mod light;
 pub mod page;

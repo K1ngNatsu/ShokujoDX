@@ -25,6 +25,13 @@
 #   thickness_mm           The thickness of the fabric, for the thread use
 #                          estimate (Design info, worksheets). 0.05 to 10.
 #                          Optional: 0.6.
+#   weave                  The surface in the 3D view: plain | twill | knit |
+#                          pique | terry | fleece | felt | leather. Optional:
+#                          plain.
+#   weave_mm               The size of the weave, mm: the distance from one
+#                          thread to the next one, or the size of a loop, a
+#                          cell or a grain. 0.05 to 5. Optional: the usual
+#                          size of the weave.
 
 [[fabric]]
 id = "cotton"
@@ -36,6 +43,8 @@ stitch_length_factor = 1.0
 pull_mm = 0.0
 underlay = "normal"
 backing = "Tear-away, medium"
+weave = "plain"
+weave_mm = 0.25
 
 [[fabric]]
 id = "denim"
@@ -47,6 +56,8 @@ stitch_length_factor = 1.0
 pull_mm = 0.05
 underlay = "normal"
 backing = "Tear-away, heavy"
+weave = "twill"
+weave_mm = 0.45
 
 [[fabric]]
 id = "knit"
@@ -58,6 +69,8 @@ stitch_length_factor = 1.0
 pull_mm = 0.15
 underlay = "heavy"
 backing = "Cut-away, medium (no-show mesh on light colors)"
+weave = "knit"
+weave_mm = 0.7
 
 [[fabric]]
 id = "pique"
@@ -70,6 +83,8 @@ pull_mm = 0.15
 underlay = "heavy"
 backing = "Cut-away, medium"
 topping = "Water-soluble film"
+weave = "pique"
+weave_mm = 1.0
 
 [[fabric]]
 id = "fleece"
@@ -82,6 +97,8 @@ pull_mm = 0.2
 underlay = "heavy"
 backing = "Cut-away, medium"
 topping = "Water-soluble film"
+weave = "fleece"
+weave_mm = 0.5
 
 [[fabric]]
 id = "towel"
@@ -94,6 +111,8 @@ pull_mm = 0.2
 underlay = "heavy"
 backing = "Tear-away, medium (cut-away for thin towels)"
 topping = "Water-soluble film (necessary)"
+weave = "terry"
+weave_mm = 1.0
 
 [[fabric]]
 id = "felt"
@@ -105,6 +124,8 @@ stitch_length_factor = 1.0
 pull_mm = 0.05
 underlay = "normal"
 backing = "Tear-away, light"
+weave = "felt"
+weave_mm = 0.4
 
 [[fabric]]
 id = "leather"
@@ -116,6 +137,8 @@ stitch_length_factor = 1.15
 pull_mm = 0.0
 underlay = "light"
 backing = "Cut-away, medium"
+weave = "leather"
+weave_mm = 0.7
 
 [[fabric]]
 id = "silk"
@@ -127,6 +150,8 @@ stitch_length_factor = 1.0
 pull_mm = 0.05
 underlay = "light"
 backing = "Wash-away or light tear-away"
+weave = "plain"
+weave_mm = 0.15
 
 [[fabric]]
 id = "cap"
@@ -138,6 +163,8 @@ stitch_length_factor = 1.0
 pull_mm = 0.15
 underlay = "normal"
 backing = "Cap backing (stiff tear-away)"
+weave = "twill"
+weave_mm = 0.4
 
 [[fabric]]
 id = "water_soluble"
@@ -149,3 +176,5 @@ stitch_length_factor = 1.0
 pull_mm = 0.0
 underlay = "lace"
 backing = "Water-soluble fibrous stabilizer, two layers, tight in the hoop"
+weave = "felt"
+weave_mm = 0.3

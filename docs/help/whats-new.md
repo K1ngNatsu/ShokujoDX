@@ -100,6 +100,17 @@ designs faster when you move and zoom the view. **View > Thread Look >
 Fine surface** turns it off on a slow computer. See [Checking a
 design](checking).
 
+**The fabric in the 3D look.** The fabric under the stitches has a
+surface at its real size: the threads of a plain weave or a twill, the
+loops of a knit, the cells of piqué, the loops of a towel, the hair of
+fleece, felt, and the grain of leather, in the light of the thread look.
+Each needle hole is a small dent, larger on leather. On a towel or fleece
+with no topping, thin stitches sink into the pile: the **Topping** check
+box of the Styles panel sets it. A fabric can have a **Second color**
+(the light threads of a denim, the second fiber of a heather). The
+product view shows the same fabric. See [Fabrics, styles and
+templates](fabrics-and-styles).
+
 **Designs with very many stitches.** The program could stop when the
 canvas showed about 350,000 stitches or more at one time in the thread
 look. Now the canvas shows them in a simpler look at that zoom, and in

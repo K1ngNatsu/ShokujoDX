@@ -88,13 +88,17 @@ Abflachen**, oder machen Sie die Dichte offener.
 **Ansicht > Garnansicht** zeigt die Stiche als Garne, wie sie auf dem
 Stoff aussehen. Ihr Menü hat **Flach** oder **3D (Licht und Schatten)**,
 die Richtung und die Höhe des Lichts, die Stärke des Schattens und die
-**Stoffstruktur** (das Gewebe des Stoffs des Designs unter der
-Stofffarbe). **Standardlicht** setzt sie zurück.
+**Stoffstruktur** (die Oberfläche des Stoffs des Designs in der
+Stofffarbe: die Fäden seines Gewebes, die Schlingen eines Handtuchs oder
+die Narbung von Leder, im Licht der Garnansicht). **Standardlicht** setzt sie zurück.
 
 Mit **Feine Oberfläche** (beim Start ein) zeigt die 3D-Ansicht die
 Oberfläche der Stiche: Garn auf Garn ist höher, jede Fläche ist heller
 oder dunkler nach der Richtung ihrer Stiche zum Licht, und hohe Teile
-werfen Schatten auf den Stoff. Das Programm macht die Oberfläche in
+werfen Schatten auf den Stoff. Jedes Nadelloch ist eine kleine Delle
+(größer auf Leder). Auf einem Handtuch oder Fleece ohne Deckvlies sinken
+dünne Stiche in den Flor (siehe [Stoffe, Stile und Vorlagen](fabrics-and-styles)).
+Das Programm macht die Oberfläche in
 Teilen, während Sie arbeiten; ein Teil, der noch nicht fertig ist, zeigt
 kurz die schnellere Ansicht. Schalten Sie **Feine Oberfläche** auf einem
 langsamen Computer aus.

@@ -71,8 +71,10 @@ Export and Output design write the current colorway.
 **Color > Fabric Color** sets the **Background**: the color of the fabric
 inside the hoop. The canvas, the thread look and the pictures show the
 fabric in that color. **No Background** removes it. The 3D thread look
-shows the weave of the fabric of the design (Design > Fabric) under the
-color.
+shows the surface of the fabric of the design (Design > Fabric) in the
+color. **Second color** (in the Threads panel, under **Background**)
+gives the fabric two colors: the light threads of a denim, or the second
+fiber of a heather. **None** gives it one color again.
 
 ## The color wheel
 

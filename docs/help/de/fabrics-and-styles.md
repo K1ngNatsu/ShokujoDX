@@ -10,7 +10,9 @@ keywords: stoff, stickvlies, deckvlies, unterlage, strickstoff, t-shirt, polo, f
 
 **Design > Stoff** legt den Stoff des Designs fest. Der Stoff legt die
 Dichte, den Zugausgleich und die Unterlage von Satin- und Füllstichen fest,
-und das Stickvlies und das Deckvlies auf dem Arbeitsblatt.
+und das Stickvlies und das Deckvlies auf dem Arbeitsblatt. In der
+3D-Garnansicht zeigt der Stoff seine Oberfläche (sein Gewebe, seine
+Schlingen oder seine Narbung in echter Größe).
 
 Die Stoffe sind: Woven cotton; Denim and canvas; T-shirt knit; Piqué knit
 (Poloshirts); Fleece and sweatshirt; Towel (terry); Felt; Leather and
@@ -26,6 +28,10 @@ Wenn Sie den Stoff ändern:
   zwei Stoffen. Objekte ohne Unterlage oder mit einer benutzerdefinierten
   Unterlage behalten ihre Unterlage.
 - Das **Stickvlies** und das **Deckvlies** kommen auf das Arbeitsblatt.
+  Entfernen Sie das Häkchen **Deckvlies** im Bereich Stile für eine
+  Stickerei ohne Deckvlies: Auf einem Handtuch oder Fleece zeigt die
+  3D-Garnansicht dann dünne Stiche, die in den Flor sinken. Ein Deckvlies
+  oder eine Unterlagefüllung unter den Stichen hält sie oben.
 
 ## Aktuelle Eigenschaften
 

@@ -28,9 +28,16 @@ fn the_pictures_of_the_reference_set() {
         .collect();
     let out = Path::new(env!("CARGO_TARGET_TMPDIR")).join("view-bench");
     let (mut lines, mut changed) = (Vec::new(), Vec::new());
-    for r in view::REFERENCE {
-        let m = view::run(&r, false);
-        assert_eq!(m.shots.len(), 2 * view::ZOOMS.len(), "{}", r.name);
+    let measures = view::REFERENCE
+        .iter()
+        .map(|r| view::run(r, false))
+        .chain(view::fabrics());
+    for m in measures {
+        assert!(
+            m.shots.len() >= 2 * view::ZOOMS.len() || m.name.starts_with("fabric-"),
+            "{}",
+            m.name
+        );
         for s in &m.shots {
             let h = format!("{:016x}", s.hash);
             lines.push(format!("{} {}x{} {h}", s.name, s.picture.width, s.picture.height));
@@ -163,4 +170,59 @@ fn the_eight_satin_angles_have_eight_brightness_values() {
     // The column at 0° has its stitches across the light (from the top
     // left), the column at 90° has them toward it.
     assert!(values[0] > 1.2 * values[4], "{values:?}");
+}
+
+/// The exit test of Milestone 6 of the view (ADR 0127): on a towel with no
+/// topping the pile hides a part of the lettering (the edges of its columns
+/// most), and the topping keeps all of it on top. (The 8 mm lettering is
+/// bold, so it loses about as much as the 20 mm lettering; a line loses
+/// more: `surface::tests::a_pile_hides_a_line_more_than_a_wide_column`.)
+#[test]
+fn thin_stitches_sink_into_a_towel_with_no_topping() {
+    use emb_geom::BBox;
+    use emb_render::fabric::Ground;
+    let d = emb_cli::corpus::build("view-towel").unwrap();
+    let laid = view::lay_design(&d);
+    let preset = emb_model::FabricCatalog::builtin().of(&d);
+    let with = Ground::of(&preset, &d);
+    assert!(with.topping, "the towel names a topping");
+    let bare = Ground {
+        topping: false,
+        ..with.clone()
+    };
+    let out = d.output_transform();
+    // The part of the area of an object that threads cover, at 16 pixels
+    // for each mm.
+    let cover = |g: &Ground, object: usize| {
+        let b = d.bbox_of(&[d.objects()[object].id]).unwrap();
+        let b = BBox::from_points([out.apply(b.min), out.apply(b.max)]).unwrap();
+        let s = laid.surface_on(b, 16.0, &Default::default(), Some(g));
+        let n: usize = s.tiles.iter().map(|t| t.cover.len()).sum();
+        s.tiles
+            .iter()
+            .flat_map(|t| t.cover.iter())
+            .map(|c| f64::from(*c) / 255.0)
+            .sum::<f64>()
+            / n as f64
+    };
+    let lost = |object: usize| 1.0 - cover(&bare, object) / cover(&with, object);
+    let (large, thin) = (lost(0), lost(1));
+    eprintln!(
+        "the pile hides {:.0} % of the large lettering, {:.0} % of the thin one",
+        100.0 * large,
+        100.0 * thin
+    );
+    assert!(thin > 0.12 && large > 0.08, "{thin} {large}");
+    // A fabric with no pile: the topping changes nothing.
+    let cotton = Ground::new(emb_render::fabric::Weave::Plain, 0.25, false);
+    let plain = Ground {
+        topping: true,
+        ..cotton.clone()
+    };
+    let b = d.bbox_of(&[d.objects()[1].id]).unwrap();
+    let b = BBox::from_points([out.apply(b.min), out.apply(b.max)]).unwrap();
+    assert_eq!(
+        laid.surface_on(b, 8.0, &Default::default(), Some(&cotton)),
+        laid.surface_on(b, 8.0, &Default::default(), Some(&plain))
+    );
 }

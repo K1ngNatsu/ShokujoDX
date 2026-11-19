@@ -82,14 +82,19 @@ Formas > Aplanar**, o haga la densidad más abierta.
 
 **Ver > Aspecto de hilo** muestra las puntadas como hilos, como se ven en
 la tela. Su menú tiene **Plano** o **3D (luz y sombra)**, la dirección y
-la altura de la luz, la fuerza de la sombra y la **Textura de la tela** (el
-tejido de la tela del diseño bajo el color de la tela). **Luz
+la altura de la luz, la fuerza de la sombra y la **Textura de la tela** (la
+superficie de la tela del diseño en el color de la tela: los hilos de su
+tejido, los rizos de una toalla o el grano del cuero, con la luz del
+aspecto de hilo). **Luz
 predeterminada** los restablece.
 
 Con **Superficie fina** (activada al inicio), el aspecto 3D muestra la
 superficie de las puntadas: el hilo sobre hilo es más alto, cada zona es
 más clara o más oscura según la dirección de sus puntadas respecto a la
-luz, y las partes altas proyectan sombras sobre la tela. El programa hace
+luz, y las partes altas proyectan sombras sobre la tela. Cada agujero de aguja es una pequeña
+hendidura (mayor en el cuero). En una toalla o un forro polar sin
+recubrimiento, las puntadas finas se hunden en el pelo (consulte [Telas,
+estilos y plantillas](fabrics-and-styles)). El programa hace
 la superficie por partes mientras trabaja; una parte que aún no está
 lista muestra un momento el aspecto más rápido. Desactive **Superficie
 fina** en un equipo lento.

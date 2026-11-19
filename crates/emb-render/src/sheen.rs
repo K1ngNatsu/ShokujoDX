@@ -26,15 +26,16 @@
 //!   white slowly, so it keeps the color of the thread.
 //!
 //! Then the threads mix with the fabric in the part of the pixel that they
-//! cover.
+//! cover (the light of the fabric: [`crate::fabric`], ADR 0127).
 
 use emb_geom::math;
 use emb_model::{Rgb, ThreadKind};
 
+use crate::fabric::FabricLook;
 use crate::light::{to_linear, to_srgb};
 use crate::raster::Picture;
 use crate::surface::{Surface, kind_of};
-use crate::thread3d::{Lighting, Weave, fabric_value};
+use crate::thread3d::Lighting;
 
 /// The angle between the fibers on top of a thread and the thread (the
 /// twist of its plies), degrees.
@@ -93,7 +94,7 @@ fn luminance(c: [f64; 3]) -> f64 {
 
 /// The tone curve: above [`KNEE`] the luminance goes toward 1 slowly, and
 /// the three channels keep their ratio (the color of the thread).
-fn tone(c: [f64; 3]) -> [f64; 3] {
+pub(crate) fn tone(c: [f64; 3]) -> [f64; 3] {
     let y = luminance(c);
     if y <= KNEE {
         return c.map(|v| v.clamp(0.0, 1.0));
@@ -101,24 +102,6 @@ fn tone(c: [f64; 3]) -> [f64; 3] {
     let y2 = KNEE + (1.0 - KNEE) * (1.0 - math::exp(-(y - KNEE) / (1.0 - KNEE)));
     let s = y2 / y;
     c.map(|v| (v * s).clamp(0.0, 1.0))
-}
-
-/// The mean brightness of the weave in the pixel (`x`, `y`): at a small
-/// zoom a pixel is as large as the pattern of the weave, so one sample
-/// would give the same part of the pattern in each pixel. Samples at most
-/// 0.12 mm apart.
-fn fabric_mean(s: &Surface, weave: Weave, x: usize, y: usize) -> f64 {
-    let size = 1.0 / s.px_per_mm;
-    let n = ((size / 0.12).ceil() as usize).clamp(1, 8);
-    let mut sum = 0.0;
-    for j in 0..n {
-        for i in 0..n {
-            let mx = s.area.min.x + (x as f64 + (i as f64 + 0.5) / n as f64) * size;
-            let my = s.area.min.y + (y as f64 + (j as f64 + 0.5) / n as f64) * size;
-            sum += fabric_value(weave, mx, my);
-        }
-    }
-    sum / (n * n) as f64
 }
 
 /// The shadow at the pixel (`x`, `y`): the shadow of the surface when its
@@ -219,16 +202,21 @@ impl Light {
 }
 
 /// The picture of a surface in the light `lighting` (see the module text).
-/// `fabric`: the color and the weave under the threads, else a transparent
+/// `fabric`: the color and the fabric under the threads, else a transparent
 /// background.
-pub fn light(s: &Surface, lighting: &Lighting, fabric: Option<(Rgb, Weave)>) -> Picture {
+pub fn light(s: &Surface, lighting: &Lighting, fabric: Option<(Rgb, FabricLook)>) -> Picture {
     light_values(s, lighting, fabric).picture()
 }
 
 /// As [`light`], the light before the tone curve.
-pub fn light_values(s: &Surface, lighting: &Lighting, fabric: Option<(Rgb, Weave)>) -> Light {
+pub fn light_values(s: &Surface, lighting: &Lighting, fabric: Option<(Rgb, FabricLook)>) -> Light {
     let (w, h) = (s.width as usize, s.height as usize);
     let lit = Lit::new(s, lighting);
+    // The light of the fabric, and its colors in linear light.
+    let lin = |c: Rgb| [c.0, c.1, c.2].map(to_linear);
+    let ground = fabric.map(|(c, f)| (f.fabric().shade(lighting), lin(c), f.mix.map(lin)));
+    let ground = &ground;
+    let size = 1.0 / s.px_per_mm;
     let mut rgba = vec![[0.0f32; 4]; w * h];
     let rows_per = h
         .div_ceil(std::thread::available_parallelism().map_or(1, usize::from))
@@ -241,9 +229,12 @@ pub fn light_values(s: &Surface, lighting: &Lighting, fabric: Option<(Rgb, Weave
                     let y = band * rows_per + r;
                     for (x, px) in row.iter_mut().enumerate() {
                         let p = lit.at(x, y);
-                        let under = fabric.map(|(c, weave)| {
-                            let v = fabric_mean(s, weave, x, y) * p.fabric;
-                            [c.0, c.1, c.2].map(|c| to_linear(c) * v)
+                        let under = ground.as_ref().map(|(shade, c1, c2)| {
+                            let (mx, my) = (
+                                s.area.min.x + (x as f64 + 0.5) * size,
+                                s.area.min.y + (y as f64 + 0.5) * size,
+                            );
+                            shade.color(*c1, *c2, mx, my, size).map(|v| v * p.fabric)
                         });
                         *px = match (p.thread, under) {
                             (None, Some(u)) => [u[0] as f32, u[1] as f32, u[2] as f32, 1.0],
@@ -468,7 +459,11 @@ mod tests {
 
     fn picture(strands: &[Strand], area: BBox, ppm: f64) -> Picture {
         let s = lay(strands, &[]).surface(area, ppm);
-        light(&s, &Lighting::default(), Some((Rgb(250, 250, 250), Weave::Smooth)))
+        light(
+            &s,
+            &Lighting::default(),
+            Some((Rgb(250, 250, 250), FabricLook::new(crate::fabric::Weave::Leather))),
+        )
     }
 
     fn red(p: &Picture, x: u32, y: u32) -> u8 {
@@ -564,7 +559,13 @@ mod tests {
         let fine = laid.surface(BBox::new(Point::new(-1.0, -1.0), Point::new(7.0, 9.0)), 16.0);
         let coarse = fine.half().half().half();
         assert_eq!((coarse.width, coarse.px_per_mm), (16, 2.0));
-        let lit = |s: &Surface| light(s, &Lighting::default(), Some((Rgb(250, 250, 250), Weave::Smooth)));
+        let lit = |s: &Surface| {
+            light(
+                s,
+                &Lighting::default(),
+                Some((Rgb(250, 250, 250), FabricLook::new(crate::fabric::Weave::Leather))),
+            )
+        };
         let c = crate::compare::compare(&lit(&fine), &lit(&coarse), None, 2, 2);
         assert!(c.largest().unwrap().relative().abs() < 0.05, "{}", c.report());
     }

@@ -12,7 +12,8 @@ sew-out of the reference set and the numbers of a small computer
 except the compare with the photos (`docs/design/p18-view-m4-report.md`,
 ADR 0125). Milestone 5 is done, with a speed pass after it; the numbers
 of a small computer are open (`docs/design/p18-view-m5-report.md`, ADR
-0126).
+0126). Milestone 6 is done except the compare with the photos
+(`docs/design/p18-view-m6-report.md`, ADR 0127).
 
 ## Goal
 
@@ -382,6 +383,25 @@ keeps (all tiles 0.23 s) (`docs/design/p18-view-m5-report.md`).
 is partly lost, and the same design with the topping setting shows it
 clear, as the two photos of the owner show; each of the seven fabrics
 has a picture at three zooms in the report.
+
+**Done (2026-11-19, ADR 0127), except the photos.** `emb_render::fabric`
+keeps one repeat of each fabric as a relief (height, direction and second
+color of each texel) for eight weaves (`emb_model::Weave`; fleece is a
+weave of its own now) at the size of the fabric preset (`weave`,
+`weave_mm`), and lights it with the light of Milestone 4; in the default
+light its mean is the fabric color. The canvas, the surface pictures, the
+3D pictures of today and the product view use it. Each needle point is a
+dent (larger on leather). On terry and fleece with no topping
+(`Design::no_topping`, the Topping check box of the Styles panel) the
+pile hides the threads that it is higher than; threads that cover the
+area round a place press it down. `view-towel` with no topping loses
+about a fifth of its lettering (the edges of the columns and the joins;
+the 8 mm lettering is bold), with the topping nothing; a run loses 84 %
+(tests). A fabric can have a second color (`Design::fabric_mix`: the weft
+of a denim, the fibers of a heather). The bench has the eight fabrics at
+three zooms (`fabric-<id>-<zoom>`); the budgets of Milestone 5 hold on
+cotton, and a towel with no topping is about 10 % slower
+(`docs/design/p18-view-m6-report.md`).
 
 ## Milestone 7: what is not thread (M)
 

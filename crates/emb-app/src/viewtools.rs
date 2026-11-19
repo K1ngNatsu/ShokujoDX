@@ -106,14 +106,14 @@ impl Default for LookSettings {
 
 impl LookSettings {
     /// The look of the pictures (design picture, decoration) for a design
-    /// on `fabric` (a fabric id).
-    pub fn picture_look(&self, fabric: Option<&str>) -> emb_render::raster::Look {
+    /// on `fabric` (`AppState::fabric_look`).
+    pub fn picture_look(&self, fabric: Option<emb_render::fabric::FabricLook>) -> emb_render::raster::Look {
         if !self.three_d {
             return emb_render::raster::Look::default();
         }
         emb_render::raster::Look {
             lighting: Some(self.light),
-            fabric: self.fabric.then(|| emb_render::thread3d::Weave::for_fabric(fabric)),
+            fabric: fabric.filter(|_| self.fabric),
         }
     }
 }
@@ -229,40 +229,44 @@ impl AppState {
     }
 }
 
-/// The fabric texture of the canvas: its weave and color, and the texture.
+/// The fabric of the canvas (ADR 0127): one repeat of its relief in the
+/// light of the 3D look, and its texture at each zoom level that showed.
 pub struct FabricTexture {
-    pub key: (emb_render::thread3d::Weave, Rgb),
-    pub texture: egui::TextureHandle,
+    pub key: (emb_render::fabric::FabricLook, Rgb, emb_render::thread3d::Lighting),
+    shade: emb_render::fabric::Shade,
+    textures: Vec<Option<egui::TextureHandle>>,
 }
 
-/// Draws the fabric texture over the background color of the hoop field
-/// (the whole canvas in open field), with the 3D thread look. The texture
-/// fades out when its threads are smaller than the screen pixels.
+/// Draws the fabric of the design over the background color of the hoop
+/// field (the whole canvas in open field), with the 3D thread look: its
+/// relief in the light of the look, at the zoom level whose texels are as
+/// small as the pixels of the screen (ADR 0127). Its mean color in the
+/// default light is the background color.
 pub fn draw_fabric(painter: &egui::Painter, ctx: &egui::Context, rect: egui::Rect, st: &mut AppState) {
-    use emb_render::thread3d::{TILE_MM, Weave, fabric_tile};
     let look = st.settings.look;
     if !(st.show_plan && st.show_thread_look && look.three_d && look.fabric) {
         return;
     }
     let d = st.doc.design();
     let Some(bg) = d.background else { return };
-    let fade = ((st.view.scale() as f32 - 2.0) / 4.0).clamp(0.0, 1.0);
-    if fade <= 0.0 {
-        return;
+    let fabric = st.fabric_look(d);
+    let key = (fabric, bg, look.light);
+    if st.fabric_tex.as_ref().is_none_or(|t| t.key != key) {
+        let shade = fabric.fabric().shade(&look.light);
+        let textures = vec![None; shade.levels()];
+        st.fabric_tex = Some(FabricTexture { key, shade, textures });
     }
-    let key = (Weave::for_fabric(d.fabric.as_deref()), bg);
-    let texture = match &st.fabric_tex {
-        Some(t) if t.key == key => t.texture.clone(),
-        _ => {
-            let tile = fabric_tile(key.0, key.1, 32.0);
-            let image =
-                egui::ColorImage::from_rgba_unmultiplied([tile.width as usize, tile.height as usize], &tile.rgba);
-            let texture = ctx.load_texture("fabric", image, egui::TextureOptions::LINEAR_REPEAT);
-            st.fabric_tex = Some(FabricTexture {
-                key,
-                texture: texture.clone(),
-            });
-            texture
+    let Some(tex) = st.fabric_tex.as_mut() else { return };
+    let level = tex.shade.level_for(st.view.scale() * f64::from(ctx.pixels_per_point()));
+    let repeat = tex.shade.repeat;
+    let texture = match &tex.textures[level] {
+        Some(t) => t.clone(),
+        None => {
+            let p = tex.shade.picture(level, bg, fabric.mix);
+            let image = egui::ColorImage::from_rgba_unmultiplied([p.width as usize, p.height as usize], &p.rgba);
+            let t = ctx.load_texture(format!("fabric-{level}"), image, egui::TextureOptions::LINEAR_REPEAT);
+            tex.textures[level] = Some(t.clone());
+            t
         }
     };
     let polygons: Vec<Vec<Pos2>> = match st.hoop_outline(0.0) {
@@ -277,8 +281,7 @@ pub fn draw_fabric(painter: &egui::Painter, ctx: &egui::Context, rect: egui::Rec
             rect.left_bottom(),
         ]],
     };
-    let a = (255.0 * fade) as u8;
-    let tint = Color32::from_rgba_premultiplied(a, a, a, a);
+    let tint = Color32::WHITE;
     for pts in polygons {
         if pts.len() < 3 {
             continue;
@@ -288,7 +291,7 @@ pub fn draw_fabric(painter: &egui::Painter, ctx: &egui::Context, rect: egui::Rec
             let mm = st.view.to_mm(rect, *p);
             mesh.vertices.push(egui::epaint::Vertex {
                 pos: *p,
-                uv: Pos2::new((mm.x / TILE_MM) as f32, (mm.y / TILE_MM) as f32),
+                uv: Pos2::new((mm.x / repeat.0) as f32, (mm.y / repeat.1) as f32),
                 color: tint,
             });
         }

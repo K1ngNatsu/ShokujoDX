@@ -14,7 +14,11 @@
 //!
 //! Each design has two pictures at each zoom: the 3D thread look of today
 //! (`<design>-<zoom>`) and the surface with its first light
-//! (`<design>-<zoom>-surface`, Milestone 3, ADR 0124).
+//! (`<design>-<zoom>-surface`, Milestone 3, ADR 0124), on the fabric of the
+//! design (Milestone 6, ADR 0127). A design on a pile with a topping also
+//! has the surface with no topping (`<design>-<zoom>-no-topping`): thin
+//! stitches sink into the pile. [`fabrics`] puts the lettering of
+//! `view-towel` on each fabric of [`FABRICS`] (`fabric-<id>-<zoom>`).
 
 use std::fmt::Write as _;
 use std::path::Path;
@@ -22,6 +26,7 @@ use std::time::Instant;
 
 use emb_geom::{BBox, Point};
 use emb_model::Rgb;
+use emb_render::fabric::{FabricLook, Ground, Weave};
 use emb_render::raster::{self, Look, Picture};
 
 use crate::corpus;
@@ -256,7 +261,16 @@ pub fn run(r: &Reference, flat: bool) -> Measure {
         bytes: laid.bytes(),
     });
     let fabric = design.background.zip(look.fabric);
+    let preset = emb_model::FabricCatalog::builtin().of(&design);
+    let ground = Ground::of(&preset, &design);
+    // With no topping, where a topping keeps the stitches on a pile.
+    let bare = Ground {
+        topping: false,
+        ..ground.clone()
+    };
+    let bare = (ground.topping && bare.sinks()).then_some(bare);
     let mut surface_shots = Vec::new();
+    let mut bare_shots = Vec::new();
     let mut shots = Vec::new();
     for z in ZOOMS {
         let b = z.close_mm.map_or(all, |s| BBox::from_center_size(at, s, s));
@@ -282,12 +296,21 @@ pub fn run(r: &Reference, flat: bool) -> Measure {
             hash: hash(&p),
             picture: p,
         });
-        let (surface, ms) = timed(|| laid.surface(b, z.px_per_mm));
+        let (surface, ms) = timed(|| laid.surface_on(b, z.px_per_mm, &Default::default(), Some(&ground)));
         steps.push(Step {
             name: format!("surface {}", z.name),
             ms,
             bytes: surface.bytes(),
         });
+        if let Some(bare) = &bare {
+            let s = laid.surface_on(b, z.px_per_mm, &Default::default(), Some(bare));
+            let p = emb_render::sheen::light(&s, &Default::default(), fabric);
+            bare_shots.push(Shot {
+                name: format!("{}-{}-no-topping", r.name, z.name),
+                hash: hash(&p),
+                picture: p,
+            });
+        }
         let (p, ms) = timed(|| emb_render::sheen::light(&surface, &Default::default(), fabric));
         steps.push(Step {
             name: format!("light {}", z.name),
@@ -301,12 +324,84 @@ pub fn run(r: &Reference, flat: bool) -> Measure {
         });
     }
     shots.extend(surface_shots);
+    shots.extend(bare_shots);
     Measure {
         name: r.name.to_string(),
         stitches: plan.stitches.stitch_count(),
         steps,
         shots,
     }
+}
+
+/// The fabrics of [`fabrics`]: the fabric preset, its color, its second
+/// color and the color of the thread on it.
+pub const FABRICS: [(&str, Rgb, Option<Rgb>, Rgb); 8] = [
+    ("cotton", Rgb(238, 234, 226), None, Rgb(25, 35, 90)),
+    ("denim", Rgb(40, 60, 110), Some(Rgb(225, 225, 215)), Rgb(230, 180, 60)),
+    ("knit", Rgb(140, 140, 142), Some(Rgb(70, 70, 74)), Rgb(245, 245, 240)),
+    ("pique", Rgb(30, 50, 120), None, Rgb(245, 245, 240)),
+    ("towel", Rgb(200, 216, 232), None, Rgb(25, 35, 90)),
+    ("fleece", Rgb(90, 90, 96), None, Rgb(245, 245, 240)),
+    ("felt", Rgb(180, 40, 40), None, Rgb(245, 245, 240)),
+    ("leather", Rgb(110, 70, 40), None, Rgb(240, 230, 200)),
+];
+
+/// The lettering of `view-towel` on each fabric of [`FABRICS`] (Milestone 6,
+/// ADR 0127), with the stitch settings of the fabric and its topping: the
+/// surface and its light at the three zooms (`fabric-<id>-<zoom>`).
+pub fn fabrics() -> Vec<Measure> {
+    let r = REFERENCE
+        .iter()
+        .find(|r| r.name == "view-towel")
+        .expect("view-towel is in the reference set");
+    let catalog = emb_model::FabricCatalog::builtin();
+    let mut out = Vec::new();
+    for (id, color, mix, thread) in FABRICS {
+        let mut design = corpus::build(r.name).expect("a design of the corpus");
+        design.set_fabric(&catalog, Some(id), true);
+        design.background = Some(color);
+        design.fabric_mix = mix;
+        for t in &mut design.threads {
+            t.color = thread;
+        }
+        let opts = crate::plan_options(&design, None).expect("the machine of the corpus");
+        let plan = crate::plan(&design, &opts);
+        let laid = lay_plan(&design, &plan);
+        let preset = catalog.of(&design);
+        let ground = Ground::of(&preset, &design);
+        let look = FabricLook::of(&preset, &design);
+        let segments = emb_render::segments(&plan.stitches);
+        let all = whole(&segments, &emb_render::sheet::picture_areas(&design));
+        let at = design.output_transform().apply(Point::new(r.close.0, r.close.1));
+        let (mut steps, mut shots) = (Vec::new(), Vec::new());
+        for z in ZOOMS {
+            let b = z.close_mm.map_or(all, |s| BBox::from_center_size(at, s, s));
+            let (surface, ms) = timed(|| laid.surface_on(b, z.px_per_mm, &Default::default(), Some(&ground)));
+            steps.push(Step {
+                name: format!("surface {}", z.name),
+                ms,
+                bytes: surface.bytes(),
+            });
+            let (p, ms) = timed(|| emb_render::sheen::light(&surface, &Default::default(), Some((color, look))));
+            steps.push(Step {
+                name: format!("light {}", z.name),
+                ms,
+                bytes: p.rgba.len(),
+            });
+            shots.push(Shot {
+                name: format!("fabric-{id}-{}", z.name),
+                hash: hash(&p),
+                picture: p,
+            });
+        }
+        out.push(Measure {
+            name: format!("fabric-{id}"),
+            stitches: plan.stitches.stitch_count(),
+            steps,
+            shots,
+        });
+    }
+    out
 }
 
 /// Measures the segments and the pictures of a synthetic design of about
@@ -324,7 +419,7 @@ pub fn stress(n: usize) -> Measure {
         bytes: std::mem::size_of_val(segments.as_slice()),
     });
     let all = whole(&segments, &[]);
-    let three_d = Look::three_d(Some(emb_render::thread3d::Weave::Plain));
+    let three_d = Look::three_d(Some(FabricLook::new(Weave::Plain)));
     for z in ZOOMS.iter().filter(|z| z.close_mm.is_none()) {
         for (name, look) in [("flat", Look::default()), ("3D", three_d)] {
             let (p, ms) = timed(|| {
@@ -350,7 +445,7 @@ pub fn stress(n: usize) -> Measure {
         ms,
         bytes: surface.bytes(),
     });
-    let fabric = Some((STRESS_FABRIC, emb_render::thread3d::Weave::Plain));
+    let fabric = Some((STRESS_FABRIC, FabricLook::new(Weave::Plain)));
     let (p, ms) = timed(|| emb_render::sheen::light(&surface, &Default::default(), fabric));
     steps.push(Step {
         name: "light 10/mm".into(),

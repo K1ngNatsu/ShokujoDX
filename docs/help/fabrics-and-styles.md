@@ -10,7 +10,9 @@ keywords: fabric, backing, topping, stabilizer, knit, t-shirt, polo, fleece, tow
 
 **Design > Fabric** sets the fabric of the design. The fabric sets the
 density, the pull compensation and the underlay of satin and fill
-stitches, and the backing and topping on the worksheet.
+stitches, and the backing and topping on the worksheet. In the 3D thread
+look, the fabric shows its surface (its weave, loops or grain at their
+real size).
 
 The fabrics are: Woven cotton; Denim and canvas; T-shirt knit; Piqué knit
 (polo shirts); Fleece and sweatshirt; Towel (terry); Felt; Leather and
@@ -23,7 +25,11 @@ When you change the fabric:
 - The window asks about the existing objects: each object keeps its own
   settings, changed by the difference between the two fabrics. Objects
   with no underlay or with a custom underlay keep their underlay.
-- The **Backing** and the **Topping** go on the worksheet.
+- The **Backing** and the **Topping** go on the worksheet. Clear the
+  **Topping** check box in the Styles panel for a sew-out with no
+  topping: on a towel or fleece, the 3D thread look then shows thin
+  stitches that sink into the pile. A topping or a laydown fill under the
+  stitches keeps them on top.
 
 ## Current properties
 

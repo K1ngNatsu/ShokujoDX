@@ -262,6 +262,7 @@ impl eframe::App for Bench {
                     plan: &plan,
                     design: &self.design,
                     lighting: Default::default(),
+                    ground: None,
                     filter: &filter,
                     cursor: None,
                     moving: &[],

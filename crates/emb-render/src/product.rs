@@ -12,8 +12,9 @@ use emb_geom::{BBox, Point, math};
 use emb_model::{ProductKind, ProductPart, ProductView, Rgb, Shade, product::shade};
 
 use crate::Segment;
+use crate::fabric::{Fabric, Weave};
 use crate::raster::{Areas, Look, Picture, picture_at, stitches_onto_look};
-use crate::thread3d::{Lighting, Weave, fabric_value};
+use crate::thread3d::Lighting;
 
 const FLATTEN_MM: f64 = 0.2;
 /// The ambient and the diffuse part of the light on the product.
@@ -68,7 +69,7 @@ pub fn weave(kind: ProductKind) -> Weave {
         | ProductKind::Beanie => Weave::Knit,
         ProductKind::Polo | ProductKind::PoloBack => Weave::Pique,
         ProductKind::Sweatshirt | ProductKind::SweatshirtBack | ProductKind::Hoodie | ProductKind::HoodieBack => {
-            Weave::Felt
+            Weave::Fleece
         }
         ProductKind::Cap | ProductKind::Tote | ProductKind::Apron | ProductKind::Messenger => Weave::Twill,
         ProductKind::Towel => Weave::Terry,
@@ -414,9 +415,13 @@ fn light_factors_with(
     let l = lighting.vector();
     let flat_light = AMBIENT + DIFFUSE * l[2];
     let strength = lighting.strength.clamp(0.0, 1.0);
+    // The fabric of the product: the same surface as on the canvas (ADR
+    // 0127), its mean light in each pixel, as a part of the light of a flat
+    // fabric (the light of the product is a part of it too).
     let weave = weave(view.kind);
-    // The fine weave shows only with enough pixels for it.
-    let fine = ((px_per_mm - 1.5) / 4.0).clamp(0.0, 1.0);
+    let shade = Fabric::shared(weave, weave.default_mm()).shade(lighting);
+    let flat = |l: &Lighting| crate::sheen::diffuse([0.0, 0.0, 1.0], l.vector());
+    let relative = 1.0 + (flat(&Lighting::default()) / flat(lighting) - 1.0) * strength;
     let step = 2.0 / px_per_mm;
     let height_at = |x: usize, y: usize| f64::from(if mask[y * w + x] { hf[y * w + x] } else { 0.0 });
     let mut out = vec![1.0f32; w * h];
@@ -442,7 +447,8 @@ fn light_factors_with(
                 b.min.x + (x as f64 + 0.5) / px_per_mm - view.origin.x,
                 b.min.y + (y as f64 + 0.5) / px_per_mm - view.origin.y,
             );
-            f *= 1.0 + (fabric_value(weave, mx, my) - 1.0) * fine;
+            let (a, c) = shade.at(mx, my, 1.0 / px_per_mm);
+            f *= (a + c) * relative;
             f *= 1.0 + 0.04 * (mottle(mx, my, 9.0) - 0.5) + 0.05 * (mottle(mx, my, 31.0) - 0.5);
             out[i] = f as f32;
         }
@@ -690,6 +696,27 @@ mod tests {
     use emb_model::ProductKind;
 
     use super::*;
+
+    /// Writes pictures of some products (the fabric of ADR 0127) to
+    /// `target/tmp/products`. Run with `cargo test --release -p emb-render
+    /// -- --ignored write_product_pictures`.
+    #[test]
+    #[ignore]
+    fn write_product_pictures() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/tmp/products");
+        std::fs::create_dir_all(&dir).expect("a folder");
+        for (kind, color, ppm) in [
+            (ProductKind::TShirt, Rgb(60, 110, 160), 2.0),
+            (ProductKind::Towel, Rgb(200, 216, 232), 4.0),
+            (ProductKind::Hoodie, Rgb(90, 90, 96), 2.0),
+            (ProductKind::Cap, Rgb(150, 40, 40), 8.0),
+            (ProductKind::Polo, Rgb(30, 50, 120), 8.0),
+        ] {
+            let view = ProductView::new(kind, color);
+            let (p, _) = product_picture(&view, ppm);
+            std::fs::write(dir.join(format!("{kind:?}-{ppm}.png")), p.png()).expect("a picture");
+        }
+    }
     use crate::SegmentKind;
 
     fn pixel(p: &Picture, b: BBox, px_per_mm: f64, at: Point) -> [u8; 4] {

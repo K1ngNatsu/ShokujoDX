@@ -84,7 +84,7 @@ pub use design::{
     Anchor, ConstructionMark, Design, Guide, GuideStyle, HoopPlacement, HoopSelection, MarkShape, Rotation, StartEnd,
 };
 pub use envelope::{Envelope, EnvelopeShape};
-pub use fabric::{Fabric, FabricCatalog, FabricChange, UnderlayWeight};
+pub use fabric::{Fabric, FabricCatalog, FabricChange, UnderlayWeight, Weave};
 pub use history::{Document, MergeKey};
 pub use hoop::{HoopCatalog, HoopPosition, HoopPreset, HoopShape};
 pub use hooping::{Hooping, HoopingLayout, HoopingOut};

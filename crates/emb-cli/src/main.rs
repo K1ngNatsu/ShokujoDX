@@ -898,6 +898,7 @@ fn run(args: &[String]) -> Result<(), String> {
             for r in emb_cli::view::REFERENCE {
                 measures.push(emb_cli::view::run(&r, true));
             }
+            measures.extend(emb_cli::view::fabrics());
             let mut text = emb_cli::view::report(&measures);
             if view_stress {
                 let stress: Vec<_> = emb_cli::view::STRESS

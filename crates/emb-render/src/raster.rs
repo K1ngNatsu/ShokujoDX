@@ -2,13 +2,16 @@
 //! pages): each stitch is a thread with soft edges, drawn in sew order.
 //! With a [`Look`] that has a lighting, each stitch has light and shade,
 //! the twist of its plies and a shadow, and the background can have the
-//! texture of the fabric (the 3D thread look, see [`crate::thread3d`]).
+//! surface of the fabric (the 3D thread look, see [`crate::thread3d`]; the
+//! fabric: [`crate::fabric`], ADR 0127).
 //! PNG output uses the `image` crate (pure Rust).
 
 use emb_geom::{BBox, Point};
 use emb_model::Rgb;
 
-use crate::thread3d::{Lighting, Weave, fabric_value, lit, ply, shine_of};
+use crate::fabric::FabricLook;
+use crate::light::{to_linear, to_srgb};
+use crate::thread3d::{Lighting, lit, ply, shine_of};
 use crate::{Segment, SegmentKind};
 
 /// The darkness of the shadow of a thread (0 to 1), in linear light: about
@@ -21,13 +24,13 @@ const SHADOW_ALPHA: f64 = 0.24;
 pub struct Look {
     /// Light and shade (the 3D thread look); `None`: the flat thread look.
     pub lighting: Option<Lighting>,
-    /// The texture of the background color (with a background only).
-    pub fabric: Option<Weave>,
+    /// The fabric of the background color (with a background only).
+    pub fabric: Option<FabricLook>,
 }
 
 impl Look {
     /// The 3D thread look with the default light, on `fabric`.
-    pub fn three_d(fabric: Option<Weave>) -> Look {
+    pub fn three_d(fabric: Option<FabricLook>) -> Look {
         Look {
             lighting: Some(Lighting::default()),
             fabric,
@@ -117,12 +120,17 @@ pub fn picture_at_look(
     let mut rgba = vec![0u8; width as usize * height as usize * 4];
     if let Some(c) = background {
         match look.fabric {
-            Some(weave) => {
+            Some(f) => {
+                // The mean light of the fabric in each pixel.
+                let shade = f.fabric().shade(&look.lighting.unwrap_or_default());
+                let lin = |c: Rgb| [c.0, c.1, c.2].map(to_linear);
+                let (c1, c2) = (lin(c), f.mix.map(lin));
+                let size = 1.0 / px_per_mm;
                 for (i, px) in rgba.as_chunks_mut::<4>().0.iter_mut().enumerate() {
                     let (x, y) = ((i % width as usize) as f64 + 0.5, (i / width as usize) as f64 + 0.5);
-                    let v = fabric_value(weave, b.min.x + x / px_per_mm, b.min.y + y / px_per_mm);
-                    let l = lit(c, (v, 0.0));
-                    px.copy_from_slice(&[l[0], l[1], l[2], 255]);
+                    let l = shade.color(c1, c2, b.min.x + x * size, b.min.y + y * size, size);
+                    let l = crate::sheen::tone(l);
+                    px.copy_from_slice(&[to_srgb(l[0]), to_srgb(l[1]), to_srgb(l[2]), 255]);
                 }
             }
             None => {
@@ -446,7 +454,7 @@ mod tests {
             1.0,
             1.0,
             Some(Rgb(200, 200, 200)),
-            &Look::three_d(Some(Weave::Twill)),
+            &Look::three_d(Some(FabricLook::new(crate::fabric::Weave::Twill))),
         );
         let vals: std::collections::BTreeSet<u8> = fab.rgba.chunks(4).map(|p| p[0]).collect();
         assert!(vals.len() > 5, "the fabric has a texture");

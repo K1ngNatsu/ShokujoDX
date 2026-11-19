@@ -582,12 +582,13 @@ pub fn output(
 }
 
 /// The look of the design picture: the 3D thread look on the fabric of the
-/// design (P10 Milestone 3), or the flat look.
+/// design (P10 Milestone 3, ADR 0127), or the flat look.
 pub fn picture_look(design: &Design, flat: bool) -> emb_render::raster::Look {
     if flat {
         return emb_render::raster::Look::default();
     }
-    emb_render::raster::Look::three_d(Some(emb_render::thread3d::Weave::for_fabric(design.fabric.as_deref())))
+    let preset = emb_model::FabricCatalog::builtin().of(design);
+    emb_render::raster::Look::three_d(Some(emb_render::fabric::FabricLook::of(&preset, design)))
 }
 
 /// Writes the rhinestone template of `design` (P9 Milestone 4): SVG or DXF

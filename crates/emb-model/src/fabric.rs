@@ -40,6 +40,81 @@ impl UnderlayWeight {
     }
 }
 
+/// The surface of a fabric in the 3D view (P18 view plan, Milestone 6, ADR
+/// 0127): what its threads, loops or grain look like.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Weave {
+    /// Plain weave: each thread goes over one thread and under the next one
+    /// (cotton, silk).
+    #[default]
+    Plain,
+    /// Twill: each thread of the warp goes over three threads and under one,
+    /// so the weave has diagonal lines (denim, caps).
+    Twill,
+    /// Knit: columns of V-shaped loops (T-shirts).
+    Knit,
+    /// Piqué: a knit with small raised cells (polo shirts).
+    Pique,
+    /// Terry: loops of thread that stand up (towels).
+    Terry,
+    /// Fleece: soft hair that stands up (sweatshirts).
+    Fleece,
+    /// Felt: pressed fibers, almost flat.
+    Felt,
+    /// Leather and vinyl: a fine grain.
+    Leather,
+}
+
+impl Weave {
+    /// All weaves.
+    pub const ALL: [Weave; 8] = [
+        Weave::Plain,
+        Weave::Twill,
+        Weave::Knit,
+        Weave::Pique,
+        Weave::Terry,
+        Weave::Fleece,
+        Weave::Felt,
+        Weave::Leather,
+    ];
+
+    /// The usual size of the weave, mm: the distance from one thread to
+    /// the next one, or the size of a loop, a cell or a grain.
+    pub fn default_mm(self) -> f64 {
+        match self {
+            Weave::Plain => 0.25,
+            Weave::Twill => 0.45,
+            Weave::Knit => 0.7,
+            Weave::Pique => 1.0,
+            Weave::Terry => 1.0,
+            Weave::Fleece => 0.5,
+            Weave::Felt => 0.4,
+            Weave::Leather => 0.7,
+        }
+    }
+
+    /// The id of the weave in `data/fabrics.toml` (data, not shown).
+    pub fn id(self) -> &'static str {
+        match self {
+            Weave::Plain => "plain",
+            Weave::Twill => "twill",
+            Weave::Knit => "knit",
+            Weave::Pique => "pique",
+            Weave::Terry => "terry",
+            Weave::Fleece => "fleece",
+            Weave::Felt => "felt",
+            Weave::Leather => "leather",
+        }
+    }
+
+    /// A pile stands up from the fabric: thin stitches sink into it (a
+    /// topping keeps them on top).
+    pub fn has_pile(self) -> bool {
+        matches!(self, Weave::Terry | Weave::Fleece)
+    }
+}
+
 /// A fabric preset.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -69,6 +144,13 @@ pub struct Fabric {
     /// The topping to use, if the fabric needs one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub topping: Option<String>,
+    /// The surface of the fabric in the 3D view.
+    #[serde(default)]
+    pub weave: Weave,
+    /// The size of the weave, mm; `None`: the usual size of the weave
+    /// ([`Weave::default_mm`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub weave_mm: Option<f64>,
 }
 
 fn default_thickness() -> f64 {
@@ -100,7 +182,14 @@ impl Fabric {
             backing: String::new(),
             thickness_mm: default_thickness(),
             topping: None,
+            weave: Weave::Plain,
+            weave_mm: None,
         }
+    }
+
+    /// The size of the weave, mm.
+    pub fn weave_size(&self) -> f64 {
+        self.weave_mm.unwrap_or_else(|| self.weave.default_mm())
     }
 
     fn validate(&self) -> Result<(), String> {
@@ -130,6 +219,12 @@ impl Fabric {
         }
         if !(self.thickness_mm.is_finite() && (0.05..=10.0).contains(&self.thickness_mm)) {
             return Err(text::fill("fabric {}: thickness_mm must be from 0.05 to 10", &[&id]));
+        }
+        if self
+            .weave_mm
+            .is_some_and(|v| !(v.is_finite() && (0.05..=5.0).contains(&v)))
+        {
+            return Err(text::fill("fabric {}: weave_mm must be from 0.05 to 5", &[&id]));
         }
         Ok(())
     }
@@ -259,6 +354,15 @@ impl FabricCatalog {
             .cloned()
             .unwrap_or_else(Fabric::base)
     }
+
+    /// The topping of the sew-out of a design: the topping of its fabric,
+    /// if the design does not say that it has none (`Design::no_topping`).
+    pub fn topping_of(&self, design: &Design) -> Option<String> {
+        if design.no_topping {
+            return None;
+        }
+        self.of(design).topping
+    }
 }
 
 impl Design {
@@ -316,6 +420,50 @@ mod tests {
             FabricChange::new(&Fabric::base(), &Fabric::base())
         );
         assert!(c.get("towel").unwrap().topping.is_some());
+    }
+
+    #[test]
+    fn each_fabric_has_a_weave() {
+        let c = FabricCatalog::builtin();
+        assert_eq!(c.get("towel").unwrap().weave, Weave::Terry);
+        assert_eq!(c.get("denim").unwrap().weave, Weave::Twill);
+        assert_eq!(c.get("leather").unwrap().weave, Weave::Leather);
+        assert!((c.get("silk").unwrap().weave_size() - 0.15).abs() < 1e-12);
+        assert_eq!(Fabric::base().weave_size(), Weave::Plain.default_mm());
+        // The ids are the names in the file.
+        #[derive(Deserialize)]
+        struct W {
+            weave: Weave,
+        }
+        for w in Weave::ALL {
+            let r: W = toml::from_str(&format!("weave = \"{}\"", w.id())).unwrap();
+            assert_eq!(r.weave, w);
+        }
+        assert!(Weave::Terry.has_pile() && !Weave::Plain.has_pile());
+        // A size out of its range is refused.
+        let bad = BUILTIN_FABRICS_TOML.replace("weave_mm = 0.25", "weave_mm = 9.0");
+        assert!(FabricCatalog::from_toml_str(&bad).is_err());
+    }
+
+    #[test]
+    fn a_design_can_have_no_topping() {
+        let c = FabricCatalog::builtin();
+        let mut d = Design::new("towel");
+        d.set_fabric(&c, Some("towel"), false);
+        assert!(c.topping_of(&d).is_some());
+        d.no_topping = true;
+        assert_eq!(c.topping_of(&d), None);
+        // The project file keeps it, and the second color of the fabric.
+        d.fabric_mix = Some(crate::Rgb(250, 250, 240));
+        let back = crate::project::from_str(&crate::project::to_string(&d)).unwrap();
+        assert!(back.no_topping);
+        assert_eq!(back.fabric_mix, d.fabric_mix);
+        // A colorway keeps the second color.
+        d.ensure_colorways();
+        d.add_colorway("Two");
+        d.fabric_mix = None;
+        assert!(d.switch_colorway(0));
+        assert_eq!(d.fabric_mix, Some(crate::Rgb(250, 250, 240)));
     }
 
     #[test]

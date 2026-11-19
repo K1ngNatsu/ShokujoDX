@@ -10,7 +10,9 @@ keywords: tela, entretela, recubrimiento, refuerzo, punto, camiseta, polo, forro
 
 **Diseño > Tela** define la tela del diseño. La tela define la densidad,
 la compensación de tiro y la base de las puntadas de satén y de relleno, y
-la entretela y el recubrimiento de la hoja de trabajo.
+la entretela y el recubrimiento de la hoja de trabajo. En el aspecto de
+hilo 3D, la tela muestra su superficie (su tejido, sus rizos o su grano a
+su tamaño real).
 
 Las telas son: Woven cotton; Denim and canvas; T-shirt knit; Piqué knit
 (polos); Fleece and sweatshirt; Towel (terry); Felt; Leather and vinyl;
@@ -24,6 +26,11 @@ Cuando cambia la tela:
   propios ajustes, cambiados según la diferencia entre las dos telas. Los
   objetos sin base o con una base personalizada conservan su base.
 - La **Entretela** y el **Recubrimiento** van a la hoja de trabajo.
+  Desmarque **Recubrimiento** en el panel Estilos para un bordado sin
+  recubrimiento: en una toalla o un forro polar, el aspecto de hilo 3D
+  muestra entonces puntadas finas que se hunden en el pelo. Un
+  recubrimiento o un relleno de base bajo las puntadas las mantiene
+  arriba.
 
 ## Propiedades actuales
 

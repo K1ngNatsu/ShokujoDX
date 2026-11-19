@@ -128,6 +128,19 @@ impl AppState {
         tr(&self.fabrics.of(self.doc.design()).name).to_string()
     }
 
+    /// The fabric of the pictures of `d`: its weave, its size and its second
+    /// color (ADR 0127).
+    pub fn fabric_look(&self, d: &emb_model::Design) -> emb_render::fabric::FabricLook {
+        emb_render::fabric::FabricLook::of(&self.fabrics.of(d), d)
+    }
+
+    /// The fabric under the stitch tiles of `d` (its pile and its needle
+    /// holes, ADR 0127), if the 3D look shows a fabric under `d`.
+    pub fn ground_of(&self, d: &emb_model::Design) -> Option<emb_render::fabric::Ground> {
+        (self.settings.look.fabric && d.background.is_some())
+            .then(|| emb_render::fabric::Ground::of(&self.fabrics.of(d), d))
+    }
+
     /// Sets the fabric as one undo step. With `objects`, the satin and fill
     /// objects change too.
     pub fn apply_fabric(&mut self, id: Option<&str>, objects: bool) {
@@ -386,8 +399,18 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
         });
         if let Some(f) = st.doc.design().fabric.as_deref().and_then(|id| st.fabrics.get(id)) {
             ui.weak(crate::i18n::fill("Backing: {}", &[&f.backing]));
-            if let Some(t) = &f.topping {
-                ui.weak(crate::i18n::fill("Topping: {}", &[&t]));
+            if let Some(t) = f.topping.clone() {
+                let mut used = !st.doc.design().no_topping;
+                if ui
+                    .checkbox(&mut used, crate::i18n::fill("Topping: {}", &[&t]))
+                    .on_hover_text(tr(
+                        "Clear: the sew-out has no topping. The worksheet shows no topping, \
+                         and the 3D look shows thin stitches that sink into a pile (towels, fleece).",
+                    ))
+                    .changed()
+                {
+                    st.doc.edit(tr("Topping"), |d| d.no_topping = !used);
+                }
             }
         }
         ui.separator();

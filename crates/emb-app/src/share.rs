@@ -351,7 +351,7 @@ impl AppState {
                 .ok_or_else(|| crate::i18n::fill("The program cannot write .{} files.", &[&ext]))?;
         let project = emb_model::project::to_string(&d).into_bytes();
         let segments = emb_render::segments(&plan.stitches);
-        let look = self.settings.look.picture_look(d.fabric.as_deref());
+        let look = self.settings.look.picture_look(Some(self.fabric_look(&d)));
         let pic = emb_render::raster::picture_look(&segments, &[], 10.0, 0.4, 2.0, d.background, &look);
         Ok(vec![
             (format!("{name}.{ext}"), machine_file),

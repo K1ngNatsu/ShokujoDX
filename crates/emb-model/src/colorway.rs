@@ -72,6 +72,9 @@ pub struct Colorway {
     pub looks: BTreeMap<ThreadId, ThreadLook>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub background: Option<Rgb>,
+    /// The second color of the fabric (`Design::fabric_mix`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fabric_mix: Option<Rgb>,
 }
 
 impl Design {
@@ -82,6 +85,7 @@ impl Design {
                 name: "Colorway 1".into(),
                 looks: BTreeMap::new(),
                 background: None,
+                fabric_mix: None,
             });
             self.colorway = 0;
             self.store_colorway();
@@ -91,10 +95,11 @@ impl Design {
     /// Writes the current thread looks and background into the current colorway.
     fn store_colorway(&mut self) {
         let looks = self.threads.iter().map(|t| (t.id, ThreadLook::of(t))).collect();
-        let background = self.background;
+        let (background, mix) = (self.background, self.fabric_mix);
         if let Some(c) = self.colorways.get_mut(self.colorway) {
             c.looks = looks;
             c.background = background;
+            c.fabric_mix = mix;
         }
     }
 
@@ -113,6 +118,7 @@ impl Design {
             }
         }
         self.background = c.background;
+        self.fabric_mix = c.fabric_mix;
         true
     }
 

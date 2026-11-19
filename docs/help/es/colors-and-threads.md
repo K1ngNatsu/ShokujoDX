@@ -73,8 +73,10 @@ Exportar y Producir diseño escriben la combinación actual.
 **Color > Color de la tela** define el **Fondo**: el color de la tela
 dentro del bastidor. El lienzo, el aspecto del hilo y las imágenes
 muestran la tela en ese color. **Sin fondo** lo quita. El aspecto del hilo
-en 3D muestra el tejido de la tela del diseño (Diseño > Tela) bajo el
-color.
+en 3D muestra la superficie de la tela del diseño (Diseño > Tela) en ese
+color. **Segundo color** (en el panel Hilos, bajo **Fondo**) da a la tela
+dos colores: los hilos claros de un denim, o la segunda fibra de una tela
+jaspeada. **Ninguno** le devuelve un solo color.
 
 ## La rueda de colores
 

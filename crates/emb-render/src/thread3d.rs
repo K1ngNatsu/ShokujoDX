@@ -25,8 +25,6 @@ use emb_geom::math;
 use emb_model::{Rgb, ThreadKind};
 use serde::{Deserialize, Serialize};
 
-use crate::raster::Picture;
-
 /// Light and shade of the 3D thread look.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -205,115 +203,6 @@ pub fn ply(along_mm: f64, s: f64, strength: f64) -> f64 {
     1.0 + 0.07 * strength.clamp(0.0, 1.0) * math::sin(2.0 * std::f64::consts::PI * (along_mm / PITCH_MM + 0.6 * s))
 }
 
-/// The surface of a fabric for the 3D look.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum Weave {
-    /// Plain weave (cotton, silk, caps).
-    #[default]
-    Plain,
-    /// Diagonal lines (denim, canvas).
-    Twill,
-    /// Rows of small V shapes (T-shirt knit).
-    Knit,
-    /// A fine grid of cells (piqué).
-    Pique,
-    /// Loops (towels).
-    Terry,
-    /// Soft noise (felt, fleece).
-    Felt,
-    /// Almost smooth with a fine grain (leather, vinyl).
-    Smooth,
-}
-
-impl Weave {
-    /// The surface for a fabric id of `data/fabrics.toml` (plain weave if unknown).
-    pub fn for_fabric(id: Option<&str>) -> Weave {
-        match id {
-            Some("denim") => Weave::Twill,
-            Some("knit") => Weave::Knit,
-            Some("pique") => Weave::Pique,
-            Some("towel") => Weave::Terry,
-            Some("fleece" | "felt") => Weave::Felt,
-            Some("leather") => Weave::Smooth,
-            _ => Weave::Plain,
-        }
-    }
-}
-
-/// The size of a fabric tile, mm. All patterns repeat in it.
-pub const TILE_MM: f64 = 4.0;
-
-/// A value from 0 to 1 for a cell of a grid that repeats every `n` cells.
-fn hash(x: i64, y: i64, n: i64) -> f64 {
-    let (x, y) = (x.rem_euclid(n), y.rem_euclid(n));
-    let mut h = (x as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ (y as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F);
-    h ^= h >> 29;
-    h = h.wrapping_mul(0xBF58_476D_1CE4_E5B9);
-    h ^= h >> 32;
-    (h & 0xFFFF) as f64 / 65535.0
-}
-
-/// Smooth noise with cells of `cell_mm` that repeats every [`TILE_MM`].
-fn noise(x: f64, y: f64, cell_mm: f64) -> f64 {
-    let n = (TILE_MM / cell_mm).round() as i64;
-    let (gx, gy) = (x / cell_mm, y / cell_mm);
-    let (ix, iy) = (gx.floor() as i64, gy.floor() as i64);
-    let (fx, fy) = (gx - gx.floor(), gy - gy.floor());
-    let smooth = |f: f64| f * f * (3.0 - 2.0 * f);
-    let (sx, sy) = (smooth(fx), smooth(fy));
-    let a = hash(ix, iy, n) + (hash(ix + 1, iy, n) - hash(ix, iy, n)) * sx;
-    let b = hash(ix, iy + 1, n) + (hash(ix + 1, iy + 1, n) - hash(ix, iy + 1, n)) * sx;
-    a + (b - a) * sy
-}
-
-/// The brightness factor of the fabric at (`x`, `y`) mm (near 1).
-pub fn fabric_value(weave: Weave, x: f64, y: f64) -> f64 {
-    use std::f64::consts::PI;
-    let wave = |v: f64, period: f64| math::sin(2.0 * PI * v / period);
-    match weave {
-        Weave::Plain => {
-            // Over and under at each crossing: a checker of small bumps.
-            let p = 0.5;
-            let bump = wave(x, p) * wave(y, p);
-            1.0 + 0.07 * bump + 0.03 * (noise(x, y, 0.5) - 0.5)
-        }
-        Weave::Twill => 1.0 + 0.09 * wave(x + y, 0.8) + 0.03 * wave(y, 0.25) + 0.03 * (noise(x, y, 0.5) - 0.5),
-        Weave::Knit => {
-            // Columns of V shapes.
-            let col = (x / 1.0).rem_euclid(1.0) - 0.5;
-            1.0 + 0.09 * wave(y + col.abs() * 1.2, 1.0) - 0.05 * (col * 2.0).powi(2)
-        }
-        Weave::Pique => 1.0 + 0.08 * (wave(x, 1.0) * wave(y, 1.0)).abs() - 0.04,
-        Weave::Terry => {
-            let n = noise(x, y, 0.5);
-            let loops = (wave(x, 1.0) * wave(y, 1.0) + 1.0) / 2.0;
-            0.92 + 0.12 * loops * n + 0.06 * noise(x, y, 0.25)
-        }
-        Weave::Felt => 0.94 + 0.08 * noise(x, y, 0.5) + 0.04 * noise(x, y, 0.25),
-        Weave::Smooth => 0.98 + 0.03 * noise(x, y, 0.25),
-    }
-}
-
-/// A tile of the fabric of [`TILE_MM`] × [`TILE_MM`] at `px_per_mm`, in the
-/// fabric `color`. It repeats with no seam.
-pub fn fabric_tile(weave: Weave, color: Rgb, px_per_mm: f64) -> Picture {
-    let n = ((TILE_MM * px_per_mm).round() as u32).max(1);
-    let step = TILE_MM / f64::from(n);
-    let mut rgba = Vec::with_capacity(n as usize * n as usize * 4);
-    for py in 0..n {
-        for px in 0..n {
-            let v = fabric_value(weave, (f64::from(px) + 0.5) * step, (f64::from(py) + 0.5) * step);
-            let c = lit(color, (v, 0.0));
-            rgba.extend_from_slice(&[c[0], c[1], c[2], 255]);
-        }
-    }
-    Picture {
-        width: n,
-        height: n,
-        rgba,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -375,29 +264,5 @@ mod tests {
             ..l
         };
         assert!(low.shadow_length() > l.shadow_length());
-    }
-
-    #[test]
-    fn fabric_tiles_repeat_with_no_seam() {
-        for weave in [
-            Weave::Plain,
-            Weave::Twill,
-            Weave::Knit,
-            Weave::Pique,
-            Weave::Terry,
-            Weave::Felt,
-            Weave::Smooth,
-        ] {
-            for (x, y) in [(0.3, 0.7), (1.1, 2.9), (3.95, 0.05)] {
-                let a = fabric_value(weave, x, y);
-                let b = fabric_value(weave, x + TILE_MM, y - TILE_MM);
-                assert!((a - b).abs() < 1e-9, "{weave:?}");
-                assert!((0.8..1.2).contains(&a), "{weave:?} {a}");
-            }
-            let tile = fabric_tile(weave, Rgb(200, 100, 50), 16.0);
-            assert_eq!((tile.width, tile.height), (64, 64));
-        }
-        assert_eq!(Weave::for_fabric(Some("towel")), Weave::Terry);
-        assert_eq!(Weave::for_fabric(None), Weave::Plain);
     }
 }

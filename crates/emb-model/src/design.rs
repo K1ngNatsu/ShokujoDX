@@ -51,6 +51,16 @@ pub struct Design {
     /// Fabric preset id from `fabrics.toml` (see `fabric`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fabric: Option<String>,
+    /// The second color of the fabric of the current colorway (ADR 0127):
+    /// the light threads of a denim, the second fiber of a heather. `None`:
+    /// the fabric has one color.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fabric_mix: Option<Rgb>,
+    /// The sew-out has no topping, also if the fabric names one: the
+    /// worksheet shows no topping, and in the 3D view thin stitches sink
+    /// into a pile (ADR 0127).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub no_topping: bool,
     /// The stitch settings of new objects (see `style`).
     #[serde(default, skip_serializing_if = "CurrentProperties::is_default")]
     pub current: CurrentProperties,
@@ -342,6 +352,8 @@ impl Design {
             colorway: 0,
             notes: String::new(),
             fabric: None,
+            fabric_mix: None,
+            no_topping: false,
             current: CurrentProperties::default(),
             styles: Vec::new(),
             monograms: Vec::new(),

@@ -46,6 +46,7 @@ use std::time::{Duration, Instant};
 use eframe::egui::{self, Color32, ColorImage, Pos2, Rect, Shape, TextureHandle, TextureOptions};
 use emb_geom::{BBox, Point, Transform};
 use emb_model::{Design, ObjectId, Rgb};
+use emb_render::fabric::Ground;
 use emb_render::strand::Strand;
 use emb_render::surface::{self, APRON_MM, Changes, Laid, Surface};
 use emb_render::thread3d::Lighting;
@@ -267,12 +268,14 @@ impl Shown {
     }
 }
 
-/// The tiles of one lay in one light with the strands that show.
+/// The tiles of one lay in one light on one fabric with the strands that
+/// show.
 #[derive(Clone)]
 struct Variant {
     id: u64,
     generation: u64,
     light: Lighting,
+    ground: Option<Ground>,
     shown: Shown,
 }
 
@@ -343,6 +346,7 @@ struct Job {
     laid: Arc<Laid>,
     shown: Shown,
     light: Lighting,
+    ground: Option<Ground>,
 }
 
 impl Job {
@@ -447,6 +451,9 @@ pub struct Scene<'a> {
     pub plan: &'a Arc<StitchPlan>,
     pub design: &'a Design,
     pub lighting: Lighting,
+    /// The fabric under the stitches: its pile and its needle holes (ADR
+    /// 0127; `AppState::ground_of`).
+    pub ground: Option<Ground>,
     pub filter: &'a ViewFilter,
     /// The stitch cursor (a record of `plan`).
     pub cursor: Option<usize>,
@@ -615,10 +622,12 @@ impl TileCache {
                 scene.lighting.azimuth_deg.to_bits(),
                 scene.lighting.elevation_deg.to_bits(),
                 scene.lighting.strength.to_bits(),
+                scene.ground.as_ref().map(Ground::key),
                 shown.key,
             )),
             generation: lay.generation,
             light: scene.lighting,
+            ground: scene.ground.clone(),
             shown,
         };
         let laid = lay.laid.clone();
@@ -937,6 +946,7 @@ impl TileCache {
                     laid: laid.clone(),
                     shown: v.shown.clone(),
                     light: v.light,
+                    ground: v.ground.clone(),
                 };
                 let key = job.keys()[0];
                 if q.running_quick.contains(&key) || !self.queued_relights.insert(key) {
@@ -1020,6 +1030,7 @@ impl TileCache {
                             laid: laid.clone(),
                             shown: v.shown.clone(),
                             light: v.light,
+                            ground: v.ground.clone(),
                         };
                         if self.sync {
                             jobs.push(job);
@@ -1044,6 +1055,7 @@ impl TileCache {
                     laid: laid.clone(),
                     shown: v.shown.clone(),
                     light: v.light,
+                    ground: v.ground.clone(),
                 };
                 let keys = job.keys();
                 let made = |k: &Key| self.tiles.get(k).is_some_and(|e| !e.provisional);
@@ -1315,7 +1327,7 @@ impl TileCache {
             return;
         }
         // A pixel changes if a changed stitch is this near.
-        let apron = surface::apron_for(&v.light, top);
+        let apron = surface::apron_for(&v.light, top, v.ground.as_ref());
         let keys: Vec<Key> = self.tiles.keys().filter(|k| k.variant == old.id).copied().collect();
         for k in keys {
             let ppm = level_ppm(i32::from(k.level));
@@ -1400,12 +1412,14 @@ pub fn tiles_of(ctx: &egui::Context, rect: Rect, view: &CanvasView, st: &mut App
         (pv.state, pv.plan.clone())
     };
     let moving = moving_objects(st);
+    let ground = st.ground_of(st.doc.design());
     let scene = Scene {
         doc: st.doc_id,
         state,
         plan: &plan,
         design: st.doc.design(),
         lighting: st.settings.look.light,
+        ground,
         filter: &st.view_filter,
         cursor: st.cursor,
         moving: &moving,
@@ -1719,7 +1733,11 @@ fn make(job: &Job) -> Made {
         // A part of a tile: its pixels, transparent where nothing is.
         let (w, h) = (p[2] - p[0], p[3] - p[1]);
         let (x0, y0) = (job.gx * SIDE - 1 + i64::from(p[0]), job.gy * SIDE - 1 + i64::from(p[1]));
-        let image = match job.laid.block(ppm, x0, y0, w, h, &job.light, &|r| job.shown.shows(r)) {
+        let image = match job
+            .laid
+            .block(ppm, x0, y0, w, h, &job.light, job.ground.as_ref(), &|r| {
+                job.shown.shows(r)
+            }) {
             Some(s) => {
                 let picture = emb_render::sheen::overlay(&s, &job.light);
                 ColorImage::from_rgba_premultiplied([w as usize, h as usize], &picture.rgba)
@@ -1745,6 +1763,7 @@ fn make(job: &Job) -> Made {
         side,
         side,
         &job.light,
+        job.ground.as_ref(),
         &|r| job.shown.shows(r),
         detail,
     );
@@ -1918,6 +1937,7 @@ mod tests {
             plan: &plan,
             design: h.st.doc.design(),
             lighting: h.st.settings.look.light,
+            ground: None,
             filter: &filter,
             cursor: None,
             moving: &[],
@@ -2038,6 +2058,7 @@ mod tests {
             laid: laid.clone(),
             shown: Shown::default(),
             light,
+            ground: None,
         };
         let (a, b) = (
             Lighting::default(),
@@ -2135,6 +2156,12 @@ mod tests {
         let size = egui::vec2(1920.0, 1080.0);
         let rect = Rect::from_min_size(Pos2::ZERO, size);
         let design = Design::new("stress");
+        // On woven cotton (the needle holes; no pile).
+        let ground = Some(emb_render::fabric::Ground::new(
+            emb_render::fabric::Weave::Plain,
+            0.25,
+            true,
+        ));
         let filter = ViewFilter::default();
         // Runs frames until all tiles of the screen show; gives the time, ms.
         // Runs frames until a frame has what `ready` asks; gives the time, ms.
@@ -2175,6 +2202,7 @@ mod tests {
                 plan: &plan,
                 design: &design,
                 lighting: Lighting::default(),
+                ground: ground.clone(),
                 filter: &filter,
                 cursor: None,
                 moving: &[],
@@ -2230,6 +2258,7 @@ mod tests {
             plan: &plan,
             design: &design,
             lighting: Lighting::default(),
+            ground: ground.clone(),
             filter: &filter,
             cursor: None,
             moving: &[],
@@ -2287,13 +2316,21 @@ mod tests {
     fn write_tile_pictures() {
         let out = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/tmp/tiles");
         std::fs::create_dir_all(&out).expect("a folder");
-        for (name, zoom, draft) in [
-            ("view-fill-border", 1.0, false),
-            ("view-fill-border", 1.0, true),
-            ("view-lettering", 3.0, false),
-            ("view-puff", 2.0, false),
+        for (name, zoom, draft, bare) in [
+            ("view-fill-border", 1.0, false, false),
+            ("view-fill-border", 1.0, true, false),
+            ("view-lettering", 3.0, false, false),
+            ("view-puff", 2.0, false, false),
+            ("view-towel", 2.5, false, false),
+            ("view-towel", 2.5, false, true),
         ] {
-            let design = emb_cli::corpus::build(name).expect("corpus design");
+            let mut design = emb_cli::corpus::build(name).expect("corpus design");
+            // With no topping: thin stitches sink into the pile (ADR 0127).
+            design.no_topping = bare;
+            let preset = emb_model::FabricCatalog::builtin().of(&design);
+            let ground = design
+                .background
+                .map(|_| emb_render::fabric::Ground::of(&preset, &design));
             let opts = emb_cli::plan_options(&design, None).expect("a machine");
             let plan = Arc::new(emb_cli::plan(&design, &opts));
             let mut cache = TileCache::default();
@@ -2313,6 +2350,7 @@ mod tests {
                 plan: &plan,
                 design: &design,
                 lighting: Lighting::default(),
+                ground: ground.clone(),
                 filter: &filter,
                 cursor: None,
                 moving: &[],
@@ -2321,10 +2359,21 @@ mod tests {
             cache.draw(&ctx, r, &view, &scene);
             let f = cache.draw(&ctx, r, &view, &scene).expect("a lay");
             assert!(f.complete, "{name}");
-            // The tiles of the frame from their jobs, over the fabric.
+            // The tiles of the frame from their jobs, over the fabric (its
+            // mean light in each pixel, as the canvas draws it).
             let c = design.background.unwrap_or(Rgb(240, 236, 228));
             let (w, h) = (r.width() as usize, r.height() as usize);
-            let mut px: Vec<[f32; 3]> = vec![[f32::from(c.0), f32::from(c.1), f32::from(c.2)]; w * h];
+            let look = emb_render::fabric::FabricLook::of(&preset, &design);
+            let shade = look.fabric().shade(&Lighting::default());
+            let lin = |c: Rgb| [c.0, c.1, c.2].map(emb_render::light::to_linear);
+            let size = 1.0 / view.scale();
+            let mut px: Vec<[f32; 3]> = (0..w * h)
+                .map(|i| {
+                    let p = view.to_mm(r, Pos2::new((i % w) as f32 + 0.5, (i / w) as f32 + 0.5));
+                    let l = shade.color(lin(c), look.mix.map(lin), p.x, p.y, size);
+                    l.map(|v| f32::from(emb_render::light::to_srgb(v.min(1.0))))
+                })
+                .collect();
             let level = f.level;
             let vis = view.visible(r);
             let (xs, ys) = tiles_in(level, vis);
@@ -2343,6 +2392,7 @@ mod tests {
                         laid: laid.clone(),
                         shown: Shown::default(),
                         light: Lighting::default(),
+                        ground: ground.clone(),
                     };
                     let Some(img) = make(&job).images.pop().flatten() else {
                         continue;
@@ -2375,10 +2425,10 @@ mod tests {
                     image::Rgb(p.map(|v| v.round().clamp(0.0, 255.0) as u8)),
                 );
             }
-            let file = if draft {
-                format!("{name}-draft.png")
-            } else {
-                format!("{name}.png")
+            let file = match (draft, bare) {
+                (true, _) => format!("{name}-draft.png"),
+                (_, true) => format!("{name}-no-topping.png"),
+                _ => format!("{name}.png"),
             };
             img.save(out.join(file)).expect("a picture");
         }

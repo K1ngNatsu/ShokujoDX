@@ -81,13 +81,18 @@ or make the density more open.
 **View > Thread Look** shows the stitches as threads, as they look on the
 fabric. Its menu has **Flat** or **3D (light and shade)**, the direction
 and the height of the light, the strength of the shade, and the **Fabric
-texture** (the weave of the fabric of the design under the fabric color).
+texture** (the surface of the fabric of the design in the fabric color:
+the threads of its weave, the loops of a towel or the grain of leather,
+in the light of the thread look).
 **Default light** sets them back.
 
 With **Fine surface** (on at the start), the 3D look shows the surface of
 the stitches: thread on thread is higher, each area is lighter or darker
 by the direction of its stitches to the light, and high parts put
-shadows on the fabric. The program makes the surface in parts while you
+shadows on the fabric. Each needle hole is a small dent (larger on
+leather). On a towel or fleece with no topping, thin stitches sink into
+the pile (see [Fabrics, styles and templates](fabrics-and-styles)). The
+program makes the surface in parts while you
 work; a part that is not ready yet shows the faster look for a moment.
 Clear **Fine surface** on a slow computer.
 

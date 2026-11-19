@@ -75,7 +75,10 @@ Exportieren und Design ausgeben schreiben die aktuelle Farbvariante.
 **Farbe > Stofffarbe** legt den **Hintergrund** fest: die Farbe des Stoffs
 im Rahmen. Die Arbeitsfläche, die Garnansicht und die Bilder zeigen den
 Stoff in dieser Farbe. **Kein Hintergrund** entfernt sie. Die 3D-Garnansicht
-zeigt das Gewebe des Stoffs des Designs (Design > Stoff) unter der Farbe.
+zeigt die Oberfläche des Stoffs des Designs (Design > Stoff) in der Farbe.
+**Zweite Farbe** (im Bereich Garne, unter **Hintergrund**) gibt dem Stoff
+zwei Farben: die hellen Fäden eines Denims oder die zweite Faser eines
+Melange-Stoffs. **Keine** gibt ihm wieder eine Farbe.
 
 ## Der Farbkreis
 

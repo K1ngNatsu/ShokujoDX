@@ -106,6 +106,17 @@ bewegen und zoomen sich auch schneller. **Ansicht > Garnansicht > Feine
 Oberfläche** schaltet sie auf einem langsamen Computer aus. Siehe [Ein
 Design prüfen](checking).
 
+**Der Stoff in der 3D-Ansicht.** Der Stoff unter den Stichen hat eine
+Oberfläche in echter Größe: die Fäden einer Leinwandbindung oder eines
+Köpers, die Maschen eines Strickstoffs, die Waben von Piqué, die
+Schlingen eines Handtuchs, der Flor von Fleece, Filz und die Narbung von
+Leder, im Licht der Garnansicht. Jedes Nadelloch ist eine kleine Delle,
+größer auf Leder. Auf einem Handtuch oder Fleece ohne Deckvlies sinken
+dünne Stiche in den Flor: Das Häkchen **Deckvlies** im Bereich Stile legt
+es fest. Ein Stoff kann eine **Zweite Farbe** haben (die hellen Fäden
+eines Denims, die zweite Faser eines Melange-Stoffs). Die Produktansicht
+zeigt denselben Stoff. Siehe [Stoffe, Stile und Vorlagen](fabrics-and-styles).
+
 **Designs mit sehr vielen Stichen.** Das Programm konnte abbrechen, wenn
 die Arbeitsfläche etwa 350.000 Stiche oder mehr auf einmal in der
 Garnansicht zeigte. Jetzt zeigt die Arbeitsfläche sie bei diesem Zoom

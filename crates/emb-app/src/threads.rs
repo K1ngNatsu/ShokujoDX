@@ -342,6 +342,35 @@ fn colorway_section(ui: &mut egui::Ui, st: &mut AppState) {
             st.doc.edit(tr("Background color"), |d| d.background = None);
         }
     });
+    // The second color of the fabric (ADR 0127).
+    let mix = st.doc.design().fabric_mix;
+    ui.horizontal(|ui| {
+        ui.label(tr("Second color"));
+        let tip = tr(
+            "The second color of the fabric in the 3D look: the light threads of a denim, \
+             or the second fiber of a heather. It changes with the colorway.",
+        );
+        if let Some(c) = swatch_picker(
+            ui,
+            ui.id().with("fabric_mix"),
+            mix.unwrap_or(Rgb(255, 255, 255)),
+            18.0,
+            false,
+            tip,
+        ) {
+            st.doc
+                .edit_merged(tr("Second fabric color"), MergeKey::new("fabric_mix"), |d| {
+                    d.fabric_mix = Some(c)
+                });
+        }
+        if ui
+            .add_enabled(mix.is_some(), egui::Button::new(tr("None")))
+            .on_hover_text(tr("The fabric has one color."))
+            .clicked()
+        {
+            st.doc.edit(tr("Second fabric color"), |d| d.fabric_mix = None);
+        }
+    });
 }
 
 fn threads_section(ui: &mut egui::Ui, st: &mut AppState) {

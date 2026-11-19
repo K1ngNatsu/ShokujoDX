@@ -35,6 +35,14 @@
 //! with an apron round them, so a pixel is the same in each block. After a
 //! change of the design [`relay`] lays again only the stitches that the
 //! change reaches, and tells where the surface changed ([`Changes`]).
+//!
+//! The fabric under the stitches (Milestone 6, ADR 0127, [`Ground`]): each
+//! thread makes a small dent where it goes into the fabric (a needle hole,
+//! larger on leather), and on a fabric with a pile (terry, fleece) the pile
+//! hides the threads where it is higher than them. Stitches press the pile
+//! down where they cover the area round a place, so a dense column and a
+//! fill under the stitches (a laydown) keep them on top; a topping keeps
+//! all stitches on top.
 
 use std::collections::HashSet;
 use std::ops::Range;
@@ -43,6 +51,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use emb_geom::{BBox, Point};
 use emb_model::{Rgb, ThreadKind};
 
+use crate::fabric::{Ground, PILE_HIDE, PILE_PRESS, PILE_PRESS_FROM, PILE_RADIUS_MM, PILE_SOFT_MM};
 use crate::raster::Areas;
 use crate::strand::Strand;
 use crate::thread3d::Lighting;
@@ -71,9 +80,11 @@ pub const DETAIL_PX_PER_MM: f64 = 16.0;
 /// The most pixels of the surface that is halved (16 bytes each): a very
 /// large design at a small zoom gets less detail.
 const MAX_DETAIL_PIXELS: u64 = 8_000_000;
-/// The apron round a block, mm: the light of a pixel depends on the heights
-/// this far from it (its shadow, its gaps and its slope).
-pub const APRON_MM: f64 = SHADOW_MAX_MM + GAP_RADIUS_MM + 0.2;
+/// The largest apron round a block, mm: the light of a pixel depends on the
+/// heights this far from it (its shadow, its gaps and its slope, and the
+/// threads that press a pile; [`apron_for`]).
+pub const APRON_MM: f64 = SHADOW_MAX_MM + PILE_RADIUS_MM + 0.2;
+const _: () = assert!(PILE_RADIUS_MM >= GAP_RADIUS_MM);
 /// The longest side of a block that is made with its detail in one piece,
 /// pixels of the detail (a larger block is made in parts).
 const MAX_BLOCK_SIDE: u32 = 768;
@@ -100,6 +111,9 @@ const PLY_PITCH_MM: f64 = 0.35;
 const GAP_RADIUS_MM: f64 = 0.3;
 const GAP_DARK: f64 = 0.35;
 const GAP_DEPTH_MM: f64 = 0.15;
+/// A thread this high over a needle hole does not go into it (a thread goes
+/// into the hole from the height 0), mm.
+const HOLE_DEPTH_MM: f64 = 0.15;
 
 /// The materials of a pixel.
 pub mod material {
@@ -1087,11 +1101,10 @@ impl Laid {
         self.top
     }
 
-    /// How far from a pixel a stitch can change its light in `lighting`,
-    /// mm: the longest shadow of these stitches, and the gaps (at most
-    /// [`APRON_MM`]).
-    pub fn apron(&self, lighting: &Lighting) -> f64 {
-        apron_for(lighting, self.top)
+    /// How far from a pixel a stitch can change its light in `lighting` on
+    /// `ground`, mm ([`apron_for`]).
+    pub fn apron(&self, lighting: &Lighting, ground: Option<&Ground>) -> f64 {
+        apron_for(lighting, self.top, ground)
     }
 
     /// The area of the laid stitches and pieces, with a margin.
@@ -1166,6 +1179,12 @@ impl Laid {
     /// As [`Laid::surface`], with the shadows of the threads for the light
     /// `lighting` (made at the detail and halved, as the other values).
     pub fn surface_in(&self, area: BBox, px_per_mm: f64, lighting: &Lighting) -> Surface {
+        self.surface_on(area, px_per_mm, lighting, None)
+    }
+
+    /// As [`Laid::surface_in`], on the fabric `ground` (its pile and its
+    /// needle holes).
+    pub fn surface_on(&self, area: BBox, px_per_mm: f64, lighting: &Lighting, ground: Option<&Ground>) -> Surface {
         let width = ((area.width() * px_per_mm).ceil() as u32).clamp(1, 16_384);
         let height = ((area.height() * px_per_mm).ceil() as u32).clamp(1, 16_384);
         let mut k = 0u32;
@@ -1183,6 +1202,7 @@ impl Laid {
             width << k,
             height << k,
             lighting,
+            ground,
             None,
             0,
         );
@@ -1199,7 +1219,8 @@ impl Laid {
     /// made with its detail and halved as [`Laid::surface_in`] (at most
     /// [`MAX_BLOCK_HALVINGS`] times), with an apron of [`APRON_MM`] round
     /// it, so a pixel is the same in each block that has it. `None` if no
-    /// shown thread and no piece is near.
+    /// shown thread and no piece is near. `ground`: the fabric (its pile
+    /// and its needle holes).
     #[allow(clippy::too_many_arguments)]
     pub fn block(
         &self,
@@ -1209,9 +1230,10 @@ impl Laid {
         w: u32,
         h: u32,
         lighting: &Lighting,
+        ground: Option<&Ground>,
         show: &dyn Fn(u32) -> bool,
     ) -> Option<Surface> {
-        self.block_with(ppm, x0, y0, w, h, lighting, show, DETAIL_PX_PER_MM)
+        self.block_with(ppm, x0, y0, w, h, lighting, ground, show, DETAIL_PX_PER_MM)
     }
 
     /// As [`Laid::block`], made with at least `detail` pixels for each mm
@@ -1225,6 +1247,7 @@ impl Laid {
         w: u32,
         h: u32,
         lighting: &Lighting,
+        ground: Option<&Ground>,
         show: &dyn Fn(u32) -> bool,
         detail: f64,
     ) -> Option<Surface> {
@@ -1232,7 +1255,7 @@ impl Laid {
         while ppm * f64::from(1u32 << k) < detail - 1e-9 && k < MAX_BLOCK_HALVINGS {
             k += 1;
         }
-        self.block_at(ppm, k, x0, y0, w, h, lighting, show)
+        self.block_at(ppm, k, x0, y0, w, h, lighting, ground, show)
     }
 
     /// As [`Laid::block`], with `k` halvings; a block that is too large for
@@ -1247,6 +1270,7 @@ impl Laid {
         w: u32,
         h: u32,
         lighting: &Lighting,
+        ground: Option<&Ground>,
         show: &dyn Fn(u32) -> bool,
     ) -> Option<Surface> {
         let f = 1u32 << k;
@@ -1262,7 +1286,17 @@ impl Laid {
             .into_iter()
             .filter(|p| p.2 > 0 && p.3 > 0)
             .map(|(dx, dy, pw, ph)| {
-                let part = self.block_at(ppm, k, x0 + i64::from(dx), y0 + i64::from(dy), pw, ph, lighting, show);
+                let part = self.block_at(
+                    ppm,
+                    k,
+                    x0 + i64::from(dx),
+                    y0 + i64::from(dy),
+                    pw,
+                    ph,
+                    lighting,
+                    ground,
+                    show,
+                );
                 (dx, dy, part)
             })
             .collect();
@@ -1279,7 +1313,7 @@ impl Laid {
         }
         // The block with its apron, in pixels of the level: as far as the
         // longest shadow of these stitches can fall, and the gaps.
-        let apron_mm = self.apron(lighting);
+        let apron_mm = self.apron(lighting, ground);
         let apron = (apron_mm * ppm).ceil().max(1.0) as i64;
         let (bx, by) = (x0 - apron, y0 - apron);
         let (bw, bh) = (i64::from(w) + 2 * apron, i64::from(h) + 2 * apron);
@@ -1308,6 +1342,7 @@ impl Laid {
             (bw * f) as u32,
             (bh * f) as u32,
             lighting,
+            ground,
             Some(&ids),
             1,
         );
@@ -1332,9 +1367,11 @@ impl Laid {
         width: u32,
         height: u32,
         lighting: &Lighting,
+        ground: Option<&Ground>,
         ids: Option<&[u32]>,
         threads: usize,
     ) -> Surface {
+        let hole = Ground::hole(ground);
         let (tx, ty) = (width.div_ceil(TILE), height.div_ceil(TILE));
         // The stitches of each tile, in sew order.
         let mut lists: Vec<Vec<u32>> = vec![Vec::new(); (tx * ty) as usize];
@@ -1363,7 +1400,7 @@ impl Laid {
             let (cx, cy) = (k as u32 % tx, k as u32 / tx);
             let (x0, y0) = (cx * TILE, cy * TILE);
             let (w, h) = (TILE.min(width - x0), TILE.min(height - y0));
-            self.tile(base, origin, ppm, x0, y0, w, h, &lists[k])
+            self.tile(base, origin, ppm, x0, y0, w, h, &lists[k], hole)
         });
         let min = Point::new(base.x + origin.0 as f64 / ppm, base.y + origin.1 as f64 / ppm);
         let area = BBox::new(
@@ -1379,14 +1416,26 @@ impl Laid {
             tiles,
             light: *lighting,
         };
-        s.finish(threads);
+        s.finish(threads, ground);
         s
     }
 
     /// One tile: the pixels `x0..x0 + w`, `y0..y0 + h` of the surface (see
-    /// [`Laid::raster`]).
+    /// [`Laid::raster`]), with the needle holes `hole` (radius, mm, and
+    /// darkness; [`Ground::hole`]) in [`Tile::open`].
     #[allow(clippy::too_many_arguments)]
-    fn tile(&self, base: Point, origin: (i64, i64), ppm: f64, x0: u32, y0: u32, w: u32, h: u32, ids: &[u32]) -> Tile {
+    fn tile(
+        &self,
+        base: Point,
+        origin: (i64, i64),
+        ppm: f64,
+        x0: u32,
+        y0: u32,
+        w: u32,
+        h: u32,
+        ids: &[u32],
+        hole: (f64, f64),
+    ) -> Tile {
         let mut t = Tile::new(x0, y0, w, h);
         let center = |px: u32, py: u32| {
             Point::new(
@@ -1480,6 +1529,45 @@ impl Laid {
                 }
             }
         }
+        // The needle holes: a dent where each thread goes into the fabric,
+        // darkest in its middle (the gaps are made from the heights later).
+        // A thread that lies over a hole (higher) does not go into it.
+        let (hole_mm, hole_dark) = hole;
+        if hole_mm > 0.0 && hole_dark > 0.0 {
+            let r = hole_mm * ppm;
+            let px = |v: f64, b: f64, o: i64, s: u32| (v - b) * ppm - o as f64 - f64::from(s) - 0.5;
+            for &i in ids {
+                let s = &self.strands[i as usize];
+                let end = Point::new(s.a.x + s.dir.0 * s.len, s.a.y + s.dir.1 * s.len);
+                for p in [s.a, end] {
+                    let (cx, cy) = (px(p.x, base.x, origin.0, x0), px(p.y, base.y, origin.1, y0));
+                    if cx + r < 0.0 || cy + r < 0.0 || cx - r >= f64::from(w) || cy - r >= f64::from(h) {
+                        continue;
+                    }
+                    let (xa, xb) = (
+                        (cx - r).ceil().max(0.0) as u32,
+                        ((cx + r).floor() + 1.0).min(f64::from(w)) as u32,
+                    );
+                    let (ya, yb) = (
+                        (cy - r).ceil().max(0.0) as u32,
+                        ((cy + r).floor() + 1.0).min(f64::from(h)) as u32,
+                    );
+                    for py in ya..yb {
+                        for qx in xa..xb {
+                            let (dx, dy) = (f64::from(qx) - cx, f64::from(py) - cy);
+                            let q = (dx * dx + dy * dy) / (r * r);
+                            if q >= 1.0 {
+                                continue;
+                            }
+                            let k = (py * w + qx) as usize;
+                            let low = (1.0 - f64::from(t.height[k]) / HOLE_DEPTH_MM).clamp(0.0, 1.0);
+                            let open = ((1.0 - hole_dark * (1.0 - q) * low) * 255.0).round() as u8;
+                            t.open[k] = t.open[k].min(open);
+                        }
+                    }
+                }
+            }
+        }
         t
     }
 }
@@ -1526,11 +1614,24 @@ fn wave(t: f64) -> f64 {
 /// How long a shadow can be, mm.
 const SHADOW_MAX_MM: f64 = 4.0;
 
+/// How much threads press a pile down where they cover the part `cover` of
+/// the area round a place (0 to 1): a wide area of thread holds the loops
+/// down, a narrow line only a part of them ([`PILE_PRESS_FROM`]).
+fn pressed(cover: f64) -> f64 {
+    ((cover - PILE_PRESS_FROM) / (1.0 - PILE_PRESS_FROM)).clamp(0.0, 1.0)
+}
+
 /// How far from a pixel stitches up to `top` mm high can change its light
-/// in `lighting`, mm: their longest shadow and the gaps (at most
+/// in `lighting` on `ground`, mm: their longest shadow, and the gaps or
+/// (where stitches sink into a pile) the press of the pile (at most
 /// [`APRON_MM`]).
-pub fn apron_for(lighting: &Lighting, top: f64) -> f64 {
-    shadow_reach(lighting, top) + GAP_RADIUS_MM + 0.2
+pub fn apron_for(lighting: &Lighting, top: f64, ground: Option<&Ground>) -> f64 {
+    let reach = if ground.is_some_and(Ground::sinks) {
+        PILE_RADIUS_MM
+    } else {
+        GAP_RADIUS_MM
+    };
+    shadow_reach(lighting, top) + reach + 0.2
 }
 
 /// How far the shadow of a part `top` mm high falls in the light `l`, mm (at
@@ -1761,7 +1862,8 @@ pub struct Tile {
     /// union of the parts of each thread).
     pub cover: Vec<u8>,
     /// The light that the gaps let in, 0 to 255 (a gap between stitches or
-    /// a needle hole is darker).
+    /// a needle hole is darker). Before [`Surface::finish`]: the light that
+    /// the needle holes let in.
     pub open: Vec<u8>,
     /// The twist of the plies at the pixel, −127 to 127.
     pub ply: Vec<i8>,
@@ -1946,8 +2048,9 @@ impl Surface {
     }
 
     /// The normals, the gaps and the shadows, from the heights (after the
-    /// tiles), on `threads` processors (0: all).
-    fn finish(&mut self, threads: usize) {
+    /// tiles), and the pile of `ground` over the threads, on `threads`
+    /// processors (0: all).
+    fn finish(&mut self, threads: usize, ground: Option<&Ground>) {
         let (w, h) = (self.width as usize, self.height as usize);
         let mut flat = vec![0.0f32; w * h];
         for t in &self.tiles {
@@ -1968,6 +2071,22 @@ impl Surface {
         let tops = Tops::new(flat, w, h);
         let tops = &tops;
         let (light, ppm) = (self.light, self.px_per_mm);
+        // The pile: how much the threads round each place press it down.
+        let pile = ground.filter(|g| g.sinks()).map(|g| {
+            let mut cover = vec![0.0f32; w * h];
+            for t in &self.tiles {
+                for row in 0..t.h as usize {
+                    for col in 0..t.w as usize {
+                        cover[(t.y0 as usize + row) * w + t.x0 as usize + col] =
+                            f32::from(t.cover[row * t.w as usize + col]) / 255.0;
+                    }
+                }
+            }
+            let r = ((PILE_RADIUS_MM * ppm).round() as usize).max(1);
+            (g.fabric.clone(), box_mean(&cover, w, h, r))
+        });
+        let pile = &pile;
+        let min = self.area.min;
         // The direction of the light, one time (not for each pixel).
         let lv = light.vector();
         let work = move |chunk: &mut [Tile]| {
@@ -1981,8 +2100,20 @@ impl Surface {
                         let len = (dzdx * dzdx + dzdy * dzdy + 1.0).sqrt();
                         t.normal[k] = [-dzdx / len, -dzdy / len, 1.0 / len].map(|v| (v * 127.0).round() as i8);
                         let depth = (f64::from(around[y as usize * w + x as usize]) - at(x, y)).max(0.0);
-                        let open = 1.0 - GAP_DARK * (depth / GAP_DEPTH_MM).min(1.0);
+                        let hole = f64::from(t.open[k]) / 255.0;
+                        let open = (1.0 - GAP_DARK * (depth / GAP_DEPTH_MM).min(1.0)) * hole;
                         t.open[k] = (open * 255.0).round() as u8;
+                        // The pile hides the threads where it is higher than
+                        // them.
+                        if let Some((fabric, press)) = pile
+                            && t.cover[k] > 0
+                        {
+                            let (mx, my) = (min.x + (x as f64 + 0.5) / ppm, min.y + (y as f64 + 0.5) / ppm);
+                            let top = fabric.pile_at(mx, my)
+                                * (1.0 - PILE_PRESS * pressed(f64::from(press[y as usize * w + x as usize])));
+                            let hide = ((top - at(x, y)) / PILE_SOFT_MM).clamp(0.0, 1.0) * PILE_HIDE;
+                            t.cover[k] = (f64::from(t.cover[k]) * (1.0 - hide)).round() as u8;
+                        }
                         let dark = shadow_with(
                             &at,
                             Some(tops),
@@ -2428,6 +2559,64 @@ mod tests {
     }
 
     #[test]
+    fn a_pile_hides_a_line_more_than_a_wide_column() {
+        use crate::fabric::Weave;
+        // A run (one stitch) and a column 4 mm wide (stitches across it,
+        // 0.2 mm apart), far from each other.
+        let run = [strand((0.0, 0.0), (12.0, 0.0))];
+        let column: Vec<Strand> = (0..60)
+            .map(|k| {
+                let x = 20.0 + 0.2 * f64::from(k);
+                if k % 2 == 0 {
+                    strand((x, -2.0), (x + 0.1, 2.0))
+                } else {
+                    strand((x + 0.1, 2.0), (x, -2.0))
+                }
+            })
+            .collect();
+        let laid = lay(&design(&[&run, &column]), &[]);
+        let towel = Ground::new(Weave::Terry, 1.0, false);
+        let topping = Ground {
+            topping: true,
+            ..towel.clone()
+        };
+        let cover = |g: &Ground, b: BBox| {
+            let s = laid.surface_on(b, 16.0, &Lighting::default(), Some(g));
+            s.tiles
+                .iter()
+                .flat_map(|t| t.cover.iter())
+                .map(|c| f64::from(*c))
+                .sum::<f64>()
+        };
+        let lost = |b: BBox| 1.0 - cover(&towel, b) / cover(&topping, b);
+        let line = BBox::new(Point::new(1.0, -0.5), Point::new(11.0, 0.5));
+        let middle = BBox::new(Point::new(23.0, -1.0), Point::new(29.0, 1.0));
+        let (a, b) = (lost(line), lost(middle));
+        eprintln!(
+            "the pile hides {:.0} % of a line, {:.1} % of the middle of a column",
+            100.0 * a,
+            100.0 * b
+        );
+        assert!(a > 0.4, "the pile hides most of a line: {a}");
+        assert!(b < 0.1 * a, "a wide column keeps its middle: {b}");
+        // No pile, or a topping: nothing is hidden.
+        let plain = Ground::new(Weave::Plain, 0.25, false);
+        let s = |g: &Ground| laid.surface_on(line, 16.0, &Lighting::default(), Some(g));
+        let covered = |s: &Surface| {
+            s.tiles
+                .iter()
+                .flat_map(|t| t.cover.iter())
+                .map(|c| u64::from(*c))
+                .sum::<u64>()
+        };
+        assert_eq!(
+            covered(&s(&plain)),
+            covered(&laid.surface_on(line, 16.0, &Lighting::default(), None))
+        );
+        assert!(towel.sinks() && !topping.sinks() && !plain.sinks());
+    }
+
+    #[test]
     fn a_block_has_the_pixels_of_each_other_block() {
         let (fill, satin, far) = objects();
         let laid = lay(&design(&[&fill, &satin, &far]), &[]);
@@ -2435,27 +2624,33 @@ mod tests {
         let all = |_: u32| true;
         // At 8 and 32 pixels for each mm, and at 1 (made in parts).
         for (ppm, x0, y0, w, h) in [(8.0, -8, -4, 80, 104), (32.0, -16, -8, 300, 200), (1.0, -3, -3, 60, 50)] {
-            let big = laid.block(ppm, x0, y0, w, h, &l, &all).expect("stitches");
-            let (px, py, pw, ph) = (w / 10, h / 10, w / 3, h / 2);
-            let part = laid
-                .block(ppm, x0 + i64::from(px), y0 + i64::from(py), pw, ph, &l, &all)
-                .expect("stitches");
-            for y in 0..ph {
-                for x in 0..pw {
-                    assert_eq!(pixel(&part, x, y), pixel(&big, x + px, y + py), "{ppm}: {x} {y}");
+            // Also on a towel with no topping (the pile) and on leather (large
+            // needle holes).
+            let towel = Ground::new(crate::fabric::Weave::Terry, 1.0, false);
+            let leather = Ground::new(crate::fabric::Weave::Leather, 0.7, false);
+            for ground in [None, Some(&towel), Some(&leather)] {
+                let big = laid.block(ppm, x0, y0, w, h, &l, ground, &all).expect("stitches");
+                let (px, py, pw, ph) = (w / 10, h / 10, w / 3, h / 2);
+                let part = laid
+                    .block(ppm, x0 + i64::from(px), y0 + i64::from(py), pw, ph, &l, ground, &all)
+                    .expect("stitches");
+                for y in 0..ph {
+                    for x in 0..pw {
+                        assert_eq!(pixel(&part, x, y), pixel(&big, x + px, y + py), "{ppm}: {x} {y}");
+                    }
                 }
+                assert!((part.area.min.x - (x0 + i64::from(px)) as f64 / ppm).abs() < 1e-12);
             }
-            assert!((part.area.min.x - (x0 + i64::from(px)) as f64 / ppm).abs() < 1e-12);
         }
         // Far from the stitches, or with no stitch shown: nothing.
-        assert!(laid.block(8.0, 4000, 4000, 16, 16, &l, &all).is_none());
-        assert!(laid.block(8.0, -8, -4, 80, 104, &l, &|_| false).is_none());
+        assert!(laid.block(8.0, 4000, 4000, 16, 16, &l, None, &all).is_none());
+        assert!(laid.block(8.0, -8, -4, 80, 104, &l, None, &|_| false).is_none());
         // Only the shown strands: the satin alone covers less.
         let first = fill.len() as u32;
         let satin_only = laid
-            .block(8.0, -8, -4, 80, 104, &l, &|r| (first..first + 40).contains(&r))
+            .block(8.0, -8, -4, 80, 104, &l, None, &|r| (first..first + 40).contains(&r))
             .expect("the satin");
-        let all_of_it = laid.block(8.0, -8, -4, 80, 104, &l, &all).expect("stitches");
+        let all_of_it = laid.block(8.0, -8, -4, 80, 104, &l, None, &all).expect("stitches");
         let covered = |s: &Surface| s.tiles.iter().flat_map(|t| t.cover.iter()).filter(|c| **c > 0).count();
         assert!(covered(&satin_only) < covered(&all_of_it));
     }
@@ -2499,10 +2694,20 @@ mod tests {
             let f = (16.0 / ppm).max(1.0) as i64;
             let w = (258 * f) as u32;
             let t = std::time::Instant::now();
-            let mut sf = laid.raster(Point::ZERO, (x0 * f, y0 * f), ppm * f as f64, w, w, &l, Some(&ids), 1);
+            let mut sf = laid.raster(
+                Point::ZERO,
+                (x0 * f, y0 * f),
+                ppm * f as f64,
+                w,
+                w,
+                &l,
+                None,
+                Some(&ids),
+                1,
+            );
             let raster = ms(t);
             let t = std::time::Instant::now();
-            sf.finish(1);
+            sf.finish(1, None);
             let finish = ms(t);
             let t = std::time::Instant::now();
             let mut k = f;
@@ -2515,7 +2720,8 @@ mod tests {
             crate::sheen::overlay(&sf, &l);
             let light = ms(t);
             let t = std::time::Instant::now();
-            laid.block(ppm, x0, y0, 258, 258, &l, &|_| true).expect("stitches");
+            laid.block(ppm, x0, y0, 258, 258, &l, None, &|_| true)
+                .expect("stitches");
             println!(
                 "{ppm} px/mm: {} strands, {} pixels of the detail; the stitches and the finish {raster:.0} ms \
                  (the finish {finish:.0} ms), halved {half:.0} ms, light {light:.0} ms; the block {:.0} ms",

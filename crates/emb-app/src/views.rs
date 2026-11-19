@@ -121,6 +121,7 @@ impl AppState {
             plan,
             design: slot.doc.design(),
             lighting: self.settings.look.light,
+            ground: self.ground_of(slot.doc.design()),
             filter: &filter,
             cursor: None,
             moving: &[],
