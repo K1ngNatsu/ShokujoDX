@@ -27,6 +27,10 @@ pub struct DecorWindows {
     pub frame_shape: Option<emb_model::FrameShape>,
     /// The size of the stitch of the border, as a factor.
     pub frame_scale: f64,
+    /// The text of the search of the Borders window.
+    pub frame_search: String,
+    /// The stitches of the borders, for their pictures.
+    pub frame_pictures: crate::item_pictures::FramePictures,
 }
 
 impl Default for DecorWindows {
@@ -41,6 +45,8 @@ impl Default for DecorWindows {
             frame_margin_mm: 4.0,
             frame_shape: None,
             frame_scale: 1.0,
+            frame_search: String::new(),
+            frame_pictures: Default::default(),
         }
     }
 }
@@ -370,16 +376,56 @@ fn borders_window(ctx: &egui::Context, st: &mut AppState) {
     .default_width(300.0)
     .show(ctx, |ui| {
         let w = &mut st.decor;
-        egui::ScrollArea::vertical().max_height(230.0).show(ui, |ui| {
-            egui::Grid::new("frames").spacing([6.0, 4.0]).show(ui, |ui| {
-                for (i, f) in all.iter().enumerate() {
-                    ui.selectable_value(&mut w.frame, i, &f.name);
-                    if i % 3 == 2 {
+        ui.add(
+            egui::TextEdit::singleline(&mut w.frame_search)
+                .hint_text(tr("Search"))
+                .desired_width(180.0),
+        );
+        let search = w.frame_search.trim().to_lowercase();
+        let found: Vec<usize> = (0..all.len())
+            .filter(|&i| {
+                search.is_empty()
+                    || all[i].name.to_lowercase().contains(&search)
+                    || tr(all[i].shape.name()).to_lowercase().contains(&search)
+            })
+            .collect();
+        // The pictures: the stitches of each border round a small box. Some
+        // are made in each frame, so the window opens at once.
+        let mut budget = crate::item_pictures::FramePictures::IN_A_FRAME;
+        let mut waiting = false;
+        egui::ScrollArea::vertical().max_height(260.0).show(ui, |ui| {
+            egui::Grid::new("frames").spacing([6.0, 6.0]).show(ui, |ui| {
+                for (k, &i) in found.iter().enumerate() {
+                    let f = &all[i];
+                    let lines = w.frame_pictures.get(f).or_else(|| {
+                        if budget == 0 {
+                            waiting = true;
+                            return None;
+                        }
+                        budget -= 1;
+                        Some(w.frame_pictures.make(f))
+                    });
+                    let clicked = crate::item_pictures::cell(ui, w.frame == i, &f.name, |painter, rect, ink| {
+                        if let Some(lines) = &lines {
+                            crate::item_pictures::border(painter, rect, lines, ink);
+                        }
+                    })
+                    .clicked();
+                    if clicked {
+                        w.frame = i;
+                    }
+                    if k % crate::item_pictures::COLUMNS == crate::item_pictures::COLUMNS - 1 {
                         ui.end_row();
                     }
                 }
             });
+            if found.is_empty() {
+                ui.weak(tr("No border has this text in its name."));
+            }
         });
+        if waiting {
+            ui.ctx().request_repaint();
+        }
         ui.horizontal(|ui| {
             ui.label(tr("Shape")).on_hover_text(tr(
                 "Each border has a shape of its own. Choose another shape to make a border of your own.",
@@ -526,5 +572,40 @@ mod tests {
         assert!(b.min.x < -4.0 && b.max.x > 44.0, "{b:?}");
         h.st.decor.borders = true;
         draw(&mut h);
+        // The window makes the pictures of some borders in each frame.
+        let made = |h: &Harness| {
+            frames()
+                .iter()
+                .filter(|f| h.st.decor.frame_pictures.get(f).is_some())
+                .count()
+        };
+        let first = made(&h);
+        assert!(
+            first >= 1 && first <= crate::item_pictures::FramePictures::IN_A_FRAME,
+            "{first}"
+        );
+        for _ in 0..20 {
+            draw(&mut h);
+        }
+        assert_eq!(made(&h), frames().len());
+        // A search, another shape and another size: the border of the
+        // list with the shape and the size of the window.
+        h.st.decor.frame_search = "no border has this name".into();
+        draw(&mut h);
+        h.st.decor.frame_search = "greek".into();
+        draw(&mut h);
+        h.st.decor.frame = frames().iter().position(|f| f.name == "Greek key").unwrap();
+        h.st.decor.frame_shape = Some(emb_model::FrameShape::Octagon);
+        h.st.decor.frame_scale = 1.5;
+        h.st.selection.set(id);
+        assert!(h.st.add_frame());
+        let d = h.st.doc.design();
+        let last = d.objects().last().unwrap();
+        let ObjectKind::Running { params, .. } = &last.kind else {
+            panic!()
+        };
+        let run = params.motif.as_ref().unwrap();
+        assert_eq!(run.motif.name, "Key");
+        assert!((run.length_mm - 9.0).abs() < 1e-9 && (run.height_mm - 4.5).abs() < 1e-9);
     }
 }

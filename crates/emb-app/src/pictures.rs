@@ -394,6 +394,31 @@ impl Studio {
     }
 }
 
+impl Studio {
+    /// The picture of a piece of user interface that is not a window of
+    /// the program (the picture lists that open as menus).
+    fn paint(&mut self, size: Vec2, mut add: impl FnMut(&mut egui::Ui)) -> Picture {
+        let input = || egui::RawInput {
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)),
+            ..Default::default()
+        };
+        let mut out = self.ctx.run_ui(input(), &mut add);
+        self.painter.set(&mut out.textures_delta);
+        for _ in 0..3 {
+            self.painter.free(&mut out.textures_delta);
+            out = self.ctx.run_ui(input(), &mut add);
+            self.painter.set(&mut out.textures_delta);
+        }
+        let ppp = out.pixels_per_point;
+        let primitives = self.ctx.tessellate(std::mem::take(&mut out.shapes), ppp);
+        let pixels = [(size.x * ppp).round() as usize, (size.y * ppp).round() as usize];
+        let clear = self.ctx.global_style().visuals.panel_fill;
+        let picture = self.painter.paint(&primitives, ppp, pixels, clear);
+        self.painter.free(&mut out.textures_delta);
+        picture
+    }
+}
+
 /// What a scene shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum View {
@@ -1023,6 +1048,60 @@ mod tests {
         );
         let row = draw_all(&all[pick("ribbon Digitize")..=pick("ribbon Digitize")], &["en"], None);
         assert!(row[0][0].error.is_none() && row[0][0].files.is_empty());
+    }
+
+    /// Writes pictures of the picture lists of the patterns, the stamps and
+    /// the borders (the lists open as menus, so no scene shows them):
+    /// `cargo test --release -p emb-app -- --ignored write_list_pictures`.
+    #[test]
+    #[ignore = "writes pictures of the lists; run it by hand in a release build"]
+    fn write_list_pictures() {
+        use crate::item_pictures::{COLUMNS, FramePictures, border, cell, pattern, stamp};
+        let dir = out_dir();
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut studio = Studio::new();
+        let mut frames = FramePictures::default();
+        let grid = |ui: &mut egui::Ui, n: usize, one: &mut dyn FnMut(&mut egui::Ui, usize)| {
+            egui::CentralPanel::default().show(ui, |ui| {
+                egui::Grid::new("list").spacing([6.0, 6.0]).show(ui, |ui| {
+                    for i in 0..n {
+                        one(ui, i);
+                        if i % COLUMNS == COLUMNS - 1 {
+                            ui.end_row();
+                        }
+                    }
+                });
+            });
+        };
+        let patterns = emb_model::split::split_patterns();
+        let stamps = emb_model::split::stamps();
+        let borders = emb_model::decor::frames();
+        let size = |n: usize| Vec2::new(390.0, 30.0 + 84.0 * n.div_ceil(COLUMNS) as f32);
+        let picture = studio.paint(size(patterns.len()), |ui| {
+            grid(ui, patterns.len(), &mut |ui, i| {
+                let p = &patterns[i];
+                cell(ui, i == 0, &p.name, |painter, rect, ink| {
+                    pattern(painter, rect, p, 4.0, ink)
+                });
+            })
+        });
+        picture.save(&dir.join("list-patterns.png")).unwrap();
+        let picture = studio.paint(size(stamps.len()), |ui| {
+            grid(ui, stamps.len(), &mut |ui, i| {
+                let s = &stamps[i];
+                cell(ui, false, &s.name, |painter, rect, ink| stamp(painter, rect, s, ink));
+            })
+        });
+        picture.save(&dir.join("list-stamps.png")).unwrap();
+        let picture = studio.paint(size(borders.len()), |ui| {
+            grid(ui, borders.len(), &mut |ui, i| {
+                let lines = frames.make(&borders[i]);
+                cell(ui, false, &borders[i].name, |painter, rect, ink| {
+                    border(painter, rect, &lines, ink)
+                });
+            })
+        });
+        picture.save(&dir.join("list-borders.png")).unwrap();
     }
 
     /// The pictures of all windows in all languages. Run it by hand in a

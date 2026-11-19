@@ -48,6 +48,7 @@ mod hoops;
 mod i18n;
 mod icons;
 mod info;
+mod item_pictures;
 mod jobs;
 mod join;
 mod keyboard;

@@ -242,34 +242,8 @@ fn preview(ui: &mut egui::Ui, item: &Item, size: Vec2) {
     let inner = rect.shrink(8.0);
     match item {
         Item::Motif(_) => {}
-        Item::Split(p) => {
-            // The needle points of the rows, at 0.4 mm between two rows.
-            let mm = 7.0_f32;
-            let (tile, step) = (p.width_mm as f32 * mm, 0.4 * mm);
-            let mut row = 0;
-            while (row as f32) * step < inner.height() {
-                let y = inner.top() + row as f32 * step;
-                let points = &p.rows[row % p.rows.len()];
-                let mut k = 0.0_f32;
-                while k * tile < inner.width() {
-                    for f in points {
-                        let x = inner.left() + (k + *f as f32) * tile;
-                        if x <= inner.right() {
-                            painter.circle_filled(Pos2::new(x, y), 1.2, ink);
-                        }
-                    }
-                    k += 1.0;
-                }
-                row += 1;
-            }
-        }
-        Item::Stamp(s) => {
-            let side = inner.width().min(inner.height());
-            let at = |q: &Point| inner.center() + Vec2::new(q.x as f32 * side, q.y as f32 * side);
-            for line in &s.lines {
-                painter.add(egui::Shape::line(line.iter().map(at).collect(), Stroke::new(1.5, ink)));
-            }
-        }
+        Item::Split(p) => crate::item_pictures::pattern(&painter, inner, p, 7.0, ink),
+        Item::Stamp(s) => crate::item_pictures::stamp(&painter, inner, s, ink),
         Item::Clipart(d) => {
             let Some(b) = d
                 .objects()

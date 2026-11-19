@@ -1738,12 +1738,26 @@ fn split_pattern_ui(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, current:
         ui.label(tr("Pattern")).on_hover_text(tr(words::SPLIT_PATTERN_HELP));
         egui::ComboBox::from_id_salt("split_pattern")
             .selected_text(current)
+            .height(360.0)
             .show_ui(ui, |ui| {
-                for p in emb_model::split::split_patterns() {
-                    if ui.selectable_label(p.name == current, &p.name).clicked() && p.name != current {
-                        pick = Some(p);
-                    }
-                }
+                // A picture of each pattern: its needle points.
+                egui::Grid::new("split_pattern_grid")
+                    .spacing([6.0, 6.0])
+                    .show(ui, |ui| {
+                        for (i, p) in emb_model::split::split_patterns().into_iter().enumerate() {
+                            let on = p.name == current;
+                            let clicked = crate::item_pictures::cell(ui, on, &p.name, |painter, rect, ink| {
+                                crate::item_pictures::pattern(painter, rect, &p, 4.0, ink)
+                            })
+                            .clicked();
+                            if clicked && !on {
+                                pick = Some(p);
+                            }
+                            if i % crate::item_pictures::COLUMNS == crate::item_pictures::COLUMNS - 1 {
+                                ui.end_row();
+                            }
+                        }
+                    });
             });
         if ui
             .small_button(tr("Families…"))
@@ -1889,12 +1903,23 @@ fn stamps_ui(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &FillPa
     ui.horizontal(|ui| {
         egui::ComboBox::from_id_salt("add_stamp")
             .selected_text(tr("Add a stamp…"))
+            .height(360.0)
             .show_ui(ui, |ui| {
-                for s in emb_model::split::stamps() {
-                    if ui.selectable_label(false, &s.name).clicked() {
-                        add = Some(s);
+                // A picture of each stamp: its lines.
+                egui::Grid::new("stamp_grid").spacing([6.0, 6.0]).show(ui, |ui| {
+                    for (i, s) in emb_model::split::stamps().into_iter().enumerate() {
+                        let clicked = crate::item_pictures::cell(ui, false, &s.name, |painter, rect, ink| {
+                            crate::item_pictures::stamp(painter, rect, &s, ink)
+                        })
+                        .clicked();
+                        if clicked {
+                            add = Some(s);
+                        }
+                        if i % crate::item_pictures::COLUMNS == crate::item_pictures::COLUMNS - 1 {
+                            ui.end_row();
+                        }
                     }
-                }
+                });
             });
         if ui
             .small_button(tr("Families…"))

@@ -300,7 +300,13 @@ tools), then 5 to 8. Lane 5 and lane 6 wait for a sew-out.
    since the last run.
 3. **Pictures in the lists** (M): the patterns, the stamps and the
    borders as picture grids, as the motifs have, with a search. The
-   Families window draws them already.
+   Families window draws them already. **Done (2026-11-19):**
+   `emb-app/src/item_pictures.rs` draws a pattern as its needle points,
+   a stamp as its lines and a border as its stitches round a small box.
+   The lists of the patterns and of the stamps in Object Properties and
+   the Borders window show these pictures with the names; the Borders
+   window has a search. The lists of Object Properties open as menus,
+   so they have no search.
 4. **The route in the converter of the program** (S to M): Convert runs
    the extension and the route as a background job with a progress
    bar, so a font of the user is as good as a font of the tool.
