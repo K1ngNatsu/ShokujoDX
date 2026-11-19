@@ -194,6 +194,7 @@ mod tests {
             b: Point::new(b.0, b.1),
             color,
             kind,
+            ..Default::default()
         }
     }
 

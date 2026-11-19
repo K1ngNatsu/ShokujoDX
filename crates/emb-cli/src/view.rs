@@ -34,8 +34,9 @@ pub struct Reference {
 }
 
 /// The reference set: the faults of the list "What a sew-out shows and the
-/// view does not" of the plan, one design for each.
-pub const REFERENCE: [Reference; 12] = [
+/// view does not" of the plan, one design for each (twelve of Milestone 1,
+/// and the kinds and the weights of thread of Milestone 2).
+pub const REFERENCE: [Reference; 13] = [
     Reference {
         name: "view-satin-angles",
         shows: "Sheen by direction: satin columns at eight angles",
@@ -95,6 +96,11 @@ pub const REFERENCE: [Reference; 12] = [
         name: "view-dark",
         shows: "Light and dark threads on a dark fabric",
         close: (0.0, 8.0),
+    },
+    Reference {
+        name: "view-thread-kinds",
+        shows: "Kinds of thread (polyester, rayon, cotton, metallic, wool, glow) and weights 30 and 60",
+        close: (-11.0, -12.0),
     },
 ];
 

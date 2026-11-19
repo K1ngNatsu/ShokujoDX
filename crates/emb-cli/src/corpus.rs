@@ -12,7 +12,7 @@ use emb_model::{
     SatinGeometry, SatinParams, ThreadId,
 };
 
-pub const NAMES: [&str; 79] = [
+pub const NAMES: [&str; 80] = [
     "circle-fill",
     "satin-column",
     "s-curve",
@@ -92,6 +92,7 @@ pub const NAMES: [&str; 79] = [
     "view-blend",
     "view-towel",
     "view-dark",
+    "view-thread-kinds",
 ];
 
 const MACHINE: &str = "husqvarna_topaz20";
@@ -184,6 +185,7 @@ pub fn build(name: &str) -> Option<Design> {
         "view-blend" => view_blend(),
         "view-towel" => view_towel(),
         "view-dark" => view_dark(),
+        "view-thread-kinds" => view_thread_kinds(),
         _ => return None,
     };
     d.name = name.to_string();
@@ -507,6 +509,40 @@ fn view_dark() -> Design {
             },
         },
     );
+    d
+}
+
+/// Reference set (P18 view plan, Milestone 2, ADR 0123): the kinds and the
+/// weights of thread. Eight satin columns of one color: one in each kind of
+/// thread (polyester, rayon, cotton, metallic, wool, glow) of weight 40,
+/// then polyester of weight 30 and 60 with the same stitch settings, so the
+/// thinner thread covers less. The columns are steps from the top left
+/// (each one starts level with the end of the one before) and the design
+/// starts at its top left, so all columns sew from the top down: the view
+/// of today draws a column that sews up darker (see the report of
+/// Milestone 2).
+fn view_thread_kinds() -> Design {
+    use emb_model::ThreadKind;
+    let mut d = view_design();
+    let color = Rgb(110, 150, 200);
+    let threads = ThreadKind::ALL
+        .into_iter()
+        .map(|k| (k, 40))
+        .chain([(ThreadKind::Polyester, 30), (ThreadKind::Polyester, 60)]);
+    for (k, (kind, weight)) in threads.enumerate() {
+        let id = d.add_thread(format!("{} {weight}", kind.name()), color);
+        if let Some(t) = d.threads.iter_mut().find(|t| t.id == id) {
+            t.kind = kind;
+            t.weight = weight;
+        }
+        let (x, y) = (-38.5 + 11.0 * k as f64, -40.0 + 10.0 * k as f64);
+        satin(
+            &mut d,
+            id,
+            SatinGeometry::from_centerline(&Path::new().move_to(p(x, y)).line_to(p(x, y + 10.0)), 5.0),
+        );
+    }
+    d.start_end.start = Some(emb_model::Anchor::DesignBox { x: 0.0, y: 0.0 });
     d
 }
 

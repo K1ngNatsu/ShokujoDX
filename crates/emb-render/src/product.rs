@@ -676,8 +676,9 @@ fn paint_photo(pic: &mut Picture, b: BBox, px_per_mm: f64, img: &image::RgbaImag
             let s = img.get_pixel(sx, sy).0;
             let a = f64::from(s[3]) / 255.0;
             let i = (py as usize * pic.width as usize + px as usize) * 4;
+            // In linear light (ADR 0123).
             for (dst, src) in pic.rgba[i..i + 3].iter_mut().zip(s) {
-                *dst = (f64::from(src) * a + f64::from(*dst) * (1.0 - a)).round() as u8;
+                *dst = crate::light::mix(src, *dst, a);
             }
             pic.rgba[i + 3] = 255;
         }
@@ -810,6 +811,7 @@ mod tests {
             b: Point::new(900_010.0, 0.0),
             color: Rgb(0, 0, 200),
             kind: SegmentKind::Stitch,
+            ..Default::default()
         };
         let b = decoration_area(&v, &[far]);
         assert!(b.width() <= v.bbox().width() + 2020.0, "{b:?}");
@@ -823,12 +825,15 @@ mod tests {
             b: Point::new(20.0, 230.0),
             color: Rgb(0, 0, 200),
             kind: SegmentKind::Stitch,
+            ..Default::default()
         };
         let pic = decoration(&v, None, &[seg], 2.0, 0.6, &Look::default());
         let b = v.bbox().expand(10.0);
-        // The blue stitch is on the bag (its soft shadow darkens the edges a little).
+        // The blue stitch is on the bag (its soft shadow darkens the edges a
+        // little). The thread is 1.2 pixels wide, so the pixel mixes it with
+        // the bag, in linear light (ADR 0123).
         let st = pixel(&pic, b, 2.0, Point::new(0.0, 230.0));
-        assert!(st[0] < 100 && st[2] > 170, "{st:?}");
+        assert!(st[0] < 160 && st[2] > 170 && st[2] > st[0] + 40, "{st:?}");
         let bag = pixel(&pic, b, 2.0, Point::new(0.0, 300.0));
         assert!(near(bag, [240, 230, 200], 25), "{bag:?}");
         // White round the product.
@@ -912,6 +917,7 @@ mod tests {
                     b: Point::new(20.0, y),
                     color: Rgb(0, 0, 200),
                     kind: SegmentKind::Stitch,
+                    ..Default::default()
                 }
             })
             .collect();
@@ -933,6 +939,7 @@ mod tests {
             b: Point::new(20.0, 230.0),
             color: Rgb(0, 0, 200),
             kind: SegmentKind::Stitch,
+            ..Default::default()
         };
         let flat = decoration(&v, None, &[seg], 8.0, 1.0, &Look::default());
         let lit = decoration(&v, None, &[seg], 8.0, 1.0, &Look::three_d(None));

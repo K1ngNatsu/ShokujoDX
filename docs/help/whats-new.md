@@ -84,6 +84,14 @@ satin columns, a font sews fill letters, so it goes up to 300 mm.
 whole text.
 See [Lettering](lettering).
 
+**Kinds and weights of thread.** A thread has a kind (polyester, rayon,
+cotton, metallic, wool or acrylic, glow in the dark) and a weight (40 is
+the usual). Set them for the current thread in the Threads panel. The
+thread look shows a thread of another weight thinner or thicker, and a
+matte thread with no shine. A chart thread gives its kind when the name
+of the chart tells it. In the design pictures, the colors at the edges of
+the threads now mix as light does. See [Colors and threads](colors-and-threads).
+
 **Designs with very many stitches.** The program could stop when the
 canvas showed about 350,000 stitches or more at one time in the thread
 look. Now the canvas shows them in a simpler look at that zoom, and in

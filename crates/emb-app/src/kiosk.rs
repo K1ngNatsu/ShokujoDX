@@ -183,6 +183,7 @@ impl AppState {
                 color,
                 brand: None,
                 code: None,
+                ..Default::default()
             });
         let product_color = PRODUCT_COLORS[c.product_color.min(PRODUCT_COLORS.len() - 1)].1;
         let fabrics = self.fabrics.clone();

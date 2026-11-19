@@ -120,7 +120,7 @@ pub use stitch::{StitchDesign, StitchKind, StitchRecord};
 pub use style::{CurrentProperties, Style};
 pub use tartan::Sett;
 pub use teamnames::{TeamColumn, TeamNames, TeamRow};
-pub use thread::{Rgb, Thread, ThreadId};
+pub use thread::{Rgb, Thread, ThreadId, ThreadKind};
 pub use trace::{BorderTrace, TraceOrder, TraceSpec, TraceStitch};
 pub use vector::{ConvertTo, VectorStyle};
 

@@ -117,6 +117,17 @@ fn validate(design: &Design) -> Result<(), ModelError> {
         if !thread_ids.insert(t.id) {
             return Err(invalid(text::fill("thread id {} is used more than once", &[&t.id.0])));
         }
+        if !crate::thread::WEIGHTS.contains(&t.weight) {
+            return Err(invalid(text::fill(
+                "thread {}: the weight {} is not from {} to {}",
+                &[
+                    &t.id.0,
+                    &t.weight,
+                    crate::thread::WEIGHTS.start(),
+                    crate::thread::WEIGHTS.end(),
+                ],
+            )));
+        }
     }
     let mut object_ids = BTreeSet::new();
     for o in design.objects() {

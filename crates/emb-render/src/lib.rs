@@ -14,6 +14,7 @@
 //! - [`cross_chart`]: the chart of a cross-stitch design; [`stone_sheet`]:
 //!   the rhinestone template on paper.
 //! - [`density`]: the layers of thread on each small square (density map).
+//! - [`light`]: colors mix in linear light (ADR 0123).
 //! - [`compare`]: two pictures side by side with their difference, for the
 //!   developer; [`stress`]: large synthetic stitch lists to measure speed
 //!   (ADR 0122).
@@ -24,6 +25,7 @@ pub mod compare;
 pub mod cross_chart;
 pub mod density;
 pub mod hooping_sheet;
+pub mod light;
 pub mod page;
 pub mod pdf;
 pub mod photo;
@@ -38,7 +40,7 @@ pub mod thread3d;
 pub mod turntable;
 
 use emb_geom::{BBox, Point};
-use emb_model::{Rgb, StitchDesign, StitchKind};
+use emb_model::{Rgb, StitchDesign, StitchKind, ThreadKind};
 
 /// Color for threads that are not in the palette.
 pub const FALLBACK_COLOR: Rgb = Rgb(128, 128, 128);
@@ -57,6 +59,32 @@ pub struct Segment {
     pub b: Point,
     pub color: Rgb,
     pub kind: SegmentKind,
+    /// The kind of the thread (ADR 0123): the 3D look gives it its shine.
+    pub thread_kind: ThreadKind,
+    /// The weight of the thread: the views give it its width
+    /// (`emb_model::thread::width_factor`).
+    pub thread_weight: u16,
+}
+
+impl Default for Segment {
+    /// A stitch of a black 40 weight polyester thread at the origin.
+    fn default() -> Self {
+        Segment {
+            a: Point::ZERO,
+            b: Point::ZERO,
+            color: Rgb(0, 0, 0),
+            kind: SegmentKind::Stitch,
+            thread_kind: ThreadKind::default(),
+            thread_weight: emb_model::thread::DEFAULT_WEIGHT,
+        }
+    }
+}
+
+impl Segment {
+    /// The width of the thread, as a part of the width of a 40 weight thread.
+    pub fn width_factor(&self) -> f64 {
+        emb_model::thread::width_factor(self.thread_weight)
+    }
 }
 
 /// Converts a stitch design to line segments in sew order.
@@ -69,6 +97,14 @@ pub fn segments(design: &StitchDesign) -> Vec<Segment> {
     let mut last: Option<Point> = None;
     let mut thread_cut = false;
     let color_of = |i: usize| design.threads.get(i).map(|t| t.color).unwrap_or(FALLBACK_COLOR);
+    let look_of = |i: usize| {
+        design
+            .threads
+            .get(i)
+            .map_or((ThreadKind::default(), emb_model::thread::DEFAULT_WEIGHT), |t| {
+                (t.kind, t.weight)
+            })
+    };
 
     for r in &design.records {
         match r.kind {
@@ -81,11 +117,14 @@ pub fn segments(design: &StitchDesign) -> Vec<Segment> {
                     } else {
                         SegmentKind::Stitch
                     };
+                    let (thread_kind, thread_weight) = look_of(thread_index);
                     out.push(Segment {
                         a,
                         b: r.pos,
                         color: color_of(thread_index),
                         kind,
+                        thread_kind,
+                        thread_weight,
                     });
                 }
                 if r.kind == StitchKind::Stitch {
@@ -124,6 +163,7 @@ mod tests {
             color: c,
             brand: None,
             code: None,
+            ..Default::default()
         }
     }
 

@@ -93,6 +93,7 @@ pub fn hoop_template(spec: &TemplateSpec) -> Vec<Page> {
                         b: b + on_page,
                         color: Rgb(190, 190, 190),
                         kind: SegmentKind::Stitch,
+                        ..Default::default()
                     })
                 })
                 .collect();

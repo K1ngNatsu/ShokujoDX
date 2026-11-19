@@ -90,6 +90,14 @@ reicht so bis 300 mm. **Stichart** im Fenster Schrift wählt Satin oder
 Füllung für den ganzen Text.
 Siehe [Schrift](lettering).
 
+**Garnarten und Garnstärken.** Ein Garn hat eine Art (Polyester, Viskose,
+Baumwolle, Metallic, Wolle oder Acryl, nachtleuchtend) und eine Stärke (40
+ist üblich). Stellen Sie sie im Bereich Garne für das aktuelle Garn ein.
+Die Garnansicht zeigt ein Garn einer anderen Stärke dünner oder dicker
+und ein mattes Garn ohne Glanz. Ein Garn einer Karte gibt seine Art, wenn
+der Name der Karte sie nennt. In den Designbildern mischen sich die
+Farben an den Rändern der Garne jetzt wie Licht. Siehe [Farben und Garne](colors-and-threads).
+
 **Designs mit sehr vielen Stichen.** Das Programm konnte abbrechen, wenn
 die Arbeitsfläche etwa 350.000 Stiche oder mehr auf einmal in der
 Garnansicht zeigte. Jetzt zeigt die Arbeitsfläche sie bei diesem Zoom

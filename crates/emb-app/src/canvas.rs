@@ -2,7 +2,7 @@
 
 use eframe::egui::{self, Color32, Mesh, Pos2, Rect, Sense, Shape, Stroke, Vec2};
 use emb_geom::{BBox, Path, Point, Transform};
-use emb_model::{ObjectId, Rgb};
+use emb_model::{ObjectId, Rgb, ThreadKind};
 use emb_render::{Segment, SegmentKind};
 
 use crate::app::AppState;
@@ -830,7 +830,10 @@ pub fn thread_mesh(rect: Rect, view: &CanvasView, segments: &[(Segment, Color32)
     mesh.reserve_vertices(segments.len() * 10);
     mesh.reserve_triangles(segments.len() * 6);
     let shadow_offset = Vec2::new(0.35, 0.5) * half;
+    let base = half;
     for (seg, color) in segments {
+        // The width of the weight of the thread (ADR 0123).
+        let half = base * seg.width_factor() as f32;
         let (a, b) = (seg.a, seg.b);
         if (a.x < vis.min.x && b.x < vis.min.x)
             || (a.x > vis.max.x && b.x > vis.max.x)
@@ -939,8 +942,13 @@ pub fn thread_mesh_3d(
     // of the stitches before (stitches come in runs of one color).
     const POINTS: usize = ACROSS.len() * ALONG.len();
     let mut cache: Vec<Option<[Color32; POINTS]>> = vec![None; emb_render::thread3d::ShadeTable::DIRECTIONS];
-    let mut cache_color = Color32::TRANSPARENT;
+    let mut cache_color = (Color32::TRANSPARENT, ThreadKind::default());
+    let base = half;
     for (seg, color) in segments {
+        // The width of the weight of the thread and the highlight of its
+        // kind (ADR 0123).
+        let half = base * seg.width_factor() as f32;
+        let shine = emb_render::thread3d::shine_of(seg.thread_kind) as f32;
         let (a, b) = (seg.a, seg.b);
         if (a.x < vis.min.x && b.x < vis.min.x)
             || (a.x > vis.max.x && b.x > vis.max.x)
@@ -981,14 +989,14 @@ pub fn thread_mesh_3d(
         mesh.add_triangle(i, i + 2, i + 3);
         // The thread goes into the fabric at the ends: round them a little.
         let (pa, pb) = (pa + u * half * 0.3, pb - u * half * 0.3);
-        if *color != cache_color {
+        if (*color, seg.thread_kind) != cache_color {
             cache.iter_mut().for_each(|c| *c = None);
-            cache_color = *color;
+            cache_color = (*color, seg.thread_kind);
         }
         let k = table.index(d.x, d.y);
         let lit = *cache[k].get_or_insert_with(|| {
             let shade = table.cell(k);
-            std::array::from_fn(|j| lit_premultiplied(rgba, shade[j]))
+            std::array::from_fn(|j| lit_premultiplied(rgba, (shade[j].0, shade[j].1 * shine)))
         });
         let i = mesh.vertices.len() as u32;
         // The rows: their place along the stitch and their row of the table.
@@ -1077,6 +1085,7 @@ mod tests {
                     b: Point::new(x + 2.0, 0.0),
                     color: Rgb(200, 0, 0),
                     kind,
+                    ..Default::default()
                 },
                 Color32::from_rgb(200, 0, 0),
             )
@@ -1106,6 +1115,7 @@ mod tests {
                     b: Point::new(x + 1.0, 0.0),
                     color: Rgb(0, 0, 0),
                     kind: SegmentKind::Stitch,
+                    ..Default::default()
                 },
                 Color32::BLACK,
             )
@@ -1178,6 +1188,58 @@ mod tests {
     }
 
     #[test]
+    fn the_weight_gives_the_width_and_the_kind_the_highlight() {
+        let r = rect();
+        let v = CanvasView {
+            center: Point::ZERO,
+            zoom: 16.0,
+        };
+        let table = emb_render::thread3d::ShadeTable::new(Default::default());
+        let seg = |kind: emb_model::ThreadKind, weight: u16| Segment {
+            a: Point::new(-4.0, 0.0),
+            b: Point::new(4.0, 0.0),
+            color: Rgb(120, 60, 60),
+            kind: SegmentKind::Stitch,
+            thread_kind: kind,
+            thread_weight: weight,
+        };
+        let span = |m: &Mesh| {
+            // The thread (not its shadow): the vertices after the first four.
+            let ys: Vec<f32> = m.vertices[4..].iter().map(|v| v.pos.y).collect();
+            ys.iter().copied().fold(f32::MIN, f32::max) - ys.iter().copied().fold(f32::MAX, f32::min)
+        };
+        let mesh = |kind, weight| {
+            let s = seg(kind, weight);
+            thread_mesh_3d(r, &v, &[(s, color32(s.color))], false, &table)
+        };
+        let (w40, w60) = (
+            span(&mesh(ThreadKind::Polyester, 40)),
+            span(&mesh(ThreadKind::Polyester, 60)),
+        );
+        assert!((w60 / w40 - 0.816).abs() < 0.01, "{w40} {w60}");
+        let flat = |weight| {
+            let s = seg(ThreadKind::Polyester, weight);
+            span(&thread_mesh(r, &v, &[(s, color32(s.color))], false))
+        };
+        assert!((flat(60) / flat(40) - 0.816).abs() < 0.01);
+        // A matte thread has no highlight: no point is lighter than the
+        // color with the light of the shading alone.
+        let brightest = |m: &Mesh| m.vertices[4..].iter().map(|v| v.color.r()).max().unwrap();
+        let (shiny, matte) = (
+            brightest(&mesh(ThreadKind::Polyester, 40)),
+            brightest(&mesh(ThreadKind::Cotton, 40)),
+        );
+        assert!(shiny > matte + 5, "{shiny} {matte}");
+        let most = table
+            .cell(table.index(1.0, 0.0))
+            .iter()
+            .map(|&(f, _)| f)
+            .fold(0.0f32, f32::max);
+        assert!(f32::from(matte) <= (120.0 * most).ceil(), "{matte} {most}");
+        assert!(brightest(&mesh(ThreadKind::Metallic, 40)) > shiny);
+    }
+
+    #[test]
     fn a_mesh_that_is_too_large_gets_a_lighter_look() {
         let r = rect();
         let v = CanvasView {
@@ -1192,6 +1254,7 @@ mod tests {
                     b: Point::new(x, 2.0),
                     color: Rgb(120, 120, 120),
                     kind: SegmentKind::Stitch,
+                    ..Default::default()
                 },
                 Color32::GRAY,
             )
@@ -1235,6 +1298,7 @@ mod tests {
             b: Point::new(2.0, 0.0),
             color: Rgb(120, 120, 120),
             kind: SegmentKind::Stitch,
+            ..Default::default()
         };
         let table = emb_render::thread3d::ShadeTable::new(Default::default());
         let mesh = thread_mesh_3d(r, &v, &[(seg, color32(seg.color))], false, &table);

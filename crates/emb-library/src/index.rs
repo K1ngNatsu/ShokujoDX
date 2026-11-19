@@ -452,6 +452,7 @@ pub(crate) mod tests {
                 color: Rgb(40 * c as u8, 100, 200),
                 brand: None,
                 code: None,
+                ..Default::default()
             });
             if c > 0 {
                 s.records.push(StitchRecord::new(Point::ZERO, StitchKind::ColorChange));

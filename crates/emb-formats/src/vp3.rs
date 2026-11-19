@@ -357,6 +357,7 @@ fn read_thread(r: &mut In, index: usize) -> Result<Thread, Vp3Error> {
         color,
         brand: some(brand),
         code: some(code),
+        ..Default::default()
     })
 }
 
@@ -497,6 +498,7 @@ mod tests {
             color,
             brand: Some("Robison-Anton".into()),
             code: Some(format!("{}", 2000 + id)),
+            ..Default::default()
         }
     }
 

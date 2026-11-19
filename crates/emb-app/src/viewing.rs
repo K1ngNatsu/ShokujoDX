@@ -250,6 +250,7 @@ pub fn visible_segments(st: &mut AppState) -> Arc<Vec<(Segment, Color32)>> {
                             b: back.apply(r.pos),
                             color: rgb,
                             kind,
+                            ..Default::default()
                         },
                         color,
                     ));

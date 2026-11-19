@@ -1260,6 +1260,7 @@ mod tests {
                 b: Point::new(36.0, 25.0),
                 color: Rgb(200, 0, 0),
                 kind: SegmentKind::Stitch,
+                ..Default::default()
             }],
             ..SheetData::default()
         }

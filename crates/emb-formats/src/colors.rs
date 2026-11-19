@@ -118,6 +118,7 @@ pub fn read_inf(bytes: &[u8]) -> Vec<Thread> {
             color: Rgb(data[2], data[3], data[4]),
             brand: None,
             code: None,
+            ..Default::default()
         };
         let mut parts = data[7..].split(|&c| c == 0);
         if let Some(name) = parts.next() {
@@ -166,6 +167,7 @@ mod tests {
                 color: Rgb(200, 10, 20),
                 brand: Some("Madeira".into()),
                 code: Some("1147".into()),
+                ..Default::default()
             },
             color_thread(1, Rgb(0, 0, 255)),
         ]

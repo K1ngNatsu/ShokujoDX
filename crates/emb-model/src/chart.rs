@@ -7,8 +7,9 @@
 //! `docs/design/p3-plan.md` and `docs/design/p11-plan.md`.
 
 use emb_geom::{math, text};
+use serde::Deserialize;
 
-use crate::{ModelError, Rgb};
+use crate::{ModelError, Rgb, ThreadKind};
 
 /// One thread of a chart.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,13 +23,45 @@ pub struct ChartThread {
 }
 
 /// A named list of threads, usually of one brand.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ThreadChart {
     pub name: String,
     pub threads: Vec<ChartThread>,
+    /// The kind of the threads of the chart and its source (ADR 0123);
+    /// `None`: not known, the default.
+    pub kind: Option<(ThreadKind, String)>,
+    /// The weight of the threads of the chart and its source; `None`: not
+    /// known, the default (40).
+    pub weight: Option<(u16, String)>,
 }
 
 const PEC_GPL: &str = include_str!("../../../data/threads/brother-pec.gpl");
+/// The kinds and the weights of the charts of the program.
+const KINDS_TOML: &str = include_str!("../../../data/threads/kinds.toml");
+
+/// `data/threads/kinds.toml`.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct KindFile {
+    chart: Vec<KindEntry>,
+}
+
+/// The kind and the weight of one chart, each with its source.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct KindEntry {
+    name: String,
+    kind: Option<ThreadKind>,
+    kind_source: Option<String>,
+    weight: Option<u16>,
+    weight_source: Option<String>,
+}
+
+fn kind_entries() -> Vec<KindEntry> {
+    toml::from_str::<KindFile>(KINDS_TOML)
+        .expect("the kinds of the charts are valid (tested)")
+        .chart
+}
 
 include!("charts_inkstitch.rs");
 
@@ -42,6 +75,13 @@ impl ThreadChart {
                 .iter()
                 .map(|(name, text)| ThreadChart::parse_gpl(text, name).expect("built-in chart is valid (tested)")),
         );
+        // A value goes to a chart only with its source.
+        for e in kind_entries() {
+            if let Some(c) = v.iter_mut().find(|c| c.name == e.name) {
+                c.kind = e.kind.zip(e.kind_source);
+                c.weight = e.weight.zip(e.weight_source);
+            }
+        }
         v
     }
 
@@ -79,6 +119,7 @@ impl ThreadChart {
         let mut chart = ThreadChart {
             name: default_name.to_string(),
             threads: Vec::new(),
+            ..Default::default()
         };
         for (i, line) in lines {
             let line = line.trim();
@@ -125,6 +166,7 @@ impl ThreadChart {
         let mut chart = ThreadChart {
             name: name.to_string(),
             threads: Vec::new(),
+            ..Default::default()
         };
         for (i, line) in text.lines().enumerate() {
             let line = line.trim_start_matches('\u{feff}').trim();
@@ -286,6 +328,42 @@ pub fn harmonies(c: Rgb) -> Vec<(&'static str, Rgb)> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_charts_of_the_program_have_kinds_with_their_sources() {
+        use super::*;
+        let charts = ThreadChart::builtin();
+        for e in kind_entries() {
+            assert!(charts.iter().any(|c| c.name == e.name), "{}: no such chart", e.name);
+            // Each value has its source, and each source has a value.
+            assert_eq!(
+                e.kind.is_some(),
+                e.kind_source.as_ref().is_some_and(|s| !s.trim().is_empty()),
+                "{}",
+                e.name
+            );
+            assert_eq!(
+                e.weight.is_some(),
+                e.weight_source.as_ref().is_some_and(|s| !s.trim().is_empty()),
+                "{}",
+                e.name
+            );
+            assert!(
+                e.weight.is_none_or(|w| crate::thread::WEIGHTS.contains(&w)),
+                "{}",
+                e.name
+            );
+        }
+        let get = |name: &str| charts.iter().find(|c| c.name == name).unwrap();
+        assert_eq!(get("Madeira Rayon").kind.as_ref().map(|k| k.0), Some(ThreadKind::Rayon));
+        assert_eq!(get("Madeira Matt").kind.as_ref().map(|k| k.0), Some(ThreadKind::Cotton));
+        assert_eq!(get("Brother PEC").kind, None, "no source: the default");
+        // A chart thread gives its kind to a thread.
+        let look = crate::colorway::chart_look(get("Sulky Rayon"), 0);
+        assert_eq!((look.kind, look.weight), (ThreadKind::Rayon, 40));
+        let look = crate::colorway::chart_look(get("DMC"), 0);
+        assert_eq!((look.kind, look.weight), (ThreadKind::Polyester, 40));
+    }
+
     #[test]
     fn hsv_round_trip_and_harmonies() {
         use super::*;

@@ -183,6 +183,7 @@ pub fn read_jpx(bytes: &[u8]) -> StitchDesign {
             color: Rgb(g, g, g),
             brand: None,
             code: None,
+            ..Default::default()
         });
     }
     let mut p = Pattern::default();

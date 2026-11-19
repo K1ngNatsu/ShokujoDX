@@ -678,6 +678,7 @@ percent_off = 10
             color: Rgb(200, 0, 0),
             brand: None,
             code: None,
+            ..Default::default()
         };
         let mut blue = red(3);
         blue.color = Rgb(0, 0, 200);

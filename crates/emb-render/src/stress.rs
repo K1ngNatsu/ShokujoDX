@@ -26,6 +26,7 @@ pub fn make(count: usize) -> StitchDesign {
             color: *color,
             brand: None,
             code: None,
+            ..Default::default()
         })
         .collect();
 

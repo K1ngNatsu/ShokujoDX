@@ -174,6 +174,7 @@ mod tests {
                 color: Rgb(200, 0, 0),
                 brand: Some("Test".into()),
                 code: Some("7".into()),
+                ..Default::default()
             }],
             records: vec![
                 rec(0.0, 0.0, StitchKind::Jump),

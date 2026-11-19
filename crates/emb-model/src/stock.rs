@@ -77,6 +77,7 @@ impl StockThread {
             color: self.color,
             brand: Some(self.brand.clone()).filter(|b| !b.trim().is_empty()),
             code: Some(self.code.clone()).filter(|c| !c.trim().is_empty()),
+            ..Default::default()
         }
     }
 
@@ -159,6 +160,7 @@ impl ThreadStock {
         (!threads.is_empty()).then(|| ThreadChart {
             name: STOCK_CHART.into(),
             threads,
+            ..Default::default()
         })
     }
 
@@ -506,6 +508,7 @@ mod tests {
             color,
             brand: Some(brand.into()),
             code: Some(code.into()),
+            ..Default::default()
         }
     }
 
@@ -525,6 +528,7 @@ mod tests {
             color: Rgb(200, 20, 30),
             brand: None,
             code: None,
+            ..Default::default()
         };
         assert_eq!(s.find(&l), Some(1));
         // The same thread again adds its spools.
@@ -582,6 +586,7 @@ mod tests {
             color,
             brand: Some("Madeira Polyneon".into()),
             code: Some(code.into()),
+            ..Default::default()
         };
         let mut records = Vec::new();
         for (k, len) in [100.0, 50.0, 100.0].into_iter().enumerate() {

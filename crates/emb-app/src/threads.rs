@@ -400,6 +400,9 @@ fn threads_section(ui: &mut egui::Ui, st: &mut AppState) {
             ui.end_row();
         }
     });
+    if let Some((t, n)) = threads.iter().zip(&counts).find(|(t, _)| current == Some(t.id)) {
+        kind_and_weight(ui, st, t, *n);
+    }
     ui.horizontal_wrapped(|ui| {
         if ui.button(tr("Add thread")).clicked() {
             let id = st.doc.edit(tr("Add thread"), |d| {
@@ -469,6 +472,63 @@ fn threads_section(ui: &mut egui::Ui, st: &mut AppState) {
                 }
             });
         });
+    }
+}
+
+/// The kind and the weight of the current thread `t` (ADR 0123), which `n`
+/// objects use. A change of the kind changes only the view; for a weight
+/// that is not 40 a note says how to change the density.
+fn kind_and_weight(ui: &mut egui::Ui, st: &mut AppState, t: &emb_model::Thread, n: usize) {
+    use emb_model::thread::{COMMON_WEIGHTS, DEFAULT_WEIGHT, ThreadKind, width_factor};
+    ui.horizontal_wrapped(|ui| {
+        ui.label(tr("Kind"));
+        let mut kind = t.kind;
+        egui::ComboBox::from_id_salt(("thread_kind", t.id.0))
+            .selected_text(tr(kind.name()))
+            .show_ui(ui, |ui| {
+                for k in ThreadKind::ALL {
+                    ui.selectable_value(&mut kind, k, tr(k.name()));
+                }
+            })
+            .response
+            .on_hover_text(tr(
+                "How the thread takes the light in the 3D thread look. The stitches stay the same.",
+            ));
+        if kind != t.kind {
+            let mut look = ThreadLook::of(t);
+            look.kind = kind;
+            st.set_look(t.id, look, tr("Thread kind"), None);
+        }
+        ui.label(tr("Weight"));
+        let mut weight = t.weight;
+        let mut weights: Vec<u16> = COMMON_WEIGHTS.to_vec();
+        if !weights.contains(&weight) {
+            weights.push(weight);
+            weights.sort_unstable();
+        }
+        egui::ComboBox::from_id_salt(("thread_weight", t.id.0))
+            .selected_text(weight.to_string())
+            .show_ui(ui, |ui| {
+                for w in weights {
+                    ui.selectable_value(&mut weight, w, w.to_string());
+                }
+            })
+            .response
+            .on_hover_text(tr(
+                "The weight number of the thread: a higher number is a thinner thread. The views show its width.",
+            ));
+        if weight != t.weight {
+            let mut look = ThreadLook::of(t);
+            look.weight = weight;
+            st.set_look(t.id, look, tr("Thread weight"), None);
+        }
+    });
+    if t.weight != DEFAULT_WEIGHT && n > 0 {
+        let percent = (100.0 * width_factor(t.weight)).round();
+        ui.weak(crate::i18n::fill(
+            "The density of the objects of this thread is for a 40 weight thread. For a {} weight thread, make their spacing about {} % of it.",
+            &[&t.weight, &percent],
+        ));
     }
 }
 
@@ -617,6 +677,33 @@ mod tests {
             st.undo();
         }
         assert!(st.doc.design().same_content(&start));
+    }
+
+    #[test]
+    fn kind_and_weight_of_a_thread() {
+        use emb_model::ThreadKind;
+        let mut st = state();
+        let first = st.doc.design().threads[0].id;
+        let mut look = ThreadLook::of(st.doc.design().thread(first).unwrap());
+        look.kind = ThreadKind::Cotton;
+        look.weight = 60;
+        st.set_look(first, look, tr("Thread kind"), None);
+        let t = st.doc.design().thread(first).unwrap();
+        assert_eq!((t.kind, t.weight), (ThreadKind::Cotton, 60));
+        // The stitches of the views have them (ADR 0123).
+        let segs = st.plan_view().segments.clone();
+        assert!(
+            segs.iter()
+                .any(|(s, _)| s.thread_kind == ThreadKind::Cotton && s.thread_weight == 60)
+        );
+        st.undo();
+        let t = st.doc.design().thread(first).unwrap();
+        assert_eq!((t.kind, t.weight), (ThreadKind::Polyester, 40));
+        // A chart whose name gives the kind gives it to the thread.
+        st.chart_index = st.charts.iter().position(|c| c.name == "Sulky Rayon").unwrap();
+        st.current_thread = Some(first);
+        st.use_chart_thread(0, false);
+        assert_eq!(st.doc.design().thread(first).unwrap().kind, ThreadKind::Rayon);
     }
 
     #[test]

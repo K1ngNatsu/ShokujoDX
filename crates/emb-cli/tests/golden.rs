@@ -224,6 +224,18 @@ fn view_dark() {
     golden("view-dark");
 }
 
+/// The reference set of the 3D view: the kinds and the weights (ADR 0123).
+#[test]
+fn view_thread_kinds() {
+    golden("view-thread-kinds");
+    // The kinds and the weights go to the stitch plan.
+    let d = corpus::build("view-thread-kinds").unwrap();
+    let (s, _) = stitches(&Input::Design(Box::new(d)), None).unwrap();
+    let kinds: std::collections::HashSet<_> = s.threads.iter().map(|t| t.kind).collect();
+    assert_eq!(kinds.len(), 6);
+    assert!(s.threads.iter().any(|t| t.weight == 60) && s.threads.iter().any(|t| t.weight == 30));
+}
+
 /// Arabic, Devanagari and ligatures (ADR 0114).
 #[test]
 fn shaped_text() {

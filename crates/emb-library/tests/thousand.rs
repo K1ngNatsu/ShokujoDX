@@ -25,6 +25,7 @@ fn design(k: usize) -> StitchDesign {
             color: Rgb(40 * c as u8, 120, 200 - 30 * c as u8),
             brand: None,
             code: None,
+            ..Default::default()
         });
         if c > 0 {
             s.records.push(StitchRecord::new(Point::ZERO, StitchKind::ColorChange));

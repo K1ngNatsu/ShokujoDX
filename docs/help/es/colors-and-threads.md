@@ -13,6 +13,14 @@ keywords: color, hilo, carta, marca, madeira, isacord, sulky, combinación de co
 - **Hilos del diseño** lista los hilos del diseño. Haga clic en el color de
   un hilo para cambiarlo. Haga clic en su nombre para que sea el hilo de
   los objetos nuevos.
+- **Tipo** y **Grosor** son para el hilo actual. El tipo (poliéster,
+  rayón, algodón, metálico, lana o acrílico, brilla en la oscuridad)
+  define cómo toma la luz el hilo en el aspecto de hilo 3D; las puntadas
+  no cambian. El grosor es el número del grueso del hilo: 40 es el grosor
+  habitual, y un número mayor es un hilo más fino. Las vistas muestran un
+  hilo más fino o más grueso. La densidad de los objetos es para un hilo
+  de grosor 40: para otro grosor, una nota le indica el espaciado que
+  debe usar.
 - Para dar otro hilo a un objeto, seleccione el objeto y haga clic en el
   hilo. O haga clic derecho en el objeto y use **Hilo**. Propiedades del
   objeto también tiene el hilo.
@@ -31,8 +39,10 @@ Isacord, Sulky, Robison-Anton, Gunold, Marathon, Floriani y más).
 
 - Seleccione una carta en **Color > Carta de hilos**, o en el panel Hilos.
 - **Buscar** encuentra un hilo por su nombre o su código.
-- Haga clic en un hilo de la carta para dar su color y su nombre al hilo
-  actual. **Ctrl+clic** lo añade como hilo nuevo.
+- Haga clic en un hilo de la carta para dar su color, su nombre y su tipo
+  al hilo actual. **Ctrl+clic** lo añade como hilo nuevo. Una carta cuyo
+  nombre indica el tipo de su hilo (por ejemplo Rayon o Polyester) da ese
+  tipo; otra carta da poliéster.
 - **Ajustar a la carta** da a cada hilo usado el color más cercano de la
   carta.
 - **Importar carta** lee una carta de una paleta de GIMP (`.gpl`) o de un

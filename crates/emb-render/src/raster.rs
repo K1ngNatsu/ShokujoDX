@@ -8,11 +8,13 @@
 use emb_geom::{BBox, Point};
 use emb_model::Rgb;
 
-use crate::thread3d::{Lighting, Weave, fabric_value, lit, ply};
+use crate::thread3d::{Lighting, Weave, fabric_value, lit, ply, shine_of};
 use crate::{Segment, SegmentKind};
 
-/// The darkness of the shadow of a thread (0 to 1).
-const SHADOW_ALPHA: f64 = 0.12;
+/// The darkness of the shadow of a thread (0 to 1), in linear light: about
+/// the shadow of the mix of the screen colors of before (0.12) on a light
+/// fabric (ADR 0123).
+const SHADOW_ALPHA: f64 = 0.24;
 
 /// How a picture draws the threads and the background.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -160,15 +162,10 @@ pub fn picture_at_look(
     pic
 }
 
-/// Blends `color` with coverage `a` over the pixel `dst`.
+/// Blends `color` with coverage `a` over the pixel `dst`, in linear light
+/// (ADR 0123).
 fn blend(dst: &mut [u8], color: [f64; 3], a: f64) {
-    let da = f64::from(dst[3]) / 255.0;
-    let out_a = a + da * (1.0 - a);
-    for k in 0..3 {
-        let v = (color[k] * a + f64::from(dst[k]) * da * (1.0 - a)) / out_a.max(1e-9);
-        dst[k] = v.round().clamp(0.0, 255.0) as u8;
-    }
-    dst[3] = (out_a * 255.0).round() as u8;
+    crate::light::over(dst, color, a);
 }
 
 /// Calls `paint(pixel, cover, s, t, d)` for each pixel near the thread
@@ -217,7 +214,9 @@ fn each_pixel(
 
 /// Draws the stitches over the picture `pic`, which shows the area `b` at
 /// `px_per_mm`. With a `lighting`, each stitch has light and shade, the
-/// twist of its plies and a shadow (the 3D thread look).
+/// twist of its plies and a shadow (the 3D thread look). `thread_mm` is the
+/// width of a 40 weight thread; a thread of another weight is wider or
+/// narrower, and its kind gives its highlight (ADR 0123).
 pub fn stitches_onto_look(
     pic: &mut Picture,
     b: BBox,
@@ -227,8 +226,8 @@ pub fn stitches_onto_look(
     lighting: Option<&Lighting>,
 ) {
     let to_px = |p: Point| ((p.x - b.min.x) * px_per_mm, (p.y - b.min.y) * px_per_mm);
-    let r = thread_mm * px_per_mm / 2.0;
     for s in segments.iter().filter(|s| s.kind == SegmentKind::Stitch) {
+        let r = thread_mm * s.width_factor() * px_per_mm / 2.0;
         let (a, e) = (to_px(s.a), to_px(s.b));
         match lighting {
             Some(l) if r > 1.0 => {
@@ -243,8 +242,10 @@ pub fn stitches_onto_look(
                     blend(dst, [0.0; 3], SHADOW_ALPHA * cover * l.strength.clamp(0.0, 1.0));
                 });
                 let len_mm = len / px_per_mm;
+                let shine = shine_of(s.thread_kind);
                 each_pixel(pic, a, e, r, |dst, cover, sv, t, _| {
                     let (f, h) = l.shade(u, sv, t);
+                    let h = h * shine;
                     let f = f * ply(t * len_mm, sv, l.strength);
                     let c = lit(s.color, (f, h));
                     blend(dst, c.map(f64::from), cover);
@@ -285,6 +286,7 @@ mod tests {
             b: Point::new(10.0, 0.0),
             color: Rgb(200, 0, 0),
             kind: SegmentKind::Stitch,
+            ..Default::default()
         };
         let jump = Segment {
             kind: SegmentKind::Jump,
@@ -304,6 +306,81 @@ mod tests {
         assert_eq!((back.width(), back.height()), (128, 28));
     }
 
+    /// A horizontal stitch from (0, 0) to (10, 0).
+    fn across(color: Rgb, kind: emb_model::ThreadKind, weight: u16) -> Segment {
+        Segment {
+            a: Point::new(0.0, 0.0),
+            b: Point::new(10.0, 0.0),
+            color,
+            kind: SegmentKind::Stitch,
+            thread_kind: kind,
+            thread_weight: weight,
+        }
+    }
+
+    #[test]
+    fn the_flat_look_keeps_its_colors() {
+        // 1 mm thread at 10 px/mm with a margin of 1 mm: the row 19 is 0.05 mm
+        // from the middle of the thread, so its shade is 0.75 + 0.45 * 0.9.
+        let seg = across(Rgb(120, 60, 30), emb_model::ThreadKind::Polyester, 40);
+        let p = picture(&[seg], &[], 10.0, 1.0, 1.0, Some(Rgb(250, 250, 250)));
+        let i = ((19 * p.width + 60) * 4) as usize;
+        let shade = 0.75 + 0.45 * 0.9;
+        let old = [120.0, 60.0, 30.0].map(|v: f64| (v * shade).round() as u8);
+        assert_eq!(&p.rgba[i..i + 3], &old);
+    }
+
+    #[test]
+    fn a_thread_has_the_width_of_its_weight() {
+        // The exit test of Milestone 2: a 40 weight and a 60 weight thread
+        // have two widths.
+        let width = |weight: u16| {
+            let seg = across(Rgb(20, 20, 20), emb_model::ThreadKind::Polyester, weight);
+            let p = picture(&[seg], &[], 40.0, 0.4, 1.0, Some(Rgb(255, 255, 255)));
+            let x = p.width / 2;
+            (0..p.height)
+                .filter(|&y| p.rgba[((y * p.width + x) * 4) as usize] < 128)
+                .count()
+        };
+        let (w40, w60) = (width(40), width(60));
+        // 0.4 mm and 0.33 mm at 40 px/mm.
+        assert!((15..=17).contains(&w40), "{w40}");
+        assert!((12..=14).contains(&w60), "{w60}");
+        assert!(width(12) > 2 * w60, "{}", width(12));
+    }
+
+    #[test]
+    fn a_matte_thread_has_no_highlight() {
+        let look = Look::three_d(None);
+        let green = |kind| {
+            let seg = across(Rgb(120, 60, 60), kind, 40);
+            let p = picture_look(&[seg], &[], 20.0, 1.0, 1.0, None, &look);
+            p.rgba.chunks(4).filter(|c| c[3] == 255).map(|c| c[1]).max().unwrap()
+        };
+        use emb_model::ThreadKind::*;
+        let (polyester, cotton, wool) = (green(Polyester), green(Cotton), green(Wool));
+        // The light alone makes the green at most 1.3 times as bright (78);
+        // a highlight goes toward white.
+        assert!(cotton <= 80 && wool <= 80, "{cotton} {wool}");
+        assert!(polyester > 100, "{polyester}");
+        assert!(green(Rayon) > polyester && green(Metallic) > green(Rayon));
+    }
+
+    #[test]
+    fn the_edges_mix_in_linear_light() {
+        // A black thread on white: an edge pixel half covered is about sRGB
+        // 188 (half the light), not 128. The thread is 9.5 pixels wide, so
+        // its edges are in the middle of pixels.
+        let seg = across(Rgb(0, 0, 0), emb_model::ThreadKind::Polyester, 40);
+        let p = picture(&[seg], &[], 10.0, 0.95, 1.0, Some(Rgb(255, 255, 255)));
+        let column: Vec<u8> = (0..p.height)
+            .map(|y| p.rgba[((y * p.width + 60) * 4) as usize])
+            .collect();
+        let edge = column.iter().copied().filter(|&v| v > 5 && v < 250).collect::<Vec<_>>();
+        assert!(!edge.is_empty(), "{column:?}");
+        assert!(edge.iter().all(|&v| v >= 140), "{column:?}");
+    }
+
     #[test]
     fn background() {
         let p = picture(&[], &[], 4.0, 0.4, 2.0, Some(Rgb(1, 2, 3)));
@@ -314,6 +391,7 @@ mod tests {
             b: Point::new(20.0, 20.0),
             color: Rgb(0, 0, 0),
             kind: SegmentKind::Stitch,
+            ..Default::default()
         };
         let ring = |a: f64, b: f64| vec![Point::new(a, a), Point::new(b, a), Point::new(b, b), Point::new(a, b)];
         let p = picture(
@@ -337,6 +415,7 @@ mod tests {
             b: Point::new(10.0, 0.0),
             color: Rgb(120, 120, 120),
             kind: SegmentKind::Stitch,
+            ..Default::default()
         };
         let white = Some(Rgb(255, 255, 255));
         let flat = picture(&[seg], &[], 20.0, 1.0, 1.0, white);

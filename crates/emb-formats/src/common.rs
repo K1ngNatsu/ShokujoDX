@@ -293,6 +293,7 @@ pub(crate) fn table_thread(id: usize, t: TableThread, brand: &str) -> Thread {
         color: Rgb(r, g, b),
         brand: Some(brand.to_string()),
         code: (!code.is_empty()).then(|| code.to_string()),
+        ..Default::default()
     }
 }
 
@@ -304,6 +305,7 @@ pub(crate) fn color_thread(id: usize, c: Rgb) -> Thread {
         color: c,
         brand: None,
         code: None,
+        ..Default::default()
     }
 }
 

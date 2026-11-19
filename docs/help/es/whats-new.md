@@ -88,6 +88,14 @@ y así llega a 300 mm. **Tipo de puntada** en la ventana Letras selecciona
 satén o relleno para todo el texto.
 Consulte [Letras](lettering).
 
+**Tipos y grosores de hilo.** Un hilo tiene un tipo (poliéster, rayón,
+algodón, metálico, lana o acrílico, brilla en la oscuridad) y un grosor
+(40 es lo habitual). Ajústelos para el hilo actual en el panel Hilos. El
+aspecto de hilo muestra un hilo de otro grosor más fino o más grueso, y un
+hilo mate sin brillo. Un hilo de una carta da su tipo cuando el nombre de
+la carta lo indica. En las imágenes del diseño, los colores de los bordes
+de los hilos se mezclan ahora como la luz. Consulte [Colores e hilos](colors-and-threads).
+
 **Diseños con muchísimas puntadas.** El programa podía cerrarse cuando el
 lienzo mostraba unas 350 000 puntadas o más a la vez con el aspecto de
 hilo. Ahora el lienzo las muestra con un aspecto más simple con ese zoom,

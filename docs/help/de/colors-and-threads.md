@@ -13,6 +13,14 @@ keywords: farbe, garn, garnkarte, marke, madeira, isacord, sulky, farbvariante, 
 - **Designgarne** listet die Garne des Designs auf. Klicken Sie auf die
   Farbe eines Garns, um sie zu ändern. Klicken Sie auf seinen Namen, um es
   zum Garn neuer Objekte zu machen.
+- **Art** und **Stärke** gelten für das aktuelle Garn. Die Art (Polyester,
+  Viskose, Baumwolle, Metallic, Wolle oder Acryl, nachtleuchtend) legt
+  fest, wie das Garn in der 3D-Garnansicht das Licht annimmt; die Stiche
+  bleiben gleich. Die Stärke ist die Nummer der Dicke des Garns: 40 ist
+  die übliche Stärke, und eine höhere Nummer ist ein dünneres Garn. Die
+  Ansichten zeigen ein dünneres oder ein dickeres Garn. Die Dichte der
+  Objekte ist für ein Garn der Stärke 40: Für eine andere Stärke nennt
+  ein Hinweis den Abstand, den Sie benutzen sollten.
 - Um einem Objekt ein anderes Garn zu geben, wählen Sie das Objekt aus und
   klicken Sie auf das Garn. Oder klicken Sie mit der rechten Maustaste auf
   das Objekt und benutzen Sie **Garn**. Die Objekteigenschaften haben das
@@ -32,8 +40,11 @@ Robison-Anton, Gunold, Marathon, Floriani und mehr).
 
 - Wählen Sie eine Karte unter **Farbe > Garnkarte** oder im Bereich Garne.
 - **Suchen** findet ein Garn nach seinem Namen oder seiner Nummer.
-- Klicken Sie auf ein Garn der Karte, um dem aktuellen Garn seine Farbe und
-  seinen Namen zu geben. **Strg+Klick** fügt es als neues Garn hinzu.
+- Klicken Sie auf ein Garn der Karte, um dem aktuellen Garn seine Farbe,
+  seine Art und seinen Namen zu geben. **Strg+Klick** fügt es als neues
+  Garn hinzu. Eine Karte, deren Name die Art ihres Garns nennt (zum
+  Beispiel Rayon oder Polyester), gibt diese Art; eine andere Karte gibt
+  Polyester.
 - **An Karte anpassen** gibt jedem benutzten Garn die nächstliegende Farbe
   der Karte.
 - **Karte importieren** liest eine Karte aus einer GIMP-Palette (`.gpl`)

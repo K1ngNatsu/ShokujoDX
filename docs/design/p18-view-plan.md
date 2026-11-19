@@ -6,7 +6,8 @@ P18 (2026-11-19). The first part of P18 (designs from other programs,
 `docs/design/p18-plan.md`) does not change. The owner started this part
 first, with Milestone 1 (2026-11-19). Milestone 1 is done except the
 sew-out of the reference set and the numbers of a small computer
-(`docs/design/p18-view-m1-report.md`, ADR 0122).
+(`docs/design/p18-view-m1-report.md`, ADR 0122). Milestone 2 is done
+(`docs/design/p18-view-m2-report.md`, ADR 0123).
 
 ## Goal
 
@@ -208,6 +209,18 @@ sew-out and its photos, and the numbers of a small computer.
 widths; a matte thread has no highlight; the pictures of the reference
 set change only at the edges of threads (linear light), and the report
 shows them next to the pictures before.
+
+**Done (2026-11-19, ADR 0123).** `emb_render::light` mixes in linear
+light (the pictures, the design on the product, pictures on PDF pages);
+`Thread::kind` and `Thread::weight` with `thread::width_mm`; 43 of the 75
+charts have a kind with its source (`data/threads/kinds.toml`); the
+Threads panel sets both; the pictures and the canvas use the width of the
+weight, and the 3D look the highlight of the kind. A new reference
+design, `view-thread-kinds`. At the close and the normal zoom the
+brightness of an area of a reference picture changed by at most 5.5 %;
+at the zoom of the whole design (each pixel a mix) by up to 21 %, lighter.
+The bench found that a satin that sews up looks darker than one that
+sews down; Milestone 3 removes it (`docs/design/p18-view-m2-report.md`).
 
 ## Milestone 3: the surface (L)
 

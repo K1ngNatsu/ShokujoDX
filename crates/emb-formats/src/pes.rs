@@ -601,6 +601,7 @@ fn pec_threads(indices: &[u8]) -> Vec<Thread> {
                 color: Rgb(r, g, bl),
                 brand: Some("Brother".into()),
                 code: Some(idx.to_string()),
+                ..Default::default()
             }
         })
         .collect()
@@ -794,6 +795,7 @@ mod tests {
             color,
             brand: None,
             code: None,
+            ..Default::default()
         }
     }
 

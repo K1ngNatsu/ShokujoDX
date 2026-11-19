@@ -186,7 +186,7 @@ the individual tools.
 | Travel through design | Stitch cursor by stitch, object, color, segment, function, trim | ✅ | P2 |
 | Stitch player | Animated stitch-out with speed control | ✅ Player bar: play, pause, color steps, speed, position, sew time | P3 |
 | View by color, hide others | Show only some colors or objects | ✅ Only these colors, hide others, show all (View tab) | P2 |
-| Thread charts | Commercial charts, custom charts, match colors, search | ✅ Brother PEC and 74 brand charts built in (the GPL palettes of Ink/Stitch: Madeira, Isacord, Sulky, Robison-Anton, Gunold, Marathon, Floriani and more; owner decision, P11 Milestone 2, ADR 0045); import GPL and CSV charts; match; search | P3, P10, P11 |
+| Thread charts | Commercial charts, custom charts, match colors, search | ✅ Brother PEC and 74 brand charts built in (the GPL palettes of Ink/Stitch: Madeira, Isacord, Sulky, Robison-Anton, Gunold, Marathon, Floriani and more; owner decision, P11 Milestone 2, ADR 0045); import GPL and CSV charts; match; search; the kind of thread of 43 charts, with its source, and the kind and the weight of each thread of a design (Threads panel; the views show its width and shine; P18, ADR 0123) | P3, P10, P11, P18 |
 | Design info and worksheets | Production worksheet, approval sheet, print preview, barcodes (Code 39, Code 128) | ✅ Worksheet and approval sheet (PDF), print preview, a barcode of the file name on the worksheet (Code 39 or Code 128, P8 Milestone 7) | P3, P8 |
 
 ### 6.2 Setup (Part II: chapters 6–8)

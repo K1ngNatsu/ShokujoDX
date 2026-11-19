@@ -235,6 +235,7 @@ mod tests {
                 color: emb_model::Rgb(0, 0, 0),
                 brand: None,
                 code: None,
+                ..Default::default()
             }],
             records,
         }

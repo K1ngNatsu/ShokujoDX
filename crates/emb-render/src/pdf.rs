@@ -130,8 +130,9 @@ fn jpeg(pic: &crate::raster::Picture) -> Option<(Vec<u8>, u32, u32)> {
         .0
         .iter()
         .flat_map(|p| {
-            let a = u32::from(p[3]);
-            let over = |c: u8| ((u32::from(c) * a + 255 * (255 - a)) / 255) as u8;
+            // Over white, in linear light (ADR 0123).
+            let a = f64::from(p[3]) / 255.0;
+            let over = |c: u8| crate::light::mix(c, 255, a);
             [over(p[0]), over(p[1]), over(p[2])]
         })
         .collect();
@@ -421,6 +422,7 @@ mod tests {
                     b: Point::new(60.0, 50.0),
                     color: Rgb(255, 0, 0),
                     kind: SegmentKind::Stitch,
+                    ..Default::default()
                 };
                 3
             ],

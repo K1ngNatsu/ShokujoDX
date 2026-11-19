@@ -460,6 +460,7 @@ impl Design {
             color,
             brand: None,
             code: None,
+            ..Default::default()
         });
         id
     }

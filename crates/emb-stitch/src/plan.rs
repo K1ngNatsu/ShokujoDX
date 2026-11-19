@@ -216,6 +216,7 @@ pub fn build_plan_until(
             color: emb_model::Rgb(0, 0, 0),
             brand: None,
             code: None,
+            ..Default::default()
         }));
         let mut prev: Option<ObjectId> = None;
         for (k, r) in block.iter().enumerate() {

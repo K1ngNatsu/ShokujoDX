@@ -1566,6 +1566,8 @@ impl AppState {
                                 if let Some(t) = d.threads.iter_mut().find(|t| t.id == id) {
                                     t.brand = look.brand;
                                     t.code = look.code;
+                                    t.kind = look.kind;
+                                    t.weight = look.weight;
                                 }
                                 id
                             }

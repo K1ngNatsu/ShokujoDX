@@ -148,6 +148,7 @@ mod tests {
                 color: Rgb(200, 30, 40),
                 brand: None,
                 code: None,
+                ..Default::default()
             }],
             records,
         }

@@ -324,6 +324,7 @@ mod tests {
             color,
             brand: None,
             code: None,
+            ..Default::default()
         }
     }
 

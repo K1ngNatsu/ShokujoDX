@@ -369,6 +369,7 @@ pub(crate) mod tests {
         out.extend(crate::manipulate::ScaleFrom::ALL.iter().map(|(_, name)| *name));
         out.extend(emb_model::ConvertTo::ALL.iter().map(|p| p.name()));
         out.extend(emb_model::TextDirection::ALL.iter().map(|d| d.name()));
+        out.extend(emb_model::ThreadKind::ALL.iter().map(|k| k.name()));
         // The kinds and the parameters of the families, and the shapes of
         // the borders (P17 Milestone 8, ADR 0118).
         out.extend(emb_model::family::Kind::ALL.iter().map(|k| k.name()));

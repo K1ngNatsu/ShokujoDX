@@ -64,6 +64,7 @@ mod tests {
                     color: emb_model::Rgb(220, 20, 30),
                     brand: None,
                     code: None,
+                    ..Default::default()
                 }],
                 records: (0..=40)
                     .flat_map(|i| {

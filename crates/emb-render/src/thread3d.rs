@@ -22,7 +22,7 @@
 //! [`Lighting::shade`] for each pixel, with the twist of the thread plies.
 
 use emb_geom::math;
-use emb_model::Rgb;
+use emb_model::{Rgb, ThreadKind};
 use serde::{Deserialize, Serialize};
 
 use crate::raster::Picture;
@@ -59,6 +59,19 @@ const SHINE_POWER: f64 = 18.0;
 const SHINE: f64 = 0.38;
 /// The brightness at the needle points, where the thread goes into the fabric.
 const END_DARK: f64 = 0.82;
+
+/// The strength of the highlight of a kind of thread, as a part of the
+/// highlight of polyester (ADR 0123): rayon shines more, metallic thread
+/// most; cotton, wool and acrylic are matte and have no highlight.
+pub fn shine_of(kind: ThreadKind) -> f64 {
+    match kind {
+        ThreadKind::Polyester => 1.0,
+        ThreadKind::Rayon => 1.25,
+        ThreadKind::Cotton | ThreadKind::Wool => 0.0,
+        ThreadKind::Metallic => 1.8,
+        ThreadKind::Glow => 0.6,
+    }
+}
 
 impl Lighting {
     /// The unit vector toward the light.

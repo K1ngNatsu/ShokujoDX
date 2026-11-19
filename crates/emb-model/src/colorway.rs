@@ -9,7 +9,8 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Design, ObjectId, Rgb, Thread, ThreadChart, ThreadId};
+use crate::thread::DEFAULT_WEIGHT;
+use crate::{Design, ObjectId, Rgb, Thread, ThreadChart, ThreadId, ThreadKind};
 
 /// The look of a thread: everything except its id.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -20,6 +21,26 @@ pub struct ThreadLook {
     pub brand: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub code: Option<String>,
+    /// The kind of the thread (ADR 0123).
+    #[serde(default, skip_serializing_if = "ThreadKind::is_default")]
+    pub kind: ThreadKind,
+    /// The weight number of the thread (ADR 0123).
+    #[serde(default = "default_weight", skip_serializing_if = "is_default_weight")]
+    pub weight: u16,
+}
+
+fn default_weight() -> u16 {
+    DEFAULT_WEIGHT
+}
+
+fn is_default_weight(w: &u16) -> bool {
+    *w == DEFAULT_WEIGHT
+}
+
+impl Default for ThreadLook {
+    fn default() -> Self {
+        ThreadLook::of(&Thread::default())
+    }
 }
 
 impl ThreadLook {
@@ -29,6 +50,8 @@ impl ThreadLook {
             color: t.color,
             brand: t.brand.clone(),
             code: t.code.clone(),
+            kind: t.kind,
+            weight: t.weight,
         }
     }
 
@@ -37,6 +60,8 @@ impl ThreadLook {
         t.color = self.color;
         t.brand.clone_from(&self.brand);
         t.code.clone_from(&self.code);
+        t.kind = self.kind;
+        t.weight = self.weight;
     }
 }
 
@@ -256,7 +281,8 @@ impl Design {
 }
 
 /// The look of chart thread `k`. The brand is the brand of the thread, else
-/// the chart name.
+/// the chart name; the kind and the weight are those of the chart, else the
+/// defaults (ADR 0123).
 pub fn chart_look(chart: &ThreadChart, k: usize) -> ThreadLook {
     let c = &chart.threads[k];
     ThreadLook {
@@ -264,6 +290,8 @@ pub fn chart_look(chart: &ThreadChart, k: usize) -> ThreadLook {
         color: c.color,
         brand: Some(c.brand.clone().unwrap_or_else(|| chart.name.clone())),
         code: c.code.clone(),
+        kind: chart.kind.as_ref().map_or_else(ThreadKind::default, |(k, _)| *k),
+        weight: chart.weight.as_ref().map_or(DEFAULT_WEIGHT, |(w, _)| *w),
     }
 }
 
@@ -347,6 +375,7 @@ mod tests {
             color: Rgb(255, 150, 150),
             brand: None,
             code: None,
+            ..Default::default()
         };
         d.set_colorway_look(0, red, look);
         assert_eq!(d.thread(red).unwrap().name, "Red", "colorway 1 is current");

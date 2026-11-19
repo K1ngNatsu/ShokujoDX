@@ -258,6 +258,7 @@ mod tests {
             b: Point::new(20.0, 10.0),
             color: Rgb(0, 0, 0),
             kind: SegmentKind::Stitch,
+            ..Default::default()
         };
         let (out, fit) = fit_segments(&[seg], BBox::new(Point::new(10.0, 10.0), Point::new(110.0, 110.0)));
         assert!((fit.scale - 5.0).abs() < 1e-9);

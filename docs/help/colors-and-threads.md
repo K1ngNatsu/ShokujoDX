@@ -13,6 +13,14 @@ keywords: color, colour, thread, chart, brand, madeira, isacord, sulky, colorway
 - **Design threads** lists the threads of the design. Click the color of
   a thread to change it. Click its name to make it the thread of new
   objects.
+- **Kind** and **Weight** are for the current thread. The kind
+  (polyester, rayon, cotton, metallic, wool or acrylic, glow in the dark)
+  sets how the thread takes the light in the 3D thread look; the
+  stitches stay the same. The weight is the number of the thickness of
+  the thread: 40 is the usual weight, and a higher number is a thinner
+  thread. The views show a thinner or a thicker thread. The density of
+  the objects is for a 40 weight thread: for another weight, a note
+  tells you the spacing to use.
 - To give an object another thread, select the object and click the
   thread. Or right-click the object and use **Thread**. Object Properties
   has the thread too.
@@ -31,8 +39,10 @@ Sulky, Robison-Anton, Gunold, Marathon, Floriani and more).
 
 - Select a chart in **Color > Chart**, or in the Threads panel.
 - **Search** finds a thread by its name or code.
-- Click a chart thread to give its color and name to the current thread.
-  **Ctrl+click** adds it as a new thread.
+- Click a chart thread to give its color, name and kind to the current
+  thread. **Ctrl+click** adds it as a new thread. A chart whose name
+  tells the kind of its thread (for example Rayon or Polyester) gives
+  that kind; another chart gives polyester.
 - **Match to Chart** gives each used thread the nearest color of the
   chart.
 - **Import Chart** reads a chart from a GIMP palette (`.gpl`) or a CSV

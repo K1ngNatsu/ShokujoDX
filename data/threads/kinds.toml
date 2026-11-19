@@ -1,0 +1,225 @@
+# The kind and the weight of the threads of the thread charts of the
+# program (P18 view plan, Milestone 2, ADR 0123). Each value has its
+# source: here the name of the chart, as its maker names the line. A chart
+# that is not in this list, and a value that is not given, has the
+# default: polyester, weight 40. No chart of the program gives the weight
+# of its thread in its name ("Brothread 40" is a set of 40 colors).
+#
+# Fields: name (the chart), kind and kind_source, weight and
+# weight_source. Kinds: polyester, rayon, cotton (matte threads), metallic,
+# wool (wool and acrylic), glow.
+
+[[chart]]
+name = "Admelody Polyester"
+kind = "polyester"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Admelody Rayon"
+kind = "rayon"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "ARC Polyester"
+kind = "polyester"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "ARC Rayon"
+kind = "rayon"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Aurifil Lana"
+kind = "wool"
+kind_source = "the name of the chart (Lana: wool)"
+
+[[chart]]
+name = "Aurifil Mako"
+kind = "cotton"
+kind_source = "the name of the chart (Mako: a cotton)"
+
+[[chart]]
+name = "Aurifil Polyester"
+kind = "polyester"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Aurifil Rayon"
+kind = "rayon"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "BFC Polyester"
+kind = "polyester"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Floriani Polyester"
+kind = "polyester"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "FuFu Polyester"
+kind = "polyester"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "FuFu Rayon"
+kind = "rayon"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Gunold Polyester"
+kind = "polyester"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Isacord Polyester"
+kind = "polyester"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Isafil Rayon"
+kind = "rayon"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Isalon Polyester"
+kind = "polyester"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Madeira Burmilana"
+kind = "wool"
+kind_source = "the name of the chart (Burmilana: wool)"
+
+[[chart]]
+name = "Madeira Matt"
+kind = "cotton"
+kind_source = "the name of the chart (Matt: a matte thread)"
+
+[[chart]]
+name = "Madeira Polyneon"
+kind = "polyester"
+kind_source = "the name of the chart (Polyneon: polyester)"
+
+[[chart]]
+name = "Madeira Rayon"
+kind = "rayon"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Marathon Polyester"
+kind = "polyester"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Marathon Rayon"
+kind = "rayon"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Marathon Rayon V3"
+kind = "rayon"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Mettler Poly Sheen"
+kind = "polyester"
+kind_source = "the name of the chart (Poly: polyester)"
+
+[[chart]]
+name = "Outback Embroidery Rayon"
+kind = "rayon"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Poly X40"
+kind = "polyester"
+kind_source = "the name of the chart (Poly: polyester)"
+
+[[chart]]
+name = "Radiant Rayon"
+kind = "rayon"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Robison-Anton Polyester"
+kind = "polyester"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Robison-Anton Rayon"
+kind = "rayon"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Royal Polyester"
+kind = "polyester"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Royal Viscose Rayon"
+kind = "rayon"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Simthread Glow In The Dark 15 Colors"
+kind = "glow"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Simthread Polyester"
+kind = "polyester"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Simthread Polyester 63 Brother Colors"
+kind = "polyester"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Simthread Rayon"
+kind = "rayon"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Sulky Polyester"
+kind = "polyester"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Sulky Rayon"
+kind = "rayon"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Swist Rayon"
+kind = "rayon"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Tristar Polyester"
+kind = "polyester"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Tristar Rayon"
+kind = "rayon"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Vyapar Rayon"
+kind = "rayon"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Wonderfil Polyester"
+kind = "polyester"
+kind_source = "the name of the chart"
+
+[[chart]]
+name = "Wonderfil Rayon"
+kind = "rayon"
+kind_source = "the name of the chart"
