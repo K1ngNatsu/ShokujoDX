@@ -831,13 +831,23 @@ mod tests {
     }
 
     #[test]
-    fn auto_uses_fill_for_wide_strokes() {
+    fn auto_uses_tatami_columns_for_wide_strokes() {
+        // A stem of about 17 mm is a tatami column, also after the settings
+        // of the object are applied (P20 Milestone 2; it was a fill).
         let f = bundled::font("Lato", "Bold").unwrap();
         let mut l = lettering("I");
         l.height_mm = 120.0;
-        assert!(matches!(layout(&l, &f)[0].parts[0], ObjectKind::Fill { .. }));
+        relayout(&mut l, &f);
+        assert!(matches!(
+            &l.letters[0].parts[0],
+            ObjectKind::Satin { params, .. } if matches!(params.pattern, emb_model::ColumnPattern::Tatami { .. })
+        ));
         l.height_mm = 10.0;
-        assert!(matches!(layout(&l, &f)[0].parts[0], ObjectKind::Satin { .. }));
+        relayout(&mut l, &f);
+        assert!(matches!(
+            &l.letters[0].parts[0],
+            ObjectKind::Satin { params, .. } if params.pattern.is_satin()
+        ));
     }
 }
 

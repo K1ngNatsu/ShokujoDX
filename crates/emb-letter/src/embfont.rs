@@ -9,7 +9,6 @@ use emb_model::{FontRef, LetterStitch, ObjectKind, PartTuning};
 use serde::{Deserialize, Serialize};
 
 use crate::font::Font;
-use crate::glyph::AUTO_MIN_COVERAGE;
 use crate::source::LetterSource;
 
 pub const FILE_EXTENSION: &str = "embfont";
@@ -677,16 +676,23 @@ impl LetterSource for EmbFont {
 
     /// The stored parts; an embroidery font keeps its own stitch types. A
     /// letter with a fill letter (ADR 0120) gives its fills for large
-    /// lettering ([`EmbFont::uses_fill`]).
+    /// lettering ([`EmbFont::uses_fill`]). In `Auto`, a satin column that
+    /// is wider than the satin limit at `scale` is a tatami column
+    /// ([`crate::glyph::auto_column`], P20 Milestone 2).
     fn parts(&self, letter: u32, stitch: LetterStitch, scale: f64) -> Vec<ObjectKind> {
         char::from_u32(letter)
             .and_then(|c| self.letters.get(&c))
             .map(|l| {
                 if self.uses_fill(l, stitch, scale) {
-                    l.fill_parts.clone()
-                } else {
-                    l.parts.clone()
+                    return l.fill_parts.clone();
                 }
+                let mut parts = l.parts.clone();
+                if stitch == LetterStitch::Auto {
+                    for p in &mut parts {
+                        crate::glyph::auto_column(p, scale);
+                    }
+                }
+                parts
             })
             .unwrap_or_default()
     }
@@ -924,7 +930,7 @@ pub fn convert_with(
         let satin = match stitch {
             LetterStitch::Satin => !shapes.strokes.satins.is_empty(),
             LetterStitch::Fill => false,
-            LetterStitch::Auto => !shapes.strokes.satins.is_empty() && shapes.strokes.coverage >= AUTO_MIN_COVERAGE,
+            LetterStitch::Auto => shapes.columns_cover(),
         };
         let mut parts = if satin {
             shapes.satin_parts()
@@ -1096,10 +1102,57 @@ mod validate_tests {
 #[cfg(test)]
 mod tests {
     use emb_geom::Point;
-    use emb_model::Lettering;
+    use emb_model::{ColumnPattern, Lettering};
 
     use super::*;
     use crate::{bundled, layout};
+
+    #[test]
+    fn auto_makes_wide_columns_tatami_columns() {
+        // P20 Milestone 2: in Auto, a column wider than the satin limit is
+        // a tatami column, in a TrueType font and in an embroidery font
+        // with no fill letters. Before, a TrueType letter with one wide
+        // column was all fill.
+        let f = bundled::font("Lato", "Bold").unwrap();
+        let g = u32::from(f.glyph('I').unwrap());
+        let stem = f.shapes(g as u16).strokes.typical_width;
+        let kinds = |parts: &[ObjectKind]| -> Vec<Option<ColumnPattern>> {
+            parts
+                .iter()
+                .map(|p| match p {
+                    ObjectKind::Satin { params, .. } => Some(params.pattern),
+                    _ => None,
+                })
+                .collect()
+        };
+        let tatami = Some(ColumnPattern::Tatami {
+            stitch_mm: crate::glyph::AUTO_TATAMI_STITCH_MM,
+        });
+        for (stroke_mm, want) in [
+            (6.0, Some(ColumnPattern::Satin)),
+            (10.0, Some(ColumnPattern::Satin)),
+            (16.0, tatami),
+        ] {
+            let scale = stroke_mm / stem;
+            let parts = LetterSource::parts(&f, g, LetterStitch::Auto, scale);
+            assert!(!parts.is_empty());
+            assert!(
+                kinds(&parts).iter().all(|k| *k == want),
+                "{stroke_mm} mm: {:?}",
+                kinds(&parts)
+            );
+            let satin = LetterSource::parts(&f, g, LetterStitch::Satin, scale);
+            assert!(kinds(&satin).iter().all(|k| *k == Some(ColumnPattern::Satin)));
+        }
+        let e = convert(&f, "Block Sans", "", LetterStitch::Auto, &['I']);
+        let stem_mm = stem * DESIGN_CAP_MM / f.cap_height;
+        let scale = 16.0 / stem_mm;
+        assert_eq!(kinds(&e.parts(u32::from('I'), LetterStitch::Auto, scale)), vec![tatami]);
+        assert_eq!(
+            kinds(&e.parts(u32::from('I'), LetterStitch::Satin, scale)),
+            vec![Some(ColumnPattern::Satin)]
+        );
+    }
 
     #[test]
     fn convert_save_load_and_layout() {

@@ -12,7 +12,9 @@
 //!   of the parts outside it, and the part of the area of the parts that
 //!   two or more parts cover (two layers of thread: `quality::areas`);
 //! - the narrowest column (the middle width of the narrowest one) and the
-//!   widest place of a column.
+//!   widest column (its width between its two sides,
+//!   `glyph::column_width`), the columns wider than [`WIDE_MM`] and of
+//!   them the satin columns with no split stitches (P20 Milestone 2: none).
 //!
 //! It also counts the trims of the reference words ([`WORDS`]). The test
 //! `tests/lettering_bench.rs` keeps the numbers of the test font
@@ -27,9 +29,10 @@ pub const SIZES: [f64; 4] = [15.0, 25.0, 50.0, 80.0];
 /// A column narrower than this does not sew well as satin, mm (P20
 /// Milestone 5).
 pub const NARROW_MM: f64 = 0.8;
-/// A column wider than this is too wide for plain satin, mm
-/// (`glyph::AUTO_MAX_SATIN_MM`).
-pub const WIDE_MM: f64 = emb_letter::glyph::AUTO_MAX_SATIN_MM;
+/// A column wider than this is too wide for satin with no split
+/// stitches, mm (P20 Milestone 2): it must have split stitches or be a
+/// tatami column.
+pub const WIDE_MM: f64 = 8.0;
 
 /// The hiragana: the 46 basic characters, the 25 with voicing marks and
 /// the 9 small ones.
@@ -115,15 +118,19 @@ pub struct Measure {
     pub overlap: f64,
     /// The middle width of the narrowest column, mm.
     pub narrowest_mm: Option<f64>,
-    /// The widest place of a column, mm.
+    /// The width of the widest column between its two sides
+    /// (`glyph::column_width`), mm.
     pub widest_mm: Option<f64>,
-    /// The columns wider than [`WIDE_MM`] at their widest place.
+    /// The columns wider than [`WIDE_MM`].
     pub wide_columns: usize,
+    /// The columns wider than [`WIDE_MM`] that sew as satin with no split
+    /// stitches.
+    pub wide_unsplit: usize,
 }
 
 /// The widths of a column (mm): its middle width (half of its length is
-/// narrower) and its widest place (pieces of at least 0.5 mm, so that one
-/// rung does not count).
+/// narrower) and its widest place (the longest stitch across it, with no
+/// pull compensation).
 fn widths(g: &emb_model::SatinGeometry) -> Option<(f64, f64)> {
     let mut w = quality::column_widths(g, 0.25);
     w.retain(|(width, len)| width.is_finite() && *len > 0.0);
@@ -131,11 +138,7 @@ fn widths(g: &emb_model::SatinGeometry) -> Option<(f64, f64)> {
     if total <= 0.0 {
         return None;
     }
-    let widest = w
-        .iter()
-        .filter(|(_, l)| *l >= 0.5)
-        .map(|(width, _)| *width)
-        .fold(f64::NAN, f64::max);
+    let widest = w.iter().map(|(width, _)| *width).fold(f64::NAN, f64::max);
     w.sort_by(|a, b| a.0.total_cmp(&b.0));
     let mut sum = 0.0;
     let middle = w
@@ -168,21 +171,29 @@ pub fn measure(font: &Font, c: char, size_mm: f64) -> Option<Measure> {
     let areas = quality::areas(&parts, &outline)?;
     let mut kinds = Kinds::default();
     let (mut narrowest, mut widest): (Option<f64>, Option<f64>) = (None, None);
-    let mut wide_columns = 0;
+    let (mut wide_columns, mut wide_unsplit) = (0, 0);
     for p in &parts {
         match p {
             ObjectKind::Satin { geometry, params } => {
                 let w = widths(geometry);
-                if let Some((middle, top)) = w {
+                if let Some((middle, _)) = w {
                     narrowest = Some(narrowest.map_or(middle, |n| n.min(middle)));
-                    widest = Some(widest.map_or(top, |x| x.max(top)));
-                    if top > WIDE_MM {
-                        wide_columns += 1;
+                }
+                let real = emb_letter::glyph::column_width(geometry);
+                if let Some(real) = real {
+                    widest = Some(widest.map_or(real, |x| x.max(real)));
+                }
+                let split = w.is_some_and(|(_, top)| top > params.split_mm);
+                let tatami = matches!(params.pattern, ColumnPattern::Tatami { .. });
+                if real.is_some_and(|r| r > WIDE_MM) {
+                    wide_columns += 1;
+                    if !tatami && !split {
+                        wide_unsplit += 1;
                     }
                 }
-                if matches!(params.pattern, ColumnPattern::Tatami { .. }) {
+                if tatami {
                     kinds.tatami_column += 1;
-                } else if w.is_some_and(|(_, top)| top > params.split_mm) {
+                } else if split {
                     kinds.split += 1;
                 } else {
                     kinds.satin += 1;
@@ -202,6 +213,7 @@ pub fn measure(font: &Font, c: char, size_mm: f64) -> Option<Measure> {
         narrowest_mm: narrowest,
         widest_mm: widest,
         wide_columns,
+        wide_unsplit,
     })
 }
 
@@ -319,6 +331,7 @@ pub fn report(b: &Bench, letters: bool) -> String {
             .filter(|m| m.narrowest_mm.is_some_and(|w| w < NARROW_MM))
             .count();
         let wide_columns: usize = rows.iter().map(|m| m.wide_columns).sum();
+        let wide_unsplit: usize = rows.iter().map(|m| m.wide_unsplit).sum();
         out.push_str(&format!("\n{size} mm\n"));
         out.push_str(&format!(
             "  characters all fill: {} {}\n",
@@ -355,7 +368,7 @@ pub fn report(b: &Bench, letters: bool) -> String {
             narrow.map_or("none".into(), |(w, c)| format!("{w:.2} mm ({c})"))
         ));
         out.push_str(&format!(
-            "  widest column: {}; columns over {WIDE_MM} mm: {wide_columns}\n",
+            "  widest column: {}; columns over {WIDE_MM} mm: {wide_columns}, satin with no split stitches: {wide_unsplit}\n",
             wide.map_or("none".into(), |(w, c)| format!("{w:.2} mm ({c})"))
         ));
     }

@@ -33,8 +33,10 @@ There are two kinds of fonts:
   and Object Properties warns when the text is out of the range. 65
   embroidery fonts come with the program.
 - **TrueType** and OpenType fonts of the computer. The program makes the
-  letters from their outlines: satin for narrow strokes, fill for wide
-  ones (**Automatic**), or all **Satin** or all **Fill**.
+  letters from their outlines: columns that follow the strokes
+  (**Automatic**: satin, with split stitches in strokes wider than 7 mm,
+  and rows of tatami in strokes wider than 12 mm), or all **Satin** or all
+  **Fill**.
 
 **Lettering > Fonts** opens the font list: search, see a preview and the
 size range, and show **All**, **Embroidery**, **TrueType**, **For small

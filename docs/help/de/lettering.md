@@ -36,9 +36,10 @@ Es gibt zwei Arten von Schriften:
   Text außerhalb des Bereichs ist. 65 Stickschriften kommen mit dem
   Programm.
 - **TrueType**- und OpenType-Schriften des Computers. Das Programm
-  erstellt die Buchstaben aus ihren Umrissen: Satin für schmale Striche,
-  Füllung für breite (**Automatisch**), oder alles **Satin** oder alles
-  **Füllung**.
+  erstellt die Buchstaben aus ihren Umrissen: Säulen, die den Strichen
+  folgen (**Automatisch**: Satin, mit geteilten Stichen in Strichen, die
+  breiter als 7 mm sind, und Tatami-Reihen in Strichen, die breiter als
+  12 mm sind), oder alles **Satin** oder alles **Füllung**.
 
 **Schrift > Schriften** öffnet die Schriftliste: Suchen, eine Vorschau und
 den Größenbereich sehen, und **Alle**, **Stickerei**, **TrueType**,

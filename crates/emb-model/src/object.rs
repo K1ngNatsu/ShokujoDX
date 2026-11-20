@@ -1051,6 +1051,18 @@ impl SatinParams {
         }
     }
 
+    /// These settings with the column type `pattern`, and the spacing and
+    /// the short stitches of that type. The pull compensation, the underlay
+    /// and the other settings stay.
+    pub fn with_type(&self, pattern: ColumnPattern) -> Self {
+        Self {
+            spacing_mm: pattern.default_spacing_mm(),
+            short_stitches: pattern.is_satin(),
+            pattern,
+            ..self.clone()
+        }
+    }
+
     /// Settings for a turning fill ("complex turning"): rows 0.4 mm apart,
     /// split into tatami-like stitches of 3.5 mm.
     pub fn turning() -> Self {

@@ -20,7 +20,7 @@ use emb_geom::region::Region;
 use emb_geom::{BBox, Point, Transform, text};
 use serde::{Deserialize, Serialize};
 
-use crate::{Baseline, Envelope, FillParams, ObjectKind, SatinParams, Underlay};
+use crate::{Baseline, ColumnPattern, Envelope, FillParams, ObjectKind, SatinParams, Underlay};
 
 /// The default lettering height (capital height), in mm.
 pub const DEFAULT_HEIGHT_MM: f64 = 25.0;
@@ -155,7 +155,9 @@ impl Underline {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LetterStitch {
-    /// Satin where the strokes are narrow enough, else fill (for each letter).
+    /// Columns that follow the strokes, with the stitch of each column from
+    /// its width (satin; split stitches; a tatami column for a very wide
+    /// stroke, P20). A letter that the columns do not cover well is a fill.
     #[default]
     Auto,
     Satin,
@@ -744,7 +746,15 @@ impl Lettering {
                 let pull = tune.map_or(0.0, |t| t.pull_mm);
                 match part {
                     ObjectKind::Satin { params, .. } => {
-                        *params = satin.clone();
+                        // A wide column that the stitch type Auto made a
+                        // tatami column (P20) stays one, if the object
+                        // has satin columns.
+                        let tatami = matches!(params.pattern, ColumnPattern::Tatami { .. }) && satin.pattern.is_satin();
+                        *params = if tatami {
+                            satin.with_type(params.pattern)
+                        } else {
+                            satin.clone()
+                        };
                         params.pull_compensation_mm = (params.pull_compensation_mm + pull).max(0.0);
                         if let Some(u) = underlay {
                             params.underlay = u.clone();
@@ -1010,6 +1020,50 @@ cd",
         l.reset_letter(0);
         assert_eq!(l.edits.len(), 2);
         assert!(l.edit(1).is_some() && l.edit(0).is_none());
+    }
+
+    #[test]
+    fn a_tatami_column_of_auto_stays_one() {
+        // Auto makes a wide column a tatami column (P20 Milestone 2); the
+        // settings of the object keep its type.
+        let column = |pattern: ColumnPattern| ObjectKind::Satin {
+            geometry: SatinGeometry {
+                rail_a: Path::new().move_to(Point::new(0.0, 0.0)).line_to(Point::new(0.0, 50.0)),
+                rail_b: Path::new()
+                    .move_to(Point::new(15.0, 0.0))
+                    .line_to(Point::new(15.0, 50.0)),
+                rungs: Vec::new(),
+            },
+            params: SatinParams::default().with_type(pattern),
+        };
+        let tatami = ColumnPattern::Tatami { stitch_mm: 3.5 };
+        let mut l = Lettering::new("I", FontRef::new("Lato", "Bold"), 60.0, Point::ZERO);
+        l.satin.pull_compensation_mm = 0.35;
+        let letter = |parts: Vec<ObjectKind>| Letter {
+            text: "I".into(),
+            line: 0,
+            index: 0,
+            frame: Transform::IDENTITY,
+            center: Point::ZERO,
+            parts,
+            fixed: false,
+            tuning: Vec::new(),
+        };
+        l.set_letters(vec![letter(vec![column(tatami), column(ColumnPattern::Satin)])]);
+        let params = |l: &Lettering, i: usize| match &l.letters[0].parts[i] {
+            ObjectKind::Satin { params, .. } => params.clone(),
+            _ => unreachable!(),
+        };
+        let p = params(&l, 0);
+        assert_eq!(p.pattern, tatami);
+        assert_eq!((p.spacing_mm, p.short_stitches), (0.8, false));
+        assert_eq!(p.pull_compensation_mm, 0.35, "the pull compensation of the object");
+        assert_eq!(params(&l, 1), l.satin, "a satin column gets the settings of the object");
+        // Columns of another type for the object: all columns get it.
+        l.satin = SatinParams::default().with_type(ColumnPattern::Zigzag);
+        l.apply_params();
+        assert_eq!(params(&l, 0).pattern, ColumnPattern::Zigzag);
+        assert_eq!(params(&l, 1).pattern, ColumnPattern::Zigzag);
     }
 
     #[test]

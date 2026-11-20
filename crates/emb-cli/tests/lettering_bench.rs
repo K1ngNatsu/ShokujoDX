@@ -35,5 +35,17 @@ fn lettering_bench() {
             assert!(m.overlap < 1e-3, "a fill letter with two layers: {m:?}");
         }
     }
+    // The exit test of P20 Milestone 2: the stitch of each column. No
+    // character is all fill (tatami) from 15 mm to 80 mm, and each column
+    // wider than 8 mm has split stitches or is a tatami column.
+    let all_fill: Vec<String> = b
+        .rows
+        .iter()
+        .filter(|m| m.kinds.fill > 0 && m.kinds.satin + m.kinds.split + m.kinds.tatami_column == 0)
+        .map(|m| format!("{} {} mm", m.c, m.size_mm))
+        .collect();
+    assert!(all_fill.is_empty(), "all fill: {all_fill:?}");
+    let unsplit: Vec<&Measure> = b.rows.iter().filter(|m| m.wide_unsplit > 0).collect();
+    assert!(unsplit.is_empty(), "wide satin with no split stitches: {unsplit:?}");
     insta::assert_snapshot!(lettering_bench::report(&b, false));
 }

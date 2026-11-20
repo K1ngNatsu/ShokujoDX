@@ -34,9 +34,10 @@ Hay dos tipos de fuentes:
   avisa cuando el texto está fuera del rango. Con el programa vienen 65
   fuentes de bordado.
 - Fuentes **TrueType** y OpenType del ordenador. El programa crea las
-  letras a partir de sus contornos: satén para los trazos estrechos,
-  relleno para los anchos (**Automático**), o todo **Satén** o todo
-  **Relleno**.
+  letras a partir de sus contornos: columnas que siguen los trazos
+  (**Automático**: satén, con puntadas divididas en los trazos de más de
+  7 mm de ancho, y filas de tatami en los trazos de más de 12 mm), o todo
+  **Satén** o todo **Relleno**.
 
 **Letras > Fuentes** abre la lista de fuentes: busque, vea una vista
 previa y el rango de tamaños, y muestre **Todo**, **Bordado**,

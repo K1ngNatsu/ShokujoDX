@@ -55,6 +55,16 @@ Schreibschriften, Arabisch (von rechts nach links) und Devanagari. Die
 Schriften Tajawal (Arabisch) und Poppins (Devanagari) kommen mit dem
 Programm. Siehe [Schrift](lettering).
 
+**Stiche, die den Strichen folgen.** Mit einer TrueType- oder
+OpenType-Schrift und der Stichart **Automatisch** bekommt jeder Strich
+eines Buchstabens seinen eigenen Stich: Satin, mit geteilten Stichen in
+Strichen, die breiter als 7 mm sind, und Tatami-Reihen in Strichen, die
+breiter als 12 mm sind. Vorher war ein Buchstabe mit einem breiten Strich
+ganz eine Füllung: In einer fetten Schrift waren die meisten Kanji und
+Kana bei 50 mm Füllungen. Schriften mit Strichen, die sich überlappen
+(viele Schriften aus dem Internet), geben jetzt Buchstaben ohne Löcher und
+ohne Stiche außerhalb des Buchstabens. Siehe [Schrift](lettering).
+
 **Mehr Schriften, mit einer Qualitätswertung.** Das Programm hat 65
 Stickschriften (vorher 30), und die Schriftpakete auf der Seite des
 Programms haben 68 weitere. Jede Stickschrift hat eine Qualitätswertung von

@@ -12,44 +12,44 @@ Lettering bench: Noto Sans JP Bold; 248 characters of the reference set
   outside: mean 0.4 %, highest 1.6 % (タ)
   two layers: mean 6.3 %, highest 24.9 % (ャ); characters over 3 %: 171
   narrowest column: 0.06 mm (ろ); characters with a column under 0.8 mm: 9
-  widest column: 3.32 mm (・); columns over 8 mm: 0
+  widest column: 3.20 mm (糸); columns over 8 mm: 0, satin with no split stitches: 0
 
 25 mm
-  characters all fill: 3 森木・
+  characters all fill: 0 
   characters partly fill: 0 
-  parts: satin 1232, split satin 0, tatami column 0, fill 5, run 0
-  covered: mean 97.3 %, lowest 88.1 % (、)
+  parts: satin 1241, split satin 8, tatami column 0, fill 0, run 0
+  covered: mean 97.2 %, lowest 83.6 % (・)
   outside: mean 0.4 %, highest 1.6 % (タ)
-  two layers: mean 6.2 %, highest 24.9 % (ャ); characters over 3 %: 168
+  two layers: mean 6.3 %, highest 24.9 % (ャ); characters over 3 %: 170
   narrowest column: 0.10 mm (ろ); characters with a column under 0.8 mm: 6
-  widest column: 5.34 mm (糸); columns over 8 mm: 0
+  widest column: 5.34 mm (糸); columns over 8 mm: 0, satin with no split stitches: 0
 
 50 mm
-  characters all fill: 247 あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんがぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽぁぃぅぇぉっゃゅょアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンヴァィゥェォッャュョー一右雨円王音下火花貝学気九休玉金空月犬見五口校左三山子四糸字耳七車手十出女小上森人水正生青夕石赤千川先早草足村大男竹中虫町天田土二日入年白八百文木本名目立力林六愛夢心龍鶴桜刺繍東京都道府県国語書漢海星光風雪侍忍武、「」・
+  characters all fill: 0 
   characters partly fill: 0 
-  parts: satin 1, split satin 0, tatami column 0, fill 454, run 0
-  covered: mean 100.0 %, lowest 99.1 % (。)
-  outside: mean 0.0 %, highest 0.3 % (。)
-  two layers: mean 0.0 %, highest 0.0 % (あ); characters over 3 %: 0
-  narrowest column: 4.90 mm (。); characters with a column under 0.8 mm: 0
-  widest column: 4.90 mm (。); columns over 8 mm: 0
+  parts: satin 176, split satin 1073, tatami column 0, fill 0, run 0
+  covered: mean 97.2 %, lowest 83.7 % (・)
+  outside: mean 0.4 %, highest 1.6 % (タ)
+  two layers: mean 6.3 %, highest 24.8 % (ャ); characters over 3 %: 170
+  narrowest column: 0.18 mm (り); characters with a column under 0.8 mm: 6
+  widest column: 10.68 mm (糸); columns over 8 mm: 615, satin with no split stitches: 0
 
 80 mm
-  characters all fill: 247 あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんがぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽぁぃぅぇぉっゃゅょアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲンヴァィゥェォッャュョー一右雨円王音下火花貝学気九休玉金空月犬見五口校左三山子四糸字耳七車手十出女小上森人水正生青夕石赤千川先早草足村大男竹中虫町天田土二日入年白八百文木本名目立力林六愛夢心龍鶴桜刺繍東京都道府県国語書漢海星光風雪侍忍武、「」・
+  characters all fill: 0 
   characters partly fill: 0 
-  parts: satin 0, split satin 1, tatami column 0, fill 454, run 0
-  covered: mean 100.0 %, lowest 99.1 % (。)
-  outside: mean 0.0 %, highest 0.3 % (。)
-  two layers: mean 0.0 %, highest 0.0 % (あ); characters over 3 %: 0
-  narrowest column: 7.83 mm (。); characters with a column under 0.8 mm: 0
-  widest column: 7.83 mm (。); columns over 8 mm: 0
+  parts: satin 19, split satin 394, tatami column 836, fill 0, run 0
+  covered: mean 97.2 %, lowest 83.7 % (・)
+  outside: mean 0.4 %, highest 1.6 % (タ)
+  two layers: mean 6.3 %, highest 24.9 % (ャ); characters over 3 %: 170
+  narrowest column: 0.29 mm (り); characters with a column under 0.8 mm: 6
+  widest column: 17.09 mm (糸); columns over 8 mm: 1183, satin with no split stitches: 0
 
 Trims of the words at 15, 25, 50, 80 mm
-  刺繍: 26, 27, 6, 6
-  東京: 17, 14, 4, 4
-  ありがとう: 14, 15, 7, 7
-  サムライ: 10, 10, 4, 4
-  龍: 17, 18, 2, 2
-  山田太郎: 25, 25, 4, 4
-  さくら: 7, 7, 4, 4
-  日本: 9, 9, 1, 1
+  刺繍: 26, 27, 25, 27
+  東京: 17, 14, 17, 18
+  ありがとう: 14, 15, 15, 15
+  サムライ: 10, 10, 10, 10
+  龍: 17, 18, 18, 18
+  山田太郎: 25, 25, 25, 25
+  さくら: 7, 7, 7, 7
+  日本: 9, 9, 9, 9

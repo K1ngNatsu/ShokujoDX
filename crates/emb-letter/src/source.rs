@@ -125,15 +125,10 @@ impl LetterSource for Font {
 
     fn parts(&self, letter: u32, stitch: LetterStitch, scale: f64) -> Vec<ObjectKind> {
         let shapes = self.shapes(letter as u16);
-        let satin = match stitch {
-            LetterStitch::Satin => !shapes.strokes.satins.is_empty(),
-            LetterStitch::Fill => false,
-            LetterStitch::Auto => shapes.satin_fits(scale),
-        };
-        if satin {
-            shapes.satin_parts()
-        } else {
-            shapes.fill_parts()
+        match stitch {
+            LetterStitch::Satin if !shapes.strokes.satins.is_empty() => shapes.satin_parts(),
+            LetterStitch::Satin | LetterStitch::Fill => shapes.fill_parts(),
+            LetterStitch::Auto => shapes.auto_parts(scale),
         }
     }
 

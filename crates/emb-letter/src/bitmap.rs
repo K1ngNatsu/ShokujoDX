@@ -10,7 +10,7 @@ use emb_geom::{Point, Transform, text};
 use emb_model::LetterStitch;
 
 use crate::embfont::{DESIGN_CAP_MM, EmbFont, EmbLetter, round_part};
-use crate::glyph::{AUTO_MIN_COVERAGE, GlyphShapes};
+use crate::glyph::GlyphShapes;
 
 /// One glyph: rows of pixels from the top, `x` pixels right of the pen and
 /// with its top row `top` pixels below the baseline (negative: above).
@@ -399,7 +399,7 @@ pub fn to_embfont(b: &BitmapFont, family: &str, stitch: LetterStitch) -> EmbFont
         let satin = match stitch {
             LetterStitch::Satin => !shapes.strokes.satins.is_empty(),
             LetterStitch::Fill => false,
-            LetterStitch::Auto => !shapes.strokes.satins.is_empty() && shapes.strokes.coverage >= AUTO_MIN_COVERAGE,
+            LetterStitch::Auto => shapes.columns_cover(),
         };
         let mut parts = if satin {
             shapes.satin_parts()

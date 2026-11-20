@@ -1,7 +1,7 @@
 # Plan: Japanese lettering (phase P20)
 
 Date: 2026-11-20 · Status: Accepted (owner, 2026-11-20: before v0.4.0).
-Milestone 1 is done (ADR 0141).
+Milestones 1 and 2 are done (ADR 0141, ADR 0142).
 
 ## Goal
 
@@ -109,6 +109,34 @@ This milestone fixes what the owner saw.
 character of the reference set is all tatami, and each column wider than
 8 mm sews with split stitches or as a tatami column. The lettering of the
 corpus designs keeps its stitches, or the snapshots change with a note.
+
+**Done (2026-11-20, ADR 0142).** The width of a column is the largest
+width that it keeps over 1.5 times that width (`glyph::column_width`), so
+the place where it crosses or meets another stroke does not count (木 at
+50 mm: 17.5 mm at the junction, 10.1 mm for the stroke). In Auto, each
+column gets its stitch (`glyph::auto_column`): satin up to 12 mm
+(`AUTO_MAX_SATIN_MM`, now the longest satin stitch `quality::LONG_MM`),
+with the stitches longer than 7 mm split (the auto split of all satin
+columns); a tatami column above it. Embroidery fonts get the same choice
+in Auto below their fill letters, and the lettering keeps a tatami column
+when it applies its satin settings. The exit test is in
+`tests/lettering_bench.rs`; the golden snapshots did not change.
+
+Not done: a fill for a large part that no column covers. The stroke
+finder covers each character of the reference set more than the limit
+(the lowest is 88 %), so a letter under the limit stays a fill letter.
+
+| Measure | 15 mm | 25 mm | 50 mm | 80 mm |
+| --- | --- | --- | --- | --- |
+| Characters all tatami (of 248) | 0 (0) | 0 (3) | 0 (247) | 0 (247) |
+| Satin / split satin / tatami columns | 1,249 / 0 / 0 | 1,241 / 8 / 0 | 176 / 1,073 / 0 | 19 / 394 / 836 |
+| Columns wider than 8 mm with no split stitches | 0 | 0 | 0 | 0 |
+| Two layers, mean | 6.3 % | 6.3 % | 6.3 % | 6.3 % |
+| Trims of 刺繍 / 東京 / 龍 | 26 / 17 / 17 | 27 / 14 / 18 | 25 / 17 / 18 | 27 / 18 / 18 |
+
+(In brackets: the baseline of Milestone 1. At 50 mm and 80 mm the letters
+are columns now, so they have the two layers of the crossings and the
+trims of the columns, as at 15 mm: Milestones 3 and 4.)
 
 ## Milestone 3: crossings and junctions (L)
 

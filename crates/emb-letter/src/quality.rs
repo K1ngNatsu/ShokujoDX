@@ -260,6 +260,16 @@ impl Rail {
 /// the column with this width), in the units of the column. The stitches go
 /// between the points of the two rails that the rungs pair.
 pub fn column_widths(g: &SatinGeometry, step: f64) -> Vec<(f64, f64)> {
+    column_pairs(g, step)
+        .into_iter()
+        .map(|(pa, pb, len)| (pa.distance(pb), len))
+        .collect()
+}
+
+/// The points of the two rails that the stitches go between, along the
+/// column, with the length of the piece of the column at each pair (as
+/// [`column_widths`]).
+pub fn column_pairs(g: &SatinGeometry, step: f64) -> Vec<(Point, Point, f64)> {
     let (Some(a), Some(b)) = (Rail::new(&g.rail_a), Rail::new(&g.rail_b)) else {
         return Vec::new();
     };
@@ -285,8 +295,7 @@ pub fn column_widths(g: &SatinGeometry, step: f64) -> Vec<(f64, f64)> {
         let n = (mid / step.max(1e-6)).ceil().max(1.0) as usize;
         for q in 0..n {
             let f = (q as f64 + 0.5) / n as f64;
-            let width = a.point(w[0].0 + f * la).distance(b.point(w[0].1 + f * lb));
-            out.push((width, mid / n as f64));
+            out.push((a.point(w[0].0 + f * la), b.point(w[0].1 + f * lb), mid / n as f64));
         }
     }
     out
