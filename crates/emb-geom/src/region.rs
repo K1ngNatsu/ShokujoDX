@@ -1,7 +1,8 @@
 //! Filled regions (polygons with holes) and boolean and offset operations.
 //!
 //! The operations use the `geo` crate with its `i_overlay` back end (pure Rust).
-//! See ADR 0002.
+//! See ADR 0002. [`without_overlaps`] uses `i_overlay` itself, for the
+//! nonzero fill rule of font outlines.
 
 use geo::algorithm::buffer::{BufferStyle, LineJoin};
 use geo::{BooleanOps, Buffer, Coord, LineString, MultiLineString, MultiPolygon, Polygon};
@@ -274,6 +275,50 @@ fn line_join(join: Join, distance: f64) -> LineJoin<f64> {
     }
 }
 
+/// The rings of the area that `rings` fill with the nonzero rule (the rule
+/// of TrueType and OpenType outlines: a point is inside if the rings wind
+/// round it a number of times that is not 0), with no ring over another:
+/// each outer ring, then its holes.
+///
+/// Many fonts draw a letter as strokes that overlap (all variable fonts,
+/// and the static fonts made from them). Code that reads rings by even-odd
+/// nesting makes a hole of a part where two strokes overlap. If the rings
+/// do not overlap, they come back as they are (the same points), so a font
+/// with clean outlines gives the same shapes as before.
+pub fn without_overlaps(rings: &[Vec<Point>]) -> Vec<Vec<Point>> {
+    use i_overlay::core::fill_rule::FillRule;
+    use i_overlay::float::simplify::SimplifyShape;
+    if rings.len() < 2 {
+        return rings.to_vec();
+    }
+    let paths: Vec<Vec<[f64; 2]>> = rings.iter().map(|r| r.iter().map(|p| [p.x, p.y]).collect()).collect();
+    let area = |shapes: &[Vec<Vec<[f64; 2]>>]| -> f64 {
+        shapes
+            .iter()
+            .flat_map(|s| s.iter().enumerate())
+            .map(|(i, c)| {
+                let ring: Vec<Point> = c.iter().map(|q| Point::new(q[0], q[1])).collect();
+                let a = ring_signed_area(&ring).abs();
+                if i == 0 { a } else { -a }
+            })
+            .sum()
+    };
+    let nonzero = paths.simplify_shape(FillRule::NonZero);
+    let even_odd = paths.simplify_shape(FillRule::EvenOdd);
+    let (a, b) = (area(&nonzero), area(&even_odd));
+    // With no overlap both rules fill the same area (the numbers of the
+    // overlay library are snapped to a grid: a small difference is noise).
+    if (a - b).abs() <= 1e-6 * a.abs().max(1e-12) {
+        return rings.to_vec();
+    }
+    nonzero
+        .iter()
+        .flat_map(|s| s.iter())
+        .map(|c| c.iter().map(|q| Point::new(q[0], q[1])).collect::<Vec<Point>>())
+        .filter(|r| r.len() >= 3)
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -413,5 +458,37 @@ mod tests {
     fn offset_is_deterministic() {
         let a = [square(0.0, 0.0, 10.0), square(20.0, 3.0, 4.0)];
         assert_eq!(offset(&a, 0.7, Join::Round), offset(&a, 0.7, Join::Round));
+    }
+
+    fn ring(x0: f64, y0: f64, x1: f64, y1: f64) -> Vec<Point> {
+        vec![
+            Point::new(x0, y0),
+            Point::new(x1, y0),
+            Point::new(x1, y1),
+            Point::new(x0, y1),
+        ]
+    }
+
+    #[test]
+    fn overlapping_rings_become_one_area() {
+        // Two strokes of a cross, drawn as two rings in the same direction.
+        let rings = [ring(0.0, 4.0, 10.0, 6.0), ring(4.0, 0.0, 6.0, 10.0)];
+        let out = without_overlaps(&rings);
+        assert_eq!(out.len(), 1, "one ring round the cross: {out:?}");
+        assert!((ring_signed_area(&out[0]).abs() - 36.0).abs() < 1e-6);
+        // A ring with a hole (the other direction) and no overlap stays as
+        // it is.
+        let mut hole = ring(2.0, 2.0, 8.0, 8.0);
+        hole.reverse();
+        let clean = vec![ring(0.0, 0.0, 10.0, 10.0), hole];
+        assert_eq!(without_overlaps(&clean), clean);
+        // A stroke over the hole of another ring fills it there (nonzero).
+        let rings = [clean[0].clone(), clean[1].clone(), ring(4.0, 0.0, 6.0, 10.0)];
+        let area: f64 = without_overlaps(&rings)
+            .iter()
+            .map(|r| ring_signed_area(r))
+            .sum::<f64>()
+            .abs();
+        assert!((area - (100.0 - 36.0 + 12.0)).abs() < 1e-6, "{area}");
     }
 }

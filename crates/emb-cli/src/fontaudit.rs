@@ -201,15 +201,7 @@ pub const SAMPLE_TEXT: &str = "The Quick Brown Fox Jumps over the lazy dog 01234
 /// The trims of `text` as one lettering object at the capital height
 /// `size_mm`: the trims in the letters and between them.
 pub fn text_trims(font: &EmbFont, text: &str, size_mm: f64) -> usize {
-    let mut d = Design::new("audit");
-    let thread = d.add_thread("Black", Rgb(0, 0, 0));
-    let mut l = Lettering::new(text, font.font_ref(), size_mm, Point::ZERO);
-    emb_letter::relayout(&mut l, font);
-    d.add_object(thread, ObjectKind::Lettering(Box::new(l)));
-    let Ok(opts) = crate::plan_options(&d, None) else {
-        return 0;
-    };
-    crate::plan(&d, &opts).stitches.trim_count().saturating_sub(1)
+    crate::lettering_bench::trims(font, text, size_mm)
 }
 
 /// The measures of the letter `c` of `font`. `source` is the font that

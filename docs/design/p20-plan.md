@@ -1,7 +1,7 @@
 # Plan: Japanese lettering (phase P20)
 
-Date: 2026-11-20 · Status: Proposed (owner request, 2026-11-20: before
-v0.4.0). The owner accepts the milestones before the work starts.
+Date: 2026-11-20 · Status: Accepted (owner, 2026-11-20: before v0.4.0).
+Milestone 1 is done (ADR 0141).
 
 ## Goal
 
@@ -56,6 +56,35 @@ quality score (ADR 0115).
 
 **Exit test:** the measure runs in CI and gives the numbers of today (the
 baseline of the milestones below).
+
+**Done (2026-11-20, ADR 0141).** The reference set has 248 characters (80
+hiragana, 57 katakana, the 80 kanji of the first school year, 26 more
+kanji, 5 punctuation marks) and eight words. The test font is the Bold
+instance of Noto Sans JP 2.004, kept for these characters
+(`crates/emb-cli/tests/data/noto-sans-jp-bold-subset.ttf`, 131 KB, made by
+`tools/make-test-font-jp.py`; the owner approved the font and the
+download). `emb-cli lettering-bench` prints the measures, and
+`tests/lettering_bench.rs` keeps them as a snapshot (4 s).
+
+The first run found a fault: the strokes of Noto Sans JP overlap (a
+variable font), and the engine read overlapping rings by even-odd nesting,
+so letters had holes where strokes overlap, fill parts on each other and
+columns outside the letter (14 % of its area on average at 15 mm). Font
+outlines now use the nonzero rule (`region::without_overlaps`); fonts with
+clean outlines do not change.
+
+The baseline in the test font:
+
+| Measure | 15 mm | 25 mm | 50 mm | 80 mm |
+| --- | --- | --- | --- | --- |
+| Characters all tatami (of 248) | 0 | 3 | 247 | 247 |
+| Two layers, mean (highest) | 6.3 % (24.9 %, ャ) | 6.2 % (24.9 %) | 0 (all fill) | 0 (all fill) |
+| Characters with two layers on more than 3 % | 171 | 168 | 0 | 0 |
+| Characters with a column under 0.8 mm | 9 | 6 | 0 | 0 |
+| Parts outside the letter, mean (highest) | 0.4 % (1.6 %) | 0.4 % (1.6 %) | 0 % | 0 % |
+| Trims of 刺繍 / 東京 / 龍 | 26 / 17 / 17 | 27 / 14 / 18 | 6 / 4 / 2 | 6 / 4 / 2 |
+
+(At 50 mm and 80 mm the trims are few because the letters are fills.)
 
 ## Milestone 2: the stitch of each column (M)
 

@@ -9,6 +9,7 @@ repository.workspace = true
 
 [dependencies]
 geo.workspace = true
+i_overlay.workspace = true
 libm.workspace = true
 serde.workspace = true
 

@@ -25,6 +25,9 @@ emb-sketch = { path = "crates/emb-sketch" }
 # Default features of geo enable multithreading (rayon). Keep it off so the
 # engine stays deterministic and single-threaded per object.
 geo = { version = "0.33", default-features = false }
+# The back end of geo, for the nonzero fill rule of font outlines (P20). No
+# default features: no threads (the same version and features as in geo).
+i_overlay = { version = "4.5", default-features = false }
 libm = "0.2"
 # Scripts (emb-script, ADR 0067). Pure Rust, MIT or Apache-2.0; a script
 # has no file, network or process functions.
@@ -90,4 +93,9 @@ opt-level = 2
 
 # Fill and satin generation runs on each edit in the app.
 [profile.dev.package.emb-stitch]
+opt-level = 2
+
+# The stroke finder of lettering runs on each new letter in the app, and
+# the lettering bench measures 248 characters at four sizes (P20).
+[profile.dev.package.emb-letter]
 opt-level = 2

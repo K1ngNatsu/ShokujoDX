@@ -1299,6 +1299,7 @@ name = "emb-geom"
 version = "0.3.0"
 dependencies = [
  "geo",
+ "i_overlay",
  "libm",
  "proptest",
  "serde",

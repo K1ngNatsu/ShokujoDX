@@ -131,13 +131,17 @@ impl Font {
     }
 
     /// The outline of a glyph as closed rings (flattened curves), Y down.
+    /// Rings that overlap (the strokes of a variable font) are merged with
+    /// the nonzero rule of the font (`region::without_overlaps`, P20), so
+    /// that each ring is an outer ring or a hole.
     pub fn contours(&self, glyph: u16) -> Vec<Vec<Point>> {
         let mut b = Builder::default();
         if self.face().outline_glyph(GlyphId(glyph), &mut b).is_none() {
             return Vec::new();
         }
         let tol = self.units_per_em / 2000.0;
-        b.path
+        let rings: Vec<Vec<Point>> = b
+            .path
             .flatten(tol)
             .into_iter()
             .map(|pl| {
@@ -148,7 +152,8 @@ impl Font {
                 p
             })
             .filter(|p| p.len() >= 3)
-            .collect()
+            .collect();
+        emb_geom::region::without_overlaps(&rings)
     }
 
     /// The horizontal kerning between two glyphs (usually negative): the

@@ -145,6 +145,15 @@ Usage:
       outside, the part with two layers, the part too narrow and the
       part too long of the letter, and the same six values of the fill
       letter of the character.
+  emb-cli lettering-bench <font.ttf> [--face <n>] [--letters]
+      The lettering bench of Japanese text (P20 Milestone 1): for each
+      character of the reference set (kana, the kanji of the first school
+      year and more) at 15, 25, 50 and 80 mm, in the stitch type Auto, the
+      stitch of each part (satin, split satin, tatami column, fill, run),
+      the part of the shape that the parts cover, the parts outside it, the
+      part with two layers, and the narrowest and the widest column; and
+      the trims of words. --face: the face of a font collection (.ttc; 0 is
+      the first). --letters: one line for each character and size too.
   emb-cli view-bench [--out <folder>] [--stress] [--sew]
       The bench of the 3D view (ADR 0122). Make the pictures of the
       reference set (twelve small corpus designs, each for one thing that a
@@ -293,6 +302,7 @@ fn run(args: &[String]) -> Result<(), String> {
     let mut extend_ends = false;
     let mut tuned_font = false;
     let mut all_letters = false;
+    let mut face: u32 = 0;
     let (mut audit_source, mut audit_proof): (Option<PathBuf>, Option<PathBuf>) = (None, None);
     let (mut sheet_sizes, mut sheet_chars, mut sheet_row) = (Vec::new(), emb_letter::sheet::Characters::Basic, 180.0);
     let mut bench = emb_cli::bench::FolderSettings::default();
@@ -358,6 +368,12 @@ fn run(args: &[String]) -> Result<(), String> {
             "--extend" => extend_ends = true,
             "--tuned" => tuned_font = true,
             "--letters" => all_letters = true,
+            "--face" => {
+                face = it
+                    .next()
+                    .and_then(|s| s.parse().ok())
+                    .ok_or("--face needs the number of a face of a font collection (0 is the first)")?;
+            }
             "--source" => audit_source = Some(PathBuf::from(it.next().ok_or("--source needs a font file")?)),
             "--proof" => audit_proof = Some(PathBuf::from(it.next().ok_or("--proof needs a file")?)),
             "--sizes" => {
@@ -810,6 +826,13 @@ fn run(args: &[String]) -> Result<(), String> {
                 count("borders"),
                 count("clipart")
             );
+            Ok(())
+        }
+        ["lettering-bench", input] => {
+            let bytes = std::fs::read(input).map_err(|e| format!("{input}: {e}"))?;
+            let font = emb_letter::Font::from_bytes(bytes, face).map_err(|e| format!("{input}: {e}"))?;
+            let b = emb_cli::lettering_bench::run(&font);
+            print!("{}", emb_cli::lettering_bench::report(&b, all_letters));
             Ok(())
         }
         ["font-quality", input] => {
