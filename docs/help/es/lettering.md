@@ -51,7 +51,10 @@ Las letras de las fuentes de bordado del programa se bordan con pocos
 cortes: la aguja pasa de un trazo al siguiente por debajo de las puntadas.
 Diez de las fuentes son fuentes **afinadas**: cada una de sus letras se
 revisó. Las listas de fuentes muestran primero las fuentes afinadas, y la
-lista de **Letras > Fuentes** las marca.
+lista de **Letras > Fuentes** las marca. Las letras de las fuentes
+TrueType y OpenType tienen el mismo orden de bordado cuando las usa por
+primera vez: el programa lo busca mientras escribe, y una letra nueva
+puede aparecer un momento sin su orden.
 
 Diez de las fuentes de bordado son **fuentes de relleno**. Sus nombres
 terminan en «Fill», por ejemplo Slab Heavy Fill. Cada letra de una fuente

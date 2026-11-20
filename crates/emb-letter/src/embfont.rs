@@ -1115,9 +1115,11 @@ mod tests {
             stitch_mm: crate::glyph::AUTO_TATAMI_STITCH_MM,
         });
         let kinds = |l: &Lettering| -> Vec<Option<ColumnPattern>> {
+            // The columns (not the travel runs of the routes).
             l.letters
                 .iter()
                 .flat_map(|x| x.parts.iter())
+                .filter(|p| !matches!(p, ObjectKind::Running { .. }))
                 .map(|p| match p {
                     ObjectKind::Satin { params, .. } => Some(params.pattern),
                     _ => None,

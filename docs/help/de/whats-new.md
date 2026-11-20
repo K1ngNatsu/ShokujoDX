@@ -64,7 +64,10 @@ Vorher war ein Buchstabe mit einem breiten Strich ganz eine Füllung: In
 einer fetten Schrift waren die meisten Kanji und Kana bei 50 mm
 Füllungen. Wo sich zwei Striche kreuzen, geht einer durch, und der andere
 endet an seinen Seiten; wo ein Strich auf einem anderen endet, endet er
-etwas darin: Dort gibt es keine Garnknoten. Schriften mit Strichen, die sich überlappen
+etwas darin: Dort gibt es keine Garnknoten. Die Buchstaben dieser
+Schriften bekommen auch eine Stickreihenfolge mit wenigen Fadenschnitten,
+wie die Stickschriften des Programms: 刺繍東京 bei 20 mm hat 23
+Fadenschnitte, nicht 48. Schriften mit Strichen, die sich überlappen
 (viele Schriften aus dem Internet), geben jetzt Buchstaben ohne Löcher und
 ohne Stiche außerhalb des Buchstabens. Siehe [Schrift](lettering).
 

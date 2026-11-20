@@ -22,7 +22,7 @@
 
 use emb_geom::{Point, Transform};
 use emb_letter::{Font, LetterSource, quality};
-use emb_model::{ColumnPattern, Design, LetterStitch, Lettering, ObjectKind, Rgb};
+use emb_model::{ColumnPattern, Design, Lettering, ObjectKind, Rgb};
 
 /// The heights of the lettering, mm.
 pub const SIZES: [f64; 4] = [15.0, 25.0, 50.0, 80.0];
@@ -157,7 +157,9 @@ pub fn measure(font: &Font, c: char, size_mm: f64) -> Option<Measure> {
     let g = font.glyph(c)?;
     let scale = size_mm / font.cap_height;
     let to_mm = Transform::scale(scale, scale);
-    let mut parts = LetterSource::parts(font, u32::from(g), LetterStitch::Auto, scale);
+    // The parts before the route (P20 Milestone 4): the route changes
+    // their order, not their areas. The trims of the words are with routes.
+    let mut parts = font.shapes(g).auto_parts();
     for p in &mut parts {
         p.transform(&to_mm);
     }

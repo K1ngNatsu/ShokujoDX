@@ -61,7 +61,9 @@ letras de un texto tienen la misma puntada. Antes, una letra con un trazo
 ancho era toda de relleno: en una fuente negrita, la mayoría de los kanji
 y kana de 50 mm eran de relleno. Donde se cruzan dos trazos, uno pasa y el
 otro termina en sus lados; donde un trazo termina en otro, termina un poco
-dentro de él: no hay bultos de hilo allí. Las fuentes con trazos que
+dentro de él: no hay bultos de hilo allí. Las letras de estas fuentes
+también tienen un orden de bordado con pocos cortes, como las fuentes de
+bordado del programa: 刺繍東京 a 20 mm tiene 23 cortes, no 48. Las fuentes con trazos que
 se superponen (muchas fuentes de internet) dan ahora letras sin agujeros y
 sin puntadas fuera de la letra. Consulte [Letras](lettering).
 

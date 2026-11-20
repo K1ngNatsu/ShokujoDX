@@ -54,7 +54,10 @@ Fadenschnitten: Die Nadel geht unter den Stichen von einem Strich zum
 nächsten. Zehn der Schriften sind **abgestimmte** Schriften: Jeder ihrer
 Buchstaben wurde geprüft. Die Schriftlisten zeigen die abgestimmten
 Schriften zuerst, und die Schriftliste von **Schrift > Schriften**
-kennzeichnet sie.
+kennzeichnet sie. Die Buchstaben von TrueType- und OpenType-Schriften
+bekommen dieselbe Stickreihenfolge, wenn Sie sie zum ersten Mal verwenden:
+Das Programm findet sie, während Sie tippen, und ein neuer Buchstabe kann
+kurz ohne seine Reihenfolge erscheinen.
 
 Zehn der Stickschriften sind **Füllschriften**. Ihre Namen enden mit
 „Fill“, zum Beispiel Slab Heavy Fill. Jeder Buchstabe einer Füllschrift

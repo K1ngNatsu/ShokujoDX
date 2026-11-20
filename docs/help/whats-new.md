@@ -61,7 +61,9 @@ two strokes cross, one goes through and the other stops at its sides, and
 where a stroke ends on another, it stops a little inside it: no lumps of
 thread there. Fonts with strokes that overlap (many fonts from the web)
 now give letters with no holes and with no stitches outside the letter.
-See [Lettering](lettering).
+The letters of these fonts also get a sew order with few trims, as the
+embroidery fonts of the program have: 刺繍東京 at 20 mm has 23 trims,
+not 48. See [Lettering](lettering).
 
 **More fonts, with a quality score.** The program has 65 embroidery fonts
 (30 before), and the font packages on the page of the program have 68

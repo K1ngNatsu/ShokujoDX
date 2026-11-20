@@ -1,8 +1,8 @@
 # Plan: Japanese lettering (phase P20)
 
 Date: 2026-11-20 · Status: Accepted (owner, 2026-11-20: before v0.4.0).
-Milestones 1 and 2 are done (ADR 0141, ADR 0142). Milestone 3 is made
-(ADR 0143) and waits for the sew-out of the owner.
+Milestones 1, 2 and 4 are done (ADR 0141, 0142, 0144). Milestone 3 is
+made (ADR 0143) and waits for the sew-out of the owner.
 
 ## Goal
 
@@ -213,6 +213,27 @@ with the new stroke finder.
 **Exit test:** with the test font, the trims of the reference words are
 at most half of today (刺繍東京 at 20 mm: at most 22). A new kanji shows
 at once while its route is made.
+
+**Done (2026-11-20, ADR 0144).** `Font::route` routes the columns of a
+glyph (`route::route_with_splits` at 25 mm) and keeps the route for the
+font. A font read with `RouteMode::Wait` (the tools and the tests) makes a
+route when the glyph is first laid out; the app reads the fonts of the
+computer with `RouteMode::Background`: a thread of the font makes the
+routes, a new letter shows at once with no route, and
+`AppState::poll_routes` lays the lettering out again when its routes are
+ready, as a part of the edit that typed it (`Document::amend`). A letter
+with more than 8 parts gets a beam search (`route::Router::beam`; each
+time the nearest part sewed next before). A route takes 0.004 s to 0.56 s
+for one kanji.
+
+| Trims (test font) | No routes | Routes |
+| --- | --- | --- |
+| 刺繍東京 at 20 mm (the exit test: at most 24) | 48 | 23 |
+| 刺繍 / 東京 / 龍 at 15 mm | 28 / 19 / 16 | 13 / 8 / 7 |
+| ありがとう / サムライ / 山田太郎 at 15 mm | 16 / 12 / 24 | 6 / 4 / 6 |
+
+(The exit test of the plan says 22 from the 44 trims of Yu Gothic Bold;
+the test font has 48 with no routes, so half is 24.)
 
 ## Milestone 5: sizes and thin strokes (S)
 

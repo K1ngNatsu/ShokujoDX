@@ -1871,7 +1871,7 @@ impl EmbApp {
         crate::send::window(&ctx, st);
         crate::clipart::window(&ctx, st);
         // Jobs and the library scan go on while their tabs are hidden.
-        if st.poll_jobs() | st.poll_library() | st.poll_outside_edit() {
+        if st.poll_jobs() | st.poll_library() | st.poll_outside_edit() | st.poll_routes() {
             ctx.request_repaint_after(std::time::Duration::from_millis(150));
         }
         // The split view is a dock tab right of the canvas while it is on.

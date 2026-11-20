@@ -62,5 +62,10 @@ fn lettering_bench() {
         .map(|m| format!("{} {} mm: {:.3} {:.3}", m.c, m.size_mm, m.overlap, m.coverage))
         .collect();
     assert!(bad.is_empty(), "two layers over 6 % or covered under 95 %: {bad:?}");
+    // P20 Milestone 4: the letters have routes. The exit test: the trims
+    // of 刺繍東京 at 20 mm are at most half of the trims with no routes
+    // (48).
+    let trims = lettering_bench::trims(&f, "刺繍東京", 20.0);
+    assert!(trims <= 24, "刺繍東京 at 20 mm: {trims} trims");
     insta::assert_snapshot!(lettering_bench::report(&b, false));
 }

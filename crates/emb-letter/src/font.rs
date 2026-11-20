@@ -4,10 +4,11 @@
 //! baseline is at Y = 0 and capitals are at negative Y.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
-use emb_geom::{Path, Point, text};
-use emb_model::FontRef;
+use emb_geom::{Path, Point, Transform, text};
+use emb_model::{FontRef, ObjectKind};
 use ttf_parser::gpos::{PairAdjustment, PositioningSubtable};
 use ttf_parser::{Face, GlyphId, Tag};
 
@@ -19,10 +20,151 @@ pub enum FontError {
     Parse(String),
 }
 
-/// One font face, with a cache of the glyph shapes made from it.
-pub struct Font {
+/// How the letters of a TrueType or OpenType font get their routes (P20
+/// Milestone 4, ADR 0144): the order and the directions of their columns
+/// with the fewest trims, and travel runs under the columns that sew later
+/// (`route::route_with_splits`, as the embroidery fonts have them).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RouteMode {
+    /// The route of a letter is made when the letter is first laid out:
+    /// the same letters each time (the tools and the tests).
+    Wait,
+    /// A thread makes the route of a letter that has none yet, and the
+    /// letter has no route until it is ready (the app: typing stays quick).
+    /// [`Font::routes_made`] counts the routes that are ready.
+    Background,
+    /// No routes.
+    Off,
+}
+
+/// The glyph data and the caches of a font, which its route thread shares.
+struct Shared {
     data: Arc<Vec<u8>>,
     index: u32,
+    units_per_em: f64,
+    cap_height: f64,
+    shapes: Mutex<HashMap<u16, Arc<GlyphShapes>>>,
+    /// The route of each glyph that has one made (`None`: no columns to
+    /// route).
+    routes: Mutex<HashMap<u16, Option<Arc<Vec<ObjectKind>>>>>,
+    /// The glyphs that wait for the route thread.
+    todo: Mutex<Vec<u16>>,
+    working: AtomicBool,
+    made: AtomicU64,
+    mode: AtomicU8,
+}
+
+impl Shared {
+    fn face(&self) -> Face<'_> {
+        Face::parse(&self.data, self.index).expect("parsed in from_bytes")
+    }
+
+    fn contours(&self, glyph: u16) -> Vec<Vec<Point>> {
+        let mut b = Builder::default();
+        if self.face().outline_glyph(GlyphId(glyph), &mut b).is_none() {
+            return Vec::new();
+        }
+        let tol = self.units_per_em / 2000.0;
+        let rings: Vec<Vec<Point>> = b
+            .path
+            .flatten(tol)
+            .into_iter()
+            .map(|pl| {
+                let mut p = pl.points;
+                if p.len() > 1 && p.first() == p.last() {
+                    p.pop();
+                }
+                p
+            })
+            .filter(|p| p.len() >= 3)
+            .collect();
+        emb_geom::region::without_overlaps(&rings)
+    }
+
+    fn shapes(&self, glyph: u16) -> Arc<GlyphShapes> {
+        if let Some(s) = self.shapes.lock().ok().and_then(|c| c.get(&glyph).cloned()) {
+            return s;
+        }
+        let s = Arc::new(GlyphShapes::new(&self.contours(glyph), self.cap_height));
+        if let Ok(mut c) = self.shapes.lock() {
+            c.insert(glyph, s.clone());
+        }
+        s
+    }
+
+    /// The columns of a glyph in the order and the directions of their
+    /// route, with travel runs, in font units. The route is made at the
+    /// capital height of the embroidery fonts. `None`: no columns.
+    fn make_route(&self, glyph: u16) -> Option<Arc<Vec<ObjectKind>>> {
+        let shapes = self.shapes(glyph);
+        if shapes.strokes.satins.is_empty() {
+            return None;
+        }
+        let s = crate::embfont::DESIGN_CAP_MM / self.cap_height;
+        let mut parts = shapes.satin_parts();
+        for p in &mut parts {
+            p.transform(&Transform::scale(s, s));
+        }
+        let advance = f64::from(self.face().glyph_hor_advance(GlyphId(glyph)).unwrap_or(0));
+        let letter = crate::embfont::EmbLetter {
+            advance_mm: advance * s,
+            parts,
+            fixed: false,
+            tuning: Vec::new(),
+            fill_parts: Vec::new(),
+        };
+        let (routed, _) = crate::route::route_with_splits(&letter, crate::embfont::DESIGN_CAP_MM);
+        let mut parts = routed.parts;
+        for p in &mut parts {
+            p.transform(&Transform::scale(1.0 / s, 1.0 / s));
+        }
+        Some(Arc::new(parts))
+    }
+
+    fn mode(&self) -> RouteMode {
+        match self.mode.load(Ordering::Relaxed) {
+            0 => RouteMode::Wait,
+            1 => RouteMode::Background,
+            _ => RouteMode::Off,
+        }
+    }
+
+    /// Starts the route thread if it does not run.
+    fn start(self: &Arc<Self>) {
+        if self.working.swap(true, Ordering::AcqRel) {
+            return;
+        }
+        let me = self.clone();
+        std::thread::spawn(move || {
+            loop {
+                let next = me.todo.lock().ok().and_then(|mut t| t.pop());
+                match next {
+                    Some(g) => {
+                        let route = me.make_route(g);
+                        if let Ok(mut r) = me.routes.lock() {
+                            r.insert(g, route);
+                        }
+                        me.made.fetch_add(1, Ordering::AcqRel);
+                    }
+                    None => {
+                        me.working.store(false, Ordering::Release);
+                        // A glyph that came after the last look, and no
+                        // other thread took it: go on.
+                        let more = me.todo.lock().is_ok_and(|t| !t.is_empty());
+                        if !(more && !me.working.swap(true, Ordering::AcqRel)) {
+                            break;
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
+/// One font face, with a cache of the glyph shapes made from it and of the
+/// routes of its letters.
+pub struct Font {
+    shared: Arc<Shared>,
     pub family: String,
     pub style: String,
     pub units_per_em: f64,
@@ -32,7 +174,6 @@ pub struct Font {
     /// Negative: below the baseline.
     pub descender: f64,
     pub line_gap: f64,
-    cache: Mutex<HashMap<u16, Arc<GlyphShapes>>>,
 }
 
 impl std::fmt::Debug for Font {
@@ -95,8 +236,18 @@ impl Font {
             f64::from(face.line_gap()),
         );
         Ok(Font {
-            data,
-            index,
+            shared: Arc::new(Shared {
+                data,
+                index,
+                units_per_em,
+                cap_height,
+                shapes: Mutex::new(HashMap::new()),
+                routes: Mutex::new(HashMap::new()),
+                todo: Mutex::new(Vec::new()),
+                working: AtomicBool::new(false),
+                made: AtomicU64::new(0),
+                mode: AtomicU8::new(0),
+            }),
             family,
             style,
             units_per_em,
@@ -104,12 +255,70 @@ impl Font {
             ascender,
             descender,
             line_gap,
-            cache: Mutex::new(HashMap::new()),
         })
     }
 
     fn face(&self) -> Face<'_> {
-        Face::parse(&self.data, self.index).expect("parsed in from_bytes")
+        self.shared.face()
+    }
+
+    /// How the letters get their routes (`Wait` when the font is read).
+    pub fn set_route_mode(&self, mode: RouteMode) {
+        let v = match mode {
+            RouteMode::Wait => 0,
+            RouteMode::Background => 1,
+            RouteMode::Off => 2,
+        };
+        self.shared.mode.store(v, Ordering::Relaxed);
+    }
+
+    /// The route of a glyph: its columns in the order and the directions
+    /// with the fewest trims, with travel runs, in font units. With
+    /// [`RouteMode::Wait`] it is made now if it is not made yet; with
+    /// `Background` a thread makes it, and it is `None` until it is ready.
+    /// `None` also for a glyph with no columns.
+    pub fn route(&self, glyph: u16) -> Option<Arc<Vec<ObjectKind>>> {
+        if let Some(r) = self.shared.routes.lock().ok().and_then(|r| r.get(&glyph).cloned()) {
+            return r;
+        }
+        match self.shared.mode() {
+            RouteMode::Wait => {
+                let r = self.shared.make_route(glyph);
+                if let Ok(mut m) = self.shared.routes.lock() {
+                    m.insert(glyph, r.clone());
+                }
+                r
+            }
+            RouteMode::Background => {
+                if let Ok(mut t) = self.shared.todo.lock()
+                    && !t.contains(&glyph)
+                {
+                    t.push(glyph);
+                }
+                self.shared.start();
+                None
+            }
+            RouteMode::Off => None,
+        }
+    }
+
+    /// `true` if the route of the glyph is made (no route is made now).
+    pub fn has_route(&self, glyph: u16) -> bool {
+        self.shared
+            .routes
+            .lock()
+            .is_ok_and(|r| r.get(&glyph).is_some_and(Option::is_some))
+    }
+
+    /// The number of routes that the route thread made: a change means that
+    /// letters laid out before can have their routes now.
+    pub fn routes_made(&self) -> u64 {
+        self.shared.made.load(Ordering::Acquire)
+    }
+
+    /// `true` while the route thread has glyphs to route.
+    pub fn routing(&self) -> bool {
+        self.shared.working.load(Ordering::Acquire) || self.shared.todo.lock().is_ok_and(|t| !t.is_empty())
     }
 
     pub fn font_ref(&self) -> FontRef {
@@ -135,25 +344,7 @@ impl Font {
     /// the nonzero rule of the font (`region::without_overlaps`, P20), so
     /// that each ring is an outer ring or a hole.
     pub fn contours(&self, glyph: u16) -> Vec<Vec<Point>> {
-        let mut b = Builder::default();
-        if self.face().outline_glyph(GlyphId(glyph), &mut b).is_none() {
-            return Vec::new();
-        }
-        let tol = self.units_per_em / 2000.0;
-        let rings: Vec<Vec<Point>> = b
-            .path
-            .flatten(tol)
-            .into_iter()
-            .map(|pl| {
-                let mut p = pl.points;
-                if p.len() > 1 && p.first() == p.last() {
-                    p.pop();
-                }
-                p
-            })
-            .filter(|p| p.len() >= 3)
-            .collect();
-        emb_geom::region::without_overlaps(&rings)
+        self.shared.contours(glyph)
     }
 
     /// The horizontal kerning between two glyphs (usually negative): the
@@ -178,7 +369,7 @@ impl Font {
     /// The glyphs of one line of text, shaped with the tables of the font
     /// (see [`crate::shape`]).
     pub fn shape_line(&self, line: &str, kerning: bool) -> Option<Vec<crate::shape::ShapedGlyph>> {
-        crate::shape::shape_line(&self.data, self.index, line, kerning)
+        crate::shape::shape_line(&self.shared.data, self.shared.index, line, kerning)
     }
 
     /// The copyright notice of the font (name 0).
@@ -206,14 +397,7 @@ impl Font {
 
     /// The shapes of a glyph (cached).
     pub fn shapes(&self, glyph: u16) -> Arc<GlyphShapes> {
-        if let Some(s) = self.cache.lock().ok().and_then(|c| c.get(&glyph).cloned()) {
-            return s;
-        }
-        let s = Arc::new(GlyphShapes::new(&self.contours(glyph), self.cap_height));
-        if let Ok(mut c) = self.cache.lock() {
-            c.insert(glyph, s.clone());
-        }
-        s
+        self.shared.shapes(glyph)
     }
 }
 
@@ -345,6 +529,36 @@ mod tests {
         assert!((top + f.cap_height).abs() < 2.0, "{top}");
         assert!(f.advance(o) > 0.0);
         assert!(f.glyph('\u{10FFFF}').is_none());
+    }
+
+    #[test]
+    fn routes_wait_or_come_from_a_thread() {
+        // P20 Milestone 4: the route of a letter with columns.
+        use emb_model::ObjectKind;
+        let f = bundled::font("Lato", "Bold").unwrap();
+        let h = f.glyph('H').unwrap();
+        let routed = f.route(h).expect("a route, made now");
+        assert!(f.has_route(h));
+        assert!(routed.iter().any(|p| matches!(p, ObjectKind::Satin { .. })));
+        // In the background: no route at first, then the thread makes it.
+        let f = bundled::font("Lato", "Bold").unwrap();
+        f.set_route_mode(super::RouteMode::Background);
+        let e = f.glyph('E').unwrap();
+        let made = f.routes_made();
+        let first = f.route(e);
+        let start = std::time::Instant::now();
+        while f.routing() {
+            assert!(start.elapsed().as_secs() < 30, "the route is not made");
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        assert!(first.is_none() || f.has_route(e));
+        assert!(f.has_route(e));
+        assert!(f.routes_made() > made || first.is_some());
+        assert_eq!(f.route(e), f.route(e), "kept for the font");
+        // No routes.
+        let f = bundled::font("Lato", "Bold").unwrap();
+        f.set_route_mode(super::RouteMode::Off);
+        assert!(f.route(h).is_none() && !f.has_route(h));
     }
 
     #[test]

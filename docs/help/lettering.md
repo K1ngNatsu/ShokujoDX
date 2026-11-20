@@ -50,7 +50,10 @@ The letters of the embroidery fonts of the program sew with few trims:
 the needle goes from one stroke to the next one under the stitches. Ten
 of the fonts are **tuned** fonts: each letter of them was checked. The
 font lists show the tuned fonts first, and the font list of **Lettering >
-Fonts** marks them.
+Fonts** marks them. The letters of TrueType and OpenType fonts get the
+same sew order when you use them the first time: the program finds it
+while you type, and a new letter can show for a moment before it has its
+order.
 
 Ten of the embroidery fonts are **fill fonts**. Their names end with
 "Fill", for example Slab Heavy Fill. Each letter of a fill font sews as a

@@ -123,13 +123,25 @@ impl LetterSource for Font {
         Font::kerning(self, left as u16, right as u16)
     }
 
+    /// The columns of the letter in the order of their route (P20
+    /// Milestone 4, [`crate::font::RouteMode`]) when it has one, else as
+    /// the stroke finder gives them; or its fills.
     fn parts(&self, letter: u32, stitch: LetterStitch, _scale: f64) -> Vec<ObjectKind> {
-        let shapes = self.shapes(letter as u16);
-        match stitch {
-            LetterStitch::Satin if !shapes.strokes.satins.is_empty() => shapes.satin_parts(),
-            LetterStitch::Satin | LetterStitch::Fill => shapes.fill_parts(),
-            LetterStitch::Auto => shapes.auto_parts(),
+        let glyph = letter as u16;
+        let shapes = self.shapes(glyph);
+        if !columns(&shapes, stitch) {
+            return shapes.fill_parts();
         }
+        match self.route(glyph) {
+            Some(routed) => (*routed).clone(),
+            None => shapes.satin_parts(),
+        }
+    }
+
+    /// A letter with its route sews in that order.
+    fn fixed(&self, letter: u32, stitch: LetterStitch, _scale: f64) -> bool {
+        let glyph = letter as u16;
+        columns(&self.shapes(glyph), stitch) && self.has_route(glyph)
     }
 
     fn size_range(&self, stitch: LetterStitch) -> Option<(f64, f64)> {
@@ -138,6 +150,15 @@ impl LetterSource for Font {
 
     fn shape(&self, line: &str, kerning: bool) -> Option<Vec<ShapedGlyph>> {
         self.shape_line(line, kerning)
+    }
+}
+
+/// `true` if the letter sews as columns with the stitch type `stitch`.
+fn columns(shapes: &crate::glyph::GlyphShapes, stitch: LetterStitch) -> bool {
+    match stitch {
+        LetterStitch::Satin => !shapes.strokes.satins.is_empty(),
+        LetterStitch::Fill => false,
+        LetterStitch::Auto => shapes.columns_cover(),
     }
 }
 

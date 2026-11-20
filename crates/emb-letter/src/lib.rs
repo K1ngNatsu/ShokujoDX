@@ -37,7 +37,7 @@ pub mod teamnames;
 pub mod tune;
 
 pub use embfont::{EmbFont, EmbLetter};
-pub use font::{Font, FontError, face_count, face_names};
+pub use font::{Font, FontError, RouteMode, face_count, face_names};
 pub use glyph::GlyphShapes;
 pub use layout::{layout, layout_with_box, relayout};
 pub use source::{AnyFont, LetterSource};

@@ -41,7 +41,10 @@ pub const RUN_STITCH_MM: f64 = 1.5;
 /// time the nearest part that needs no trim sews next.
 const MAX_PARTS: usize = 8;
 /// Letters with more parts than this keep their order.
-const MOST_PARTS: usize = 24;
+const MOST_PARTS: usize = 64;
+/// The number of routes that the search for letters with more than
+/// [`MAX_PARTS`] parts keeps at each step.
+const BEAM: usize = 12;
 /// The number of steps along the end of a column where a run can start.
 const EDGE_POINTS: usize = 8;
 /// A letter goes on into the next letter if a stroke of it ends this near
@@ -629,36 +632,66 @@ impl Router {
         out
     }
 
-    /// The order of the modes for a letter with many parts: the part that
-    /// starts nearest `entry` first, then each time the part that the
-    /// needle comes to with no trim and the least travel (with a trim: the
-    /// nearest part). Returns the order and the trims.
-    fn nearest_next(&self, modes: &[Mode], all: u32, entry: Point) -> (Vec<usize>, usize) {
-        let mut order: Vec<usize> = Vec::new();
-        let (mut sewn, mut trims) = (0u32, 0usize);
-        let mut at: Option<(Point, Edge)> = None;
-        while sewn != all {
-            let open = (0..modes.len()).filter(|j| sewn & (1 << modes[*j].0) == 0);
-            let next = match at {
-                None => open.min_by(|a, b| {
-                    let d = |j: usize| self.start(modes[j], entry).distance(entry) + self.pen(modes[j]);
-                    d(*a).total_cmp(&d(*b))
-                }),
-                Some((point, edge)) => open
-                    .map(|j| (j, self.link(edge, self.start_edge(modes[j], point), all & !sewn)))
-                    .min_by(|a, b| a.1.trim.cmp(&b.1.trim).then(a.1.length.total_cmp(&b.1.length)))
-                    .map(|(j, link)| {
-                        trims += usize::from(link.trim);
-                        j
-                    }),
-            };
-            let Some(j) = next else { break };
-            let start = self.start(modes[j], at.map_or(entry, |a| a.0));
-            order.push(j);
-            sewn |= 1 << modes[j].0;
-            at = Some((self.end(modes[j], start), self.end_edge(modes[j], start)));
+    /// A route for a letter with too many parts for the search of all
+    /// orders (P20 Milestone 4): a beam search that keeps the
+    /// [`BEAM`] best routes of each length (fewest trims, then the
+    /// shortest travel), one for each set of sewn parts and last part. Each
+    /// time the nearest part with no trim sews next (the route before) used
+    /// up the parts that would hide the runs later, so kanji had many
+    /// trims.
+    fn beam(&self, modes: &[Mode], all: u32, entry: Point) -> (Vec<usize>, usize) {
+        #[derive(Clone)]
+        struct State {
+            order: Vec<usize>,
+            sewn: u32,
+            trims: usize,
+            travel: f64,
+            at: Option<(Point, Edge)>,
         }
-        (order, trims)
+        let mut beam = vec![State {
+            order: Vec::new(),
+            sewn: 0,
+            trims: 0,
+            travel: 0.0,
+            at: None,
+        }];
+        while beam.first().is_some_and(|s| s.sewn != all) {
+            let mut next: Vec<State> = Vec::new();
+            for s in &beam {
+                for (j, m) in modes.iter().enumerate() {
+                    if s.sewn & (1 << m.0) != 0 {
+                        continue;
+                    }
+                    let (trim, length) = match s.at {
+                        None => (false, self.start(*m, entry).distance(entry)),
+                        Some((point, edge)) => {
+                            let link = self.link(edge, self.start_edge(*m, point), all & !s.sewn);
+                            (link.trim, link.length)
+                        }
+                    };
+                    let start = self.start(*m, s.at.map_or(entry, |a| a.0));
+                    let mut order = s.order.clone();
+                    order.push(j);
+                    next.push(State {
+                        order,
+                        sewn: s.sewn | (1 << m.0),
+                        trims: s.trims + usize::from(trim),
+                        travel: s.travel + length + self.pen(*m),
+                        at: Some((self.end(*m, start), self.end_edge(*m, start))),
+                    });
+                }
+            }
+            next.sort_by(|a, b| a.trims.cmp(&b.trims).then(a.travel.total_cmp(&b.travel)));
+            // One route for each set of sewn parts and last part: the best.
+            let mut seen = std::collections::HashSet::new();
+            next.retain(|s| seen.insert((s.sewn, s.order.last().map(|&j| modes[j].0))));
+            next.truncate(BEAM);
+            if next.is_empty() {
+                break;
+            }
+            beam = next;
+        }
+        beam.into_iter().next().map_or((Vec::new(), 0), |s| (s.order, s.trims))
     }
 
     fn link_of(&mut self, from_key: usize, from: Edge, to: Mode, unsewn: u32) -> Link {
@@ -675,8 +708,8 @@ impl Router {
 
 /// The letter with its parts in the order and the directions of the best
 /// route, with travel runs, fixed. `cap_mm` is the capital height of the
-/// letters of the font. A letter with more than [`MAX_PARTS`] parts gets a
-/// simple route (the nearest part next). A letter with a part that is not a
+/// letters of the font. A letter with more than [`MAX_PARTS`] parts gets the
+/// route of a beam search ([`BEAM`]). A letter with a part that is not a
 /// column, a fill or a run stays as it is.
 pub fn route(letter: &EmbLetter, cap_mm: f64) -> (EmbLetter, Routed) {
     let n = letter.parts.len();
@@ -727,7 +760,7 @@ pub fn route(letter: &EmbLetter, cap_mm: f64) -> (EmbLetter, Routed) {
     let lead = tail.and_then(|p| r.nearest_covered(Point::new(p.x - letter.advance_mm, p.y), all));
     let (order, trims): (Vec<usize>, usize) = if n > MAX_PARTS {
         // Too many parts for the search of all orders.
-        r.nearest_next(&modes, all, lead.unwrap_or(entry))
+        r.beam(&modes, all, lead.unwrap_or(entry))
     } else {
         let size = 1usize << n;
         // best[mask][mode] = (trims, travel, the mode before, the start point)

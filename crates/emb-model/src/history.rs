@@ -166,6 +166,21 @@ impl Document {
         r
     }
 
+    /// Changes the design as a part of the last edit: no new undo step, and
+    /// an undo goes back to the design before that edit. For a result that
+    /// a background job made for an edit, which the user did not ask for
+    /// alone (the routes of new letters, P20 Milestone 4). With no undo
+    /// step, the design changes with no step. A change out of range is not
+    /// made (`take_refused`). A merge goes on.
+    pub fn amend<R>(&mut self, f: impl FnOnce(&mut Design) -> R) -> R {
+        let before = self.design.clone();
+        let r = f(&mut self.design);
+        if self.settle(before).is_some() {
+            self.state = self.new_state();
+        }
+        r
+    }
+
     /// Stops merging. The next `edit_merged` call makes a new undo step.
     pub fn end_merge(&mut self) {
         self.merge_key = None;
@@ -412,6 +427,29 @@ mod tests {
         assert_ne!(doc.design().object(id).unwrap().revision, rev_before);
         doc.undo();
         assert_eq!(doc.design().object(id).unwrap().revision, rev_before);
+    }
+
+    #[test]
+    fn an_amend_is_part_of_the_last_step() {
+        let (mut doc, id) = doc_with_object();
+        doc.edit("Length", |d| set_stitch_len(d, id, 3.0));
+        let undo_steps = doc.undo_len();
+        let state = doc.state_id();
+        doc.amend(|d| d.object_mut(id).unwrap().name = Some("routed".into()));
+        assert_eq!(doc.undo_len(), undo_steps, "no new step");
+        assert_ne!(doc.state_id(), state, "a new state for the caches");
+        assert_eq!(doc.undo_label(), Some("Length"));
+        // The undo goes back to before the edit, with the amend.
+        doc.undo();
+        assert_eq!(stitch_len(&doc, id), 2.5);
+        assert_eq!(doc.design().object(id).unwrap().name, None);
+        // A merge goes on after an amend.
+        let key = MergeKey::new("len");
+        doc.edit_merged("Stitch length", key.clone(), |d| set_stitch_len(d, id, 2.6));
+        doc.amend(|d| d.name = "x".into());
+        doc.edit_merged("Stitch length", key, |d| set_stitch_len(d, id, 2.7));
+        doc.undo();
+        assert_eq!(stitch_len(&doc, id), 2.5);
     }
 
     #[test]

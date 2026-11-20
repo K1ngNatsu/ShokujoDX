@@ -69,6 +69,13 @@ pub struct FontLibrary {
     /// embroidery font takes the corrections of its family when it is
     /// read. `None`: no corrections.
     pub corrections_dir: Option<PathBuf>,
+    /// The fonts of the computer make the routes of their letters in a
+    /// thread (P20 Milestone 4, ADR 0144), so typing stays quick; the
+    /// tests make them when the letters are laid out.
+    pub background_routes: bool,
+    /// The number of routes of each font that the design has (see
+    /// [`AppState::poll_routes`]).
+    routes_seen: HashMap<FontRef, u64>,
 }
 
 /// A font name in its own font: the outlines of the letters, each letter
@@ -249,6 +256,8 @@ impl Default for FontLibrary {
             corrections_dir: user_fonts_dir()
                 .filter(|_| !cfg!(test))
                 .map(|d| d.join(CORRECTIONS_DIR)),
+            background_routes: !cfg!(test),
+            routes_seen: HashMap::new(),
         };
         if let Some(dir) = user_fonts_dir() {
             lib.add_user_fonts(&dir);
@@ -374,8 +383,32 @@ impl FontLibrary {
         }
         let e = self.entries.iter().find(|e| e.font.same(r))?.clone();
         let font = load(&e.source, self.corrections_dir.as_deref())?;
+        if let AnyFont::TrueType(f) = &font
+            && self.background_routes
+        {
+            f.set_route_mode(emb_letter::RouteMode::Background);
+        }
         self.loaded.insert(e.font, font.clone());
         Some(font)
+    }
+
+    /// The fonts that made new routes of letters since the last call, and
+    /// `true` while a font makes routes.
+    pub fn routes_changed(&mut self) -> (Vec<FontRef>, bool) {
+        let mut changed = Vec::new();
+        let mut busy = false;
+        for (r, f) in &self.loaded {
+            let AnyFont::TrueType(f) = f else { continue };
+            busy |= f.routing();
+            let made = f.routes_made();
+            if self.routes_seen.get(r).is_none_or(|&seen| seen != made) {
+                self.routes_seen.insert(r.clone(), made);
+                if made > 0 {
+                    changed.push(r.clone());
+                }
+            }
+        }
+        (changed, busy)
     }
 
     /// The name of a family in its own font. `None` while it is not made
@@ -625,6 +658,48 @@ pub fn is_earlier_font(font: &FontRef) -> bool {
         && emb_letter::bundled::EARLIER
             .iter()
             .any(|f| f.eq_ignore_ascii_case(&font.family))
+}
+
+impl AppState {
+    /// Lays out again the lettering whose font made the routes of its
+    /// letters in the background (P20 Milestone 4, ADR 0144): the letters
+    /// sew in the order of their routes, with fewer trims. The change is a
+    /// part of the last edit (`Document::amend`): the edit that typed the
+    /// letters. Returns `true` while a font makes routes (the program
+    /// paints again soon).
+    pub fn poll_routes(&mut self) -> bool {
+        let (fonts, busy) = self.fonts.routes_changed();
+        if fonts.is_empty() {
+            return busy;
+        }
+        let lettering: Vec<(ObjectId, Lettering)> = self
+            .doc
+            .design()
+            .objects()
+            .iter()
+            .filter_map(|o| match &o.kind {
+                ObjectKind::Lettering(l) if fonts.iter().any(|f| f.same(&l.font)) => Some((o.id, (**l).clone())),
+                _ => None,
+            })
+            .collect();
+        let mut new = Vec::new();
+        for (id, l) in lettering {
+            let mut n = l.clone();
+            if relayout(self, &mut n) && n.letters != l.letters {
+                new.push((id, n));
+            }
+        }
+        if !new.is_empty() {
+            self.doc.amend(|d| {
+                for (id, n) in new {
+                    if let Some(o) = d.object_mut(id) {
+                        o.kind = ObjectKind::Lettering(Box::new(n));
+                    }
+                }
+            });
+        }
+        busy
+    }
 }
 
 /// Makes the letters of `l` with its font. Returns `false` (and leaves the
@@ -2354,6 +2429,37 @@ mod tests {
         let third = st.doc.design().objects().last().unwrap().id;
         assert!(cut_area(&st) > two + 10.0, "{two} -> {}", cut_area(&st));
         assert_eq!(under_text(&st, third), 0);
+    }
+
+    #[test]
+    fn routes_made_in_the_background_go_into_the_lettering() {
+        // P20 Milestone 4: the app makes the routes of the letters of a
+        // TrueType font in a thread; when they are ready, the lettering is
+        // laid out again as a part of the edit that typed it.
+        let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        st.fonts.background_routes = true;
+        st.add_lettering(LetteringDialog::new(
+            Point::new(-30.0, 10.0),
+            "Hex",
+            FontRef::new("Lato", "Bold"),
+            20.0,
+        ));
+        let steps = st.doc.undo_len();
+        let start = std::time::Instant::now();
+        while st.poll_routes() {
+            assert!(start.elapsed().as_secs() < 60, "the routes are not made");
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        // The last routes that the thread made.
+        st.poll_routes();
+        let d = st.doc.design();
+        let ObjectKind::Lettering(l) = &d.objects()[0].kind else {
+            panic!()
+        };
+        assert!(l.letters.iter().all(|x| x.fixed), "each letter has its route");
+        assert_eq!(st.doc.undo_len(), steps, "no new undo step");
+        st.doc.undo();
+        assert!(st.doc.design().objects().is_empty());
     }
 
     #[test]

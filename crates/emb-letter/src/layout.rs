@@ -274,6 +274,12 @@ fn letter_parts(
             let mut parts = Vec::new();
             for &(glyph, dx, dy) in glyphs {
                 let mut of_glyph = src.parts(glyph, stitch, scale);
+                // A letter of more glyphs (a ligature, a cluster) does not
+                // sew in the order of the route of each glyph: no travel
+                // runs (P20 Milestone 4).
+                if glyphs.len() > 1 {
+                    of_glyph.retain(|p| !matches!(p, ObjectKind::Running { .. }));
+                }
                 let mut t = Transform::scale(scale, scale);
                 if dx != 0.0 || dy != 0.0 {
                     t = t.then(Transform::translate(dx * scale, dy * scale));
@@ -529,7 +535,13 @@ mod tests {
         let b = bbox(&letters);
         assert!((b.height() - 20.0).abs() < 0.3, "{}", b.height());
         assert!(b.max.y.abs() < 0.3, "on the baseline: {}", b.max.y);
-        assert!(letters[0].parts.iter().all(|p| matches!(p, ObjectKind::Satin { .. })));
+        // Satin columns, and the travel runs of its route.
+        assert!(
+            letters[0]
+                .parts
+                .iter()
+                .all(|p| matches!(p, ObjectKind::Satin { .. } | ObjectKind::Running { .. }))
+        );
     }
 
     #[test]
