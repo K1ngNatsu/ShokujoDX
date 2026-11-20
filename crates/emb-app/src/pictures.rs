@@ -660,6 +660,11 @@ fn scenes() -> Vec<Scene> {
         st.stitch_tiles.sync = true;
         st.tilt.on_canvas = true;
     }));
+    // The stitches by the kind of their part (ADR 0131).
+    v.push(Scene::new("stitch parts", View::Screen, |st, _| {
+        st.stitch_tiles.sync = true;
+        st.parts_view.on = true;
+    }));
     v.push(Scene::new("surface checks", View::Screen, |st, _| {
         st.stitch_tiles.sync = true;
         st.show_through = true;

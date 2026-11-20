@@ -157,6 +157,11 @@ Legen Sie die Grenzen der beiden Prüfungen in den **Optionen** fest
 **Ansicht > Zeigen** hat **Sprünge** (Sprünge und Verbindungslinien),
 **Einstichpunkte** (ein Punkt an jedem Einstich) und **Fadenschnitte und
 Farben** (ein Symbol an jedem Fadenschnitt und Farbwechsel).
+**Stichteile** färbt die Stiche nach der Art ihres Teils: Steppstiche
+(blau), Säulen (orange), Reihen einer Füllung (grün) und andere Stiche
+(violett); die Unterlage eines Teils hat seine Farbe, blasser. So sehen
+Sie, wie das Programm die Stiche einer Maschinendatei eines anderen
+Programms liest, der erste Schritt, um Objekte daraus zu machen.
 
 ## Das Produkt
 

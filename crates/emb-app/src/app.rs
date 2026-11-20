@@ -93,6 +93,8 @@ pub struct AppState {
     pub magnifier: crate::viewer::Magnifier,
     /// Before and After: the stitches of the design before (ADR 0129).
     pub before_after: Option<crate::viewer::BeforeAfter>,
+    /// View > Stitch Parts (ADR 0131).
+    pub parts_view: crate::parts_view::PartsView,
     pub cursor_mm: Option<Point>,
     /// A jump of the pointer that the endless pan asked for and that has
     /// not come yet, with the frames that it can still take
@@ -686,6 +688,7 @@ impl AppState {
             tilt: Default::default(),
             magnifier: Default::default(),
             before_after: None,
+            parts_view: Default::default(),
             cursor_mm: None,
             fit_requested: true,
             message,

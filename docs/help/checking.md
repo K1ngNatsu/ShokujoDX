@@ -144,7 +144,11 @@ through** and **Thread height limit**).
 
 **View > Show** has **Jumps** (jumps and travel lines), **Needle Points**
 (a dot at each needle point) and **Trims and Colors** (a symbol at each
-trim and color change).
+trim and color change). **Stitch Parts** colors the stitches by the kind
+of their part: runs (blue), columns (orange), rows of a fill (green) and
+other stitches (purple); the underlay of a part has its color, paler.
+It shows how the program reads the stitches of a machine file of another
+program, the first step to make objects of them.
 
 ## The product
 

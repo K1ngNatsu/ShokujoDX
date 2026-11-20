@@ -430,6 +430,7 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
             crate::density::draw(&painter, ui.ctx(), rect, st);
         }
         crate::checks::draw(&painter, ui.ctx(), rect, st);
+        crate::parts_view::draw(&painter, ui.ctx(), rect, st);
         crate::repeats::draw(&painter, rect, st);
         crate::viewing::draw_overlay(&painter, rect, st);
         if waits {

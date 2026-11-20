@@ -128,6 +128,13 @@ pequeños destellos con mucho zoom, y **Ver > Aspecto de hilo > Luces
 apagadas** solo muestra el hilo fosforescente. Consulte [Comprobar un
 diseño](checking).
 
+**Partes de puntadas.** **Ver > Partes de puntadas** colorea las
+puntadas de un diseño según el tipo de su parte: rectas, columnas y las
+filas de los rellenos, con la base de cada parte. El programa las
+encuentra en las puntadas de un archivo de máquina de otro programa: el
+primer paso para hacer objetos con tipos de puntada de un archivo así.
+Consulte [Comprobar un diseño](checking).
+
 **Todas las imágenes con el aspecto 3D.** La imagen del diseño, la hoja
 de aprobación y el presupuesto, la biblioteca, las miniaturas del
 explorador de archivos, el quiosco, las imágenes de puntadas de Imagen a

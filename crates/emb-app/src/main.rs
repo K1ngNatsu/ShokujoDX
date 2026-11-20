@@ -72,6 +72,7 @@ mod p17_probe;
 mod packaging;
 mod palette;
 mod panels;
+mod parts_view;
 mod picture;
 #[cfg(test)]
 mod pictures;

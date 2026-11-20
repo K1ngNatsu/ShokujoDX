@@ -121,6 +121,12 @@ cloth**. Puff columns are round over their foam. Metallic thread has
 small glints at a large zoom, and **View > Thread Look > Lights off**
 shows only glow-in-the-dark thread. See [Checking a design](checking).
 
+**Stitch parts.** **View > Stitch Parts** colors the stitches of a
+design by the kind of their part: runs, columns and the rows of fills,
+with the underlay of each part. The program finds them in the stitches
+of a machine file of another program: the first step to make objects
+with stitch types of such a file. See [Checking a design](checking).
+
 **All pictures in the 3D look.** The design picture, the approval sheet
 and the quote, the library, the thumbnails of the file manager, the
 kiosk, the stitch pictures of Picture to Design and the preview of the

@@ -340,6 +340,8 @@ pub enum Flag {
     ShowThrough,
     /// The check view: the thread higher than the limit (ADR 0129).
     HighThread,
+    /// The stitches colored by the kind of their part (ADR 0131).
+    Parts,
 }
 
 /// A ribbon command.
@@ -859,6 +861,13 @@ impl Cmd {
                     tr("Fabric Shows Through"),
                     tr(
                         "Mark the places where the fabric shows through a fill or a satin, from the laid threads (their widths, heights and gaps). Set the limit in Options.",
+                    ),
+                ),
+                Flag::Parts => (
+                    g(ph::PUZZLE_PIECE),
+                    tr("Stitch Parts"),
+                    tr(
+                        "Color the stitches by the kind of their part: runs, columns, rows of a fill and other stitches; the underlay of a part is paler. It shows how the program reads the stitches of a machine file.",
                     ),
                 ),
                 Flag::HighThread => (

@@ -568,7 +568,7 @@ pub(super) const VIEW: &[Panel] = &[
             Custom(look_column, &[f(Flag::Artwork), f(Flag::Stitches), f(Flag::ThreadLook)]),
             Small(&[f(Flag::Jumps), f(Flag::NeedlePoints), f(Flag::Functions)]),
             Small(&[f(Flag::AppliqueFabric), f(Flag::Vectors), f(Flag::DimVectors)]),
-            Small(&[f(Flag::Density)]),
+            Small(&[f(Flag::Density), f(Flag::Parts)]),
         ],
     },
     Panel {

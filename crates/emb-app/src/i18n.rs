@@ -368,6 +368,7 @@ pub(crate) mod tests {
                 .iter()
                 .flat_map(|q| [q.label(), q.tooltip()]),
         );
+        out.extend(emb_art::parts::PartKind::ALL.iter().map(|k| k.label()));
         out.extend(emb_model::MeanderTile::ALL.iter().map(|t| t.name()));
         out.extend(emb_model::tartan::CODES.iter().map(|(_, name, _)| *name));
         out.extend(crate::color_fills::SETTS.iter().map(|(name, _, _)| *name));

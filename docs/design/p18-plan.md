@@ -1,7 +1,8 @@
 # Plan: designs from other programs (phase P18)
 
-Date: 2026-11-18 · Status: Accepted (owner, 2026-11-18). Not started; it
-starts after phase P17.
+Date: 2026-11-18 · Status: Accepted (owner, 2026-11-18). Started by the
+owner on 2026-11-19, after the second part of P18 (the 3D stitch view).
+Milestone 1 is done (ADR 0131).
 
 ## Goal
 
@@ -42,6 +43,18 @@ A stitch object is cut into parts of one kind.
 **Exit test:** for each design of the corpus, exported as DST and opened
 again, 90 % of the stitches are in a part of the kind of their source
 object.
+
+**Done (2026-11-19, ADR 0131).** `emb_art::parts` cuts the stitches at
+trims, jumps and color changes, then into legs (stitches in one
+direction), and finds back-and-forth sequences of legs: rows (a turn
+stitch between most rows, or long rows at one angle) or a column; the
+other legs are runs. A part that later columns or rows of the same color
+cover goes with them (underlay and travel). View > Stitch Parts colors the
+stitches by part. The exit test (`crates/emb-cli/tests/parts.rs`, the
+lettering cut into its letter parts): 97.1 % of the stitches of runs,
+columns and fills of rows are in a part of their kind (columns 98.7 %,
+rows 97.6 %, runs 67.9 %: the travel runs in letters go with the column
+over them, as underlay).
 
 ## Milestone 2: runs and satin columns (L)
 

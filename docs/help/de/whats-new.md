@@ -128,6 +128,13 @@ ihrem Schaumstoff rund. Metallgarn hat bei großem Zoom kleine
 Glanzpunkte, und **Ansicht > Garnansicht > Licht aus** zeigt nur
 nachtleuchtendes Garn. Siehe [Ein Design prüfen](checking).
 
+**Stichteile.** **Ansicht > Stichteile** färbt die Stiche eines Designs
+nach der Art ihres Teils: Steppstiche, Säulen und die Reihen von
+Füllungen, mit der Unterlage jedes Teils. Das Programm findet sie in den
+Stichen einer Maschinendatei eines anderen Programms: der erste Schritt,
+um aus einer solchen Datei Objekte mit Sticharten zu machen. Siehe [Ein
+Design prüfen](checking).
+
 **Alle Bilder in der 3D-Ansicht.** Das Designbild, das Freigabeblatt
 und das Angebot, die Bibliothek, die Miniaturbilder im Dateimanager, der
 Kiosk, die Stichbilder von Bild zu Design und die Vorschau des Fensters

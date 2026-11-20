@@ -149,6 +149,11 @@ se ve** y **Límite de altura del hilo**).
 **Ver > Mostrar** tiene **Saltos** (saltos y líneas de desplazamiento),
 **Penetraciones de aguja** (un punto en cada penetración de la aguja) y
 **Cortes y colores** (un símbolo en cada corte y cambio de color).
+**Partes de puntadas** colorea las puntadas según el tipo de su parte:
+rectas (azul), columnas (naranja), filas de un relleno (verde) y otras
+puntadas (violeta); la base de una parte tiene su color, más pálido.
+Muestra cómo lee el programa las puntadas de un archivo de máquina de
+otro programa, el primer paso para hacer objetos con ellas.
 
 ## El producto
 
