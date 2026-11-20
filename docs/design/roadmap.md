@@ -119,8 +119,16 @@ Still open, because they need other people, machines or systems:
   the new one is there (ADR 0126, the note of 2026-11-20). With the
   measure `stitch_tiles::tests::player_budget`: 0.02 s behind the needle
   at 200 stitches a second (2.1 s before), 0.14 s at 2,000, and no frame
-  with a rectangle of the flat look (28 of 470 before). Not checked by
-  the owner in the program yet.
+  with a rectangle of the flat look (28 of 470 before). The owner checked
+  it at 1,000 and 5,000 stitches a second.
+- **Slow and flat after a drag of the player slider** (owner report, the
+  same day). After the light by hand and a drag of the slider back and
+  forth, the view was flat and slow for a minute after the close of the
+  player: the tile threads gave thousands of results of steps that no view
+  showed any more, and the frame took them 24 at a time. Now such results
+  are not kept, and a tile that many changes reached is made again all,
+  not in parts (ADR 0126, the second note of 2026-11-20). On the owner's
+  design: all tiles 0.5 s after the close (21 s before).
 
 ## Owner list of 2026-11-16 (v0.2.1 and v0.3.0)
 

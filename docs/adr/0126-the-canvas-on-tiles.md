@@ -134,3 +134,18 @@ the design makes again only where it changed, and that all views use.
   the tiles are 0.02 s behind the needle on average (0.07 s at most), at
   2,000 stitches a second 0.14 s (at most `HOLD_MAX`), and no frame
   shows the look of today in a rectangle.
+- Changed on 2026-11-20, the second owner report: after the light by
+  hand and a drag of the player slider back and forth, the view was flat,
+  low in detail and slow for about a minute after the close of the player.
+  Each step of the slider is a new variant. A tile that many small changes
+  reached part by part was made again in up to 81 parts for each step (the
+  check of `PATCH_MAX` looked at the new part only), and the threads gave
+  thousands of tiles and parts of variants that no view showed any more.
+  The frame took 24 of them at most and gave each full tile to the screen,
+  so the tiles of the view waited behind them. Now the check is on all the
+  parts that are not made yet (`patch_of`), and a finished tile of a
+  variant that no view shows (`TileCache::alive`) is not kept; a frame
+  takes up to `TAKES` (4,096) such results and gives at most `UPLOADS`
+  tiles to the screen. On the owner's design (26,568 stitches) all tiles
+  were there 21 s after the close, now 0.5 s (`player_slider_budget`,
+  release, ignored).

@@ -77,6 +77,10 @@ const TEXTURE: usize = surface::TILE as usize + 2;
 const HOLD_MAX: Duration = Duration::from_millis(500);
 /// The finished tiles that one frame gives to the screen at most.
 const UPLOADS: usize = 24;
+/// The finished jobs that one frame takes at most: the results of tiles
+/// that no view shows any more cost nearly nothing, so a frame takes many
+/// of them (a drag of the player slider leaves thousands).
+const TAKES: usize = 4096;
 /// The memory of the tiles of all open designs (ADR 0077), bytes.
 pub const BUDGET: usize = 256 * 1024 * 1024;
 /// The size that an empty tile counts for, bytes.
@@ -236,6 +240,17 @@ fn union(a: Option<[u32; 4]>, b: [u32; 4]) -> [u32; 4] {
         None => b,
         Some(a) => [a[0].min(b[0]), a[1].min(b[1]), a[2].max(b[2]), a[3].max(b[3])],
     }
+}
+
+/// The part of a texture to make again after a change that reaches `part`,
+/// with the part that the changes before reached and that is not made yet
+/// (`dirty`). `None` if that is more than [`PATCH_MAX`] of the texture: all
+/// of it is made again then (many changes in a row, as a drag of the player
+/// slider, reach all of it part by part).
+fn patch_of(dirty: Option<[u32; 4]>, part: [u32; 4]) -> Option<[u32; 4]> {
+    let u = union(dirty, part);
+    let n = TEXTURE as f64;
+    (f64::from((u[2] - u[0]) * (u[3] - u[1])) <= PATCH_MAX * n * n).then_some(u)
 }
 
 /// Draws the texture `t` of a tile at `at` but its part `hole` (pixels of
@@ -474,6 +489,9 @@ pub struct Stats {
     pub tile_ms: f64,
     /// The tiles that the budget took out.
     pub dropped: usize,
+    /// The finished tiles and parts that no view shows any more: not given
+    /// to the screen.
+    pub discarded: usize,
     /// The parts of tiles made again after a change.
     pub patches: usize,
     /// The quick pictures of tiles: in a new light, and drafts.
@@ -1222,21 +1240,44 @@ impl TileCache {
     /// Takes the tiles that the threads finished (at most [`UPLOADS`] jobs
     /// in a frame) and keeps the cache in its budget.
     fn receive(&mut self, ctx: &egui::Context, frame: u64) {
-        let mut n = 0;
-        while n < UPLOADS {
+        let (mut uploads, mut taken) = (0, 0);
+        let mut more = false;
+        while uploads < UPLOADS {
+            if taken == TAKES {
+                more = true;
+                break;
+            }
             let Ok(done) = self.rx.try_recv() else { break };
-            self.take(ctx, done, frame);
-            n += 1;
+            taken += 1;
+            if self.take(ctx, done, frame) {
+                uploads += 1;
+                more = uploads == UPLOADS;
+            }
         }
-        if n == UPLOADS {
+        if more {
             ctx.request_repaint();
         }
         self.trim(frame);
     }
 
-    /// Puts the tiles of a finished job in the cache.
-    fn take(&mut self, ctx: &egui::Context, done: Done, frame: u64) {
+    /// `true` if a view shows the tiles of `variant` now, or shows them in
+    /// place of the tiles in a new light (`DesignLay::before_light`).
+    fn alive(&self, variant: u64) -> bool {
+        self.designs
+            .values()
+            .any(|d| d.shown.as_ref().is_some_and(|v| v.id == variant) || d.before_light == Some(variant))
+    }
+
+    /// Puts the tiles of a finished job in the cache. Returns `true` if it
+    /// gave a picture to the screen. The tiles of a variant that no view
+    /// shows any more (a step of the player slider, a light that moved on)
+    /// are not kept: their pictures would only cost uploads and memory.
+    fn take(&mut self, ctx: &egui::Context, done: Done, frame: u64) -> bool {
         self.stats.tile_ms += done.ms;
+        if done.keys.first().is_some_and(|k| !self.alive(k.variant)) {
+            self.stats.discarded += done.keys.len();
+            return false;
+        }
         if let Some(part) = done.patch {
             self.stats.patches += 1;
             let image = done.images.and_then(|mut i| i.pop()).flatten();
@@ -1255,8 +1296,9 @@ impl TileCache {
                     // The work stopped with an error: the look of today there.
                     None => e.tile = Cached::Failed,
                 }
+                return true;
             }
-            return;
+            return false;
         }
         if done.quick {
             self.stats.quick += done.keys.len();
@@ -1268,12 +1310,14 @@ impl TileCache {
             None => done.keys.iter().map(|_| None).collect(),
         };
         let mut surfaces = done.surfaces.into_iter();
+        let mut uploaded = false;
         for (key, image) in done.keys.into_iter().zip(images) {
             let surface = surfaces.next().flatten();
             // A quick picture does not take the place of a tile.
             if done.quick && self.tiles.get(&key).is_some_and(|e| !e.provisional) {
                 continue;
             }
+            uploaded = true;
             let (tile, bytes) = match image {
                 None => (Cached::Failed, EMPTY_BYTES),
                 Some(None) => (Cached::Empty, EMPTY_BYTES),
@@ -1302,6 +1346,7 @@ impl TileCache {
                 self.remove_bytes(&old);
             }
         }
+        uploaded
     }
 
     /// Takes the memory of an entry that goes out of the counts.
@@ -1469,13 +1514,16 @@ impl TileCache {
             let mut part = None;
             let mut whole = false;
             if let Some(c) = changes.within(b) {
-                // The pixels that the change reaches (with the apron): made
-                // again if they are a small part of a texture, else all.
-                let tex = self.tiles.get(&k).is_some_and(|e| matches!(e.tile, Cached::Texture(_)));
+                // The pixels that the change reaches (with the apron), with
+                // the parts that changes before reached: made again if they
+                // are a small part of a texture, else all (`patch_of`).
+                let old = self.tiles.get(&k);
+                let tex = old.is_some_and(|e| matches!(e.tile, Cached::Texture(_)));
                 part = texture_part(level, x, y, c.expand(apron));
-                let n = TEXTURE as f64;
-                let small = part.is_some_and(|p| f64::from((p[2] - p[0]) * (p[3] - p[1])) <= PATCH_MAX * n * n);
-                if !tex || !small {
+                let small = part.and_then(|p| patch_of(old.and_then(|e| e.dirty), p)).is_some();
+                // A tile that is made again all already needs no parts.
+                let remade = forward && old.is_some_and(|e| e.provisional);
+                if !tex || !small || remade {
                     if !forward {
                         continue;
                     }
@@ -2920,5 +2968,202 @@ mod tests {
                 max_lag / speed,
             );
         }
+    }
+    /// The stitch player after a light by hand and a drag of the slider back
+    /// and forth (owner report of 2026-11-20: after the close of the player
+    /// the view was flat, low in detail and slow for a minute). It runs the
+    /// owner's steps in real time with the tiles made by their threads, and
+    /// prints the time until all tiles are there after the close. The design
+    /// is the file of `EMB_PLAYER_DESIGN`, else the corpus design
+    /// full-field. `cargo test --release -p emb-app -- --ignored
+    /// player_slider_budget --nocapture`.
+    #[test]
+    #[ignore]
+    fn player_slider_budget() {
+        let design = match std::env::var("EMB_PLAYER_DESIGN") {
+            Ok(path) => emb_model::project::load(std::path::Path::new(&path)).expect("design"),
+            Err(_) => emb_cli::corpus::build("full-field").expect("corpus design"),
+        };
+        let canvas = Rect::from_min_size(Pos2::ZERO, egui::vec2(1050.0, 570.0));
+        let mut h = Harness::new();
+        h.st.doc = emb_model::Document::new(design);
+        h.st.settings.look.surface = true;
+        let b = h.st.fit_box().unwrap();
+        h.st.view.fit(canvas, b);
+        let mut last_t = Instant::now();
+        let mut worst = 0.0f64;
+        let mut step = |h: &mut Harness, worst: &mut f64| -> Option<TileFrame> {
+            std::thread::sleep(Duration::from_millis(16));
+            let now = Instant::now();
+            h.st.player_tick((now - last_t).as_secs_f64());
+            last_t = now;
+            let ctx = h.ctx.clone();
+            let view = h.st.view;
+            let mut got = None;
+            let input = egui::RawInput {
+                screen_rect: Some(canvas),
+                ..Default::default()
+            };
+            let t = Instant::now();
+            let mut o = ctx.run_ui(input, |ui| got = tiles_of(ui.ctx(), canvas, &view, &mut h.st, true));
+            *worst = worst.max(t.elapsed().as_secs_f64() * 1000.0);
+            o.textures_delta.clear();
+            got
+        };
+        let report = |label: &str, h: &Harness, f: &Option<TileFrame>, worst: f64, t0: Instant| {
+            let c = &h.st.stitch_tiles;
+            let (jobs, running, parts, quick) = {
+                let q = c.shared.lock();
+                (
+                    q.jobs.len(),
+                    q.running.len(),
+                    q.running_parts.len(),
+                    q.running_quick.len(),
+                )
+            };
+            let s = &c.stats;
+            println!(
+                "{label} t={:.1}s: {} | worst frame {worst:.1} ms | tiles made {} quick {} patches {} discarded {} | queue {jobs} running {running}+{parts}+{quick} | entries {} MB {}",
+                t0.elapsed().as_secs_f64(),
+                f.as_ref().map_or("no frame".to_string(), |f| format!(
+                    "complete {} today_from {:?} missing {} shapes {}",
+                    f.complete,
+                    f.today_from,
+                    f.missing.len(),
+                    f.shapes.len()
+                )),
+                s.tiles,
+                s.quick,
+                s.patches,
+                s.discarded,
+                c.tiles.len(),
+                c.bytes() / 1_000_000
+            );
+        };
+        let t0 = Instant::now();
+        let mut f = None;
+        while t0.elapsed() < Duration::from_secs(5) {
+            f = step(&mut h, &mut worst);
+            if f.as_ref().is_some_and(|f| f.complete) {
+                break;
+            }
+        }
+        report("first view", &h, &f, worst, t0);
+        // 1. The light by hand, then the default light.
+        let t0 = Instant::now();
+        worst = 0.0;
+        let mut az = 135.0;
+        while t0.elapsed() < Duration::from_secs(2) {
+            az += 7.0;
+            h.st.settings.look.light.azimuth_deg = az % 360.0;
+            f = step(&mut h, &mut worst);
+        }
+        h.st.settings.look.light = emb_render::thread3d::Lighting::default();
+        for _ in 0..10 {
+            f = step(&mut h, &mut worst);
+        }
+        report("light", &h, &f, worst, t0);
+        // 2. The player at 5,000 stitches a second, the slider back and forth.
+        h.st.toggle_player();
+        h.st.player.speed = 5000.0;
+        let n = h.st.shown_plan().plan.stitches.records.len();
+        let t0 = Instant::now();
+        worst = 0.0;
+        let mut x: u64 = 12345;
+        while t0.elapsed() < Duration::from_secs(5) {
+            x = x.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            let c = ((x >> 33) as usize) % n;
+            h.st.player.playing = false;
+            h.st.cursor = Some(c);
+            f = step(&mut h, &mut worst);
+        }
+        report("slider", &h, &f, worst, t0);
+        // 3. Stitch 0, then close.
+        h.st.cursor = Some(0);
+        for _ in 0..10 {
+            f = step(&mut h, &mut worst);
+        }
+        h.st.close_player();
+        // 4. Then a zoom in, when the tiles are there (or after 10 s).
+        let all = |f: &Option<TileFrame>| {
+            f.as_ref()
+                .is_some_and(|f| f.complete && f.today_from.is_none() && f.missing.is_empty())
+        };
+        let t0 = Instant::now();
+        worst = 0.0;
+        while t0.elapsed() < Duration::from_secs(10) && !all(&f) {
+            f = step(&mut h, &mut worst);
+        }
+        report("closed: all tiles", &h, &f, worst, t0);
+        h.st.view.zoom *= 4.0;
+        let t0 = Instant::now();
+        worst = 0.0;
+        f = None;
+        while t0.elapsed() < Duration::from_secs(10) && !all(&f) {
+            f = step(&mut h, &mut worst);
+        }
+        report("zoomed in: all tiles", &h, &f, worst, t0);
+    }
+    /// Small changes in a row make a tile again in parts until their parts
+    /// together are more than `PATCH_MAX` of it; then all of it is made
+    /// again (a drag of the player slider made a tile in 81 parts again for
+    /// each step: thousands of jobs).
+    #[test]
+    fn many_small_changes_make_the_whole_tile_again() {
+        let n = TEXTURE as u32;
+        assert!(patch_of(None, [0, 0, 10, 10]).is_some(), "one small part");
+        let mut dirty = None;
+        let mut strips = 0;
+        for i in 0..8 {
+            let x = i * n / 8;
+            match patch_of(dirty, [x, 0, x + n / 8, n]) {
+                Some(d) => {
+                    dirty = Some(d);
+                    strips += 1;
+                }
+                None => break,
+            }
+        }
+        assert_eq!(
+            strips, 4,
+            "four strips are half of the texture; the fifth makes all of it again"
+        );
+    }
+
+    /// A finished tile of a variant that no view shows any more is not kept
+    /// (no upload, no memory); a tile of the variant that shows is.
+    #[test]
+    fn finished_tiles_that_no_view_shows_are_not_kept() {
+        let mut h = harness(1.0);
+        frame(&mut h);
+        frame(&mut h);
+        let ctx = h.ctx.clone();
+        let c = &mut h.st.stitch_tiles;
+        let live = c
+            .designs
+            .values()
+            .find_map(|d| d.shown.as_ref().map(|v| v.id))
+            .expect("a variant");
+        let done = |variant: u64| Done {
+            keys: vec![Key {
+                variant,
+                level: MAX_LEVEL as i8,
+                x: 1000,
+                y: 1000,
+            }],
+            patch: None,
+            images: Some(vec![Some(ColorImage::new(
+                [TEXTURE, TEXTURE],
+                vec![Color32::RED; TEXTURE * TEXTURE],
+            ))]),
+            surfaces: vec![None],
+            quick: false,
+            ms: 0.0,
+        };
+        let (entries, bytes) = (c.tiles.len(), c.bytes());
+        assert!(!c.take(&ctx, done(live.wrapping_add(1)), 0), "not given to the screen");
+        assert_eq!((c.tiles.len(), c.bytes(), c.stats.discarded), (entries, bytes, 1));
+        assert!(c.take(&ctx, done(live), 0));
+        assert_eq!(c.tiles.len(), entries + 1);
     }
 }
