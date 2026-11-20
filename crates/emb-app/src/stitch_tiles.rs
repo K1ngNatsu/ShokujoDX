@@ -1116,11 +1116,7 @@ impl TileCache {
         if self.workers > 0 {
             return;
         }
-        // All processors but two (the window and the system).
-        let n = std::thread::available_parallelism()
-            .map_or(2, usize::from)
-            .saturating_sub(2)
-            .clamp(1, MAX_WORKERS);
+        let n = tile_workers();
         for i in 0..n {
             let (shared, tx) = (self.shared.clone(), self.tx.clone());
             let started = std::thread::Builder::new()
@@ -1410,6 +1406,15 @@ impl TileCache {
             }
         }
     }
+}
+
+/// The number of threads that make tiles: all processors but two (the
+/// window and the system), at most [`MAX_WORKERS`].
+pub fn tile_workers() -> usize {
+    std::thread::available_parallelism()
+        .map_or(2, usize::from)
+        .saturating_sub(2)
+        .clamp(1, MAX_WORKERS)
 }
 
 /// A stitch plan of the synthetic design of `n` stitches

@@ -128,10 +128,13 @@ impl Quality {
 }
 
 /// The time of the measure of the first start ([`measure_ms`]) under which
-/// the quality is Best, and under which it is Good, ms. The development
-/// computer measures about 0.8 ms.
-pub const BEST_UNDER_MS: f64 = 12.0;
-pub const GOOD_UNDER_MS: f64 = 40.0;
+/// the quality is Best, and under which it is Good, ms. The first full
+/// view of a design of 100,000 stitches takes about 0.12 s for each ms of
+/// the measure: the development computer measures 4.0 ms (0.44 s), on 4
+/// of its cores 7.6 ms (0.98 s), on 2 cores 13.3 ms (1.59 s). Best: the
+/// full view in about 2.5 s or less.
+pub const BEST_UNDER_MS: f64 = 20.0;
+pub const GOOD_UNDER_MS: f64 = 50.0;
 
 /// The quality for a measure of `ms` (see [`measure_ms`]).
 pub fn quality_for(ms: f64) -> Quality {
@@ -145,9 +148,10 @@ pub fn quality_for(ms: f64) -> Quality {
 }
 
 /// The short measure of the first start (ADR 0130): lays a synthetic
-/// design of 20,000 stitches and makes one tile of 256 × 256 pixels of it
-/// on one processor; the time divided by the number of processors (the
-/// tiles are made on all of them), ms.
+/// design of 20,000 stitches and makes two tiles of 256 × 256 pixels of it
+/// for each thread of the tile cache, on those threads at one time (as the
+/// canvas makes them, so the threads of a core, the memory and a laptop
+/// that slows down count); the time of all of it for each tile, ms.
 pub fn measure_ms() -> f64 {
     let stitches = emb_render::stress::make(20_000);
     let strands = emb_render::strand::strands(&stitches, &Default::default());
@@ -155,19 +159,36 @@ pub fn measure_ms() -> f64 {
     let laid = emb_render::surface::lay(&strands, &[]);
     let c = laid.bounds().center();
     let ppm = 8.0;
-    let (x0, y0) = ((c.x * ppm) as i64 - 128, (c.y * ppm) as i64 - 128);
-    let _ = laid.block(
-        ppm,
-        x0,
-        y0,
-        256,
-        256,
-        &emb_render::thread3d::Lighting::default(),
-        None,
-        &|_| true,
-    );
-    let cores = std::thread::available_parallelism().map_or(1, usize::from) as f64;
-    t0.elapsed().as_secs_f64() * 1000.0 / cores
+    let workers = crate::stitch_tiles::tile_workers();
+    let count = 2 * workers;
+    // The tiles in a square round the middle of the design.
+    let side = (count as f64).sqrt().ceil() as i64;
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    std::thread::scope(|scope| {
+        for _ in 0..workers {
+            scope.spawn(|| {
+                loop {
+                    let k = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    if k >= count {
+                        break;
+                    }
+                    let (i, j) = ((k as i64) % side - side / 2, (k as i64) / side - side / 2);
+                    let (x0, y0) = ((c.x * ppm) as i64 + 256 * i, (c.y * ppm) as i64 + 256 * j);
+                    let _ = laid.block(
+                        ppm,
+                        x0,
+                        y0,
+                        256,
+                        256,
+                        &emb_render::thread3d::Lighting::default(),
+                        None,
+                        &|_| true,
+                    );
+                }
+            });
+        }
+    });
+    t0.elapsed().as_secs_f64() * 1000.0 / count as f64
 }
 
 impl Default for LookSettings {

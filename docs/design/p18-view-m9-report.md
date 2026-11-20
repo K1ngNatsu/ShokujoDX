@@ -55,11 +55,25 @@ measure of `ShokujoDX --view-bench` (Milestone 5).
 
 ## Quality
 
-The measure of the first start makes one tile (256 × 256 pixels at 8
-pixels for each mm) of a design of 20,000 stitches on one processor and
-divides the time by the number of processors: 0.8 ms on the development
-computer. Best is under 12 ms, Good under 40 ms (about 15 and 50 times
-slower than the development computer), else Fast. A debug build does not
+The measure of the first start lays a design of 20,000 stitches and makes
+two tiles (256 × 256 pixels at 8 pixels for each mm) for each thread of
+the tile cache, on those threads at one time, and divides the time by the
+number of tiles. The first full view of a design of 100,000 stitches
+takes about 0.12 s for each ms of it. The development computer, and the
+same computer with the program on fewer cores (the speed of a core of a
+weaker computer is not in these numbers):
+
+| Cores | Measure | First drafts, 100,000 stitches | All tiles | A change of one object (200,000) | Tilt view, turning |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 16 | 4.0 ms | 0.21 s | 0.44 s | 0.05 s | 45 frames/s |
+| 4 | 7.6 ms | 0.55 s | 0.98 s | 0.11 s | 27 frames/s |
+| 2 | 13.3 ms | 0.86 s | 1.59 s | 0.23 s | 18 frames/s |
+| 1 | 25 ms | | | | |
+
+Best is under 20 ms (the full view in about 2.5 s or less), Good under
+50 ms, else Fast. An older laptop with 4 cores, each about half as fast
+as a core of the development computer, measures about 17 ms (Best); a
+dual-core of that speed about 33 ms (Good). A debug build does not
 measure. The choice is made one time; the Thread Look menu changes it.
 
 ## What changed in the pictures

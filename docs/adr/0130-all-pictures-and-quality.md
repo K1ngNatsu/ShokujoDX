@@ -51,12 +51,15 @@ graphics card, a help topic and an audit of the part.
   (`Lighting::shadows` off: the finish of a block, the light step and the
   apron leave them out), **Best** is all of it. The pictures have the
   shadows at each quality. At the first start of a release build the
-  program measures one tile of a design of 20,000 stitches on one
-  processor, divides the time by the number of processors and chooses
-  Best under 12 ms, Good under 40 ms, else Fast (the development computer:
-  0.8 ms); with the software renderer it chooses Fast
-  (`startup::is_software`). It chooses one time (`LookSettings::measured`);
-  the user can change it in the Thread Look menu.
+  program lays a design of 20,000 stitches and makes two tiles of it for
+  each thread of the tile cache, on those threads at one time (so the
+  threads of a core, the memory and a laptop that slows down count), and
+  divides the time by the number of tiles. Best is under 20 ms, Good
+  under 50 ms, else Fast: the first full view of 100,000 stitches takes
+  about 0.12 s for each ms (the development computer: 4.0 ms; on 4 of its
+  cores 7.6 ms, on 2 cores 13.3 ms). With the software renderer it chooses
+  Fast (`startup::is_software`). It chooses one time
+  (`LookSettings::measured`); the user can change it in the Thread Look menu.
 - **The graphics card: not now.** The plan leaves the decision to the
   owner after the measures. On the development computer the processor
   meets each budget of the plan (a change of the light: 16 ms for the
