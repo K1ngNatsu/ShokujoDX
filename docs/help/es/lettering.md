@@ -101,8 +101,10 @@ pequeño; por eso una fuente con trazos finos y gruesos tiene un rango
 pequeño.
 
 **Más fuentes** abre la página del programa en internet. Los **paquetes de
-fuentes** de allí tienen 68 fuentes de bordado más: fuentes sin serifas,
-decorativas, con serifas, caligráficas y manuscritas. Descargue un paquete
+fuentes** de allí tienen 70 fuentes de bordado más: fuentes sin serifas,
+decorativas, con serifas, caligráficas y manuscritas, y dos fuentes
+japonesas (Noto Sans JP y Zen Maru Gothic, con los kana y los 2136 kanji
+jōyō). Descargue un paquete
 y añádalo con **Archivo > Mis recursos > Importar un paquete**. El programa
 no descarga nada por sí mismo.
 

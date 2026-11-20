@@ -197,7 +197,21 @@ FONTS = [
     ("fat-face-serif", "Fat Face Serif", "abrilfatface", "AbrilFatface-Regular.ttf", False, "earlier"),
     ("shrikhand", "Shrikhand", "shrikhand", "Shrikhand-Regular.ttf", False, "earlier"),
     ("great-vibes", "Great Vibes", "greatvibes", "GreatVibes-Regular.ttf", False, "earlier"),
+    # Japanese fonts (P20 Milestone 6, ADR 0146): Latin letters, the kana
+    # and the 2,136 jōyō kanji. Their names have no Reserved Font Name
+    # (Noto Sans JP reserves "Source"), so they keep them.
+    ("noto-sans-jp", "Noto Sans JP", "notosansjp", "NotoSansJP[wght].ttf", False, "japanese"),
+    ("zen-maru-gothic", "Zen Maru Gothic", "zenmarugothic", "ZenMaruGothic-Bold.ttf", False, "japanese"),
 ]
+
+# The Japanese fonts: the sets of characters, and the weight of a variable
+# font. They get no --extend: the stroke finder takes the ends of the
+# strokes to the corners of the outline (ADR 0143), and the end steps of
+# --extend would make the ends that stop at a crossing long again.
+JAPANESE = {
+    "noto-sans-jp": ["--weight", "700"],
+    "zen-maru-gothic": [],
+}
 
 # The font packages: (name, title, what is in it).
 PACKS = [
@@ -206,6 +220,12 @@ PACKS = [
     ("serif", "Serif and slab fonts", "Fonts with serifs."),
     ("script", "Script fonts", "Joined and flowing fonts."),
     ("hand", "Hand fonts", "Fonts that look as if written by hand."),
+    (
+        "japanese",
+        "Japanese fonts",
+        "Fonts with the kana, the 2,136 jōyō kanji and Japanese punctuation, and Latin letters: "
+        "a gothic and a rounded gothic. The letters are large files, so they are in a package.",
+    ),
     (
         "earlier",
         "Fonts of earlier versions",
@@ -311,6 +331,8 @@ def make_font(exe, gfonts, row):
     cmd = [exe, "font", src, out, "--name", family] + (["--small-text"] if small else [])
     if slug in FILL:
         cmd += ["--stitch", "fill"]
+    elif slug in JAPANESE:
+        cmd += ["--sets", "latin,kana,kanji", "--route"] + JAPANESE[slug]
     else:
         cmd += ["--extend", "--route"]
     if slug in TUNED:

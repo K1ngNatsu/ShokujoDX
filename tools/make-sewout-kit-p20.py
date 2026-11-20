@@ -1,4 +1,4 @@
-# Makes the sew-out kit of phase P20, Milestones 3 and 4 (docs/design/p20-plan.md):
+# Makes the sew-out kit of phase P20, Milestones 3, 4 and 6 (docs/design/p20-plan.md):
 # test sheets of Japanese characters in the test font of the lettering
 # bench, with the files for the machine, a worksheet and a picture of each
 # one, and a checklist.
@@ -12,6 +12,11 @@
 #                corners, slanted strokes, kana
 #   sheet-50mm   4 of them at 50 mm
 #   words-40mm   the words 刺繍 and 東京 at 40 mm (one stitch for the text)
+#   noto-sans-jp-20mm, zen-maru-gothic-20mm
+#                the Japanese embroidery fonts of the font package
+#                (Milestone 6): words and characters at 20 mm. Make the
+#                fonts first: python tools/make-embroidery-fonts.py
+#                <google-fonts-folder> noto-sans-jp zen-maru-gothic
 #   CHECKLIST.md
 #
 # Use:  python tools/make-sewout-kit-p20.py [<folder>]
@@ -37,6 +42,14 @@ SHEETS = [
     ("sheet-50mm", 50.0, "東刺本あ", "four of them, large: split satin stitches (strokes wider than 7 mm)"),
 ]
 WORDS = [("words-40mm", 40.0, "刺繍 東京", "two words: all the letters of a text have the same stitch")]
+# The Japanese embroidery fonts (Milestone 6), from the work folder of the
+# font tool.
+JP_FONTS = os.path.join(ROOT, "target", "font-packages", "japanese")
+JP_TEXT = "刺繍東京ありがとうサムライ龍山田太郎さくら日本"
+EMB_SHEETS = [
+    ("noto-sans-jp-20mm", "noto-sans-jp", 20.0, "Noto Sans JP (embroidery font of the package) at 20 mm"),
+    ("zen-maru-gothic-20mm", "zen-maru-gothic", 20.0, "Zen Maru Gothic (embroidery font of the package) at 20 mm"),
+]
 
 
 def run(args):
@@ -50,8 +63,8 @@ def text_of(mm):
     return ("%.1f" % mm).rstrip("0").rstrip(".")
 
 
-def sheet(project, size, text):
-    out = run(["font-sheet", FONT, project, "--sizes", text_of(size), "--text", text, "--row", "180"])
+def sheet(project, size, text, font=FONT):
+    out = run(["font-sheet", font, project, "--sizes", text_of(size), "--text", text, "--row", "180"])
     m = re.search(r"([0-9]+) x ([0-9]+) mm", out)
     if not (m and float(m.group(1)) <= FIT[0] and float(m.group(2)) <= FIT[1]):
         sys.exit("%s: the sheet does not fit the hoop: %s" % (project, out.strip()))
@@ -108,6 +121,10 @@ fabric with a tear-away stabilizer, as a normal job.
 9. **The sew order** (Milestone 4): the needle goes from one stroke to the
    next under strokes that sew later, so there are few trims. Does a
    travel stitch show anywhere, or pull the fabric?
+10. **The Japanese embroidery fonts** (Milestone 6: Noto Sans JP, a gothic,
+   and Zen Maru Gothic, a rounded gothic, from the font package): do the
+   words sew well at 20 mm? Which font looks better on fabric? (Known:
+   the あ of Zen Maru Gothic has a small gap in its inner stroke.)
 
 Write the answers in the session or in a file next to this one, with
 photos if you can.
@@ -125,6 +142,18 @@ def main():
         os.makedirs(folder, exist_ok=True)
         project = os.path.join(folder, name + ".embproj")
         sheet(project, size, text)
+        n = output(project, folder)
+        rows.append("| `%s` | %s | %s | %d | %d |" % (name, what, n["size"], n["stitches"], n["trims"]))
+        print("made", name)
+    for name, slug, size, what in EMB_SHEETS:
+        font = os.path.join(JP_FONTS, slug + ".embfont")
+        if not os.path.isfile(font):
+            print("no %s: make the Japanese fonts first (tools/make-embroidery-fonts.py)" % name)
+            continue
+        folder = os.path.join(kit, name)
+        os.makedirs(folder, exist_ok=True)
+        project = os.path.join(folder, name + ".embproj")
+        sheet(project, size, JP_TEXT, font)
         n = output(project, folder)
         rows.append("| `%s` | %s | %s | %d | %d |" % (name, what, n["size"], n["stitches"], n["trims"]))
         print("made", name)

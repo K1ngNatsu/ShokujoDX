@@ -60,6 +60,9 @@ ShokujoDX makes the stitches and writes the file for your machine.
   packages; plus the TrueType and OpenType fonts of your computer.
 - Text shaping: ligatures, the joined letters of script fonts, Arabic and
   Devanagari.
+- Japanese lettering: kana and kanji as satin columns that follow the
+  strokes, with few trims; two Japanese embroidery fonts (the 2,136 jōyō
+  kanji) in a font package.
 - Bold, italic, underline and stacked text; text on arcs, circles and
   lines; monograms, team names and a lettering kiosk for shops.
 

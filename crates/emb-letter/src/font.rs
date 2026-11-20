@@ -41,6 +41,9 @@ pub enum RouteMode {
 struct Shared {
     data: Arc<Vec<u8>>,
     index: u32,
+    /// The values of the axes of a variable font (P20 Milestone 6: the
+    /// Bold instance of a font that has its weights in one file).
+    variations: Vec<(Tag, f32)>,
     units_per_em: f64,
     cap_height: f64,
     shapes: Mutex<HashMap<u16, Arc<GlyphShapes>>>,
@@ -56,7 +59,11 @@ struct Shared {
 
 impl Shared {
     fn face(&self) -> Face<'_> {
-        Face::parse(&self.data, self.index).expect("parsed in from_bytes")
+        let mut face = Face::parse(&self.data, self.index).expect("parsed in from_bytes");
+        for (axis, value) in &self.variations {
+            face.set_variation(*axis, *value);
+        }
+        face
     }
 
     fn contours(&self, glyph: u16) -> Vec<Vec<Point>> {
@@ -222,8 +229,23 @@ pub fn face_names(data: &[u8], index: u32) -> Option<(String, String)> {
 
 impl Font {
     pub fn from_bytes(data: Vec<u8>, index: u32) -> Result<Font, FontError> {
+        Font::from_bytes_with(data, index, &[])
+    }
+
+    /// [`Font::from_bytes`] for a variable font at the values `variations`
+    /// of its axes (for example `("wght", 700.0)`, the Bold instance). An
+    /// axis that the font does not have is not used.
+    pub fn from_bytes_with(data: Vec<u8>, index: u32, variations: &[(&str, f32)]) -> Result<Font, FontError> {
         let data = Arc::new(data);
-        let face = Face::parse(&data, index).map_err(|e| FontError::Parse(e.to_string()))?;
+        let mut face = Face::parse(&data, index).map_err(|e| FontError::Parse(e.to_string()))?;
+        let variations: Vec<(Tag, f32)> = variations
+            .iter()
+            .map(|(axis, value)| (Tag::from_bytes_lossy(axis.as_bytes()), *value))
+            .filter(|(axis, _)| face.variation_axes().into_iter().any(|a| a.tag == *axis))
+            .collect();
+        for (axis, value) in &variations {
+            face.set_variation(*axis, *value);
+        }
         // Typographic family and subfamily first (16, 17), then the legacy names (1, 2).
         let family = name(&face, &[16, 1]).unwrap_or_else(|| "Unnamed".to_string());
         let style = name(&face, &[17, 2]).unwrap_or_else(|| "Regular".to_string());
@@ -247,6 +269,7 @@ impl Font {
             shared: Arc::new(Shared {
                 data,
                 index,
+                variations,
                 units_per_em,
                 cap_height,
                 shapes: Mutex::new(HashMap::new()),

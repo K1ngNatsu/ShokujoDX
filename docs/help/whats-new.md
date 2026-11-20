@@ -70,8 +70,15 @@ keeps its size. Strokes thinner than 0.8 mm sew as runs, and the Lettering
 window shows the smallest height at which the text sews well. See
 [Lettering](lettering).
 
+**Japanese embroidery fonts.** A new font package has two Japanese
+embroidery fonts, Noto Sans JP (a gothic) and Zen Maru Gothic (a rounded
+gothic): Latin letters, the kana, the 2,136 jōyō kanji and Japanese
+punctuation, each letter with the sew order of the fonts of the program.
+Above the largest size of their satin columns, the strokes sew as tatami
+columns, not as fills.
+
 **More fonts, with a quality score.** The program has 65 embroidery fonts
-(30 before), and the font packages on the page of the program have 68
+(30 before), and the font packages on the page of the program have 70
 more. Each embroidery font has a quality score from 0 to 100:
 **Lettering > Fonts** shows it and can sort by it. The size ranges of some
 fonts are smaller now, so that their thin strokes are not too narrow at

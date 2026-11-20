@@ -88,7 +88,8 @@ Usage:
       files for each design, and for a design in several hoopings also
       <name>_1.vp3, <name>_2.vp3, ... (one for each hooping).
   emb-cli font <font.ttf> <out.embfont> --name <family> [--style <style>]
-               [--stitch auto|satin|fill] [--small-text]
+               [--stitch auto|satin|fill] [--small-text] [--weight <n>]
+               [--sets latin,kana,kanji]
       Convert a TrueType or OpenType font, or a bitmap font (.bdf, .fon:
       the largest size), to an embroidery font (ADR 0016, 0021).
       --small-text: a font for letters 4 to 6 mm high (satin columns from
@@ -116,6 +117,11 @@ Usage:
       --route: after that, give each letter the order of its parts with
       the fewest trims, with travel runs under the parts that sew later
       (ADR 0113).
+      --weight: the weight of a variable font (700: Bold); --face: the
+      face of a font collection.
+      --sets: the characters of the font (latin: the default; kana: the
+      kana and the Japanese punctuation; kanji: the 2,136 jōyō kanji,
+      P20 Milestone 6).
       --tuned: mark the font as a tuned font (the font lists show it
       first).
   emb-cli font-inkstitch <font folder or font.json> <out.embfont>
@@ -132,6 +138,7 @@ Usage:
       (the stitch type Automatic).
   emb-cli font-audit <font.embfont> [--source <font.ttf>] [--chars ...]
                      [--sizes <mm>,...] [--corrections <file>] [--proof <out.json>]
+                     [--text <text>] [--weight <n>]
       Print the measures of each letter of an embroidery font: how much of
       the outline of the source font its parts cover, how much is outside
       it or covered two times, the narrowest and widest column, and the
@@ -301,6 +308,8 @@ fn run(args: &[String]) -> Result<(), String> {
     let mut small_text = false;
     let mut corrections: Option<PathBuf> = None;
     let mut route_letters = false;
+    let mut font_weight: Option<f32> = None;
+    let mut font_sets: Vec<String> = vec!["latin".to_string()];
     let mut extend_ends = false;
     let mut tuned_font = false;
     let mut all_letters = false;
@@ -367,6 +376,28 @@ fn run(args: &[String]) -> Result<(), String> {
             "--small-text" => small_text = true,
             "--corrections" => corrections = Some(PathBuf::from(it.next().ok_or("--corrections needs a file")?)),
             "--route" => route_letters = true,
+            "--weight" => {
+                font_weight = Some(
+                    it.next()
+                        .and_then(|s| s.parse::<f32>().ok())
+                        .filter(|w| (1.0..=1000.0).contains(w))
+                        .ok_or("--weight needs a weight from 1 to 1000, for example 700")?,
+                );
+            }
+            "--sets" => {
+                font_sets = it
+                    .next()
+                    .ok_or("--sets needs a list such as latin,kana,kanji")?
+                    .split(',')
+                    .map(|s| s.trim().to_lowercase())
+                    .collect();
+                if let Some(bad) = font_sets
+                    .iter()
+                    .find(|s| !["latin", "kana", "kanji"].contains(&s.as_str()))
+                {
+                    return Err(format!("--sets: {bad} is not latin, kana or kanji"));
+                }
+            }
             "--extend" => extend_ends = true,
             "--tuned" => tuned_font = true,
             "--letters" => all_letters = true,
@@ -704,15 +735,24 @@ fn run(args: &[String]) -> Result<(), String> {
                 let faces = emb_letter::bitmap::read_file(&ext, &bytes).map_err(|e| format!("{input}: {e}"))?;
                 emb_letter::bitmap::to_embfont(&faces[0], &name, stitch)
             } else {
-                let font = emb_letter::Font::from_bytes(bytes, 0).map_err(|e| format!("{input}: {e}"))?;
-                let mut f = emb_letter::embfont::convert_with(
-                    &font,
-                    &name,
-                    &style,
-                    stitch,
-                    &emb_letter::embfont::default_chars(),
-                    small_text,
-                );
+                let axes: Vec<(&str, f32)> = font_weight.map(|w| ("wght", w)).into_iter().collect();
+                let font =
+                    emb_letter::Font::from_bytes_with(bytes, face, &axes).map_err(|e| format!("{input}: {e}"))?;
+                let mut chars: Vec<char> = Vec::new();
+                for set in &font_sets {
+                    chars.extend(match set.as_str() {
+                        "kana" => {
+                            let mut v = emb_letter::japanese::kana();
+                            v.extend(emb_letter::japanese::JAPANESE_MARKS.chars());
+                            v
+                        }
+                        "kanji" => emb_letter::japanese::kanji(),
+                        _ => emb_letter::embfont::default_chars(),
+                    });
+                }
+                let mut seen = std::collections::HashSet::new();
+                chars.retain(|c| seen.insert(*c));
+                let mut f = emb_letter::embfont::convert_with(&font, &name, &style, stitch, &chars, small_text);
                 if extend_ends {
                     println!("extended: {} ends of columns", f.extend_ends(&font));
                 }
@@ -878,7 +918,12 @@ fn run(args: &[String]) -> Result<(), String> {
             let source = match &audit_source {
                 Some(p) => {
                     let bytes = std::fs::read(p).map_err(|e| format!("{}: {e}", p.display()))?;
-                    Some(emb_letter::Font::from_bytes(bytes, 0).map_err(|e| format!("{}: {e}", p.display()))?)
+                    // The weight of a variable font, as the converter had it.
+                    let axes: Vec<(&str, f32)> = font_weight.map(|w| ("wght", w)).into_iter().collect();
+                    Some(
+                        emb_letter::Font::from_bytes_with(bytes, face, &axes)
+                            .map_err(|e| format!("{}: {e}", p.display()))?,
+                    )
                 }
                 None => None,
             };

@@ -612,6 +612,32 @@ fn trim_start_out_of(
     step: f64,
     own: f64,
 ) -> usize {
+    trim_start(pts, others, radius_at, step, own, false)
+}
+
+/// [`trim_start_out_of`] for the new end of a stroke cut at a crossing
+/// (P20 Milestone 3): the cut is where the stroke first comes out of the
+/// stroke that goes through. A stroke that crosses the same stroke two
+/// times (the diagonal of ぬ through its loop) keeps its part between the
+/// crossings.
+fn trim_start_at_exit(
+    pts: &mut Vec<Point>,
+    others: &[(&[Point], Option<f64>)],
+    radius_at: &dyn Fn(Point) -> f64,
+    step: f64,
+    own: f64,
+) -> usize {
+    trim_start(pts, others, radius_at, step, own, true)
+}
+
+fn trim_start(
+    pts: &mut Vec<Point>,
+    others: &[(&[Point], Option<f64>)],
+    radius_at: &dyn Fn(Point) -> f64,
+    step: f64,
+    own: f64,
+    first_exit: bool,
+) -> usize {
     if others.is_empty() || pts.len() < 2 {
         return 0;
     }
@@ -656,8 +682,17 @@ fn trim_start_out_of(
         }
         walked += d;
     }
-    let Some(last_in) = samples.iter().rposition(|s| s.2) else {
-        return 0;
+    let last_in = if first_exit {
+        // The end of the run of samples in the other stroke from the start.
+        match samples.iter().position(|s| !s.2) {
+            Some(0) | None => return 0,
+            Some(out) => out - 1,
+        }
+    } else {
+        let Some(last_in) = samples.iter().rposition(|s| s.2) else {
+            return 0;
+        };
+        last_in
     };
     let Some(&(k, p, _)) = samples.get(last_in + 1) else {
         // In other strokes up to the middle: keep the stroke.
@@ -943,10 +978,10 @@ fn cut_crossings(all: &mut Vec<Placed>, radius_at: &dyn Fn(Point) -> f64, cell: 
         };
         let through_line = all[through].3.pts.clone();
         let other = [(through_line.as_slice(), Some(all[through].2))];
-        let gone = trim_start_out_of(&mut b.pts, &other, radius_at, cell, r_cut);
+        let gone = trim_start_at_exit(&mut b.pts, &other, radius_at, cell, r_cut);
         b.ext[1] = b.ext[1].saturating_sub(gone).max(1);
         a.pts.reverse();
-        trim_start_out_of(&mut a.pts, &other, radius_at, cell, r_cut);
+        trim_start_at_exit(&mut a.pts, &other, radius_at, cell, r_cut);
         a.pts.reverse();
         a.ext[1] = a.pts.len();
         a.ext[0] = a.ext[0].min(a.ext[1].saturating_sub(1));
@@ -1772,13 +1807,17 @@ impl Rails {
         (self.a[i].lerp(self.a[j], t), self.b[i].lerp(self.b[j], t))
     }
 
-    /// `true` if `p` is in the column, at least `depth` from its edge.
+    /// `true` if `p` is in the column, at least `depth` from its edge. An
+    /// open column is the quads between its pairs: a column that goes
+    /// round and over itself (the loop of あ) has no one ring.
     fn holds(&self, p: Point, depth: f64) -> bool {
         let inside = if self.closed {
             ring_contains(&self.a, p) != ring_contains(&self.b, p)
         } else {
-            let ring: Vec<Point> = self.a.iter().chain(self.b.iter().rev()).copied().collect();
-            ring_contains(&ring, p)
+            (0..self.a.len().saturating_sub(1)).any(|i| {
+                let quad = [self.a[i], self.a[i + 1], self.b[i + 1], self.b[i]];
+                ring_contains(&quad, p)
+            })
         };
         if !inside {
             return false;

@@ -104,9 +104,10 @@ eine Schrift mit dünnen und dicken Strichen hat deshalb einen kleinen
 Bereich.
 
 **Mehr Schriften** öffnet die Seite des Programms im Internet. Die
-**Schriftpakete** dort haben 68 weitere Stickschriften: serifenlose
+**Schriftpakete** dort haben 70 weitere Stickschriften: serifenlose
 Schriften, Zierschriften, Serifenschriften, Schreibschriften und
-Handschriften. Laden Sie ein Paket herunter und fügen Sie es mit **Datei >
+Handschriften, und zwei japanische Schriften (Noto Sans JP und Zen Maru
+Gothic, mit den Kana und den 2.136 Jōyō-Kanji). Laden Sie ein Paket herunter und fügen Sie es mit **Datei >
 Meine Ressourcen > Paket importieren** hinzu. Das Programm lädt selbst
 nichts herunter.
 

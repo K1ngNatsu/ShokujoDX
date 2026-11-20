@@ -36,46 +36,15 @@ pub const NARROW_MM: f64 = 0.8;
 /// tatami column.
 pub const WIDE_MM: f64 = 8.0;
 
-/// The hiragana: the 46 basic characters, the 25 with voicing marks and
-/// the 9 small ones.
-pub const HIRAGANA: &str = "あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん\
-がぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽぁぃぅぇぉっゃゅょ";
-/// The katakana: the 46 basic characters, ヴ, the 9 small ones and the
-/// long vowel mark.
-pub const KATAKANA: &str = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン\
-ヴァィゥェォッャュョー";
-/// The 80 kanji of the first school year.
-pub const KANJI_FIRST_YEAR: &str = "一右雨円王音下火花貝学気九休玉金空月犬見五口校左三山子四糸字耳七車手十出女小上森人水正生青夕石赤千川先早草足村大男竹中虫町天田土二日入年白八百文木本名目立力林六";
-/// Kanji of the measures of 2026-11-20 that are not of the first year:
-/// many strokes, many crossings, and words that a shop sews.
-pub const KANJI_MORE: &str = "愛夢心龍鶴桜刺繍東京都道府県国語書漢海星光風雪侍忍武";
-/// Japanese punctuation.
-pub const PUNCTUATION: &str = "、。「」・";
-/// Words that a shop sews.
-pub const WORDS: [&str; 8] = [
-    "刺繍",
-    "東京",
-    "ありがとう",
-    "サムライ",
-    "龍",
-    "山田太郎",
-    "さくら",
-    "日本",
-];
+// The reference set: the sets of `emb_letter::japanese` (P20 Milestone 6
+// moved them there, so the quality score of a Japanese font measures the
+// same characters).
+pub use emb_letter::japanese::{HIRAGANA, KANJI_FIRST_YEAR, KANJI_MORE, KATAKANA, PUNCTUATION, WORDS};
 
 /// The characters of the reference set, each one time, in the order of
-/// the sets.
+/// the sets (`emb_letter::japanese::reference`).
 pub fn characters() -> Vec<char> {
-    let mut out: Vec<char> = Vec::new();
-    for c in [HIRAGANA, KATAKANA, KANJI_FIRST_YEAR, KANJI_MORE, PUNCTUATION]
-        .iter()
-        .flat_map(|s| s.chars())
-    {
-        if !out.contains(&c) {
-            out.push(c);
-        }
-    }
-    out
+    emb_letter::japanese::reference()
 }
 
 /// The number of parts of each stitch.

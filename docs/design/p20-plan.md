@@ -2,7 +2,8 @@
 
 Date: 2026-11-20 · Status: Accepted (owner, 2026-11-20: before v0.4.0).
 Milestones 1, 2, 4 and 5 are done (ADR 0141, 0142, 0144, 0145).
-Milestone 3 is made (ADR 0143) and waits for the sew-out of the owner.
+Milestones 3 and 6 are made (ADR 0143, 0146) and wait for the sew-out of
+the owner.
 
 ## Goal
 
@@ -279,6 +280,20 @@ bench has 10 mm too, and its test checks the exit test: 刺繍 at 20 mm is
 **Exit test:** a font package with the kana and the 2,136 jōyō kanji,
 with a quality score of 65 or more. A test sheet sews well on the owner's
 machine.
+
+**Made (2026-11-20, ADR 0146); the sew-out is open.** `emb_letter::japanese`
+has the kana, Japanese punctuation and the 2,136 jōyō kanji (with the forms
+that keyboards have); `emb-cli font --sets latin,kana,kanji --weight 700`
+converts them, and the route of all letters uses all processors (about two
+minutes). A font with Japanese letters gets no fill letters: in Auto its
+wide columns are tatami columns, and `EmbFont::satin_max_mm` keeps the end
+of its satin columns. The score measures the reference set too. The package
+`shokujodx-fonts-japanese.zip` (11.6 MB) has Noto Sans JP (score 89,
+6.5–300 mm) and Zen Maru Gothic (score 88, 7.5–300 mm), each with all the
+jōyō kanji. The app reads a large embroidery font only when it is used.
+The sew-out kit has a sheet of each font at 20 mm. Open: the あ of Zen
+Maru Gothic has a gap in its inner stroke (92.6 % covered; the stroke
+finder does not find it).
 
 ## Order
 

@@ -600,10 +600,24 @@ pub fn measured() -> Vec<char> {
         .collect()
 }
 
-/// The measures of the characters of [`measured`] that have parts in
+/// The characters that the score of `font` measures: [`measured`], and
+/// for a font with Japanese characters the reference set of the lettering
+/// bench too (`japanese::reference`: kana, kanji with few and with many
+/// strokes; P20 Milestone 6), so the score counts their two layers and
+/// their narrow columns.
+pub fn measured_in(font: &EmbFont) -> Vec<char> {
+    let mut v = measured();
+    let japanese = crate::japanese::reference();
+    if japanese.iter().any(|c| font.letters.contains_key(c)) {
+        v.extend(japanese);
+    }
+    v
+}
+
+/// The measures of the characters of [`measured_in`] that have parts in
 /// `font`. `source` is the font that `font` was converted from.
 pub fn letters(font: &EmbFont, source: &Font) -> Vec<(char, LetterQuality)> {
-    measured()
+    measured_in(font)
         .into_iter()
         .filter_map(|c| {
             let letter = font.letters.get(&c).filter(|l| !l.parts.is_empty())?;
@@ -616,7 +630,7 @@ pub fn letters(font: &EmbFont, source: &Font) -> Vec<(char, LetterQuality)> {
 /// at the design size: the width below which `part` (0 to 1) of the holes
 /// are. `None` with no hole.
 pub fn hole_width_at(font: &EmbFont, part: f64) -> Option<f64> {
-    let mut all: Vec<f64> = measured()
+    let mut all: Vec<f64> = measured_in(font)
         .into_iter()
         .filter_map(|c| font.letters.get(&c))
         .flat_map(|l| fill_widths(&l.parts).holes)
@@ -631,7 +645,7 @@ pub fn hole_width_at(font: &EmbFont, part: f64) -> Option<f64> {
 /// the columns is. For a fill font: the local width below which `part` of
 /// the area of its fill letters is. `None` with no column.
 pub fn width_at(font: &EmbFont, part: f64) -> Option<f64> {
-    let letters = measured().into_iter().filter_map(|c| font.letters.get(&c));
+    let letters = measured_in(font).into_iter().filter_map(|c| font.letters.get(&c));
     let mut all: Vec<(f64, f64)> = if font.fill {
         letters.flat_map(|l| fill_widths(&l.parts).strokes).collect()
     } else {

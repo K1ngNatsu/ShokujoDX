@@ -96,9 +96,11 @@ keeps its thin strokes wide enough at the smallest size, so a font with
 thin and thick strokes has a small range.
 
 **More Fonts** opens the page of the program on the internet. The **font
-packages** there have 68 more embroidery fonts: sans, display, serif,
-script and hand fonts. Download a package, then add it with **File > My
-Assets > Import a package**. The program downloads nothing itself.
+packages** there have 70 more embroidery fonts: sans, display, serif,
+script and hand fonts, and two Japanese fonts (Noto Sans JP and Zen Maru
+Gothic, with the kana and the 2,136 jōyō kanji). Download a package, then
+add it with **File > My Assets > Import a package**. The program downloads
+nothing itself.
 
 Four fonts of earlier versions have a score below 65: Slab Heavy, Fat
 Face Serif, Shrikhand and Great Vibes. They are not in the program now.

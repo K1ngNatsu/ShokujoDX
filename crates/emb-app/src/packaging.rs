@@ -266,7 +266,9 @@ fn the_release_has_the_font_packages() {
             name.starts_with("shokujodx-fonts-") && name.ends_with(".zip")
         })
         .count();
-    assert_eq!(packages, 6);
+    // sans, display, serif, script, hand, earlier, and japanese (P20
+    // Milestone 6, ADR 0146).
+    assert_eq!(packages, 7);
 }
 
 /// The release checks of the thumbnails use a test design of the

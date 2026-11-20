@@ -127,6 +127,23 @@ pub struct FillSizes {
     pub min_mm: f64,
 }
 
+/// The fields of a font file that the font lists show
+/// ([`EmbFont::load_header`]).
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+pub struct EmbFontHeader {
+    pub format: String,
+    pub version: u32,
+    pub family: String,
+    #[serde(default)]
+    pub style: String,
+    #[serde(default)]
+    pub tuned: bool,
+    #[serde(default)]
+    pub fill: bool,
+    #[serde(default)]
+    pub quality: Option<crate::quality::Quality>,
+}
+
 /// An embroidery font.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EmbFont {
@@ -150,6 +167,13 @@ pub struct EmbFont {
     /// `max_height_mm` in one look. `None`: the letters have one shape.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fill_letters: Option<FillSizes>,
+    /// The largest capital height at which the columns sew as satin, in a
+    /// font with Japanese, Chinese or Korean letters (P20 Milestone 6, ADR
+    /// 0146): above it, the stitch type Auto makes them tatami columns
+    /// (ADR 0142, 0143), up to `max_height_mm`. `None`: the columns end at
+    /// the fill letters or at `max_height_mm`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub satin_max_mm: Option<f64>,
     /// The letters by character.
     pub letters: BTreeMap<char, EmbLetter>,
     /// Kerning of pairs of characters (two characters as the key), in mm at
@@ -214,6 +238,11 @@ impl EmbFont {
         if !size(self.max_height_mm, self.min_height_mm, MAX_RANGE_MM) {
             return Err("max_height_mm".into());
         }
+        if let Some(m) = self.satin_max_mm
+            && !size(m, self.min_height_mm, self.max_height_mm)
+        {
+            return Err("satin_max_mm".into());
+        }
         if let Some(f) = &self.fill_letters
             && !(size(f.from_mm, self.min_height_mm, self.max_height_mm) && size(f.min_mm, 0.1, MAX_RANGE_MM))
         {
@@ -246,6 +275,30 @@ impl EmbFont {
     pub fn load(path: &std::path::Path) -> Result<EmbFont, String> {
         let s = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
         EmbFont::from_json(&s).map_err(|e| format!("{}: {e}", path.display()))
+    }
+
+    /// The names and the marks of a font file, with no letters: for the
+    /// font lists, so that a large font (a Japanese font with its kanji,
+    /// P20 Milestone 6) is read in full only when it is used. The letters
+    /// are not checked.
+    pub fn load_header(path: &std::path::Path) -> Result<EmbFontHeader, String> {
+        let s = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+        let h: EmbFontHeader = serde_json::from_str(&s).map_err(|e| format!("{}: {e}", path.display()))?;
+        if h.format != FORMAT {
+            return Err(format!("{}: {}", path.display(), EmbFontError::Format));
+        }
+        if h.version > VERSION {
+            return Err(format!("{}: {}", path.display(), EmbFontError::Version(h.version)));
+        }
+        if h.family.trim().is_empty() {
+            return Err(format!("{}: {}", path.display(), EmbFontError::Format));
+        }
+        Ok(h)
+    }
+
+    /// `true` if the font has Japanese, Chinese or Korean letters.
+    pub fn has_cjk(&self) -> bool {
+        self.letters.keys().any(|c| crate::layout::is_cjk(*c))
     }
 
     pub fn save(&self, path: &std::path::Path) -> Result<(), String> {
@@ -282,6 +335,7 @@ impl EmbFont {
             min_height_mm: range.0,
             max_height_mm: range.1,
             fill_letters: None,
+            satin_max_mm: None,
             letters,
             kerning,
             small_text: false,
@@ -320,6 +374,7 @@ impl EmbFont {
             min_height_mm: crate::source::MIN_HEIGHT_MM,
             max_height_mm: crate::source::MAX_HEIGHT_MM,
             fill_letters: None,
+            satin_max_mm: None,
             letters,
             kerning: BTreeMap::new(),
             small_text: false,
@@ -387,7 +442,10 @@ impl EmbFont {
     /// The largest capital height at which the letters sew as columns, in
     /// mm: where the fill letters start, or the end of the size range.
     pub fn column_max_mm(&self) -> f64 {
-        self.fill_letters.map_or(self.max_height_mm, |f| f.from_mm)
+        self.fill_letters
+            .map(|f| f.from_mm)
+            .or(self.satin_max_mm)
+            .unwrap_or(self.max_height_mm)
     }
 
     /// Gives each letter with columns its fill letter too (ADR 0120): the
@@ -400,6 +458,15 @@ impl EmbFont {
     /// text get none. Returns the number of the fill letters.
     pub fn add_fill_letters(&mut self, source: &Font) -> usize {
         if self.fill || self.small_text || self.fill_letters.is_some() {
+            return 0;
+        }
+        // A font with Japanese, Chinese or Korean letters gets none (P20
+        // Milestone 6): in Auto, wide columns are tatami columns that
+        // follow the strokes (ADR 0142, 0143), not one fill, so the font
+        // goes up to the largest size with its columns.
+        if self.has_cjk() {
+            self.satin_max_mm = Some(self.max_height_mm);
+            self.max_height_mm = self.max_height_mm.max(crate::source::MAX_HEIGHT_MM);
             return 0;
         }
         let mut made = Vec::new();
@@ -708,6 +775,9 @@ impl LetterSource for EmbFont {
         Some(match (&self.fill_letters, stitch) {
             (Some(f), LetterStitch::Satin) => (self.min_height_mm, f.from_mm),
             (Some(f), LetterStitch::Fill) => (f.min_mm, self.max_height_mm.max(f.min_mm)),
+            // The satin columns of a Japanese font end where Auto makes
+            // tatami columns.
+            (None, LetterStitch::Satin) => (self.min_height_mm, self.column_max_mm()),
             _ => (self.min_height_mm, self.max_height_mm),
         })
     }
@@ -1003,6 +1073,7 @@ pub fn convert_with(
         min_height_mm: min,
         max_height_mm: max,
         fill_letters: None,
+        satin_max_mm: None,
         letters,
         kerning,
         small_text,

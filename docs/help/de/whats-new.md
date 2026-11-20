@@ -73,13 +73,20 @@ lateinischen Großbuchstabens, die Zeichen waren also etwa ein Viertel
 größer); Schriftzüge in Designs, die Sie vorher gespeichert haben, behalten
 ihre Größe. Striche, die dünner als 0,8 mm sind, sticken als Steppstich,
 und das Schrift-Fenster zeigt die kleinste Höhe, bei der der Text gut
-stickt. Schriften mit Strichen, die sich überlappen
-(viele Schriften aus dem Internet), geben jetzt Buchstaben ohne Löcher und
-ohne Stiche außerhalb des Buchstabens. Siehe [Schrift](lettering).
+stickt. Schriften mit Strichen, die sich überlappen (viele Schriften aus
+dem Internet), geben jetzt Buchstaben ohne Löcher und ohne Stiche außerhalb
+des Buchstabens. Siehe [Schrift](lettering).
+
+**Japanische Stickschriften.** Ein neues Schriftpaket hat zwei japanische
+Stickschriften, Noto Sans JP (eine Gothic) und Zen Maru Gothic (eine runde
+Gothic): lateinische Buchstaben, die Kana, die 2.136 Jōyō-Kanji und
+japanische Satzzeichen, jeder Buchstabe mit der Stickreihenfolge der
+Schriften des Programms. Über der größten Größe ihrer Satinsäulen sticken
+die Striche als Tatami-Säulen, nicht als Füllungen.
 
 **Mehr Schriften, mit einer Qualitätswertung.** Das Programm hat 65
 Stickschriften (vorher 30), und die Schriftpakete auf der Seite des
-Programms haben 68 weitere. Jede Stickschrift hat eine Qualitätswertung von
+Programms haben 70 weitere. Jede Stickschrift hat eine Qualitätswertung von
 0 bis 100: **Schrift > Schriften** zeigt sie und kann nach ihr sortieren.
 Die Größenbereiche einiger Schriften sind jetzt kleiner, damit ihre dünnen
 Striche bei der kleinsten Größe nicht zu schmal sind. Vier Schriften mit

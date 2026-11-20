@@ -28,6 +28,9 @@ use crate::words;
 
 /// Font files larger than this are not read (large Asian fonts).
 const MAX_FONT_BYTES: u64 = 50 * 1024 * 1024;
+/// An embroidery font file larger than this is read in full only when the
+/// font is used (a Japanese font with its kanji).
+const LARGE_FONT_BYTES: u64 = 4 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum FontSource {
@@ -345,19 +348,36 @@ impl FontLibrary {
     }
 
     /// Adds one embroidery font file. A font with the same name is replaced.
+    /// A large file (a Japanese font with its kanji, P20 Milestone 6) is
+    /// read in full only when the font is used: the list gets its names.
     pub fn add_user_font(&mut self, path: &Path) -> Result<FontRef, String> {
-        let f = correct(EmbFont::load(path)?, self.corrections_dir.as_deref());
-        let r = FontRef::embroidery(&f.family, &f.style);
+        let large = std::fs::metadata(path).is_ok_and(|m| m.len() > LARGE_FONT_BYTES);
+        let (r, tuned, fill, score, font) = if large {
+            let h = EmbFont::load_header(path)?;
+            (
+                FontRef::embroidery(&h.family, &h.style),
+                h.tuned,
+                h.fill,
+                h.quality.map(|q| q.score),
+                None,
+            )
+        } else {
+            let f = correct(EmbFont::load(path)?, self.corrections_dir.as_deref());
+            let r = FontRef::embroidery(&f.family, &f.style);
+            (r, f.tuned, f.fill, f.quality.map(|q| q.score), Some(f))
+        };
         self.entries.retain(|e| !e.font.same(&r));
         self.loaded.retain(|k, _| !k.same(&r));
         self.entries.push(FontEntry {
             font: r.clone(),
             source: FontSource::EmbFile(path.to_path_buf()),
-            tuned: f.tuned,
-            fill: f.fill,
-            score: f.quality.map(|q| q.score),
+            tuned,
+            fill,
+            score,
         });
-        self.loaded.insert(r.clone(), AnyFont::Embroidery(Arc::new(f)));
+        if let Some(f) = font {
+            self.loaded.insert(r.clone(), AnyFont::Embroidery(Arc::new(f)));
+        }
         self.sort();
         Ok(r)
     }

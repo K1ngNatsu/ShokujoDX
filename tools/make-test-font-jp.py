@@ -6,7 +6,7 @@
 # version 2.004, SIL Open Font License; the Reserved Font Name is "Source",
 # so the subset keeps the name Noto Sans JP). The tool takes its Bold
 # instance (wght 700) and keeps only the characters of the reference set
-# and of the test words of crates/emb-cli/src/lettering_bench.rs, and "H"
+# and of the test words of crates/emb-letter/src/japanese.rs, and "H"
 # (the capital height of the font). The license text is
 # crates/emb-cli/tests/data/noto-sans-jp-OFL.txt.
 #
@@ -25,7 +25,7 @@ from fontTools.ttLib import TTFont
 from fontTools.varLib import instancer
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BENCH = os.path.join(ROOT, "crates", "emb-cli", "src", "lettering_bench.rs")
+BENCH = os.path.join(ROOT, "crates", "emb-letter", "src", "japanese.rs")
 OUT = os.path.join(ROOT, "crates", "emb-cli", "tests", "data", "noto-sans-jp-bold-subset.ttf")
 SETS = ["HIRAGANA", "KATAKANA", "KANJI_FIRST_YEAR", "KANJI_MORE", "PUNCTUATION"]
 QUOTE = chr(34)

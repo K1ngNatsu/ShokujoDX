@@ -69,13 +69,20 @@ de un texto japonés, chino o coreano es ahora la altura de sus caracteres
 alrededor de una cuarta parte más grandes); las letras de los diseños que
 guardó antes mantienen su tamaño. Los trazos de menos de 0,8 mm se bordan
 como puntada recta, y la ventana Letras muestra la altura más pequeña a la
-que el texto se borda bien. Las fuentes con trazos que
-se superponen (muchas fuentes de internet) dan ahora letras sin agujeros y
-sin puntadas fuera de la letra. Consulte [Letras](lettering).
+que el texto se borda bien. Las fuentes con trazos que se superponen
+(muchas fuentes de internet) dan ahora letras sin agujeros y sin puntadas
+fuera de la letra. Consulte [Letras](lettering).
+
+**Fuentes de bordado japonesas.** Un nuevo paquete de fuentes tiene dos
+fuentes de bordado japonesas, Noto Sans JP (una gótica) y Zen Maru Gothic
+(una gótica redondeada): letras latinas, los kana, los 2136 kanji jōyō y la
+puntuación japonesa, cada letra con el orden de bordado de las fuentes del
+programa. Por encima del tamaño más grande de sus columnas de satén, los
+trazos se bordan como columnas de tatami, no como rellenos.
 
 **Más fuentes, con una puntuación de calidad.** El programa tiene 65
 fuentes de bordado (antes 30), y los paquetes de fuentes de la página del
-programa tienen 68 más. Cada fuente de bordado tiene una puntuación de
+programa tienen 70 más. Cada fuente de bordado tiene una puntuación de
 calidad de 0 a 100: **Letras > Fuentes** la muestra y puede ordenar por
 ella. Los rangos de tamaños de algunas fuentes son ahora más pequeños, para
 que sus trazos finos no sean demasiado estrechos en el tamaño más pequeño.
