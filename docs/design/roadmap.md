@@ -240,7 +240,11 @@ copies of the range check of a point are one function.
   drawing), `AppState` has 185 fields, and `ribbon::commands::meta` is one
   table of 1,560 lines. They work and have tests. A split of `sketch.rs`
   into a folder module (as `ribbon/`, 2026-10-29) is the next step when
-  sketch mode gets more work.
+  sketch mode gets more work. *Done on 2026-11-20 (owner request):
+  `sketch/` is a folder module of twelve files and its tests. Each item
+  moved with no change; the items that more than one file uses are
+  `pub(super)`. The three longest functions (`draw_overlay`,
+  `handle_input` and `make`, 340 to 500 lines) are as they were.*
 - The ADRs name the code as it was at their date (a name in each of
   ADR 0042, 0124 and 0127 is gone or has another name now). An ADR is a
   record, so they stay.
