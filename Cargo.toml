@@ -80,9 +80,18 @@ unsafe_code = "forbid"
 # Release builds keep the default debug data: the .pdb file (about 10 MB)
 # gives the function names in crash reports. Line tables made it 90 MB.
 
+# Debug builds keep only the line tables of the workspace crates: a panic
+# still gives the file and the line. Full debug data of optimized code made
+# a .pdb file of 590 MB for each test program of emb-app, and Cargo does not
+# remove the files of earlier builds (target/debug grew to 370 GB).
+[profile.dev]
+debug = "line-tables-only"
+
 [profile.dev.package."*"]
 # Optimize dependencies in debug builds so the prototype canvas stays fast.
 opt-level = 2
+# No debug data for dependencies (the .pdb file keeps their function names).
+debug = false
 
 # The prototype canvas draws many stitches per frame. Optimize these crates in debug builds too.
 [profile.dev.package.emb-app]
