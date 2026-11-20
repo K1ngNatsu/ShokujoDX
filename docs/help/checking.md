@@ -147,8 +147,10 @@ through** and **Thread height limit**).
 trim and color change). **Stitch Parts** colors the stitches by the kind
 of their part: runs (blue), columns (orange), rows of a fill (green) and
 other stitches (purple); the underlay of a part has its color, paler.
-It shows how the program reads the stitches of a machine file of another
-program, the first step to make objects of them.
+Lines show the objects that the parts become: the line of a running
+object and the two sides of a satin column. It shows how the program
+reads the stitches of a machine file of another program, the first step
+to make objects of them.
 
 ## The product
 

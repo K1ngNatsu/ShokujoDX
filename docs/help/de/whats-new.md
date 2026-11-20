@@ -132,8 +132,10 @@ nachtleuchtendes Garn. Siehe [Ein Design prüfen](checking).
 nach der Art ihres Teils: Steppstiche, Säulen und die Reihen von
 Füllungen, mit der Unterlage jedes Teils. Das Programm findet sie in den
 Stichen einer Maschinendatei eines anderen Programms: der erste Schritt,
-um aus einer solchen Datei Objekte mit Sticharten zu machen. Siehe [Ein
-Design prüfen](checking).
+um aus einer solchen Datei Objekte mit Sticharten zu machen. Linien
+zeigen die Steppstichobjekte und die Satinsäulen (mit ihren
+Unterlage-Einstellungen), die aus den Steppstichen und den Säulen werden.
+Siehe [Ein Design prüfen](checking).
 
 **Alle Bilder in der 3D-Ansicht.** Das Designbild, das Freigabeblatt
 und das Angebot, die Bibliothek, die Miniaturbilder im Dateimanager, der

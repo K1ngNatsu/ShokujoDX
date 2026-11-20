@@ -2,7 +2,7 @@
 
 Date: 2026-11-18 · Status: Accepted (owner, 2026-11-18). Started by the
 owner on 2026-11-19, after the second part of P18 (the 3D stitch view).
-Milestone 1 is done (ADR 0131).
+Milestones 1 and 2 are done (ADR 0131, ADR 0132).
 
 ## Goal
 
@@ -67,6 +67,22 @@ over them, as underlay).
 
 **Exit test:** on the corpus round trip, the width of a recognized column
 is within 0.2 mm and its spacing within 10 % of the source object.
+
+**Done (2026-11-19, ADR 0132).** `emb_art::part_objects` makes a running
+object of each run (its line, its stitch length, a bean stitch when the
+stitches sew three times) and a satin column of each column: the passes
+of the stitches across, the densest pass as the top and the lighter ones
+before it as zigzag underlay; the rails from the needle points of each
+side, made smooth; rungs where the stitch angle needs them; the spacing
+from the stitches across; pull compensation 0; the underlay runs as a
+center walk or an edge walk, and an underlay setting (Auto, Light, Heavy,
+Double) when its layers are the same. The other parts stay stitches. View
+> Stitch Parts draws the lines of the objects. The exit test (the second
+test of `crates/emb-cli/tests/parts.rs`): 98.9 % of the stitches of the
+measured satins have the width within 0.2 mm and the spacing within 10 %
+of their source (the spacing that the source sews: the engine rounds the
+stitches in each section between two rungs). 95.6 % of the column
+stitches are in a recognized satin.
 
 ## Milestone 3: fills (L)
 

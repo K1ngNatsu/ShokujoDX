@@ -159,9 +159,11 @@ Legen Sie die Grenzen der beiden Prüfungen in den **Optionen** fest
 Farben** (ein Symbol an jedem Fadenschnitt und Farbwechsel).
 **Stichteile** färbt die Stiche nach der Art ihres Teils: Steppstiche
 (blau), Säulen (orange), Reihen einer Füllung (grün) und andere Stiche
-(violett); die Unterlage eines Teils hat seine Farbe, blasser. So sehen
-Sie, wie das Programm die Stiche einer Maschinendatei eines anderen
-Programms liest, der erste Schritt, um Objekte daraus zu machen.
+(violett); die Unterlage eines Teils hat seine Farbe, blasser. Linien
+zeigen die Objekte, die aus den Teilen werden: die Linie eines
+Steppstichobjekts und die zwei Seiten einer Satinsäule. So sehen Sie, wie
+das Programm die Stiche einer Maschinendatei eines anderen Programms
+liest, der erste Schritt, um Objekte daraus zu machen.
 
 ## Das Produkt
 

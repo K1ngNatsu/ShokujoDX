@@ -867,7 +867,7 @@ impl Cmd {
                     g(ph::PUZZLE_PIECE),
                     tr("Stitch Parts"),
                     tr(
-                        "Color the stitches by the kind of their part: runs, columns, rows of a fill and other stitches; the underlay of a part is paler. It shows how the program reads the stitches of a machine file.",
+                        "Color the stitches by the kind of their part: runs, columns, rows of a fill and other stitches; the underlay of a part is paler. Lines show the running and satin objects that the parts become. It shows how the program reads the stitches of a machine file.",
                     ),
                 ),
                 Flag::HighThread => (

@@ -18,6 +18,8 @@
 //! - `cross`: picture to cross stitch (P9 Milestone 2).
 //! - `parts`: the parts of a stitch file: runs, columns, rows (P18
 //!   Milestone 1, ADR 0131).
+//! - `part_objects`: running and satin objects from the parts (P18
+//!   Milestone 2, ADR 0132).
 //! - `smart`: picture to design (the steps of the guided wizard: detail,
 //!   colors, stitch types, sew order; ADR 0029).
 //!
@@ -35,6 +37,7 @@ pub mod crop;
 pub mod cross;
 pub mod cutout;
 mod maxflow;
+pub mod part_objects;
 pub mod parts;
 pub mod photo;
 pub mod recognize;

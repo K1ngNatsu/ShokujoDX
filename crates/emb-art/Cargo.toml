@@ -12,6 +12,9 @@ emb-geom.workspace = true
 emb-model.workspace = true
 # The stroke finder of the satin letters, for click-to-satin (ADR 0028).
 emb-letter.workspace = true
+# The satin columns and underlay of the objects from the parts of a stitch
+# file (ADR 0132).
+emb-stitch.workspace = true
 # Pixel buffers and PNG/JPEG/BMP decoding. Pure Rust.
 image.workspace = true
 

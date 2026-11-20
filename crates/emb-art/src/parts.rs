@@ -18,7 +18,9 @@
 //!    piece of a chain that is none of these is **other**.
 //! 4. **Underlay**: a part that a later part of the same color covers (the
 //!    area of its stitches, [`COVER_CELL_MM`] cells) goes with that part:
-//!    the underlay and the travel under a column or a fill.
+//!    the underlay and the travel under a column or a fill. A run or a
+//!    lighter part between two parts of the underlay of a part goes with it
+//!    too.
 //!
 //! A part that the program does not recognize stays a stitch part; no
 //! stitch is lost (the plan of the phase).
@@ -43,7 +45,7 @@ const COVERED: f64 = 0.85;
 /// the part over it.
 const LIGHTER: f64 = 0.8;
 /// Two legs go back and forth if the cosine of their angle is below this.
-const BACK: f64 = -0.6;
+pub(crate) const BACK: f64 = -0.6;
 /// The turn legs between two rows are at most this long, and at most half
 /// as long as the shorter row, but this long can always be a turn, mm.
 const TURN_MM: f64 = 4.0;
@@ -133,25 +135,25 @@ pub fn kinds_of_records(parts: &[Part], records: usize) -> Vec<Option<PartKind>>
 /// A leg: stitches `start..end` of a chain (stitch `k` goes from point `k`
 /// to point `k + 1`).
 #[derive(Debug, Clone, Copy)]
-struct Leg {
-    start: usize,
-    end: usize,
+pub(crate) struct Leg {
+    pub(crate) start: usize,
+    pub(crate) end: usize,
     /// From the first point to the last.
-    a: Point,
-    b: Point,
+    pub(crate) a: Point,
+    pub(crate) b: Point,
 }
 
 impl Leg {
-    fn len(&self) -> f64 {
+    pub(crate) fn len(&self) -> f64 {
         self.a.distance(self.b)
     }
 
-    fn dir(&self) -> (f64, f64) {
+    pub(crate) fn dir(&self) -> (f64, f64) {
         let l = self.len().max(1e-9);
         ((self.b.x - self.a.x) / l, (self.b.y - self.a.y) / l)
     }
 
-    fn stitches(&self) -> usize {
+    pub(crate) fn stitches(&self) -> usize {
         self.end - self.start
     }
 
@@ -160,7 +162,7 @@ impl Leg {
     }
 }
 
-fn dot(a: (f64, f64), b: (f64, f64)) -> f64 {
+pub(crate) fn dot(a: (f64, f64), b: (f64, f64)) -> f64 {
     a.0 * b.0 + a.1 * b.1
 }
 
@@ -225,7 +227,7 @@ fn chains(s: &StitchDesign) -> Vec<(usize, Range<usize>)> {
 }
 
 /// The legs of the points of a chain (see the module text).
-fn legs(points: &[Point]) -> Vec<Leg> {
+pub(crate) fn legs(points: &[Point]) -> Vec<Leg> {
     let n = points.len().saturating_sub(1);
     let mut out: Vec<Leg> = Vec::new();
     let turn = emb_geom::math::cos(emb_geom::math::to_radians(LEG_TURN_DEG));
@@ -489,6 +491,22 @@ fn find_underlay(s: &StitchDesign, parts: &mut [Part]) {
             for &c in own {
                 next.insert(c, i);
             }
+        }
+    }
+    // A run or a lighter part between two parts of the underlay of one part
+    // (or the underlay and the part) goes with it too: a piece of a zigzag
+    // that its cells do not cover.
+    for i in 1..n.saturating_sub(1) {
+        let thread = parts[i].thread;
+        if parts[i].underlay_of.is_some() || parts[i - 1].thread != thread || parts[i + 1].thread != thread {
+            continue;
+        }
+        if let Some(j) = parts[i - 1].underlay_of
+            && j > i
+            && (parts[i + 1].underlay_of == Some(j) || i + 1 == j)
+            && (parts[i].kind == PartKind::Run || density[i] < LIGHTER * density[j])
+        {
+            parts[i].underlay_of = Some(j);
         }
     }
 }
