@@ -71,3 +71,6 @@ needlework, so the name fits an embroidery program. The owner chose
   register for 织女 and get a full clearance search from a trademark
   lawyer (docs/SPEC.md, the open questions).
 - ADR 0059 and the plans keep the names of their time.
+- Changed on 2026-11-20 (ADR 0140): the icon is the logo of the software
+  of the owner's shop (a purple star in a hoop, with a needle and a
+  thread), not the drawing of item 7.

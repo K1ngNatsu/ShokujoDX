@@ -94,3 +94,5 @@ licenses, the guide and the sample designs. The program had no icon.
   safe crate) gives the program the files of Finder.
 - The settings stay in the folder of each system (ADR 0013): an
   uninstall does not remove them.
+- Changed on 2026-11-20 (ADR 0140): `tools/make-icon.py` makes the icon
+  from the logo `data/icon/icon.svg`, with one drawing for all sizes.

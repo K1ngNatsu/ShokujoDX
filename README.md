@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="data/icon/icon-256.png" alt="ShokujoDX icon: an embroidery hoop with a gold star and a needle" width="160">
+<img src="data/icon/icon-256.png" alt="ShokujoDX icon: a purple star in an embroidery hoop with a needle and a thread" width="160">
 
 # ShokujoDX
 
