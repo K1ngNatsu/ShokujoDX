@@ -132,7 +132,9 @@ shaping](artwork).
 **Ink/Stitch files.** **File > Open** opens the SVG files of Ink/Stitch
 as designs: fills, satin columns and lines with their settings, the
 commands for trims, stops and start points, and the thread colors. A
-setting that the program does not read shows in a note. See [File
+setting that the program does not read shows in a note. **Design > Export
+for Ink/Stitch** writes a design as such a file, and **Lettering > Fonts >
+Ink/Stitch Font…** converts the lettering fonts of Ink/Stitch. See [File
 formats](file-formats).
 
 **Stitch parts.** **View > Stitch Parts** colors the stitches of a

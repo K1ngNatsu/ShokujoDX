@@ -120,6 +120,14 @@ sticken lässt. Eine Füllung ist nur in einer Schrift für große Buchstaben
 besser (Größenbereich ab 15 mm): Dort wird ein Buchstabe, dessen Säulen
 einen Teil seiner Form offen lassen, zu einer Füllung.
 
+**Ink/Stitch-Schrift…** wandelt eine Schrift von Ink/Stitch in eine
+Stickschrift um: wählen Sie den Ordner der Schrift (mit font.json und
+ltr.svg). Jeder Buchstabe behält seine Teile in der Reihenfolge der
+Schrift und die Unterlage, die Zugkompensation und den Füllwinkel jedes
+Teils; das Schriftobjekt setzt den Abstand. Nach der Umwandlung zeigt eine
+Notiz die Lizenz der Schrift. Prüfen Sie, ob die Lizenz Ihnen die Nutzung
+erlaubt.
+
 ## Arabisch, Devanagari und Ligaturen
 
 Mit einer TrueType- oder OpenType-Schrift formt das Programm den Text so,

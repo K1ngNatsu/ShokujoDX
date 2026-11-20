@@ -217,6 +217,7 @@ fn file_menu(ui: &mut egui::Ui, st: &mut AppState) {
     item(ui, st, Cmd::SendByEmail, tr("Send by Email…"));
     item(ui, st, Cmd::ExportSvg, tr("Export Design Picture (SVG)…"));
     item(ui, st, Cmd::ExportOutlines, tr("Export Outlines (SVG, EMF)…"));
+    item(ui, st, Cmd::ExportInkstitch, tr("Export for Ink/Stitch (SVG)…"));
     item(ui, st, Cmd::CutterFile, tr("Appliqué Cutter File (SVG, DXF)…"));
     item(ui, st, Cmd::OutputDesign, tr("Output Design…"));
     item(ui, st, Cmd::PrintPreview, tr("Print Preview…"));

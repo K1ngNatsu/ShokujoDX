@@ -10,6 +10,7 @@ repository.workspace = true
 [dependencies]
 emb-geom.workspace = true
 emb-model.workspace = true
+emb-formats.workspace = true
 thiserror.workspace = true
 serde.workspace = true
 serde_json.workspace = true

@@ -150,6 +150,9 @@ pub struct FontsWindow {
     job: Option<Receiver<Result<PathBuf, String>>>,
     /// The progress of the conversion that runs.
     progress: std::sync::Arc<ConvertProgress>,
+    /// The notes of a conversion of an Ink/Stitch font (its license and
+    /// what the converter could not keep).
+    notes: Option<Receiver<Vec<String>>>,
 }
 
 impl FontsWindow {
@@ -343,9 +346,16 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         && let Ok(result) = rx.try_recv()
     {
         st.fonts_window.job = None;
+        let notes = st.fonts_window.notes.take().and_then(|n| n.try_recv().ok());
         match result.and_then(|path| st.fonts.add_user_font(&path)) {
             Ok(r) => {
                 st.message = crate::i18n::fill("Embroidery font {} is ready.", &[&(r.label())]);
+                if let Some(lines) = notes {
+                    st.notice = Some(crate::file::Notice {
+                        title: "Ink/Stitch font converted".into(),
+                        lines,
+                    });
+                }
                 st.fonts_window.selected = Some(r.clone());
                 st.fonts_window.preview = None;
                 st.fonts_window.kind = None;
@@ -407,6 +417,20 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                 .clicked()
             {
                 crate::update::open_releases_page(st);
+            }
+            if ui
+                .add_enabled(st.fonts_window.job.is_none(), egui::Button::new(tr("Ink/Stitch Font…")))
+                .on_hover_text(tr(
+                    "Convert a lettering font of Ink/Stitch to an embroidery font: choose its folder (with \
+                     font.json). Check that the license of the font lets you use it.",
+                ))
+                .clicked()
+                && let Some(folder) = rfd::FileDialog::new()
+                    .set_title(tr("Folder of an Ink/Stitch font"))
+                    .set_directory(st.dialog_dir())
+                    .pick_folder()
+            {
+                start_inkstitch_convert(st, folder);
             }
         });
         ui.separator();
@@ -770,6 +794,49 @@ fn convert_ui(ui: &mut egui::Ui, st: &mut AppState, sel: &FontRef) {
         if ui.button(tr("Cancel")).clicked() {
             st.fonts_window.form = None;
         }
+    });
+}
+
+/// Converts the font of Ink/Stitch in `folder` into the folder of user
+/// fonts, in a thread (ADR 0136); the notes of the converter show in a
+/// notice.
+pub fn start_inkstitch_convert(st: &mut AppState, folder: PathBuf) {
+    let Some(dir) = crate::lettering::user_fonts_dir() else {
+        st.message = tr("There is no folder for user fonts.").into();
+        return;
+    };
+    if !emb_letter::inkstitch::is_inkstitch_font(&emb_letter::inkstitch::font_folder(&folder)) {
+        st.notice = Some(crate::file::Notice {
+            title: "Not an Ink/Stitch font".into(),
+            lines: vec![
+                folder.display().to_string(),
+                tr("The folder has no font.json of an Ink/Stitch font.").to_string(),
+            ],
+        });
+        return;
+    }
+    let (tx, rx) = channel();
+    st.fonts_window.job = Some(rx);
+    st.fonts_window.form = None;
+    st.fonts_window.progress = std::sync::Arc::new(ConvertProgress::default());
+    let (ntx, nrx) = channel();
+    st.fonts_window.notes = Some(nrx);
+    std::thread::spawn(move || {
+        let run = || -> Result<PathBuf, String> {
+            let c = emb_letter::inkstitch::convert_inkstitch_font(&folder)?;
+            std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+            let path = dir.join(format!(
+                "{}.{}",
+                file_name(&c.font.family),
+                emb_letter::embfont::FILE_EXTENSION
+            ));
+            c.font.save(&path)?;
+            let mut lines = vec![crate::i18n::fill("License: {}", &[&c.license])];
+            lines.extend(c.warnings);
+            ntx.send(lines).ok();
+            Ok(path)
+        };
+        tx.send(run()).ok();
     });
 }
 

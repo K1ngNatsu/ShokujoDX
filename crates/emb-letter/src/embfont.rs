@@ -253,6 +253,48 @@ impl EmbFont {
         std::fs::write(path, self.to_json()).map_err(|e| format!("{}: {e}", path.display()))
     }
 
+    /// A font of letters made by another program (a font of Ink/Stitch, ADR
+    /// 0136): the letters and the sizes in mm, at the design size
+    /// `cap_height_mm`. A font with fills only is a fill font.
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_letters(
+        family: &str,
+        notes: String,
+        cap_height_mm: f64,
+        line_height_mm: f64,
+        space_mm: f64,
+        range: (f64, f64),
+        letters: BTreeMap<char, EmbLetter>,
+        kerning: BTreeMap<String, f64>,
+    ) -> EmbFont {
+        let fill = letters
+            .values()
+            .flat_map(|l| &l.parts)
+            .all(|p| matches!(p, ObjectKind::Fill { .. }));
+        let mut f = EmbFont {
+            format: FORMAT.into(),
+            version: VERSION,
+            family: family.to_string(),
+            style: "Regular".into(),
+            notes,
+            cap_height_mm,
+            line_height_mm,
+            space_mm,
+            min_height_mm: range.0,
+            max_height_mm: range.1,
+            fill_letters: None,
+            letters,
+            kerning,
+            small_text: false,
+            tuned: false,
+            fill,
+            quality: None,
+            kern: HashMap::new(),
+        };
+        f.index();
+        f
+    }
+
     /// An alphabet with no letters yet (only the space), for letters made
     /// by hand (P4 Milestone 7).
     pub fn empty(family: &str, style: &str) -> EmbFont {

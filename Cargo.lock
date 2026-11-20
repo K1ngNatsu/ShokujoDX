@@ -1308,6 +1308,7 @@ dependencies = [
 name = "emb-letter"
 version = "0.3.0"
 dependencies = [
+ "emb-formats",
  "emb-geom",
  "emb-model",
  "flate2",

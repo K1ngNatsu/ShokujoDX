@@ -64,6 +64,15 @@ una paleta de hilos que es una carta del programa, los hilos reciben sus
 nombres y números. Un ajuste que el programa no lee aparece en las notas
 que se muestran al abrir el archivo.
 
+**Diseño > Exportar para Ink/Stitch** (también en el menú Archivo) escribe
+el diseño como un archivo SVG de Ink/Stitch: rellenos, columnas de satén,
+líneas, letras (las partes de sus letras) y aplicaciones (las líneas de
+colocación, las líneas de fijación y las columnas de cubierta, con una
+parada tras cada paso), con sus ajustes y comandos. Las notas indican los
+objetos y los ajustes que Ink/Stitch no tiene. **Letras > Fuentes > Fuente
+de Ink/Stitch…** convierte una fuente de letras de Ink/Stitch: vea
+[Letras](lettering).
+
 ## Otros archivos
 
 | Archivo | Leer | Escribir | Uso |

@@ -611,6 +611,7 @@ pub enum Cmd {
     CloseGaps,
     CleanUp,
     ExportSvg,
+    ExportInkstitch,
     Simplify,
     CornerRadius,
     HoleFromOutline,
@@ -2081,6 +2082,13 @@ impl Cmd {
                 tr("Export SVG"),
                 tr("Save the design picture as SVG: the stitches as lines in the thread colors, at real size."),
             ),
+            Cmd::ExportInkstitch => (
+                g(ph::FILE_CODE),
+                tr("Export for Ink/Stitch"),
+                tr(
+                    "Save the design as an SVG file with the settings of Ink/Stitch: fills, satin columns and lines with their stitch types.",
+                ),
+            ),
             Cmd::QuickSimplify => (
                 g(ph::BEZIER_CURVE),
                 tr("Quick Simplify"),
@@ -2332,6 +2340,7 @@ impl Cmd {
                 | Cmd::InsertMachineFile
                 | Cmd::BatchOutput
                 | Cmd::ExportSvg
+                | Cmd::ExportInkstitch
                 | Cmd::HoopTemplate
                 | Cmd::OutputHoopings
                 | Cmd::SaveDecoration

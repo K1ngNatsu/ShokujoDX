@@ -4,7 +4,8 @@ Date: 2026-11-18 · Status: Accepted (owner, 2026-11-18). Started by the
 owner on 2026-11-19, after the second part of P18 (the 3D stitch view).
 Milestones 1 to 3 are done (ADR 0131, ADR 0132, ADR 0133); Milestone 4 is
 done except the sew-out of the owner (ADR 0134); Milestone 5 is done except
-the exit test of the owner (ADR 0135).
+the exit test of the owner (ADR 0135); Milestone 6 is done except the exit
+test of the owner and the bundled fonts (ADR 0136).
 
 ## Goal
 
@@ -186,6 +187,24 @@ colors, and sews. The files of testers are for the owner.
 
 **Exit test:** a corpus design written and opened in Ink/Stitch gives the
 same objects; one converted font sews correctly at its sizes.
+
+**Done except the exit test of the owner and the bundled fonts
+(2026-11-20, ADR 0136).** Design > Export for Ink/Stitch
+(`emb_formats::inkstitch::write`) writes fills, satin columns (rails and
+rungs that Ink/Stitch pairs as the program does), lines, stitch objects
+(manual stitches), lettering (its parts), appliqué (placement, tack-down
+and cover with stops) and vector objects, with their settings, the
+underlay layers that they sew, and commands for start and end points;
+notes list what Ink/Stitch does not have. Lettering > Fonts > Ink/Stitch
+Font… (`emb_letter::inkstitch`) converts a font folder of Ink/Stitch: the
+glyph layers become fixed letters with the settings of each part, with the
+advances, the kerning, the line height, the space and the size range of
+`font.json`, and the license in the notes. The automated part of the exit
+test (`crates/emb-cli/tests/inkstitch.rs`): the 85 corpus designs, written
+and read again, give the same 2,768 objects, kinds and colors; the font
+Cats of Ink/Stitch (OFL) converts with 115 letters, and its test sheet
+sews at three sizes. The owner chose a test only for the fonts of
+Ink/Stitch (2026-11-20): no font is bundled yet.
 
 ## Milestone 7: outlines with a stitch file (M)
 

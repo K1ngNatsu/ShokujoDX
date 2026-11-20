@@ -140,7 +140,9 @@ tun, die Sie öffnen. Siehe [Vektorgrafik und Formen](artwork).
 Ink/Stitch als Designs: Füllungen, Satinsäulen und Linien mit ihren
 Einstellungen, die Befehle für Schneiden, Stopps und Startpunkte und die
 Garnfarben. Eine Einstellung, die das Programm nicht liest, steht in einer
-Notiz. Siehe [Dateiformate](file-formats).
+Notiz. **Design > Für Ink/Stitch exportieren** schreibt ein Design als
+solche Datei, und **Schrift > Schriften > Ink/Stitch-Schrift…** wandelt
+die Schriften von Ink/Stitch um. Siehe [Dateiformate](file-formats).
 
 **Stichteile.** **Ansicht > Stichteile** färbt die Stiche eines Designs
 nach der Art ihres Teils: Steppstiche, Säulen und die Reihen von

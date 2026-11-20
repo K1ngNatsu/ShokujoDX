@@ -683,7 +683,7 @@ pub(super) const DESIGN: &[Panel] = &[
             Large(Cmd::Export),
             Large(Cmd::SendToUsb),
             Small(&[Cmd::PrintPreview, Cmd::BatchOutput, Cmd::ExportSvg]),
-            Small(&[Cmd::SendToUsbChoose, Cmd::SendByEmail]),
+            Small(&[Cmd::SendToUsbChoose, Cmd::SendByEmail, Cmd::ExportInkstitch]),
         ],
     },
 ];

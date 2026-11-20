@@ -361,6 +361,19 @@ pub fn lace_underlay(mean_width: f64) -> Vec<UnderlayLayer> {
     }
 }
 
+/// The underlay layers of the setting `u` for a column of `mean_width`.
+pub fn underlay_layers(u: &Underlay, mean_width: f64) -> Vec<UnderlayLayer> {
+    match u {
+        Underlay::Auto => auto_underlay(mean_width),
+        Underlay::Light => light_underlay(mean_width),
+        Underlay::Heavy => heavy_underlay(mean_width),
+        Underlay::Double => double_underlay(mean_width),
+        Underlay::Lace => lace_underlay(mean_width),
+        Underlay::None => Vec::new(),
+        Underlay::Custom(l) => l.clone(),
+    }
+}
+
 /// Needle points of one underlay layer, from the start of the column to the end and back.
 fn underlay_layer(col: &Column, layer: &UnderlayLayer) -> Vec<Point> {
     match *layer {
@@ -490,15 +503,7 @@ pub(crate) fn satin_with(
         col.even = true;
         col.across = true;
     }
-    let layers = match &p.underlay {
-        Underlay::Auto => auto_underlay(col.mean_width()),
-        Underlay::Light => light_underlay(col.mean_width()),
-        Underlay::Heavy => heavy_underlay(col.mean_width()),
-        Underlay::Double => double_underlay(col.mean_width()),
-        Underlay::Lace => lace_underlay(col.mean_width()),
-        Underlay::None => Vec::new(),
-        Underlay::Custom(l) => l.clone(),
-    };
+    let layers = underlay_layers(&p.underlay, col.mean_width());
     let mut out: Vec<Point> = Vec::new();
     for layer in &layers {
         // Puff: no rows across the column, they press the foam flat.

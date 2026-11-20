@@ -62,6 +62,14 @@ thread palette that is a chart of the program, the threads get their
 names and numbers. A setting that the program does not read is in the
 notes that show after the file opens.
 
+**Design > Export for Ink/Stitch** (also in the File menu) writes the
+design as an SVG file of Ink/Stitch: fills, satin columns, lines,
+lettering (the parts of its letters) and appliqué (the placement lines,
+the tack-down lines and the cover columns, with a stop after each step),
+with their settings and commands. The notes list the objects and the
+settings that Ink/Stitch does not have. **Lettering > Fonts > Ink/Stitch
+Font…** converts a lettering font of Ink/Stitch: see [Lettering](lettering).
+
 ## Other files
 
 | File | Read | Write | Use |

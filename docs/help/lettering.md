@@ -107,6 +107,13 @@ satin columns and as a fill, and keeps the one that sews better. A fill is
 better only in a font for large letters (a size range from 15 mm): there,
 a letter whose columns leave a part of its shape open becomes a fill.
 
+**Ink/Stitch Font…** converts a lettering font of Ink/Stitch to an
+embroidery font: choose the folder of the font (with font.json and
+ltr.svg). Each letter keeps its parts in the order of the font, and the
+underlay, the pull compensation and the fill angle of each part; the
+lettering object sets the spacing. After the conversion, a note shows the
+license of the font. Check that the license lets you use the font.
+
 ## Arabic, Devanagari and ligatures
 
 With a TrueType or OpenType font, the program shapes the text as a word

@@ -15,6 +15,10 @@ Usage:
       then write a machine file (.dst, .vp3, .pes, .pec, .exp, .jef, .xxx,
       .tbf, .tap, .u01), the stitch list as JSON (.json) or the design
       picture as SVG (.svg).
+  emb-cli inkstitch <design> <out.svg>
+      Write a design (.embproj, .svg) as an SVG file with the settings of
+      Ink/Stitch: fills, satin columns and lines with their stitch types
+      (ADR 0136). It prints what the file does not have.
   emb-cli stitch <input> [--machine <id>] [--fabric <id>]
       Print a summary of the stitches of the input, the thread use (an
       estimate, on the fabric of the design), the places of the density
@@ -114,6 +118,10 @@ Usage:
       (ADR 0113).
       --tuned: mark the font as a tuned font (the font lists show it
       first).
+  emb-cli font-inkstitch <font folder or font.json> <out.embfont>
+      Convert a lettering font of Ink/Stitch (a folder with font.json,
+      LICENSE and ltr.svg) to an embroidery font (ADR 0136). It prints the
+      license of the font: check that it lets you use the font.
   emb-cli font-sheet <font.embfont> <out.embproj> [--sizes <mm>,<mm>,...]
                      [--chars basic|all|capitals|lowercase|digits|accented]
                      [--text <text>] [--row <mm>] [--corrections <file>]
@@ -513,6 +521,20 @@ fn run(args: &[String]) -> Result<(), String> {
             );
             Ok(())
         }
+        ["inkstitch", input, output] => {
+            let emb_cli::Input::Design(d) = read_fabric(input, &out.fabric)? else {
+                return Err(format!(
+                    "{input}: a design (.embproj, .svg) is needed, not a machine file"
+                ));
+            };
+            let w = emb_formats::inkstitch::write::write_inkstitch(&d, &emb_stitch::object::underlay_layers);
+            std::fs::write(output, &w.svg).map_err(|e| format!("{output}: {e}"))?;
+            for line in &w.warnings {
+                eprintln!("note: {line}");
+            }
+            println!("wrote {output}: {} objects for Ink/Stitch", d.objects().len());
+            Ok(())
+        }
         ["stitch", input] => {
             let input = read_fabric(input, &out.fabric)?;
             let fabrics = emb_model::FabricCatalog::builtin();
@@ -724,6 +746,22 @@ fn run(args: &[String]) -> Result<(), String> {
                 f.kerning.len(),
                 f.min_height_mm,
                 f.max_height_mm
+            );
+            Ok(())
+        }
+        ["font-inkstitch", input, output] => {
+            let c = emb_letter::inkstitch::convert_inkstitch_font(Path::new(input))?;
+            for w in &c.warnings {
+                eprintln!("note: {w}");
+            }
+            c.font.save(Path::new(output))?;
+            println!(
+                "wrote {output}: {} {} letters, {:.1}-{:.1} mm; license: {}",
+                c.font.family,
+                c.font.letters.len(),
+                c.font.min_height_mm,
+                c.font.max_height_mm,
+                c.license
             );
             Ok(())
         }

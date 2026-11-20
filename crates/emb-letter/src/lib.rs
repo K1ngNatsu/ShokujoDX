@@ -22,6 +22,7 @@ pub mod embfont;
 pub mod font;
 pub mod glyph;
 pub mod grid;
+pub mod inkstitch;
 pub mod keyboard;
 pub mod layout;
 pub mod monogram;

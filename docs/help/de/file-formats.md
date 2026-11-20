@@ -63,6 +63,15 @@ Garnpalette, die eine Farbkarte des Programms ist, bekommen die Garne ihre
 Namen und Nummern. Eine Einstellung, die das Programm nicht liest, steht
 in den Notizen, die nach dem Öffnen erscheinen.
 
+**Design > Für Ink/Stitch exportieren** (auch im Menü Datei) schreibt das
+Design als SVG-Datei von Ink/Stitch: Füllungen, Satinsäulen, Linien,
+Schrift (die Teile ihrer Buchstaben) und Applikationen (die
+Platzierungslinien, die Heftlinien und die Abdecksäulen, mit einem Stopp
+nach jedem Schritt), mit ihren Einstellungen und Befehlen. Die Notizen
+nennen die Objekte und Einstellungen, die Ink/Stitch nicht hat. **Schrift
+> Schriften > Ink/Stitch-Schrift…** wandelt eine Schrift von Ink/Stitch
+um: siehe [Schrift](lettering).
+
 ## Andere Dateien
 
 | Datei | Lesen | Schreiben | Verwendung |

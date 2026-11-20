@@ -1142,6 +1142,58 @@ pub fn lace_fill_underlay(shape: &Shape) -> Vec<UnderlayLayer> {
     v
 }
 
+/// The underlay layers of the setting `u` for a fill shape.
+fn fill_underlay_layers(shape: &Shape, u: &Underlay) -> Vec<UnderlayLayer> {
+    match u {
+        Underlay::Auto => auto_fill_underlay(shape),
+        Underlay::Light => light_fill_underlay(shape),
+        Underlay::Heavy => heavy_fill_underlay(shape),
+        Underlay::Double => {
+            let mut v = auto_fill_underlay(shape);
+            if let Some(UnderlayLayer::Tatami {
+                inset_mm, spacing_mm, ..
+            }) = v.first().cloned()
+            {
+                v = vec![
+                    UnderlayLayer::Tatami {
+                        inset_mm,
+                        spacing_mm,
+                        angle_deg: 45.0,
+                    },
+                    UnderlayLayer::Tatami {
+                        inset_mm,
+                        spacing_mm,
+                        angle_deg: -45.0,
+                    },
+                ];
+            }
+            v
+        }
+        Underlay::Lace => lace_fill_underlay(shape),
+        Underlay::None => Vec::new(),
+        Underlay::Custom(l) => l.clone(),
+    }
+}
+
+/// The underlay layers that a fill or a satin column sews: the layers of
+/// its underlay setting for its shape or its width (the writer of Ink/Stitch
+/// files needs them, ADR 0136). `None` for the other kinds. Tatami angles
+/// are relative to the fill angle.
+pub fn underlay_layers(kind: &ObjectKind) -> Option<Vec<UnderlayLayer>> {
+    match kind {
+        ObjectKind::Fill { outer, holes, params } => {
+            let outers = outer.flatten(FLATTEN_TOL_MM);
+            let holes: Vec<Polyline> = holes.iter().flat_map(|h| h.flatten(FLATTEN_TOL_MM)).collect();
+            Some(fill_underlay_layers(&Shape::new(&outers, &holes), &params.underlay))
+        }
+        ObjectKind::Satin { geometry, params } => {
+            let width = crate::satin::Column::new(geometry).map_or(0.0, |c| c.mean_width());
+            Some(crate::satin::underlay_layers(&params.underlay, width))
+        }
+        _ => None,
+    }
+}
+
 /// The row split of a fill sewn as tatami rows (tatami, program split, user
 /// split, with their carving stamps); `None` for the other fill types.
 fn row_split(shape: &Shape, p: &FillParams) -> Option<crate::fill::RowSplit> {
@@ -1178,35 +1230,7 @@ fn fill_runs(shape: &Shape, p: &FillParams, entry: Point, exit: Option<Point>) -
     let travel = Travel::new(shape);
     let mut sewer = Sewer::new(&travel, TRAVEL_LEN_MM);
     sewer.edge_only = p.trapunto;
-    let layers = match &p.underlay {
-        Underlay::Auto => auto_fill_underlay(shape),
-        Underlay::Light => light_fill_underlay(shape),
-        Underlay::Heavy => heavy_fill_underlay(shape),
-        Underlay::Double => {
-            let mut v = auto_fill_underlay(shape);
-            if let Some(UnderlayLayer::Tatami {
-                inset_mm, spacing_mm, ..
-            }) = v.first().cloned()
-            {
-                v = vec![
-                    UnderlayLayer::Tatami {
-                        inset_mm,
-                        spacing_mm,
-                        angle_deg: 45.0,
-                    },
-                    UnderlayLayer::Tatami {
-                        inset_mm,
-                        spacing_mm,
-                        angle_deg: -45.0,
-                    },
-                ];
-            }
-            v
-        }
-        Underlay::Lace => lace_fill_underlay(shape),
-        Underlay::None => Vec::new(),
-        Underlay::Custom(l) => l.clone(),
-    };
+    let layers = fill_underlay_layers(shape, &p.underlay);
     for layer in &layers {
         match *layer {
             UnderlayLayer::Tatami {

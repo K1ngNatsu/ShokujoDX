@@ -591,6 +591,51 @@ impl AppState {
         };
     }
 
+    /// Asks for a file name and writes the design as an SVG file of
+    /// Ink/Stitch (ADR 0136).
+    pub fn export_inkstitch_dialog(&mut self) {
+        let name = self
+            .file_path
+            .as_deref()
+            .and_then(Path::file_stem)
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_else(|| self.doc.design().name.clone());
+        let Some(path) = rfd::FileDialog::new()
+            .set_title(tr("Export for Ink/Stitch"))
+            .add_filter(tr("Ink/Stitch design (SVG)"), &["svg"])
+            .set_directory(self.dialog_dir())
+            .set_file_name(format!("{name}.svg"))
+            .save_file()
+        else {
+            return;
+        };
+        self.export_inkstitch_to(&path.with_extension("svg"));
+    }
+
+    /// Writes the design as an SVG file of Ink/Stitch at `path`; the things
+    /// that the file does not have show in a notice.
+    pub fn export_inkstitch_to(&mut self, path: &Path) {
+        let written =
+            emb_formats::inkstitch::write::write_inkstitch(self.doc.design(), &emb_stitch::object::underlay_layers);
+        match std::fs::write(path, written.svg) {
+            Ok(()) => {
+                self.message = crate::i18n::fill("Written for Ink/Stitch: {}", &[&(path.display())]);
+                if !written.warnings.is_empty() {
+                    self.notice = Some(crate::file::Notice {
+                        title: "Written with notes".into(),
+                        lines: written.warnings,
+                    });
+                }
+            }
+            Err(e) => {
+                self.notice = Some(crate::file::Notice {
+                    title: "Cannot write file".into(),
+                    lines: vec![path.display().to_string(), e.to_string()],
+                })
+            }
+        }
+    }
+
     /// The design picture as SVG text.
     pub fn design_svg(&mut self) -> String {
         let data = self.current_sheet_data();

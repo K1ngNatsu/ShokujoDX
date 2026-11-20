@@ -48,6 +48,8 @@ use crate::svg::{FALLBACK, ImportedObject, MM_PER_PX, SvgError, SvgImport, subpa
 
 /// The namespace of the settings of Ink/Stitch.
 pub const NAMESPACE: &str = "http://inkstitch.org/namespace";
+/// The newest SVG version of Ink/Stitch (`lib/update.py`).
+pub const SVG_VERSION: u32 = 4;
 const INKSCAPE: &str = "http://www.inkscape.org/namespaces/inkscape";
 const XLINK: &str = "http://www.w3.org/1999/xlink";
 /// Tolerance to flatten rails, rungs and guide lines, in mm.
@@ -276,17 +278,77 @@ fn parse(s: &str) -> Result<usvg::roxmltree::Document<'_>, usvg::roxmltree::Erro
 /// Reads an SVG file of Ink/Stitch: its shapes as objects with the stitch
 /// types and the settings of Ink/Stitch, in the sew order of the file.
 pub fn import_inkstitch(data: &[u8]) -> Result<SvgImport, SvgError> {
+    let (file, found, tree) = read_file(data, false)?;
+    drop(tree);
+    Ok(build(&file, &found).0)
+}
+
+/// The glyphs of a font file of Ink/Stitch (a variant file such as
+/// `ltr.svg`; ADR 0136).
+#[derive(Debug, Clone, Default)]
+pub struct GlyphFile {
+    /// The glyphs in file order: the name of each one (the label of its
+    /// layer after `GlyphLayer-`) and its objects, in mm on the page.
+    pub glyphs: Vec<(String, Vec<ImportedObject>)>,
+    /// The y of the guide named "baseline", in mm on the page: as measured
+    /// from the top of the page, and as measured from the bottom (the files
+    /// of Inkscape have the one or the other). `None`: no such guide.
+    pub baseline: Option<[f64; 2]>,
+    /// The point 0, 0 of the user units of the file, in mm on the page:
+    /// the glyphs start at its x, and they stand on its y when the file has
+    /// no baseline guide.
+    pub origin: [f64; 2],
+    /// mm for one user unit of the file.
+    pub mm_per_unit: f64,
+    pub warnings: Vec<String>,
+}
+
+/// Reads a font file of Ink/Stitch: the objects of each glyph layer (also
+/// the hidden layers; Ink/Stitch shows each one when it reads it).
+pub fn import_inkstitch_glyphs(data: &[u8]) -> Result<GlyphFile, SvgError> {
+    let (file, found, tree) = read_file(data, true)?;
+    let (import, ids) = build(&file, &found);
+    let mut glyphs: Vec<(String, Vec<ImportedObject>)> = Vec::new();
+    for (o, id) in import.objects.into_iter().zip(ids) {
+        let Some(name) = file.element(&id).and_then(|e| e.glyph.clone()) else {
+            continue;
+        };
+        match glyphs.iter_mut().find(|g| g.0 == name) {
+            Some(g) => g.1.push(o),
+            None => glyphs.push((name, vec![o])),
+        }
+    }
+    let size = tree.size();
+    let (vx, vy, vh, unit) = match file.view_box {
+        Some([vx, vy, vw, vh]) if vw > 0.0 => (vx, vy, vh, f64::from(size.width()) / vw * MM_PER_PX),
+        _ => (0.0, 0.0, f64::from(size.height()), MM_PER_PX),
+    };
+    Ok(GlyphFile {
+        glyphs,
+        baseline: file.baseline.map(|y| [(y - vy) * unit, (vh - y) * unit]),
+        origin: [-vx * unit, -vy * unit],
+        mm_per_unit: unit,
+        warnings: import.warnings,
+    })
+}
+
+/// Reads the XML and the shapes of a file of Ink/Stitch. `glyphs`: show
+/// the hidden glyph layers of a font file.
+fn read_file(data: &[u8], glyphs: bool) -> Result<(File, Found, usvg::Tree), SvgError> {
     let s = std::str::from_utf8(data).map_err(|e| SvgError::Parse(e.to_string()))?;
     let doc = parse(s).map_err(|e| SvgError::Parse(e.to_string()))?;
-    let mut file = File::read(&doc, s);
+    let mut file = File::read(&doc, s, glyphs);
     let rewritten = file.rewrite(s);
     let tree = usvg::Tree::from_data(rewritten.as_bytes(), &usvg::Options::default())
         .map_err(|e| SvgError::Parse(e.to_string()))?;
     let mut found = Found::default();
     walk(tree.root(), None, &file, &mut found);
-    let warnings = std::mem::take(&mut file.warnings);
-    Ok(build(&file, &found, warnings))
+    Ok((file, found, tree))
 }
+
+/// The prefix of the labels of the glyph layers of a font of Ink/Stitch.
+const GLYPH_PREFIX: &str = "GlyphLayer-";
+const SODIPODI: &str = "http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd";
 
 /// The settings and the links of one element of the file.
 #[derive(Debug, Default)]
@@ -311,6 +373,8 @@ struct Element {
     commands: Vec<(String, String)>,
     /// A connector of a command: it is not sewn.
     connector: bool,
+    /// The name of the glyph of a font file that the element is in.
+    glyph: Option<String>,
 }
 
 /// A `use` element that is a copy of a shape or a group (a clone).
@@ -346,10 +410,14 @@ struct File {
     edits: Vec<(Range<usize>, String)>,
     warnings: Warnings,
     texts: usize,
+    /// The `viewBox` of the root element.
+    view_box: Option<[f64; 4]>,
+    /// The y of the guide named "baseline", in user units, as written.
+    baseline: Option<f64>,
 }
 
 impl File {
-    fn read(doc: &usvg::roxmltree::Document, s: &str) -> File {
+    fn read(doc: &usvg::roxmltree::Document, s: &str, glyphs: bool) -> File {
         let mut f = File {
             satin_stroke_mm: SATIN_STROKE_MM,
             ..File::default()
@@ -411,7 +479,48 @@ impl File {
             if tag.name() == "text" {
                 f.texts += 1;
             }
+            if tag.name() == "svg" && n.parent_element().is_none() {
+                let v: Vec<f64> = n
+                    .attribute("viewBox")
+                    .unwrap_or("")
+                    .split(|c: char| c.is_whitespace() || c == ',')
+                    .filter_map(|x| x.parse().ok())
+                    .collect();
+                if let [x, y, w, h] = v[..] {
+                    f.view_box = Some([x, y, w, h]);
+                }
+            }
+            if tag.namespace() == Some(SODIPODI)
+                && tag.name() == "guide"
+                && n.attribute((INKSCAPE, "label")) == Some("baseline")
+            {
+                f.baseline = n
+                    .attribute("position")
+                    .and_then(|p| p.split(',').nth(1))
+                    .and_then(|y| y.trim().parse().ok());
+            }
+            let glyph_label = |a: usvg::roxmltree::Node| {
+                a.attribute((INKSCAPE, "label"))
+                    .and_then(|l| l.strip_prefix(GLYPH_PREFIX))
+                    .filter(|_| a.tag_name().name() == "g")
+                    .map(str::to_string)
+            };
+            // A hidden glyph layer is shown, as Ink/Stitch does.
+            if glyphs && glyph_label(n).is_some() {
+                if let Some(a) = n.attribute_node("style")
+                    && a.value().contains("display:none")
+                {
+                    f.edits
+                        .push((a.range_value(), a.value().replace("display:none", "display:inline")));
+                }
+                if let Some(a) = n.attribute_node("display")
+                    && a.value().trim() == "none"
+                {
+                    f.edits.push((a.range_value(), "inline".into()));
+                }
+            }
             let mut el = Element {
+                glyph: n.ancestors().find_map(glyph_label),
                 tag: tag.name().to_string(),
                 label: n
                     .attribute((INKSCAPE, "label"))
@@ -917,7 +1026,9 @@ enum Type {
 }
 
 /// The objects of the shapes, in order.
-fn build(file: &File, found: &Found, mut warnings: Warnings) -> SvgImport {
+fn build(file: &File, found: &Found) -> (SvgImport, Vec<String>) {
+    let mut warnings = Warnings(file.warnings.0.clone());
+    let mut ids: Vec<String> = Vec::new();
     let mut out = SvgImport {
         chart: file.palette.clone(),
         ..SvgImport::default()
@@ -958,6 +1069,7 @@ fn build(file: &File, found: &Found, mut warnings: Warnings) -> SvgImport {
                 style.fill.or(style.stroke).unwrap_or(FALLBACK),
                 name,
             ));
+            ids.push(shape.id.clone());
             warnings.add(Warning::Ignored);
             continue;
         }
@@ -1039,6 +1151,7 @@ fn build(file: &File, found: &Found, mut warnings: Warnings) -> SvgImport {
                 warnings.add(Warning::Setting(name.clone()));
             }
         }
+        ids.extend(std::iter::repeat_n(shape.id.clone(), objects.len()));
         out.objects.extend(objects);
     }
     for list in found.marked.values() {
@@ -1059,7 +1172,7 @@ fn build(file: &File, found: &Found, mut warnings: Warnings) -> SvgImport {
         out.warnings
             .push(text::fill("{} image(s) not imported.", &[&found.images]));
     }
-    out
+    (out, ids)
 }
 
 /// What the builders of the objects of one shape need.
@@ -1882,6 +1995,8 @@ fn touch(rung: &[Point], rail: &[Point]) -> Point {
     let (first, last) = (rung[0], rung[rung.len() - 1]);
     if dist(first) <= dist(last) { first } else { last }
 }
+
+pub mod write;
 
 #[cfg(test)]
 mod tests;

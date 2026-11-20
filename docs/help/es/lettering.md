@@ -114,6 +114,13 @@ relleno solo es mejor en una fuente para letras grandes (un rango de
 tamaños desde 15 mm): allí, una letra cuyas columnas dejan abierta una
 parte de su forma pasa a ser un relleno.
 
+**Fuente de Ink/Stitch…** convierte una fuente de letras de Ink/Stitch
+en una fuente de bordado: elija la carpeta de la fuente (con font.json y
+ltr.svg). Cada letra conserva sus partes en el orden de la fuente, y la
+base, la compensación de tiro y el ángulo de relleno de cada parte; el
+objeto de letras fija la separación. Tras la conversión, una nota muestra
+la licencia de la fuente. Compruebe que la licencia le permite usarla.
+
 ## Árabe, devanagari y ligaduras
 
 Con una fuente TrueType u OpenType, el programa da forma al texto como lo
