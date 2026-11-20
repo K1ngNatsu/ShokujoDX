@@ -266,6 +266,7 @@ impl eframe::App for Bench {
                     filter: &filter,
                     cursor: None,
                     moving: &[],
+                    lead: false,
                 };
                 let frame = self.tiles.draw(&ctx, rect, &view, &scene);
                 let complete = frame.as_ref().is_some_and(|f| f.complete);

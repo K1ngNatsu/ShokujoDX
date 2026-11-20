@@ -105,6 +105,23 @@ Still open, because they need other people, machines or systems:
 - Other systems and tools: the thumbnails after an install on macOS and Linux (P11); a phone app reads the barcode of a worksheet, and a cutter program opens a cutter file at real size (P8 Milestone 7, P13).
 - Measurements and shop tests: the thread use against weighed spools (P11); the quotes and run times of real orders with a shop tester (P13). The comparison with Ink/Stitch (P1) was closed on 2026-11-18 ("Review of 2026-11-18").
 
+## Owner requests of 2026-11-20: the icon and the stitch player
+
+- **A simpler icon.** The logo of the software of the owner's shop (a
+  purple star in a hoop, with a needle and a thread) is the icon now
+  (ADR 0140): `data/icon/icon.svg`, and `tools/make-icon.py` makes the
+  pictures from it. Open: the license of the logo (its maker and the
+  owner).
+- **The stitch player with the 3D look.** The 3D look came seconds after
+  the needle, the player was jumpy, and a rectangle of the flat look
+  showed for a frame when the tiles changed. The tiles now follow the
+  needle as fast as they can be made, and a tile keeps its picture until
+  the new one is there (ADR 0126, the note of 2026-11-20). With the
+  measure `stitch_tiles::tests::player_budget`: 0.02 s behind the needle
+  at 200 stitches a second (2.1 s before), 0.14 s at 2,000, and no frame
+  with a rectangle of the flat look (28 of 470 before). Not checked by
+  the owner in the program yet.
+
 ## Owner list of 2026-11-16 (v0.2.1 and v0.3.0)
 
 After v0.2.0 the owner sent a list of changes and a start bug (the program showed nothing on a friend's PC). The work is in six stages: the start bug and the installer (v0.2.1), first start and saved preferences, endless drag, sketch changes, bold, italic, underline and stacked lettering, and a machine library. See `docs/design/v0.3-plan.md`.

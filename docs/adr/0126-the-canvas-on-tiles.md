@@ -119,3 +119,18 @@ the design makes again only where it changed, and that all views use.
   the speed pass changed all 39 surface pictures a little.
 - Open: the numbers of a small computer; the lay is on one thread (0.9 s
   for 1,000,000 stitches).
+- Changed on 2026-11-20 (owner report: the stitch player was jumpy, the
+  3D look came seconds after the needle, and a rectangle of the flat look
+  showed for a frame at each step). The step was 1,000 records: at 200
+  stitches a second the tiles were up to 5 s behind the needle, and a
+  tile that a step reached showed the look of today in a rectangle until
+  it was made again (in 28 of 470 frames at 2,000 stitches a second, up
+  to 56 % of the view). Now a step goes to the cursor when the tiles of
+  the step before are made in the canvas (`Scene::lead`; at most
+  `HOLD_MAX`, 0.5 s), and a tile that a step forward reaches keeps its
+  picture until the new part is there, with the new stitches as today
+  over it (`Entry::lags`); a step back goes at once, as before. The
+  measure `player_budget` (release, ignored): at 200 stitches a second
+  the tiles are 0.02 s behind the needle on average (0.07 s at most), at
+  2,000 stitches a second 0.14 s (at most `HOLD_MAX`), and no frame
+  shows the look of today in a rectangle.

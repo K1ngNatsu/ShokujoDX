@@ -314,7 +314,7 @@ fn preview(ui: &mut egui::Ui, st: &mut AppState, size: Vec2) {
     // The surface on tiles as on the canvas (ADR 0130), else the meshes.
     let view = st.view;
     let tiles = if st.settings.look.surface {
-        crate::stitch_tiles::tiles_of(&ctx, rect, &view, st)
+        crate::stitch_tiles::tiles_of(&ctx, rect, &view, st, true)
     } else {
         None
     };

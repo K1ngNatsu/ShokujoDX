@@ -407,7 +407,7 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
         // The surface on tiles (ADR 0126), else the meshes of the stitches.
         let tiles = if look == MeshLook::Thread3d && st.settings.look.surface {
             let view = st.view;
-            crate::stitch_tiles::tiles_of(ui.ctx(), rect, &view, st)
+            crate::stitch_tiles::tiles_of(ui.ctx(), rect, &view, st, true)
         } else {
             None
         };

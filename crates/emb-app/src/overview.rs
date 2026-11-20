@@ -45,7 +45,7 @@ pub fn contents(ui: &mut egui::Ui, st: &mut AppState) {
     let look = st.settings.look;
     // The tiles of the 3D thread look (ADR 0126), else the stitches.
     let tiles = if st.show_thread_look && look.three_d && look.surface {
-        crate::stitch_tiles::tiles_of(ui.ctx(), rect, &view, st)
+        crate::stitch_tiles::tiles_of(ui.ctx(), rect, &view, st, false)
     } else {
         None
     };

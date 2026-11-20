@@ -355,6 +355,7 @@ pub fn draw_before_after(ui: &mut egui::Ui, painter: &egui::Painter, rect: Rect,
             filter: &filter,
             cursor: None,
             moving: &[],
+            lead: false,
         };
         if let Some(frame) = st.stitch_tiles.draw(ui.ctx(), rect, &view, &scene) {
             if let Some(missing) = frame.missing.iter().copied().reduce(|a, b| a.union(b)) {

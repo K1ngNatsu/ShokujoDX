@@ -125,6 +125,7 @@ impl AppState {
             filter: &filter,
             cursor: None,
             moving: &[],
+            lead: false,
         };
         self.stitch_tiles.draw(ctx, rect, view, &scene)
     }

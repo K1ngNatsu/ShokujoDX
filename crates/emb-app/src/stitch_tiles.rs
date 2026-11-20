@@ -29,8 +29,13 @@
 //!   new light from its surface and the surfaces round it
 //!   (`sheen::overlay_around`, the shadows of its level) until it is made
 //!   again.
-//! - **The stitch player** shows the tiles up to a step of [`PLAYER_STEP`]
-//!   records, and the stitches after the step as today.
+//! - **The stitch player**: the tiles follow the cursor in steps, and the
+//!   stitches after the step show as today. A step waits until the tiles of
+//!   the step before are made (at most [`HOLD_MAX`]), so the threads finish
+//!   their work and the 3D look stays near the needle at each speed. A tile
+//!   that a step forward reaches keeps its picture until the new one is
+//!   there, with the new stitches as today over it: no part of the view
+//!   changes to the look of today in a rectangle.
 //! - **A drag** shows the objects that move as today, and the tiles of the
 //!   other objects (their lay stays as it was until the drag ends).
 //!
@@ -67,8 +72,9 @@ const SIDE: i64 = surface::TILE as i64;
 /// The side of the texture of a tile: one pixel of the tiles round it on
 /// each side, so the tiles join with no seam.
 const TEXTURE: usize = surface::TILE as usize + 2;
-/// The stitch player shows the tiles up to a step of this many records.
-pub const PLAYER_STEP: usize = 1000;
+/// The longest time that a step of the stitch player waits for the tiles
+/// of the step before (a tile that cannot be made does not stop the player).
+const HOLD_MAX: Duration = Duration::from_millis(500);
 /// The finished tiles that one frame gives to the screen at most.
 const UPLOADS: usize = 24;
 /// The memory of the tiles of all open designs (ADR 0077), bytes.
@@ -164,8 +170,15 @@ struct Entry {
     /// The surface of the pixels of the texture, for a quick picture in
     /// another light.
     surface: Option<Arc<Surface>>,
-    /// A quick picture in a new light: the tile is made again.
+    /// A picture that shows until the tile is made again: a quick picture
+    /// in a new light, or the tile of a step of the stitch player before
+    /// (`lags`).
     provisional: bool,
+    /// The picture shows the stitches of a step of the stitch player before:
+    /// the records from this one show as today over it, until the part that
+    /// the step reached (`dirty`, or all of it if `provisional`) is made
+    /// again.
+    lags: Option<u32>,
 }
 
 impl Entry {
@@ -261,6 +274,23 @@ struct Shown {
 }
 
 impl Shown {
+    /// `true` if `self` shows the records of `old` and the records after its
+    /// end: a step forward of the stitch player, or its end.
+    fn adds_to(&self, old: &Shown) -> bool {
+        let same_filter = match (&self.filter, &old.filter) {
+            (None, None) => true,
+            (Some(a), Some(b)) => Arc::ptr_eq(a, b) || a == b,
+            _ => false,
+        };
+        same_filter
+            && self.hidden == old.hidden
+            && match (old.upto, self.upto) {
+                (Some(o), Some(n)) => n > o,
+                (Some(_), None) => true,
+                _ => false,
+            }
+    }
+
     fn shows(&self, r: u32) -> bool {
         self.upto.is_none_or(|u| r < u)
             && self
@@ -321,6 +351,11 @@ struct DesignLay {
     changes: VecDeque<(u64, Changes, f64)>,
     /// The tiles that showed last.
     shown: Option<Variant>,
+    /// The lead view of the design (`Scene::lead`) had all its tiles in its
+    /// last frame: the stitch player makes its next step.
+    settled: bool,
+    /// The time from which a step of the stitch player waits.
+    held: Option<Instant>,
     /// The tiles in the light before a change of the light: they show
     /// until the tiles in the new light are there.
     before_light: Option<u64>,
@@ -462,6 +497,11 @@ pub struct Scene<'a> {
     pub cursor: Option<usize>,
     /// The objects that a drag moves.
     pub moving: &'a [ObjectId],
+    /// The view that sets the steps of the stitch player (the canvas, or the
+    /// kiosk in its place): a step waits until the tiles of this view are
+    /// there. Another view of the same design (the overview) shows the same
+    /// steps.
+    pub lead: bool,
 }
 
 /// The tiles of a view in one frame.
@@ -636,7 +676,26 @@ impl TileCache {
         if scene.cursor.is_some() && lay.state != scene.state {
             return None;
         }
-        let shown = shown_of(&mut d.filter, lay, scene);
+        // The stitch player: the tiles go to the cursor when the tiles of
+        // the step before are there (or after `HOLD_MAX`); a step back goes
+        // at once.
+        let target = scene.cursor.map(|c| c as u32 + 1);
+        let before = d
+            .shown
+            .as_ref()
+            .filter(|v| v.generation == lay.generation)
+            .and_then(|v| v.shown.upto);
+        let upto = match (target, before) {
+            (Some(t), Some(b)) if b < t && !d.settled && d.held.is_none_or(|h| h.elapsed() < HOLD_MAX) => {
+                d.held.get_or_insert_with(Instant::now);
+                Some(b)
+            }
+            _ => {
+                d.held = None;
+                target
+            }
+        };
+        let shown = shown_of(&mut d.filter, lay, scene, upto);
         let variant = Variant {
             id: hash_of((
                 scene.doc,
@@ -676,6 +735,9 @@ impl TileCache {
         let visible = view.visible(rect);
         let bounds = laid.bounds().expand(APRON_MM);
         if !visible.intersects(&bounds) {
+            if scene.lead {
+                self.settle(scene.doc, true);
+            }
             return Some(out);
         }
         let area = BBox::new(
@@ -722,12 +784,24 @@ impl TileCache {
             };
             if let Some(e) = self.tiles.get_mut(&key) {
                 e.used = frame;
+                if let Some(u) = e.lags {
+                    let u = u as usize;
+                    out.today_from = Some(out.today_from.map_or(u, |t| t.min(u)));
+                }
                 if e.provisional {
                     // A quick picture in a new light: the tile is made again.
                     out.complete = false;
                     wanted.push((level, x, y, None));
                 }
                 match (&e.tile, e.dirty) {
+                    (Cached::Texture(t), Some(hole)) if e.lags.is_some() => {
+                        // A step forward of the stitch player: the picture
+                        // of the step before, with the new stitches as
+                        // today over it, until the part is made again.
+                        out.shapes.push(Shape::image(t.id(), at, inner_uv(), Color32::WHITE));
+                        out.complete = false;
+                        wanted.push((level, x, y, Some(hole)));
+                    }
                     (Cached::Texture(t), Some(hole)) => {
                         // The part that a change reached: the look of today
                         // until it is made again.
@@ -770,6 +844,7 @@ impl TileCache {
                                 parts: Vec::new(),
                                 surface: None,
                                 provisional: true,
+                                lags: None,
                             },
                         );
                     }
@@ -812,7 +887,18 @@ impl TileCache {
             }
         }
         self.request(ctx, frame, &wanted, &variant, &laid);
+        if scene.lead {
+            self.settle(scene.doc, out.complete);
+        }
         Some(out)
+    }
+
+    /// Keeps whether the lead view of design `doc` had all its tiles (see
+    /// `DesignLay::settled`).
+    fn settle(&mut self, doc: u64, complete: bool) {
+        if let Some(d) = self.designs.get_mut(&doc) {
+            d.settled = complete;
+        }
     }
 
     /// Draws a tile of another level (or in the light before) in place of
@@ -1163,6 +1249,7 @@ impl TileCache {
                         e.parts.retain(|p| *p != part);
                         if e.parts.is_empty() {
                             e.dirty = None;
+                            e.lags = None;
                         }
                     }
                     // The work stopped with an error: the look of today there.
@@ -1206,6 +1293,7 @@ impl TileCache {
                 parts: Vec::new(),
                 surface,
                 provisional: done.quick,
+                lags: None,
             };
             let extra = entry.surface_bytes();
             self.bytes += bytes + extra;
@@ -1335,6 +1423,10 @@ impl TileCache {
             return;
         }
         d.before_light = None;
+        // A step forward of the stitch player: the tiles that it reaches keep
+        // their pictures until the new ones are there.
+        let forward = old.generation == v.generation && v.shown.adds_to(&old.shown);
+        let from = old.shown.upto.unwrap_or(u32::MAX);
         // The highest point of the stitches that changed (in the lays from
         // the old one to the new one).
         let mut top = laid.top();
@@ -1375,6 +1467,7 @@ impl TileCache {
             let (level, x, y) = (i32::from(k.level), i64::from(k.x), i64::from(k.y));
             let b = tile_box(level, x, y).expand(apron + 2.0 / ppm);
             let mut part = None;
+            let mut whole = false;
             if let Some(c) = changes.within(b) {
                 // The pixels that the change reaches (with the apron): made
                 // again if they are a small part of a texture, else all.
@@ -1383,10 +1476,27 @@ impl TileCache {
                 let n = TEXTURE as f64;
                 let small = part.is_some_and(|p| f64::from((p[2] - p[0]) * (p[3] - p[1])) <= PATCH_MAX * n * n);
                 if !tex || !small {
-                    continue;
+                    if !forward {
+                        continue;
+                    }
+                    whole = true;
+                    part = None;
                 }
             }
             let mut e = self.tiles.remove(&k).expect("listed");
+            if forward && (whole || part.is_some()) {
+                e.lags = Some(e.lags.map_or(from, |l| l.min(from)));
+            }
+            if whole {
+                // All the tile is made again; its picture shows until then.
+                let extra = e.surface_bytes();
+                e.surface = None;
+                self.bytes -= extra;
+                self.surface_bytes -= extra;
+                e.provisional = true;
+                e.dirty = None;
+                e.parts.clear();
+            }
             if let Some(p) = part {
                 let dirty = union(e.dirty, p);
                 e.dirty = Some(dirty);
@@ -1456,7 +1566,14 @@ pub fn moving_objects(st: &AppState) -> Vec<ObjectId> {
 
 /// The tiles of the design of `st` in the view `view` of `rect` (the
 /// canvas, the split view, the views and the overview).
-pub fn tiles_of(ctx: &egui::Context, rect: Rect, view: &CanvasView, st: &mut AppState) -> Option<TileFrame> {
+/// `lead`: the view sets the steps of the stitch player (`Scene::lead`).
+pub fn tiles_of(
+    ctx: &egui::Context,
+    rect: Rect,
+    view: &CanvasView,
+    st: &mut AppState,
+    lead: bool,
+) -> Option<TileFrame> {
     let (state, plan) = {
         let pv = st.shown_plan();
         (pv.state, pv.plan.clone())
@@ -1473,6 +1590,7 @@ pub fn tiles_of(ctx: &egui::Context, rect: Rect, view: &CanvasView, st: &mut App
         filter: &st.view_filter,
         cursor: st.cursor,
         moving: &moving,
+        lead,
     };
     st.stitch_tiles.draw(ctx, rect, view, &scene)
 }
@@ -1496,6 +1614,7 @@ pub fn laid_of(ctx: &egui::Context, st: &mut AppState) -> Option<(u64, Arc<Laid>
         filter: &filter,
         cursor: None,
         moving: &[],
+        lead: false,
     };
     st.stitch_tiles.laid_for(ctx, &scene)
 }
@@ -1626,7 +1745,12 @@ fn start_lay(d: &mut DesignLay, ctx: &egui::Context, scene: &Scene, sync: bool, 
 }
 
 /// The strands that `scene` shows, on the records of the plan of `lay`.
-fn shown_of(cache: &mut Option<(u64, ViewFilter, Arc<Vec<bool>>, u64)>, lay: &Lay, scene: &Scene) -> Shown {
+fn shown_of(
+    cache: &mut Option<(u64, ViewFilter, Arc<Vec<bool>>, u64)>,
+    lay: &Lay,
+    scene: &Scene,
+    upto: Option<u32>,
+) -> Shown {
     let filter = if scene.filter.is_active() {
         match cache {
             Some((g, f, v, h)) if *g == lay.generation && f == scene.filter => Some((v.clone(), *h)),
@@ -1640,7 +1764,6 @@ fn shown_of(cache: &mut Option<(u64, ViewFilter, Arc<Vec<bool>>, u64)>, lay: &La
     } else {
         None
     };
-    let upto = scene.cursor.map(|c| ((c + 1) / PLAYER_STEP * PLAYER_STEP) as u32);
     let hidden: Vec<Range<u32>> = if scene.moving.is_empty() {
         Vec::new()
     } else {
@@ -1941,7 +2064,7 @@ mod tests {
     fn frame_or_none(h: &mut Harness) -> Option<TileFrame> {
         let view = h.st.view;
         let ctx = h.ctx.clone();
-        tiles_of(&ctx, rect(), &view, &mut h.st)
+        tiles_of(&ctx, rect(), &view, &mut h.st, true)
     }
 
     fn frame(h: &mut Harness) -> TileFrame {
@@ -2009,6 +2132,7 @@ mod tests {
             filter: &filter,
             cursor: None,
             moving: &[],
+            lead: false,
         };
         let d = h.st.stitch_tiles.designs.get_mut(&doc).expect("a lay");
         let stale = stale_of(d, &scene);
@@ -2019,20 +2143,82 @@ mod tests {
     }
 
     #[test]
-    fn the_stitch_player_shows_the_tiles_up_to_its_step() {
+    fn the_stitch_player_shows_the_tiles_up_to_its_cursor() {
         let mut h = harness(1.0);
         let records = h.st.shown_plan().plan.stitches.records.len();
-        assert!(records > 2 * PLAYER_STEP, "{records}");
-        h.st.cursor = Some(PLAYER_STEP + 10);
+        assert!(records > 1000, "{records}");
+        h.st.cursor = Some(records / 3);
         frame(&mut h);
         let f = frame(&mut h);
-        assert_eq!(f.today_from, Some(PLAYER_STEP));
+        assert_eq!(f.today_from, Some(records / 3 + 1));
         assert!(f.complete);
         // The cursor goes off: all stitches on the tiles again.
         h.st.cursor = None;
+        let f = until_complete(&mut h, records / 3 + 1);
+        assert!(f.today_from.is_none());
+    }
+
+    /// Runs frames until all tiles of the view are there; each frame on the
+    /// way must show a picture on each tile (no look of today in a
+    /// rectangle) and the stitches from `from` or later as today.
+    fn until_complete(h: &mut Harness, from: usize) -> TileFrame {
+        for _ in 0..50 {
+            let f = frame(h);
+            assert!(f.missing.is_empty(), "no look of today in a rectangle: {:?}", f.missing);
+            if f.complete {
+                return f;
+            }
+            assert!(f.today_from.is_some_and(|t| t >= from), "{:?}", f.today_from);
+        }
+        panic!("the tiles are not made");
+    }
+
+    /// A step forward of the player keeps the pictures of the tiles that it
+    /// reaches (no rectangle of the look of today), with the new stitches
+    /// as today over them; the next step waits until the tiles are made.
+    #[test]
+    fn a_step_of_the_player_keeps_the_pictures_until_the_new_ones_are_there() {
+        let mut h = harness(1.0);
+        let records = h.st.shown_plan().plan.stitches.records.len();
+        let (c1, c2, c3) = (records / 4, records / 2, 3 * records / 4);
+        h.st.cursor = Some(c1);
         frame(&mut h);
+        assert!(frame(&mut h).complete);
+        // The step: the tiles that it reaches show their picture of before.
+        h.st.cursor = Some(c2);
         let f = frame(&mut h);
-        assert!(f.complete && f.today_from.is_none());
+        assert!(f.missing.is_empty(), "no look of today in a rectangle: {:?}", f.missing);
+        assert!(!f.complete, "the tiles are made again");
+        assert_eq!(f.today_from, Some(c1 + 1), "the new stitches show as today");
+        // The cursor goes on before they are there: the step waits.
+        h.st.cursor = Some(c3);
+        let f = until_complete(&mut h, c1 + 1);
+        assert_eq!(f.today_from, Some(c2 + 1), "the step of before, now made");
+        // Then the next step.
+        let f = frame(&mut h);
+        assert!(f.missing.is_empty(), "{:?}", f.missing);
+        assert_eq!(f.today_from, Some(c2 + 1));
+        let f = until_complete(&mut h, c2 + 1);
+        assert_eq!(f.today_from, Some(c3 + 1));
+        // The end of the player: the pictures stay until all stitches are on
+        // the tiles.
+        h.st.cursor = None;
+        let f = until_complete(&mut h, c3 + 1);
+        assert_eq!(f.today_from, None);
+    }
+
+    /// A step back of the player goes at once (the stitches after the
+    /// cursor must not show in 3D).
+    #[test]
+    fn a_step_back_of_the_player_goes_at_once() {
+        let mut h = harness(1.0);
+        let records = h.st.shown_plan().plan.stitches.records.len();
+        h.st.cursor = Some(records / 2);
+        frame(&mut h);
+        frame(&mut h);
+        h.st.cursor = Some(records / 3);
+        let f = frame(&mut h);
+        assert_eq!(f.today_from, Some(records / 3 + 1));
     }
 
     #[test]
@@ -2274,6 +2460,7 @@ mod tests {
                 filter: &filter,
                 cursor: None,
                 moving: &[],
+                lead: false,
             };
             let shown = until(&mut cache, &view, &scene, |f| f.shown);
             let first = until_complete(&mut cache, &view, &scene) + shown;
@@ -2330,6 +2517,7 @@ mod tests {
             filter: &filter,
             cursor: None,
             moving: &[],
+            lead: false,
         };
         until_complete(&mut cache, &view, &scene);
         cache.wait(&ctx, Duration::from_secs(120));
@@ -2422,6 +2610,7 @@ mod tests {
                 filter: &filter,
                 cursor: None,
                 moving: &[],
+                lead: false,
             };
             let ctx = egui::Context::default();
             cache.draw(&ctx, r, &view, &scene);
@@ -2635,6 +2824,7 @@ mod tests {
                 filter: &filter,
                 cursor: None,
                 moving: &[],
+                lead: false,
             };
             for _ in 0..2 {
                 let _ = ctx.run_ui(Default::default(), |_| {});
@@ -2665,5 +2855,70 @@ mod tests {
         assert_eq!((b.min.x, b.min.y, b.max.x, b.max.y), (-32.0, 64.0, 0.0, 96.0));
         let (xs, ys) = tiles_in(3, BBox::new(Point::new(-1.0, 0.0), Point::new(33.0, 31.9)));
         assert_eq!((xs, ys), (-1..2, 0..1));
+    }
+    /// The stitch player on a large corpus design with the tiles made by
+    /// their threads, frame by frame in real time: the time of a frame, the
+    /// part of the screen where the tiles are missing (the look of today
+    /// shows there in a rectangle), and how far the tiles are behind the
+    /// cursor (those stitches show as today). `cargo test --release -p
+    /// emb-app -- --ignored player_budget --nocapture`.
+    #[test]
+    #[ignore]
+    fn player_budget() {
+        for speed in [200.0, 2000.0] {
+            let mut h = Harness::new();
+            h.st.doc = emb_model::Document::new(emb_cli::corpus::build("full-field").expect("corpus design"));
+            h.st.settings.look.surface = true;
+            let b = h.st.fit_box().expect("stitches");
+            h.st.view.fit(rect(), b);
+            h.st.view.zoom *= 2.0;
+            // All tiles of the design first, with the player at the start.
+            h.st.toggle_player();
+            let t0 = Instant::now();
+            while !frame_or_none(&mut h).is_some_and(|f| f.complete) && t0.elapsed() < Duration::from_secs(30) {
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            h.st.player.speed = speed;
+            h.st.play_pause();
+            let (mut times, mut flat, mut lags) = (Vec::new(), Vec::new(), Vec::new());
+            let mut missing_frames = 0;
+            let area = rect().area();
+            let start = Instant::now();
+            let mut last = Instant::now();
+            while start.elapsed() < Duration::from_secs(8) && h.st.player.playing {
+                let next = last + Duration::from_secs_f64(1.0 / 60.0);
+                if let Some(wait) = next.checked_duration_since(Instant::now()) {
+                    std::thread::sleep(wait);
+                }
+                let now = Instant::now();
+                h.st.player_tick((now - last).as_secs_f64());
+                last = now;
+                let t = Instant::now();
+                let f = frame(&mut h);
+                times.push(t.elapsed().as_secs_f64() * 1000.0);
+                let gone: f32 = f.missing.iter().map(|r| r.intersect(rect()).area()).sum();
+                if gone > 0.0 {
+                    missing_frames += 1;
+                }
+                flat.push(f64::from(gone / area));
+                let cursor = h.st.cursor.unwrap_or(0) + 1;
+                lags.push(cursor.saturating_sub(f.today_from.unwrap_or(cursor)) as f64);
+            }
+            let n = times.len().max(1) as f64;
+            let mut sorted = times.clone();
+            sorted.sort_by(f64::total_cmp);
+            let p95 = sorted.get((sorted.len() * 95) / 100).copied().unwrap_or(0.0);
+            let max = sorted.last().copied().unwrap_or(0.0);
+            let mean_lag = lags.iter().sum::<f64>() / n;
+            let max_lag = lags.iter().copied().fold(0.0, f64::max);
+            let max_flat = flat.iter().copied().fold(0.0, f64::max);
+            println!(
+                "{speed} stitches/s: {} frames; frame p95 {p95:.1} ms, max {max:.1} ms; frames with missing tiles {missing_frames} (largest {:.0} % of the view); behind the cursor: mean {mean_lag:.0} records ({:.2} s), max {max_lag:.0} ({:.2} s)",
+                times.len(),
+                max_flat.abs() * 100.0,
+                mean_lag / speed,
+                max_lag / speed,
+            );
+        }
     }
 }
