@@ -101,7 +101,7 @@ la superficie de las puntadas: el hilo sobre hilo es más alto, una zona es
 más clara o más oscura según la dirección de sus puntadas respecto a la
 luz, los hilos brillan según su tipo y las partes altas proyectan sombras
 sobre la tela. Los diseños grandes también se mueven y se amplían más
-rápido. **Ver > Aspecto de hilo > Superficie fina** lo desactiva en un
+rápido. **Ver > Aspecto de hilo > Calidad > Rápida** lo desactiva en un
 equipo lento. Consulte [Comprobar un diseño](checking).
 
 **La tela en el aspecto 3D.** La tela bajo las puntadas tiene una
@@ -127,6 +127,16 @@ Las columnas de puff son redondas sobre su espuma. El hilo metálico tiene
 pequeños destellos con mucho zoom, y **Ver > Aspecto de hilo > Luces
 apagadas** solo muestra el hilo fosforescente. Consulte [Comprobar un
 diseño](checking).
+
+**Todas las imágenes con el aspecto 3D.** La imagen del diseño, la hoja
+de aprobación y el presupuesto, la biblioteca, las miniaturas del
+explorador de archivos, el quiosco, las imágenes de puntadas de Imagen a
+diseño y la vista previa de la ventana Fuentes muestran las puntadas como
+la vista 3D. **Producir diseño** puede escribir la imagen a hasta 600
+puntos por pulgada con **Sin fondo** (para una tienda web) y una
+**Animación del bordado (GIF)**. La **Calidad** del menú del aspecto de
+hilo (**Rápida**, **Buena**, **Mejor**) se elige en el primer inicio con
+una medida corta del equipo. Consulte [La vista 3D](3d-view).
 
 **Comprobar el aspecto.** El grupo **Comprobar** de la pestaña Ver tiene
 herramientas nuevas: luces predefinidas y una luz que se mueve (mantenga

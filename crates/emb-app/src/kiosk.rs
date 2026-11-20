@@ -311,9 +311,29 @@ fn preview(ui: &mut egui::Ui, st: &mut AppState, size: Vec2) {
     crate::product::draw(&painter, &ctx, rect, st);
     let segs = crate::viewing::visible_segments(st);
     let table = emb_render::thread3d::ShadeTable::new(st.settings.look.light);
-    painter.add(egui::Shape::mesh(crate::canvas::thread_mesh_3d(
-        rect, &st.view, &segs, false, &table,
-    )));
+    // The surface on tiles as on the canvas (ADR 0130), else the meshes.
+    let view = st.view;
+    let tiles = if st.settings.look.surface {
+        crate::stitch_tiles::tiles_of(&ctx, rect, &view, st)
+    } else {
+        None
+    };
+    match tiles {
+        Some(frame) => crate::stitch_tiles::paint(
+            &painter,
+            rect,
+            st,
+            frame,
+            &segs,
+            crate::canvas::MeshLook::Thread3d,
+            &table,
+        ),
+        None => {
+            painter.add(egui::Shape::mesh(crate::canvas::thread_mesh_3d(
+                rect, &st.view, &segs, false, &table,
+            )));
+        }
+    }
     if st.show_stones {
         crate::bling::draw(&painter, rect, st);
     }

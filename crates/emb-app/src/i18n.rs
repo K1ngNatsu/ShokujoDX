@@ -363,6 +363,11 @@ pub(crate) mod tests {
         out.extend(emb_model::ColumnPattern::ALL.iter().map(|p| p.name()));
         out.extend(emb_model::Weave::ALL.iter().map(|w| w.label()));
         out.extend(emb_render::thread3d::LightPreset::ALL.iter().map(|p| p.label()));
+        out.extend(
+            crate::viewtools::Quality::ALL
+                .iter()
+                .flat_map(|q| [q.label(), q.tooltip()]),
+        );
         out.extend(emb_model::MeanderTile::ALL.iter().map(|t| t.name()));
         out.extend(emb_model::tartan::CODES.iter().map(|(_, name, _)| *name));
         out.extend(crate::color_fills::SETTS.iter().map(|(name, _, _)| *name));

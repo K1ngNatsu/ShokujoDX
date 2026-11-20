@@ -102,8 +102,8 @@ Farben an den Rändern der Garne jetzt wie Licht. Siehe [Farben und Garne](color
 die Oberfläche der Stiche: Garn auf Garn ist höher, eine Fläche ist heller
 oder dunkler nach der Richtung ihrer Stiche zum Licht, Garne glänzen nach
 ihrer Art, und hohe Teile werfen Schatten auf den Stoff. Große Designs
-bewegen und zoomen sich auch schneller. **Ansicht > Garnansicht > Feine
-Oberfläche** schaltet sie auf einem langsamen Computer aus. Siehe [Ein
+bewegen und zoomen sich auch schneller. **Ansicht > Garnansicht > Qualität >
+Schnell** schaltet sie auf einem langsamen Computer aus. Siehe [Ein
 Design prüfen](checking).
 
 **Der Stoff in der 3D-Ansicht.** Der Stoff unter den Stichen hat eine
@@ -127,6 +127,16 @@ Kreuzstich hat den neuen Stoff **Aida cloth**. Puff-Säulen sind über
 ihrem Schaumstoff rund. Metallgarn hat bei großem Zoom kleine
 Glanzpunkte, und **Ansicht > Garnansicht > Licht aus** zeigt nur
 nachtleuchtendes Garn. Siehe [Ein Design prüfen](checking).
+
+**Alle Bilder in der 3D-Ansicht.** Das Designbild, das Freigabeblatt
+und das Angebot, die Bibliothek, die Miniaturbilder im Dateimanager, der
+Kiosk, die Stichbilder von Bild zu Design und die Vorschau des Fensters
+Schriften zeigen die Stiche wie die 3D-Ansicht. **Design ausgeben** kann
+das Bild mit bis zu 600 Punkten pro Zoll mit **Kein Hintergrund**
+schreiben (für einen Webshop), und einen **Stickablauf als Animation
+(GIF)**. Die **Qualität** im Menü der Garnansicht (**Schnell**, **Gut**,
+**Beste**) wird beim ersten Start aus einer kurzen Messung des Computers
+gewählt. Siehe [Die 3D-Ansicht](3d-view).
 
 **Die Ansicht prüfen.** Die Gruppe **Prüfen** der Registerkarte Ansicht
 hat neue Werkzeuge: Lichtvorgaben und ein Licht, das Sie bewegen (**L**

@@ -132,6 +132,9 @@ const INDEX_MM: f64 = 2.0;
 /// The side of the squares of the index with which [`relay`] finds the
 /// heights under a stitch, mm.
 const QUERY_MM: f64 = 1.0;
+/// The most squares of an index: a larger design gets larger squares (the
+/// probe of Milestone 9: a design 1 km wide).
+const MAX_SQUARES: f64 = 4.0e6;
 /// The side of the squares of [`Changes`], mm.
 pub const CHANGE_MM: f64 = 1.0;
 /// [`Changes`] with more squares than this are a change everywhere.
@@ -751,6 +754,11 @@ impl Index {
     /// The index of the boxes of the strands, in their order, in the area
     /// `b`.
     fn new(boxes: impl Iterator<Item = BBox> + Clone, b: BBox, side: f64) -> Index {
+        // Two times larger squares as many times as a large area needs.
+        let mut side = side;
+        while (b.width() / side + 1.0) * (b.height() / side + 1.0) > MAX_SQUARES {
+            side *= 2.0;
+        }
         let (ox, oy) = ((b.min.x / side).floor() as i64, (b.min.y / side).floor() as i64);
         let w = ((b.max.x / side).floor() as i64 - ox + 1).max(1) as usize;
         let h = ((b.max.y / side).floor() as i64 - oy + 1).max(1) as usize;
@@ -1631,11 +1639,31 @@ impl Laid {
         show: &dyn Fn(u32) -> bool,
         detail: f64,
     ) -> Option<Surface> {
+        self.block_from(Point::ZERO, ppm, x0, y0, w, h, lighting, ground, show, detail)
+    }
+
+    /// As [`Laid::block_with`], on the grid of pixels whose pixel `x` has
+    /// its center at `base.x + (x + 0.5) / ppm` (a picture of any area,
+    /// ADR 0130).
+    #[allow(clippy::too_many_arguments)]
+    pub fn block_from(
+        &self,
+        base: Point,
+        ppm: f64,
+        x0: i64,
+        y0: i64,
+        w: u32,
+        h: u32,
+        lighting: &Lighting,
+        ground: Option<&Ground>,
+        show: &dyn Fn(u32) -> bool,
+        detail: f64,
+    ) -> Option<Surface> {
         let mut k = 0u32;
         while ppm * f64::from(1u32 << k) < detail - 1e-9 && k < MAX_BLOCK_HALVINGS {
             k += 1;
         }
-        self.block_at(ppm, k, x0, y0, w, h, lighting, ground, show)
+        self.block_at(base, ppm, k, x0, y0, w, h, lighting, ground, show)
     }
 
     /// As [`Laid::block`], with `k` halvings; a block that is too large for
@@ -1643,6 +1671,7 @@ impl Laid {
     #[allow(clippy::too_many_arguments)]
     fn block_at(
         &self,
+        base: Point,
         ppm: f64,
         k: u32,
         x0: i64,
@@ -1667,6 +1696,7 @@ impl Laid {
             .filter(|p| p.2 > 0 && p.3 > 0)
             .map(|(dx, dy, pw, ph)| {
                 let part = self.block_at(
+                    base,
                     ppm,
                     k,
                     x0 + i64::from(dx),
@@ -1684,6 +1714,7 @@ impl Laid {
                 return None;
             }
             let mut out = Surface::flat(ppm, x0, y0, w, h, lighting);
+            out.area = moved(out.area, base);
             for (dx, dy, part) in parts {
                 if let Some(part) = part {
                     out.paste(&part, dx, dy);
@@ -1697,9 +1728,12 @@ impl Laid {
         let apron = (apron_mm * ppm).ceil().max(1.0) as i64;
         let (bx, by) = (x0 - apron, y0 - apron);
         let (bw, bh) = (i64::from(w) + 2 * apron, i64::from(h) + 2 * apron);
-        let mm = BBox::new(
-            Point::new(bx as f64 / ppm, by as f64 / ppm),
-            Point::new((bx + bw) as f64 / ppm, (by + bh) as f64 / ppm),
+        let mm = moved(
+            BBox::new(
+                Point::new(bx as f64 / ppm, by as f64 / ppm),
+                Point::new((bx + bw) as f64 / ppm, (by + bh) as f64 / ppm),
+            ),
+            base,
         );
         let ids: Vec<u32> = self
             .index
@@ -1713,7 +1747,7 @@ impl Laid {
         }
         let f = i64::from(f);
         let mut s = self.raster(
-            Point::ZERO,
+            base,
             (bx * f, by * f),
             ppm * f as f64,
             (bw * f) as u32,
@@ -1727,7 +1761,7 @@ impl Laid {
             s = s.half_with(1);
         }
         let mut out = s.crop(apron as u32, apron as u32, w, h);
-        out.area = grid_area(ppm, x0, y0, w, h);
+        out.area = moved(grid_area(ppm, x0, y0, w, h), base);
         Some(out)
     }
 
@@ -2099,7 +2133,7 @@ pub fn apron_for(lighting: &Lighting, top: f64, ground: Option<&Ground>) -> f64 
 fn shadow_reach(l: &Lighting, top: f64) -> f64 {
     let v = l.vector();
     let flat = (v[0] * v[0] + v[1] * v[1]).sqrt();
-    if flat < 1e-6 || l.strength <= 0.0 {
+    if flat < 1e-6 || l.strength <= 0.0 || !l.shadows {
         return 0.0;
     }
     (top * flat / v[2]).min(SHADOW_MAX_MM)
@@ -2406,6 +2440,11 @@ pub struct Surface {
     pub light: Lighting,
 }
 
+/// The box `b` moved by `by`.
+fn moved(b: BBox, by: Point) -> BBox {
+    BBox::new(b.min + by, b.max + by)
+}
+
 /// The area of the pixels `x0..x0 + w`, `y0..y0 + h` of the grid of pixels
 /// at `ppm` (see [`Laid::block`]).
 fn grid_area(ppm: f64, x0: i64, y0: i64, w: u32, h: u32) -> BBox {
@@ -2436,6 +2475,15 @@ impl Surface {
             tiles,
             light: *lighting,
         }
+    }
+
+    /// A surface of `w` × `h` pixels at `ppm` with no thread and no piece
+    /// in the light `lighting`, its first pixel at `corner` (a part of a
+    /// picture with no stitches).
+    pub fn empty(corner: Point, ppm: f64, w: u32, h: u32, lighting: &Lighting) -> Surface {
+        let mut s = Surface::flat(ppm, 0, 0, w, h, lighting);
+        s.area = moved(s.area, corner);
+        s
     }
 
     /// The pixels `x0..x0 + w`, `y0..y0 + h` of the surface.
@@ -2629,7 +2677,7 @@ impl Surface {
                         }
                         let mut dark = 0.0;
                         for (v, part) in lv {
-                            if part > 0.0 {
+                            if part > 0.0 && light.shadows {
                                 dark += part
                                     * shadow_with(
                                         &at,

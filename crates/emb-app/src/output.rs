@@ -55,6 +55,12 @@ pub struct OutputProfile {
     /// The PNG design picture has the flat thread look (else the 3D look
     /// with the default light, on the texture of the fabric).
     pub flat_picture: bool,
+    /// The dots for each inch of the PNG design picture (ADR 0130).
+    pub picture_dpi: u32,
+    /// The PNG design picture has no background (for a web shop).
+    pub clear_picture: bool,
+    /// The sew-out animation (GIF): the design as it sews.
+    pub sewout_gif: bool,
 }
 
 impl Default for OutputProfile {
@@ -74,12 +80,31 @@ impl Default for OutputProfile {
             stone_template: true,
             stone_clearance_mm: emb_model::bling::DEFAULT_CLEARANCE_MM,
             flat_picture: false,
+            picture_dpi: PICTURE_DPI[1],
+            clear_picture: false,
+            sewout_gif: false,
         }
     }
 }
 
-/// Pixels per mm of the design picture.
-const PICTURE_PX_PER_MM: f64 = 10.0;
+/// The dots for each inch of the design picture that the Output window
+/// offers (the second is the default: 10 pixels for each mm).
+pub const PICTURE_DPI: [u32; 4] = [150, 254, 300, 600];
+
+/// The look of the pictures of the approval sheet and of the PNG design
+/// picture: the 3D look in the default light, on the fabric of the design.
+fn sheet_look(design: &Design, fabrics: &FabricCatalog, flat: bool) -> emb_render::raster::Look {
+    crate::viewtools::LookSettings {
+        three_d: !flat,
+        ..Default::default()
+    }
+    .picture_look(Some(emb_render::fabric::FabricLook::of(&fabrics.of(design), design)))
+}
+
+/// The records of each object of `plan`.
+fn spans_of(plan: &emb_stitch::StitchPlan) -> impl Iterator<Item = (emb_model::ObjectId, std::ops::Range<usize>)> + '_ {
+    plan.spans.iter().map(|s| (s.object, s.records.clone()))
+}
 /// Pixels per mm of the picture of the design on the product, on the
 /// approval sheet (about 250 dpi on the page for one side).
 const SHEET_PX_PER_MM: f64 = 2.5;
@@ -99,6 +124,9 @@ fn product_page(
 }
 
 /// The pictures of the product for the approval sheet, each with its caption.
+/// The picture of the design on the approval sheet and the area that it
+/// shows (`SheetData::picture`).
+pub type SheetPicture = Option<(std::sync::Arc<emb_render::raster::Picture>, emb_geom::BBox)>;
 pub type SheetPictures = Vec<(std::sync::Arc<emb_render::raster::Picture>, String)>;
 
 /// The pictures of the design on its product `v` for the approval sheet,
@@ -464,7 +492,11 @@ pub fn write_files(
         let pdf = emb_render::pdf::write(&sheet::production(&data, profile.paper), &design.name);
         write(folder.join(format!("{name} worksheet.pdf")), &pdf, &mut written)?;
     }
+    let ground = Some(emb_render::fabric::Ground::of(&c.fabrics.of(design), design));
     if profile.approval {
+        // The picture of the design with the surface of the 3D look (ADR 0130).
+        let e = emb_render::picture::Embroidery::of_design(design, stitches, spans_of(plan), ground.clone());
+        data.set_picture(&e, &sheet_look(design, c.fabrics, false));
         let mut pages = vec![sheet::approval(&data, profile.paper)];
         if profile.approval_product
             && let Some(page) = product_page(design, plan, c.machines, &data, profile.paper)
@@ -475,21 +507,27 @@ pub fn write_files(
         write(folder.join(format!("{name} approval.pdf")), &pdf, &mut written)?;
     }
     if profile.picture {
-        let look = crate::viewtools::LookSettings {
-            three_d: !profile.flat_picture,
-            ..Default::default()
-        }
-        .picture_look(Some(emb_render::fabric::FabricLook::of(&c.fabrics.of(design), design)));
-        let pic = emb_render::raster::picture_look(
-            &data.segments,
-            &sheet::picture_areas(design),
-            PICTURE_PX_PER_MM,
-            0.4,
+        let pic = emb_render::picture::design_picture(
+            design,
+            stitches,
+            spans_of(plan),
+            ground.clone(),
+            f64::from(profile.picture_dpi.clamp(72, 600)) / 25.4,
             2.0,
-            design.background,
-            &look,
+            design.background.filter(|_| !profile.clear_picture),
+            &sheet_look(design, c.fabrics, profile.flat_picture),
         );
         write(folder.join(format!("{name}.png")), &pic.png(), &mut written)?;
+    }
+    if profile.sewout_gif && sews {
+        let gif = emb_render::picture::sewout_gif(
+            design,
+            stitches,
+            spans_of(plan),
+            ground,
+            &sheet_look(design, c.fabrics, false),
+        )?;
+        write(folder.join(format!("{name} sew-out.gif")), &gif, &mut written)?;
     }
     if profile.picture_svg {
         let svg = emb_render::svg::picture(
@@ -644,11 +682,29 @@ impl AppState {
         self.message = tr("Batch output is in the queue (the Exports tab shows it).").into();
     }
 
+    /// The picture of the approval sheet and the quote of the design now
+    /// (ADR 0130), kept for the state of the design.
+    pub fn sheet_picture(&mut self, data: &mut SheetData) {
+        let state = self.doc.state_id();
+        if self.sheet_picture.as_ref().is_none_or(|(s, _)| *s != state) {
+            let plan = self.plan_view().plan.clone();
+            let d = self.doc.design();
+            let ground = Some(emb_render::fabric::Ground::of(&self.fabrics.of(d), d));
+            let e = emb_render::picture::Embroidery::of_design(d, &plan.stitches, spans_of(&plan), ground);
+            data.set_picture(&e, &sheet_look(d, &self.fabrics, false));
+            self.sheet_picture = Some((state, data.picture.clone()));
+        }
+        if let Some((_, p)) = &self.sheet_picture {
+            data.picture = p.clone();
+        }
+    }
+
     /// The pages of the sheet that the preview shows.
     fn preview_pages(&mut self, approval: bool) -> Vec<Page> {
-        let data = self.current_sheet_data();
+        let mut data = self.current_sheet_data();
         let paper = self.settings.output.paper;
         if approval {
+            self.sheet_picture(&mut data);
             let mut pages = vec![sheet::approval(&data, paper)];
             if self.settings.output.approval_product
                 && let Some(v) = self.doc.design().product.clone()
@@ -848,6 +904,27 @@ fn profile_ui(ui: &mut egui::Ui, st: &mut AppState) {
             }
         });
     });
+    ui.add_enabled_ui(p.picture, |ui| {
+        ui.horizontal(|ui| {
+            ui.add_space(24.0);
+            egui::ComboBox::from_id_salt("output-dpi")
+                .selected_text(crate::i18n::fill("{} dpi", &[&p.picture_dpi]))
+                .show_ui(ui, |ui| {
+                    for dpi in PICTURE_DPI {
+                        ui.selectable_value(&mut p.picture_dpi, dpi, crate::i18n::fill("{} dpi", &[&dpi]));
+                    }
+                })
+                .response
+                .on_hover_text(tr(
+                    "The dots for each inch of the picture at the real size of the design.",
+                ));
+            ui.checkbox(&mut p.clear_picture, tr("No background")).on_hover_text(tr(
+                "A clear background round the stitches (for a web shop), not the fabric color.",
+            ));
+        });
+    });
+    ui.checkbox(&mut p.sewout_gif, tr("Sew-out animation (GIF)"))
+        .on_hover_text(tr("An animated picture of the design as it sews, color by color."));
     ui.checkbox(&mut p.picture_svg, tr("Design picture (SVG)"))
         .on_hover_text(tr(
             "The stitches as lines in the thread colors, at real size, for vector programs.",
@@ -1133,8 +1210,9 @@ mod tests {
                 let dir = temp(&format!("approval-{with}-{paper:?}"));
                 output(&mut st, &dir, "shirt").unwrap();
                 let pdf = std::fs::read(dir.join("shirt approval.pdf")).unwrap();
-                // Both sides: two pictures on the product page.
-                assert_eq!(pages(&pdf), if with { (2, 2) } else { (1, 0) }, "{paper:?}");
+                // The picture of the design and its soft mask (ADR 0130), and
+                // both sides: two pictures on the product page.
+                assert_eq!(pages(&pdf), if with { (2, 4) } else { (1, 2) }, "{paper:?}");
                 std::fs::remove_dir_all(&dir).ok();
             }
         }

@@ -12,6 +12,8 @@ emb-geom.workspace = true
 emb-model.workspace = true
 # PNG output of the design picture. Pure Rust.
 image.workspace = true
+# The soft masks of the pictures of a PDF (ADR 0130). Pure Rust.
+flate2.workspace = true
 serde.workspace = true
 
 [lints]

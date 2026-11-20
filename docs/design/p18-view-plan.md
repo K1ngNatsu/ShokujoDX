@@ -16,7 +16,9 @@ of a small computer are open (`docs/design/p18-view-m5-report.md`, ADR
 (`docs/design/p18-view-m6-report.md`, ADR 0127). Milestone 7 is done
 except the compare with the sew-outs (`docs/design/p18-view-m7-report.md`,
 ADR 0128). Milestone 8 is done except the check of the owner
-(`docs/design/p18-view-m8-report.md`, ADR 0129).
+(`docs/design/p18-view-m8-report.md`, ADR 0129). Milestone 9 is done
+except the test with users (`docs/design/p18-view-m9-report.md`, ADR
+0130).
 
 ## Goal
 
@@ -525,6 +527,21 @@ and a picture of the view (the same design, the same size) and say which
 one is the photo and what gave it away; the list of what gave it away is
 the list of the work that is left. The budgets of the table hold, and
 the program starts and edits with the software renderer.
+
+**Done (2026-11-19, ADR 0130), except the test with users.** All pictures
+of the program come from the surface (`emb_render::picture`: blocks on
+all processors, a fast detail for the thumbnails of the file manager);
+the worksheet keeps its lines. The PNG design picture has 150 to 600 dots
+for each inch and can have no background, and Output Design writes a
+sew-out animation (GIF). The quality Fast, Good or Best is chosen at the
+first start from a short measure (Fast with the software renderer). The
+graphics card is not needed now: the processor meets the budgets on the
+development computer (a design picture of 4000 × 3592 pixels of 100,000
+stitches in 0.54 s); the question stays open until the numbers of a small
+computer. The help has the topic *The 3D view*. The audit found that the
+index of a lay of a design 1 km wide asked for 1 TB (now at most 4
+million squares), and the lays of the tile cache got a budget of 256 MB
+(`docs/design/p18-view-m9-report.md`).
 
 ## Order and size
 

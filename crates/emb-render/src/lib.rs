@@ -36,6 +36,7 @@ pub mod light;
 pub mod page;
 pub mod pdf;
 pub mod photo;
+pub mod picture;
 pub mod product;
 pub mod raster;
 pub mod sheen;

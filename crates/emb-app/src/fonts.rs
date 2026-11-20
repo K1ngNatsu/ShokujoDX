@@ -142,6 +142,9 @@ pub struct FontsWindow {
     pub by_quality: bool,
     selected: Option<FontRef>,
     preview: Option<Preview>,
+    /// The letters of the preview sewn (ADR 0130), for a font, the dark
+    /// mode and a width of the preview.
+    sewn: Option<(FontRef, bool, u32, Option<Texture>)>,
     form: Option<ConvertForm>,
     /// A conversion that runs in the background.
     job: Option<Receiver<Result<PathBuf, String>>>,
@@ -257,6 +260,53 @@ pub(crate) fn part_rings(part: &ObjectKind) -> Vec<Vec<Point>> {
         ObjectKind::Fill { outer, holes, .. } => ring(outer).into_iter().chain(holes.iter().flat_map(ring)).collect(),
         _ => Vec::new(),
     }
+}
+
+/// A texture of the window (it has no text form for `Debug`).
+#[derive(Clone)]
+struct Texture(egui::TextureHandle);
+
+impl std::fmt::Debug for Texture {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Texture")
+    }
+}
+
+/// The letters `letters` sewn in `thread` on `fabric`, with the surface of
+/// the 3D look (ADR 0130), at most `w` × `h` pixels.
+fn sewn_letters(
+    letters: &[Letter],
+    thread: emb_model::Rgb,
+    fabric: emb_model::Rgb,
+    w: f64,
+    h: f64,
+) -> Option<emb_render::raster::Picture> {
+    let mut d = emb_model::Design::new("");
+    let t = d.add_thread("", thread);
+    for part in letters.iter().flat_map(|l| l.parts.iter()) {
+        d.add_object(t, part.clone());
+    }
+    let plan = emb_stitch::build_plan(&d, &Default::default(), &mut Default::default());
+    if plan.stitches.stitch_count() == 0 {
+        return None;
+    }
+    let segs = emb_render::segments(&plan.stitches);
+    let b = emb_render::picture::area_of(&segs, &[], 0.6)?;
+    let ppm = (w / b.width().max(1e-3)).min(h / b.height().max(1e-3)).min(20.0);
+    let e = emb_render::picture::Embroidery::of_design(
+        &d,
+        &plan.stitches,
+        plan.spans.iter().map(|s| (s.object, s.records.clone())),
+        None,
+    );
+    Some(e.picture(
+        b,
+        ppm,
+        &emb_render::raster::Look::three_d(None),
+        Some(fabric),
+        emb_render::picture::FULL_DETAIL,
+        &|_| true,
+    ))
 }
 
 /// The shapes of the letters, as screen rings (each part alone).
@@ -531,8 +581,49 @@ fn details(ui: &mut egui::Ui, st: &mut AppState) {
         ));
     }
     let (rect, _) = ui.allocate_exact_size(Vec2::new(ui.available_width(), 90.0), egui::Sense::hover());
-    ui.painter().rect_filled(rect, 4.0, ui.visuals().extreme_bg_color);
-    draw_letters(ui.painter(), rect, &p.letters, ui.visuals().text_color());
+    let back = ui.visuals().extreme_bg_color;
+    ui.painter().rect_filled(rect, 4.0, back);
+    // The letters sewn (ADR 0130); their outlines while they are not.
+    let dark = ui.visuals().dark_mode;
+    let width = rect.width().round() as u32;
+    let fw = &mut st.fonts_window;
+    if fw
+        .sewn
+        .as_ref()
+        .is_none_or(|(f, d, w, _)| !f.same(&sel) || *d != dark || *w != width)
+    {
+        let ppp = f64::from(ui.ctx().pixels_per_point());
+        let text = ui.visuals().text_color();
+        let (w, h) = (
+            f64::from(rect.width() - 16.0) * ppp,
+            f64::from(rect.height() - 12.0) * ppp,
+        );
+        let rgb = |c: Color32| emb_model::Rgb(c.r(), c.g(), c.b());
+        let texture = sewn_letters(&p.letters, rgb(text), rgb(back), w, h).map(|pic| {
+            let image = egui::ColorImage::from_rgba_unmultiplied([pic.width as usize, pic.height as usize], &pic.rgba);
+            Texture(crate::resources::load_texture(
+                ui.ctx(),
+                "font-preview",
+                image,
+                egui::TextureOptions::LINEAR,
+            ))
+        });
+        fw.sewn = Some((sel.clone(), dark, width, texture));
+    }
+    match fw.sewn.as_ref().and_then(|(_, _, _, t)| t.clone()) {
+        Some(Texture(t)) => {
+            let ppp = ui.ctx().pixels_per_point();
+            let size = t.size_vec2() / ppp;
+            let r = Rect::from_center_size(rect.center(), size);
+            ui.painter().image(
+                t.id(),
+                r,
+                Rect::from_min_max(Pos2::ZERO, Pos2::new(1.0, 1.0)),
+                Color32::WHITE,
+            );
+        }
+        None => draw_letters(ui.painter(), rect, &p.letters, ui.visuals().text_color()),
+    }
     if let Some((lo, hi)) = p.range {
         ui.label(crate::i18n::fill(
             "Size range: {}–{} mm (capital height)",

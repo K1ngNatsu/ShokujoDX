@@ -114,7 +114,7 @@ pub(crate) fn half_vector(l: [f64; 3]) -> [f64; 3] {
 /// `true` if the shadows of the surface in the light `a` are those in the
 /// light `b`.
 pub(crate) fn same_shadows(a: &Lighting, b: &Lighting) -> bool {
-    a.azimuth_deg == b.azimuth_deg && a.elevation_deg == b.elevation_deg && a.two == b.two
+    a.azimuth_deg == b.azimuth_deg && a.elevation_deg == b.elevation_deg && a.two == b.two && a.shadows == b.shadows
 }
 
 /// The highlight of a kind of thread: its strength and its sharpness (a
@@ -274,6 +274,16 @@ pub fn light(s: &Surface, lighting: &Lighting, fabric: Option<(Rgb, FabricLook)>
 
 /// As [`light`], the light before the tone curve.
 pub fn light_values(s: &Surface, lighting: &Lighting, fabric: Option<(Rgb, FabricLook)>) -> Light {
+    light_values_on(s, lighting, fabric, 0)
+}
+
+/// As [`light`], on `threads` processors (0: all).
+pub fn light_on(s: &Surface, lighting: &Lighting, fabric: Option<(Rgb, FabricLook)>, threads: usize) -> Picture {
+    light_values_on(s, lighting, fabric, threads).picture()
+}
+
+/// As [`light_values`], on `threads` processors (0: all).
+fn light_values_on(s: &Surface, lighting: &Lighting, fabric: Option<(Rgb, FabricLook)>, threads: usize) -> Light {
     let (w, h) = (s.width as usize, s.height as usize);
     let lit = Lit::new(s, lighting);
     // The light of the fabric, and its colors in linear light.
@@ -283,9 +293,12 @@ pub fn light_values(s: &Surface, lighting: &Lighting, fabric: Option<(Rgb, Fabri
     let size = 1.0 / s.px_per_mm;
     let behind = lit.behind;
     let mut rgba = vec![[0.0f32; 4]; w * h];
-    let rows_per = h
-        .div_ceil(std::thread::available_parallelism().map_or(1, usize::from))
-        .max(1);
+    let threads = if threads == 0 {
+        std::thread::available_parallelism().map_or(1, usize::from)
+    } else {
+        threads
+    };
+    let rows_per = h.div_ceil(threads).max(1);
     std::thread::scope(|scope| {
         for (band, chunk) in rgba.chunks_mut(rows_per * w).enumerate() {
             let lit = &lit;
@@ -457,7 +470,7 @@ impl<'a> Lit<'a> {
         let (t, i) = s.at(x as u32, y as u32);
         let open = f64::from(t.open[i]) / 255.0;
         let dark = match self.around {
-            _ if k <= 0.0 => 0.0,
+            _ if k <= 0.0 || !self.lighting.shadows => 0.0,
             Some(a) => lights
                 .iter()
                 .filter(|(_, w)| *w > 0.0)

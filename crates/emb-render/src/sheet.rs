@@ -25,6 +25,11 @@ const BOX: Rgb = Rgb(200, 200, 200);
 /// The picture background when the design has no fabric color: light
 /// gray, so white thread shows.
 const PAPER_GRAY: Rgb = Rgb(232, 232, 232);
+/// The picture of the approval sheet: at most this many pixels on its
+/// longest side, and at most this many pixels for each mm (254 dots for
+/// each inch).
+const SHEET_PICTURE_PX: f64 = 2400.0;
+const SHEET_PICTURE_PX_PER_MM: f64 = 10.0;
 
 /// One color block, in sew order.
 #[derive(Debug, Clone, PartialEq)]
@@ -281,6 +286,10 @@ pub struct SheetData {
     pub price: Option<String>,
     /// The threads to buy for the order (ADR 0066), one line each.
     pub to_buy: Vec<String>,
+    /// The picture of the design for the approval sheet and the quote (the
+    /// surface of the stitches, ADR 0130) and the area of `segments` that
+    /// it shows. `None`: the sheets draw the stitches as lines.
+    pub picture: Option<(std::sync::Arc<crate::raster::Picture>, BBox)>,
 }
 
 impl SheetData {
@@ -291,6 +300,29 @@ impl SheetData {
             Some(n) => n.to_string(),
             None => file_name.to_string(),
         }
+    }
+
+    /// Makes the picture of the approval sheet and the quote from the laid
+    /// stitches `e` (in the coordinates of `segments`) in the light of
+    /// `look` (ADR 0130): the threads and their shadows on a clear
+    /// background, so they lie on the color of the box (the fabric color of
+    /// the design) with no edge.
+    pub fn set_picture(&mut self, e: &crate::picture::Embroidery, look: &crate::raster::Look) {
+        let stitches = self
+            .segments
+            .iter()
+            .filter(|s| s.kind == crate::SegmentKind::Stitch)
+            .flat_map(|s| [s.a, s.b]);
+        let stones = self
+            .stones
+            .iter()
+            .flat_map(|(c, r, _)| [Point::new(c.x - r, c.y - r), Point::new(c.x + r, c.y + r)]);
+        let Some(b) = BBox::from_points(stitches.chain(stones)).map(|b| b.expand(1.0)) else {
+            return;
+        };
+        let ppm = (SHEET_PICTURE_PX / b.width().max(b.height())).min(SHEET_PICTURE_PX_PER_MM);
+        let pic = e.picture(b, ppm, look, None, crate::picture::FULL_DETAIL, &|_| true);
+        self.picture = Some((std::sync::Arc::new(pic), b));
     }
 
     /// The design notes, and the notes of the order after them.
@@ -544,13 +576,27 @@ fn header(p: &mut Page, d: &SheetData, kind: &str) -> f64 {
 }
 
 /// The picture in a box, with the size under it. Returns the box bottom.
-fn picture(p: &mut Page, d: &SheetData, area: BBox) -> f64 {
+/// With `look`, the picture of the design (`SheetData::picture`) if there
+/// is one, else the stitches as lines (the worksheet: for the operator).
+fn picture(p: &mut Page, d: &SheetData, area: BBox, look: bool) -> f64 {
     p.ops.push(Op::Rect {
         rect: area,
         fill: Some(d.background.unwrap_or(PAPER_GRAY)),
         stroke: Some((0.2, BOX)),
     });
     let inner = BBox::new(area.min + Point::new(4.0, 4.0), area.max - Point::new(4.0, 4.0));
+    if look && let Some((pic, b)) = &d.picture {
+        let scale = (inner.width() / b.width().max(1e-6))
+            .min(inner.height() / b.height().max(1e-6))
+            .min(1.0);
+        let size = Point::new(b.width() * scale, b.height() * scale);
+        let min = inner.center() - Point::new(size.x / 2.0, size.y / 2.0);
+        p.ops.push(Op::Image {
+            rect: BBox::new(min, min + size),
+            picture: pic.clone(),
+        });
+        return size_line(p, d, area, scale);
+    }
     let (mut segments, mut fit) = fit_segments(&d.segments, inner);
     // With rhinestones, the picture fits the stitches and the stones.
     if let Some(stones) = d
@@ -614,6 +660,12 @@ fn picture(p: &mut Page, d: &SheetData, area: BBox) -> f64 {
             fill: *color,
         });
     }
+    size_line(p, d, area, scale)
+}
+
+/// The size of the design and its scale under the box `area`. Returns the
+/// y of the line.
+fn size_line(p: &mut Page, d: &SheetData, area: BBox, scale: f64) -> f64 {
     let shown = if (scale - 1.0).abs() < 0.005 {
         text::tr("shown at real size").to_string()
     } else {
@@ -810,7 +862,7 @@ pub fn production(d: &SheetData, paper: Paper) -> Vec<Page> {
         crate::barcode::draw(&mut p, *kind, text, w - MARGIN, MARGIN, 9.0, 70.0);
     }
     let pic = BBox::new(Point::new(MARGIN, top), Point::new(MARGIN + 100.0, top + 110.0));
-    picture(&mut p, d, pic);
+    picture(&mut p, d, pic, false);
 
     let mut info: Vec<(&str, String)> = d.order_rows(None);
     info.extend([
@@ -1007,7 +1059,7 @@ pub fn approval(d: &SheetData, paper: Paper) -> Page {
     let w = p.width_mm;
     let top = header(&mut p, d, text::tr("Design approval"));
     let pic = BBox::new(Point::new(MARGIN, top), Point::new(w - MARGIN, top + 140.0));
-    let mut y = picture(&mut p, d, pic) + 10.0;
+    let mut y = picture(&mut p, d, pic, true) + 10.0;
     p.text(MARGIN, y, 10.0, true, text::tr("Colors"));
     y += 6.0;
     let col_w = (w - 2.0 * MARGIN) / 2.0;
@@ -1098,7 +1150,7 @@ pub fn quote_sheet(d: &SheetData, q: &emb_model::quote::Quote, currency: &str, p
     let w = p.width_mm;
     let top = header(&mut p, d, text::tr("Quote"));
     let pic = BBox::new(Point::new(MARGIN, top), Point::new(w - MARGIN, top + 90.0));
-    let mut y = picture(&mut p, d, pic) + 10.0;
+    let mut y = picture(&mut p, d, pic, true) + 10.0;
     let threads = d.colors.len();
     p.gray_text(
         MARGIN,

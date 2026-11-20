@@ -56,6 +56,9 @@ use crate::app::AppState;
 use crate::canvas::{CanvasView, MeshLook, fitted_mesh, stitch_mesh};
 use crate::viewing::ViewFilter;
 
+/// The memory of the lays of the designs that the views showed last: a
+/// design whose lay goes out is laid again when it shows (ADR 0130).
+const LAY_BUDGET: usize = 256 * 1024 * 1024;
 /// The levels of the tiles: level `L` has 2^L pixels for each mm.
 pub const MIN_LEVEL: i32 = -4;
 pub const MAX_LEVEL: i32 = 7;
@@ -541,6 +544,15 @@ impl TileCache {
         self.bytes
     }
 
+    /// The memory of the lays of all designs, bytes.
+    pub fn lay_bytes(&self) -> usize {
+        self.designs
+            .values()
+            .filter_map(|d| d.lay.as_ref())
+            .map(|l| l.laid.bytes())
+            .sum()
+    }
+
     /// The number of tiles in the cache.
     pub fn len(&self) -> usize {
         self.tiles.len()
@@ -634,6 +646,7 @@ impl TileCache {
                 scene.lighting.strength.to_bits(),
                 scene.lighting.lights_off,
                 scene.lighting.two,
+                scene.lighting.shadows,
                 scene.ground.as_ref().map(Ground::key),
                 shown.key,
             )),
@@ -1285,10 +1298,30 @@ impl TileCache {
         }
     }
 
-    /// Takes out the lays of designs that no view used for a while.
+    /// Takes out the lays of designs that no view used for a while, and the
+    /// lays that no view used for the longest time while all of them have
+    /// more than [`LAY_BUDGET`] (the audit of P18 view: ten open designs).
     fn forget_old(&mut self, keep: u64) {
         self.designs
             .retain(|doc, d| *doc == keep || d.job.is_some() || d.used.is_some_and(|t| t.elapsed() < KEEP_LAY));
+        let mut total = self.lay_bytes();
+        if total <= LAY_BUDGET {
+            return;
+        }
+        let mut old: Vec<(Option<Instant>, u64, usize)> = self
+            .designs
+            .iter()
+            .filter(|(doc, d)| **doc != keep && d.job.is_none())
+            .filter_map(|(doc, d)| d.lay.as_ref().map(|l| (d.used, *doc, l.laid.bytes())))
+            .collect();
+        old.sort_by_key(|(used, doc, _)| (*used, *doc));
+        for (_, doc, bytes) in old {
+            if total <= LAY_BUDGET {
+                break;
+            }
+            self.designs.remove(&doc);
+            total -= bytes;
+        }
     }
 
     /// The tiles of the variant that showed before `v` that a change does
@@ -2506,6 +2539,114 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// The audit of P18 view (Milestone 9): a machine file 1 km wide (a
+    /// wrong value) shows its tiles at the zoom of all of it and near a
+    /// corner, with no error and in a bounded memory.
+    #[test]
+    fn a_design_of_one_km_shows_its_tiles() {
+        use emb_model::{StitchDesign, StitchKind, StitchRecord, Thread};
+        let thread = |c| Thread {
+            color: c,
+            ..Default::default()
+        };
+        let mut s = StitchDesign {
+            threads: vec![thread(emb_model::Rgb(20, 60, 160)), thread(emb_model::Rgb(200, 40, 40))],
+            ..Default::default()
+        };
+        // Two small objects 1 km apart (an object larger than 3 m does not
+        // sew: `emb_stitch::MAX_OBJECT_MM`).
+        for (x, y, k) in [
+            (0.0, 0.0, StitchKind::Stitch),
+            (10.0, 0.0, StitchKind::Stitch),
+            (10.0, 5.0, StitchKind::Stitch),
+            (10.0, 5.0, StitchKind::ColorChange),
+            (1_000_000.0, 1_000_000.0, StitchKind::Jump),
+            (1_000_000.0, 1_000_000.0, StitchKind::Stitch),
+            (1_000_010.0, 1_000_000.0, StitchKind::Stitch),
+        ] {
+            s.records.push(StitchRecord::new(Point::new(x, y), k));
+        }
+        let mut h = Harness::empty();
+        h.st.settings.look.surface = true;
+        h.st.stitch_tiles.sync = true;
+        h.st.show_thread_look = true;
+        h.st.doc = emb_model::Document::new(emb_model::design_from_stitches(&s, "one km"));
+        h.st.doc_id += 1;
+        let t0 = Instant::now();
+        let b = h.st.fit_box().expect("the stitches");
+        h.st.view.fit(rect(), b);
+        // The first frame asks for the tiles, the second shows them.
+        frame(&mut h);
+        let f = frame(&mut h);
+        assert!(
+            f.complete,
+            "all tiles at the zoom of all of it: level {}, {} shapes, {} missing, zoom {}, {:?}",
+            f.level,
+            f.shapes.len(),
+            f.missing.len(),
+            h.st.view.zoom,
+            h.st.stitch_tiles.stats
+        );
+        // Near the first stitches (canvas coordinates).
+        let plan = h.st.shown_plan().plan.clone();
+        let span = plan.stitches.extents().expect("the stitches sew");
+        assert!(span.width() > 999_000.0, "{span:?}");
+        let first = plan.stitches.records[1].pos;
+        h.st.view.zoom = 4.0;
+        h.st.view.center = h.st.doc.design().from_hoop_transform().apply(first);
+        frame(&mut h);
+        let f = frame(&mut h);
+        assert!(f.complete && !f.shapes.is_empty(), "{} {}", f.complete, f.shapes.len());
+        assert!(h.st.stitch_tiles.bytes() <= h.st.stitch_tiles.budget);
+        assert!(t0.elapsed() < Duration::from_secs(60), "{:?}", t0.elapsed());
+    }
+
+    /// The audit of P18 view (Milestone 9): the memory of the tiles and the
+    /// lays of ten open designs of 100,000 stitches, each shown on the
+    /// canvas. Run with `cargo test --release -p emb-app -- --ignored
+    /// ten_open_designs --nocapture`.
+    #[test]
+    #[ignore]
+    fn ten_open_designs() {
+        let mut cache = TileCache::default();
+        cache.sync = true;
+        let ctx = crate::test_util::ready_context();
+        let plan = Arc::new(stress_plan(100_000));
+        let design = Design::new("");
+        let filter = ViewFilter::default();
+        let b = plan.stitches.extents().expect("stitches");
+        let mut view = CanvasView::default();
+        view.fit(rect(), b);
+        for doc in 0..10u64 {
+            let scene = Scene {
+                doc: 1000 + doc,
+                state: doc,
+                plan: &plan,
+                design: &design,
+                lighting: Lighting::default(),
+                ground: None,
+                filter: &filter,
+                cursor: None,
+                moving: &[],
+            };
+            for _ in 0..2 {
+                let _ = ctx.run_ui(Default::default(), |_| {});
+                cache.draw(&ctx, rect(), &view, &scene);
+            }
+        }
+        let (tiles, lays) = (cache.bytes(), cache.lay_bytes());
+        println!(
+            "ten designs of 100,000 stitches: tiles {} MB (budget {} MB), lays {} MB (budget {} MB, {} lays kept)",
+            tiles >> 20,
+            cache.budget >> 20,
+            lays >> 20,
+            LAY_BUDGET >> 20,
+            cache.designs.values().filter(|d| d.lay.is_some()).count()
+        );
+        assert!(tiles <= cache.budget);
+        assert!(lays <= LAY_BUDGET, "{lays}");
     }
 
     #[test]

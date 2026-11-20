@@ -28,6 +28,9 @@ fn output_with_a_fabric() {
         stone_template: true,
         stone_clearance_mm: emb_model::bling::DEFAULT_CLEARANCE_MM,
         flat_picture: false,
+        picture_dpi: emb_cli::DEFAULT_DPI,
+        clear_picture: false,
+        sewout_gif: false,
     };
     let (files, data) = output(&input, &out_dir, None, &o).unwrap();
     assert_eq!(files.len(), 5, "{files:?}");

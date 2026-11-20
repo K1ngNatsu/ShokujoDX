@@ -92,7 +92,7 @@ die Richtung und die Höhe des Lichts, die Stärke des Schattens und die
 Stofffarbe: die Fäden seines Gewebes, die Schlingen eines Handtuchs oder
 die Narbung von Leder, im Licht der Garnansicht). **Standardlicht** setzt sie zurück.
 
-Mit **Feine Oberfläche** (beim Start ein) zeigt die 3D-Ansicht die
+Mit der **Qualität** Gut oder Beste zeigt die 3D-Ansicht die
 Oberfläche der Stiche: Garn auf Garn ist höher, jede Fläche ist heller
 oder dunkler nach der Richtung ihrer Stiche zum Licht, und hohe Teile
 werfen Schatten auf den Stoff. Jedes Nadelloch ist eine kleine Delle
@@ -107,8 +107,8 @@ aus** zeigt einen dunklen Raum: Nur nachtleuchtendes Garn ist zu sehen,
 in seinem eigenen Licht.
 Das Programm macht die Oberfläche in
 Teilen, während Sie arbeiten; ein Teil, der noch nicht fertig ist, zeigt
-kurz die schnellere Ansicht. Schalten Sie **Feine Oberfläche** auf einem
-langsamen Computer aus.
+kurz die schnellere Ansicht. Wählen Sie auf einem langsamen Computer die
+**Qualität** Schnell (siehe [Die 3D-Ansicht](3d-view)).
 
 ## Die Ansicht prüfen
 

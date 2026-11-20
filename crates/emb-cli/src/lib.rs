@@ -442,7 +442,26 @@ pub struct OutputOptions {
     /// The PNG picture with the flat thread look (else the 3D thread look,
     /// with the texture of the fabric under a background color).
     pub flat_picture: bool,
+    /// The dots for each inch of the PNG picture (72 to 600; ADR 0130).
+    pub picture_dpi: u32,
+    /// The PNG picture with no background (for a web shop).
+    pub clear_picture: bool,
+    /// The sew-out animation (GIF).
+    pub sewout_gif: bool,
 }
+
+impl OutputOptions {
+    /// The pixels for each mm of the PNG picture.
+    pub fn picture_px_per_mm(&self) -> f64 {
+        f64::from(self.picture_dpi.clamp(MIN_DPI, MAX_DPI)) / 25.4
+    }
+}
+
+/// The dots for each inch of a picture: the least, the most and the
+/// default (10 pixels for each mm).
+pub const MIN_DPI: u32 = 72;
+pub const MAX_DPI: u32 = 600;
+pub const DEFAULT_DPI: u32 = 254;
 
 /// Writes the output files of one input (a project, artwork or machine file)
 /// to `dir` as `<name>.*`: machine files, the project file, and the sheets
@@ -556,17 +575,41 @@ pub fn output(
             emb_render::pdf::write(&sheet::production(&data, o.paper), &design.name),
         )?;
     }
+    let spans = || p.spans.iter().map(|s| (s.object, s.records.clone()));
+    let preset = emb_model::FabricCatalog::builtin().of(&design);
+    let ground = Some(emb_render::fabric::Ground::of(&preset, &design));
     if o.approval {
+        // The picture of the design with the surface of the 3D look (ADR 0130).
+        let e = emb_render::picture::Embroidery::of_design(&design, &p.stitches, spans(), ground.clone());
+        data.set_picture(&e, &picture_look(&design, false));
         write(
             dir.join(format!("{name} approval.pdf")),
             emb_render::pdf::write(&[sheet::approval(&data, o.paper)], &design.name),
         )?;
     }
     if o.picture {
-        let areas = sheet::picture_areas(&design);
         let look = picture_look(&design, o.flat_picture);
-        let pic = emb_render::raster::picture_look(&data.segments, &areas, 10.0, 0.4, 2.0, design.background, &look);
+        let pic = emb_render::picture::design_picture(
+            &design,
+            &p.stitches,
+            spans(),
+            ground,
+            o.picture_px_per_mm(),
+            2.0,
+            design.background.filter(|_| !o.clear_picture),
+            &look,
+        );
         write(dir.join(format!("{name}.png")), pic.png())?;
+    }
+    if o.sewout_gif && p.stitches.stitch_count() > 0 {
+        let gif = emb_render::picture::sewout_gif(
+            &design,
+            &p.stitches,
+            spans(),
+            Some(emb_render::fabric::Ground::of(&preset, &design)),
+            &picture_look(&design, false),
+        )?;
+        write(dir.join(format!("{name} sew-out.gif")), gif)?;
     }
     if o.svg {
         let svg = emb_render::svg::picture(

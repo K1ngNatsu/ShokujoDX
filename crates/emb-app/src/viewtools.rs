@@ -87,8 +87,87 @@ pub struct LookSettings {
     pub fabric: bool,
     /// The 3D thread look shows the surface of the stitches on tiles (their
     /// heights, the sheen of the thread and the shadows; P18 view, ADR
-    /// 0126). Else it shows the faster look of the stitches one by one.
+    /// 0126). Else it shows the faster look of the stitches one by one (the
+    /// quality Fast, ADR 0130).
     pub surface: bool,
+    /// The short measure of the first start chose the quality (ADR 0130).
+    pub measured: bool,
+}
+
+/// The quality of the 3D look of the canvas (ADR 0130).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Quality {
+    /// The look of the stitches one by one (no tiles).
+    Fast,
+    /// The surface on tiles, with no shadows from the heights.
+    Good,
+    /// All of the surface.
+    Best,
+}
+
+impl Quality {
+    pub const ALL: [Quality; 3] = [Quality::Fast, Quality::Good, Quality::Best];
+
+    /// The name (English; translated where it shows).
+    pub fn label(self) -> &'static str {
+        match self {
+            Quality::Fast => "Fast",
+            Quality::Good => "Good",
+            Quality::Best => "Best",
+        }
+    }
+
+    /// The tooltip.
+    pub fn tooltip(self) -> &'static str {
+        match self {
+            Quality::Fast => "The stitches one by one, with light and shade: for a slow computer.",
+            Quality::Good => "The surface of the stitches (heights, sheen, gaps), with no shadows from the heights.",
+            Quality::Best => "All of the surface: also the shadows of high parts on the fabric and on lower stitches.",
+        }
+    }
+}
+
+/// The time of the measure of the first start ([`measure_ms`]) under which
+/// the quality is Best, and under which it is Good, ms. The development
+/// computer measures about 0.8 ms.
+pub const BEST_UNDER_MS: f64 = 12.0;
+pub const GOOD_UNDER_MS: f64 = 40.0;
+
+/// The quality for a measure of `ms` (see [`measure_ms`]).
+pub fn quality_for(ms: f64) -> Quality {
+    if ms < BEST_UNDER_MS {
+        Quality::Best
+    } else if ms < GOOD_UNDER_MS {
+        Quality::Good
+    } else {
+        Quality::Fast
+    }
+}
+
+/// The short measure of the first start (ADR 0130): lays a synthetic
+/// design of 20,000 stitches and makes one tile of 256 × 256 pixels of it
+/// on one processor; the time divided by the number of processors (the
+/// tiles are made on all of them), ms.
+pub fn measure_ms() -> f64 {
+    let stitches = emb_render::stress::make(20_000);
+    let strands = emb_render::strand::strands(&stitches, &Default::default());
+    let t0 = std::time::Instant::now();
+    let laid = emb_render::surface::lay(&strands, &[]);
+    let c = laid.bounds().center();
+    let ppm = 8.0;
+    let (x0, y0) = ((c.x * ppm) as i64 - 128, (c.y * ppm) as i64 - 128);
+    let _ = laid.block(
+        ppm,
+        x0,
+        y0,
+        256,
+        256,
+        &emb_render::thread3d::Lighting::default(),
+        None,
+        &|_| true,
+    );
+    let cores = std::thread::available_parallelism().map_or(1, usize::from) as f64;
+    t0.elapsed().as_secs_f64() * 1000.0 / cores
 }
 
 impl Default for LookSettings {
@@ -100,19 +179,57 @@ impl Default for LookSettings {
             // The tests of the program draw the faster look, unless they
             // ask for the surface.
             surface: !cfg!(test),
+            measured: false,
         }
     }
 }
 
 impl LookSettings {
+    /// The quality of the 3D look of the canvas.
+    pub fn quality(&self) -> Quality {
+        match (self.surface, self.light.shadows) {
+            (false, _) => Quality::Fast,
+            (true, false) => Quality::Good,
+            (true, true) => Quality::Best,
+        }
+    }
+
+    /// Sets the quality of the 3D look of the canvas.
+    pub fn set_quality(&mut self, q: Quality) {
+        self.surface = q != Quality::Fast;
+        self.light.shadows = q != Quality::Good;
+    }
+
+    /// The quality of the first start (ADR 0130): Fast with the software
+    /// renderer, else from the short measure. It is chosen one time; the
+    /// user can change it.
+    pub fn choose_quality(&mut self, software: bool) {
+        // A debug build is too slow for the measure (and its settings are
+        // those of the program).
+        if self.measured || (cfg!(debug_assertions) && !software) {
+            return;
+        }
+        self.measured = true;
+        let q = if software {
+            Quality::Fast
+        } else {
+            quality_for(measure_ms())
+        };
+        self.set_quality(q);
+    }
+
     /// The look of the pictures (design picture, decoration) for a design
     /// on `fabric` (`AppState::fabric_look`).
     pub fn picture_look(&self, fabric: Option<emb_render::fabric::FabricLook>) -> emb_render::raster::Look {
         if !self.three_d {
             return emb_render::raster::Look::default();
         }
+        // The pictures have all of the surface, at each quality.
         emb_render::raster::Look {
-            lighting: Some(self.light),
+            lighting: Some(emb_render::thread3d::Lighting {
+                shadows: true,
+                ..self.light
+            }),
             fabric: fabric.filter(|_| self.fabric),
         }
     }
@@ -322,15 +439,25 @@ pub fn look_ui(ui: &mut egui::Ui, st: &mut AppState) {
         ui.add_enabled_ui(l.three_d, |ui| {
             crate::viewer::light_ui(ui, &mut l.light);
             ui.separator();
-            ui.checkbox(&mut l.surface, tr("Fine surface")).on_hover_text(tr(
-                "Shows the surface of the stitches: their heights, the sheen of the thread and the shadows. Clear it on a slow computer for the faster look.",
-            ));
+            ui.horizontal(|ui| {
+                ui.label(tr("Quality"));
+                let now = l.quality();
+                for q in Quality::ALL {
+                    if ui
+                        .radio(now == q, tr(q.label()))
+                        .on_hover_text(tr(q.tooltip()))
+                        .clicked()
+                    {
+                        l.set_quality(q);
+                    }
+                }
+            });
             ui.checkbox(&mut l.fabric, tr("Fabric texture")).on_hover_text(tr(
                 "The surface of the fabric of the design (its weave, loops or grain) in the background color (Color tab).",
             ));
             ui.add_enabled(l.surface, egui::Checkbox::new(&mut l.light.lights_off, tr("Lights off")))
                 .on_hover_text(tr(
-                    "A dark room: only glow-in-the-dark thread shows, in its own light (with Fine surface).",
+                    "A dark room: only glow-in-the-dark thread shows, in its own light (with the quality Good or Best).",
                 ));
             if ui.button(tr("Default light")).clicked() {
                 l.light = Default::default();
@@ -899,6 +1026,38 @@ mod tests {
         assert!(h.st.confirm.is_none());
         assert_eq!(h.st.tab_count(), 1);
         assert!(h.st.is_blank());
+    }
+
+    #[test]
+    fn the_quality_sets_the_surface_and_the_shadows() {
+        let mut l = LookSettings::default();
+        for q in Quality::ALL {
+            l.set_quality(q);
+            assert_eq!(l.quality(), q);
+        }
+        l.set_quality(Quality::Good);
+        assert!(l.surface && !l.light.shadows);
+        // The pictures have the shadows at each quality.
+        assert!(l.picture_look(None).lighting.unwrap().shadows);
+        assert_eq!(quality_for(10.0), Quality::Best);
+        assert_eq!(quality_for(BEST_UNDER_MS + 1.0), Quality::Good);
+        assert_eq!(quality_for(GOOD_UNDER_MS + 1.0), Quality::Fast);
+        // The software renderer starts with Fast, one time.
+        let mut l = LookSettings::default();
+        l.choose_quality(true);
+        assert_eq!((l.quality(), l.measured), (Quality::Fast, true));
+        l.set_quality(Quality::Best);
+        l.choose_quality(true);
+        assert_eq!(l.quality(), Quality::Best, "the choice of the user stays");
+    }
+
+    /// The measure of the first start on this computer. Run with `cargo test
+    /// --release -p emb-app -- --ignored first_start_measure --nocapture`.
+    #[test]
+    #[ignore]
+    fn first_start_measure() {
+        let runs: Vec<f64> = (0..5).map(|_| measure_ms()).collect();
+        println!("first start measure: {runs:?} ms -> {:?}", quality_for(runs[0]));
     }
 
     #[test]

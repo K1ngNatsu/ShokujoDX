@@ -42,6 +42,9 @@ pub struct Lighting {
     /// Two lights (ADR 0129): a second light at the same height from the
     /// opposite side, with [`SECOND_LIGHT`] of the light of the first one.
     pub two: bool,
+    /// The heights of the surface put shadows (the quality Good turns
+    /// them off: faster tiles, ADR 0130).
+    pub shadows: bool,
 }
 
 impl Default for Lighting {
@@ -52,6 +55,7 @@ impl Default for Lighting {
             strength: 1.0,
             lights_off: false,
             two: false,
+            shadows: true,
         }
     }
 }

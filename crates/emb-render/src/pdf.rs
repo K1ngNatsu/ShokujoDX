@@ -123,24 +123,47 @@ fn title_string(title: &str) -> String {
     out
 }
 
+#[cfg(test)]
 fn jpeg(pic: &crate::raster::Picture) -> Option<(Vec<u8>, u32, u32)> {
-    let rgb: Vec<u8> = pic
-        .rgba
-        .as_chunks::<4>()
-        .0
+    jpeg_and_mask(pic).map(|(j, w, h, _)| (j, w, h))
+}
+
+/// The JPEG of a picture, its width and height, and its soft mask.
+type Encoded = (Vec<u8>, u32, u32, Option<Vec<u8>>);
+
+/// A picture as a JPEG image and, if a part of it is clear, its soft mask
+/// (the alpha of each pixel, deflated; ADR 0130): the picture lies on
+/// what is under it on the page. The JPEG has the color of each pixel,
+/// white where it is all clear (a reader with no masks shows it on white).
+/// An opaque picture has no mask.
+fn jpeg_and_mask(pic: &crate::raster::Picture) -> Option<Encoded> {
+    let px = pic.rgba.as_chunks::<4>().0;
+    let clear = px.iter().any(|p| p[3] < 255);
+    let rgb: Vec<u8> = px
         .iter()
-        .flat_map(|p| {
-            // Over white, in linear light (ADR 0123).
-            let a = f64::from(p[3]) / 255.0;
-            let over = |c: u8| crate::light::mix(c, 255, a);
-            [over(p[0]), over(p[1]), over(p[2])]
+        .flat_map(|p| match p[3] {
+            0 => [255, 255, 255],
+            _ if clear => [p[0], p[1], p[2]],
+            a => {
+                // Over white, in linear light (ADR 0123).
+                let a = f64::from(a) / 255.0;
+                let over = |c: u8| crate::light::mix(c, 255, a);
+                [over(p[0]), over(p[1]), over(p[2])]
+            }
         })
         .collect();
     let mut out = Vec::new();
     image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, JPEG_QUALITY)
         .encode(&rgb, pic.width, pic.height, image::ExtendedColorType::Rgb8)
         .ok()?;
-    Some((out, pic.width, pic.height))
+    let mask = clear.then(|| {
+        use std::io::Write;
+        let alpha: Vec<u8> = px.iter().map(|p| p[3]).collect();
+        let mut z = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
+        let _ = z.write_all(&alpha);
+        z.finish().unwrap_or_default()
+    });
+    Some((out, pic.width, pic.height, mask))
 }
 
 /// The content stream of one page. The pictures are `/Im0`, `/Im1`, … in
@@ -293,22 +316,43 @@ pub fn write(pages: &[Page], title: &str) -> Vec<u8> {
         let mut ids = Vec::new();
         for op in &p.ops {
             if let Op::Image { picture, .. } = op {
-                let body = match jpeg(picture) {
-                    Some((bytes, w, h)) => {
+                let id = page_id(pages.len()) + pictures.len();
+                let (body, mask) = match jpeg_and_mask(picture) {
+                    Some((bytes, w, h, mask)) => {
+                        // The soft mask is the object after the image.
+                        let smask = if mask.is_some() {
+                            format!(" /SMask {} 0 R", id + 1)
+                        } else {
+                            String::new()
+                        };
                         let mut b = format!(
-                            "<< /Type /XObject /Subtype /Image /Width {w} /Height {h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {} >>\nstream\n",
+                            "<< /Type /XObject /Subtype /Image /Width {w} /Height {h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode{smask} /Length {} >>\nstream\n",
                             bytes.len()
                         )
                         .into_bytes();
                         b.extend(bytes);
                         b.extend(b"\nendstream");
-                        b
+                        let mask = mask.map(|m| {
+                            let mut b = format!(
+                                "<< /Type /XObject /Subtype /Image /Width {w} /Height {h} /ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /FlateDecode /Length {} >>\nstream\n",
+                                m.len()
+                            )
+                            .into_bytes();
+                            b.extend(m);
+                            b.extend(b"\nendstream");
+                            b
+                        });
+                        (b, mask)
                     }
                     // A white pixel, if the picture cannot be encoded.
-                    None => b"<< /Type /XObject /Subtype /Image /Width 1 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8 /Length 1 >>\nstream\n\xff\nendstream".to_vec(),
+                    None => (
+                        b"<< /Type /XObject /Subtype /Image /Width 1 /Height 1 /ColorSpace /DeviceGray /BitsPerComponent 8 /Length 1 >>\nstream\n\xff\nendstream".to_vec(),
+                        None,
+                    ),
                 };
-                ids.push(page_id(pages.len()) + pictures.len());
+                ids.push(id);
                 pictures.push(body);
+                pictures.extend(mask);
             }
         }
         page_images.push(ids);
@@ -453,8 +497,12 @@ mod tests {
     fn a_picture_is_a_jpeg_image_of_its_page() {
         let pdf = write(&[sample(), with_picture()], "Test");
         let text: String = pdf.iter().map(|&b| if b < 128 { b as char } else { '?' }).collect();
-        assert_eq!(text.matches("/Subtype /Image").count(), 1);
-        assert!(text.contains("/Width 40 /Height 20 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode"));
+        // The picture has a clear part: an image and its soft mask after it.
+        assert_eq!(text.matches("/Subtype /Image").count(), 2);
+        assert!(text.contains(
+            "/Width 40 /Height 20 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /SMask 11 0 R"
+        ));
+        assert!(text.contains("/ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /FlateDecode"));
         // The first page has no pictures; the second has /Im0 (object 10).
         assert_eq!(text.matches("/XObject << /Im0 10 0 R >>").count(), 1);
         let c = content(&with_picture());
@@ -504,7 +552,8 @@ mod tests {
             .take_while(|l| !l.starts_with("trailer"))
             .map(|l| l[..10].parse().unwrap())
             .collect();
-        assert_eq!(entries.len(), 10);
+        // The picture has a clear part: its soft mask is one more object.
+        assert_eq!(entries.len(), 11);
         for (i, off) in entries.iter().enumerate() {
             assert!(
                 text[*off..].starts_with(&format!("{} 0 obj", i + 1)),

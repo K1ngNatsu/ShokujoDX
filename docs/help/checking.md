@@ -86,7 +86,7 @@ the threads of its weave, the loops of a towel or the grain of leather,
 in the light of the thread look).
 **Default light** sets them back.
 
-With **Fine surface** (on at the start), the 3D look shows the surface of
+With the **Quality** Good or Best, the 3D look shows the surface of
 the stitches: thread on thread is higher, each area is lighter or darker
 by the direction of its stitches to the light, and high parts put
 shadows on the fabric. Each needle hole is a small dent (larger on
@@ -100,7 +100,7 @@ small glints at a large zoom. **Lights off** shows a dark room: only
 glow-in-the-dark thread shows, in its own light. The
 program makes the surface in parts while you
 work; a part that is not ready yet shows the faster look for a moment.
-Clear **Fine surface** on a slow computer.
+Choose the **Quality** Fast on a slow computer (see [The 3D view](3d-view)).
 
 ## Check the look
 

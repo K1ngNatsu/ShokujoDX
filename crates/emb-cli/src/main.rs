@@ -23,12 +23,14 @@ Usage:
   emb-cli output <input>... --dir <dir> [--machine <id>] [--format vp3,dst]
                  [--worksheet] [--approval] [--picture] [--svg] [--csv] [--paper a4|letter]
                  [--fabric <id>] [--barcode none|code39|code128] [--clearance <mm>]
-                 [--flat-picture]
+                 [--flat-picture] [--dpi <72-600>] [--clear-picture] [--sewout-gif]
       Batch output: for each input, the machine files (default: the format
       of the machine), the project file, and the worksheet (PDF), approval
       sheet (PDF), picture (PNG) and SVG picture when asked. --csv writes designs.csv
       with one line for each design. The PNG picture has the 3D thread look
-      (--flat-picture: the flat look).
+      (--flat-picture: the flat look), 254 dots for each inch (--dpi) and
+      the fabric color (--clear-picture: no background, for a web shop).
+      --sewout-gif writes the sew-out animation (<name> sew-out.gif).
   emb-cli library <folder>... [--search <text>] [--sort name|folder|date|size|stitches|colors|format]
                  [--desc] [--index <file.json>] [--list <file.csv>] [--catalog <file.pdf>]
       Find the designs in the folders and their subfolders (ADR 0035) and
@@ -269,6 +271,9 @@ fn run(args: &[String]) -> Result<(), String> {
         stone_template: true,
         stone_clearance_mm: emb_model::bling::DEFAULT_CLEARANCE_MM,
         flat_picture: false,
+        picture_dpi: emb_cli::DEFAULT_DPI,
+        clear_picture: false,
+        sewout_gif: false,
     };
     let mut csv = false;
     let (mut search, mut sort_key, mut desc, mut index_file, mut list, mut catalog) =
@@ -311,6 +316,15 @@ fn run(args: &[String]) -> Result<(), String> {
             "--picture" => out.picture = true,
             "--svg" => out.svg = true,
             "--flat-picture" => out.flat_picture = true,
+            "--clear-picture" => out.clear_picture = true,
+            "--sewout-gif" => out.sewout_gif = true,
+            "--dpi" => {
+                out.picture_dpi = it
+                    .next()
+                    .and_then(|v| v.parse::<u32>().ok())
+                    .filter(|v| (emb_cli::MIN_DPI..=emb_cli::MAX_DPI).contains(v))
+                    .ok_or("--dpi needs a number from 72 to 600")?
+            }
             "--csv" => csv = true,
             "--clearance" => {
                 out.stone_clearance_mm = it

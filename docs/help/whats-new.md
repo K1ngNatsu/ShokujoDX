@@ -97,7 +97,7 @@ surface of the stitches: thread on thread is higher, an area is lighter or
 darker by the direction of its stitches to the light, threads shine by
 their kind, and high parts put shadows on the fabric. It also shows large
 designs faster when you move and zoom the view. **View > Thread Look >
-Fine surface** turns it off on a slow computer. See [Checking a
+Quality > Fast** turns it off on a slow computer. See [Checking a
 design](checking).
 
 **The fabric in the 3D look.** The fabric under the stitches has a
@@ -120,6 +120,16 @@ between the lines of stitches. Cross stitch has the new fabric **Aida
 cloth**. Puff columns are round over their foam. Metallic thread has
 small glints at a large zoom, and **View > Thread Look > Lights off**
 shows only glow-in-the-dark thread. See [Checking a design](checking).
+
+**All pictures in the 3D look.** The design picture, the approval sheet
+and the quote, the library, the thumbnails of the file manager, the
+kiosk, the stitch pictures of Picture to Design and the preview of the
+Fonts window show the stitches as the 3D view does. **Output Design** can
+write the picture at up to 600 dots for each inch with **No background**
+(for a web shop), and a **Sew-out animation (GIF)**. The **Quality** in
+the Thread Look menu (**Fast**, **Good**, **Best**) is chosen at the
+first start from a short measure of the computer. See [The 3D
+view](3d-view).
 
 **Check the look.** The **Check** panel of the View tab has new tools:
 light presets and a light that you move (hold **L** and drag), a **Tilt

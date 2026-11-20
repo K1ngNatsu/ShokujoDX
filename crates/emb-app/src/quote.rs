@@ -67,7 +67,8 @@ impl AppState {
     pub fn quote_sheet(&mut self) -> Option<emb_render::page::Page> {
         let (q, _) = self.current_quote()?;
         let plan = self.plan_view().plan.clone();
-        let data = crate::output::sheet_data(self.doc.design(), &plan.stitches, self.catalogs(), Vec::new());
+        let mut data = crate::output::sheet_data(self.doc.design(), &plan.stitches, self.catalogs(), Vec::new());
+        self.sheet_picture(&mut data);
         let currency = self.settings.thread_prices.currency.clone();
         Some(emb_render::sheet::quote_sheet(
             &data,

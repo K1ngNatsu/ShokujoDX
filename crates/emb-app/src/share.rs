@@ -350,9 +350,17 @@ impl AppState {
             emb_formats::write_machine_with(&ext, &plan.stitches, &name, &date, machine.as_ref(), needles.as_ref())
                 .ok_or_else(|| crate::i18n::fill("The program cannot write .{} files.", &[&ext]))?;
         let project = emb_model::project::to_string(&d).into_bytes();
-        let segments = emb_render::segments(&plan.stitches);
         let look = self.settings.look.picture_look(Some(self.fabric_look(&d)));
-        let pic = emb_render::raster::picture_look(&segments, &[], 10.0, 0.4, 2.0, d.background, &look);
+        let pic = emb_render::picture::design_picture(
+            &d,
+            &plan.stitches,
+            plan.spans.iter().map(|s| (s.object, s.records.clone())),
+            Some(emb_render::fabric::Ground::of(&self.fabrics.of(&d), &d)),
+            10.0,
+            2.0,
+            d.background,
+            &look,
+        );
         Ok(vec![
             (format!("{name}.{ext}"), machine_file),
             (format!("{name}.{}", emb_model::project::FILE_EXTENSION), project),

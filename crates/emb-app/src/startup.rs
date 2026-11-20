@@ -245,6 +245,13 @@ pub fn first_frame() {
     }
 }
 
+/// `true` if the program draws with the software renderer: after the
+/// fallbacks, or when the graphics library chose a processor adapter.
+pub fn is_software(adapter: Option<&wgpu::AdapterInfo>) -> bool {
+    current().is_some_and(|s| s.renderer == Renderer::Software)
+        || adapter.is_some_and(|i| i.device_type == wgpu::DeviceType::Cpu)
+}
+
 /// Writes the adapter in use (`adapter`, if known) in the start log, and
 /// returns the text that tells the user that the program does not use the
 /// graphics card: after a fallback, or when the graphics library selected
@@ -260,9 +267,7 @@ pub fn graphics_notice(adapter: Option<&wgpu::AdapterInfo>) -> Option<Vec<String
             false,
         );
     }
-    let software =
-        start.renderer == Renderer::Software || adapter.is_some_and(|i| i.device_type == wgpu::DeviceType::Cpu);
-    let how = if software {
+    let how = if is_software(adapter) {
         tr("ShokujoDX could not use the graphics card, so it draws with the software renderer. It can be slow.")
     } else if start.renderer == Renderer::Gl {
         tr("ShokujoDX draws with OpenGL, because the first way to use the graphics card did not work.")

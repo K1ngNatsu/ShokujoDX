@@ -670,6 +670,9 @@ pub fn write_sew_files(dir: &Path) -> Result<(), String> {
         stone_template: false,
         stone_clearance_mm: emb_model::bling::DEFAULT_CLEARANCE_MM,
         flat_picture: false,
+        picture_dpi: crate::DEFAULT_DPI,
+        clear_picture: false,
+        sewout_gif: false,
     };
     for r in REFERENCE {
         let design = corpus::build(r.name).expect("a design of the corpus");

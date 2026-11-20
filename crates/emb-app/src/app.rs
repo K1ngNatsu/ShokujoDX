@@ -282,6 +282,9 @@ pub struct AppState {
     /// The picture of the design on the product for the approval sheet, and
     /// the design state that it shows.
     pub sheet_product: Option<(u64, crate::output::SheetPictures)>,
+    /// The picture of the design on the approval sheet and the quote, and
+    /// the state of the design that it shows (ADR 0130).
+    pub sheet_picture: Option<(u64, crate::output::SheetPicture)>,
     /// The next frame shows all of the product.
     pub fit_product: bool,
     /// The Repeats window is open.
@@ -564,6 +567,13 @@ impl EmbApp {
         }
         // The program does not use the graphics card (v0.3 plan, Stage 1).
         let adapter = cc.wgpu_render_state.as_ref().map(|r| r.adapter.get_info());
+        // The quality of the 3D look: chosen one time, from a short measure
+        // (Fast with the software renderer; ADR 0130).
+        if !state.settings.look.measured {
+            let mut s = state.settings.clone();
+            s.look.choose_quality(crate::startup::is_software(adapter.as_ref()));
+            state.set_settings(s);
+        }
         if let Some(lines) = crate::startup::graphics_notice(adapter.as_ref()) {
             state.notice = Some(crate::file::Notice {
                 title: "Graphics".into(),
@@ -779,6 +789,7 @@ impl AppState {
             turntable: Default::default(),
             product_templates: None,
             sheet_product: None,
+            sheet_picture: None,
             fit_product: false,
             repeats_window: false,
             about_window: false,

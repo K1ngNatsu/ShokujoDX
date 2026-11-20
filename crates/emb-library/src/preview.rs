@@ -4,10 +4,14 @@
 //! - [`sniff`]: the kind of a design file from its first bytes. A Windows
 //!   thumbnail handler gets the bytes of the file, not its name.
 //! - [`stitches_of`]: the stitches of the bytes of a project or machine file.
-//! - [`picture`]: the design with the 3D thread look, at most `px` pixels on
-//!   its longest side, on a transparent background.
+//! - [`picture`]: the design with the surface of the 3D look (ADR 0130, at
+//!   the fast level of detail), at most `px` pixels on its longest side,
+//!   on a transparent background.
 
 use emb_model::{Design, MachineCatalog, StitchDesign, project};
+use std::ops::Range;
+
+use emb_model::ObjectId;
 use emb_render::raster::{Look, Picture};
 use emb_stitch::{PlanOptions, StitchCache, build_plan};
 
@@ -63,6 +67,15 @@ pub fn sniff(bytes: &[u8]) -> Option<&'static str> {
 /// The stitches of the bytes of a design file of kind `ext` (a project file
 /// gets its stitch plan), and the design of a project file.
 pub fn stitches_of(ext: &str, bytes: &[u8]) -> Result<(StitchDesign, Option<Design>), String> {
+    plan_of(ext, bytes).map(|(s, d)| (s, d.map(|(d, _)| d)))
+}
+
+/// The records of each object of a stitch plan.
+type Spans = Vec<(ObjectId, Range<usize>)>;
+
+/// As [`stitches_of`], with the records of each object of the plan of a
+/// project file.
+fn plan_of(ext: &str, bytes: &[u8]) -> Result<(StitchDesign, Option<(Design, Spans)>), String> {
     if ext.eq_ignore_ascii_case(project::FILE_EXTENSION) {
         let text = std::str::from_utf8(bytes).map_err(|e| e.to_string())?;
         let d = project::from_str(text).map_err(|e| e.to_string())?;
@@ -73,7 +86,8 @@ pub fn stitches_of(ext: &str, bytes: &[u8]) -> Result<(StitchDesign, Option<Desi
             .and_then(|id| machines.get(id))
             .map_or_else(PlanOptions::default, PlanOptions::for_machine);
         let plan = build_plan(&d, &opts, &mut StitchCache::default());
-        return Ok((plan.stitches, Some(d)));
+        let spans = plan.spans.iter().map(|s| (s.object, s.records.clone())).collect();
+        return Ok((plan.stitches, Some((d, spans))));
     }
     emb_formats::read_machine(&ext.to_ascii_lowercase(), bytes).map(|s| (s, None))
 }
@@ -85,15 +99,14 @@ pub fn picture(bytes: &[u8], ext: Option<&str>, px: u32) -> Option<Picture> {
     let ext = ext
         .map(str::to_ascii_lowercase)
         .or_else(|| sniff(bytes).map(str::to_string))?;
-    let (s, design) = stitches_of(&ext, bytes).ok()?;
+    let (s, plan) = plan_of(&ext, bytes).ok()?;
     if s.stitch_count() == 0 {
         return None;
     }
-    let areas = design
+    let areas = plan
         .as_ref()
-        .map(emb_render::sheet::picture_areas)
+        .map(|(d, _)| emb_render::sheet::picture_areas(d))
         .unwrap_or_default();
-    let segments = emb_render::segments(&s);
     // The size of the stitches (not of the jumps: a reader can add a jump
     // from the hoop corner) and of the areas.
     let b = emb_geom::BBox::from_points(
@@ -107,22 +120,23 @@ pub fn picture(bytes: &[u8], ext: Option<&str>, px: u32) -> Option<Picture> {
         areas.iter().flat_map(|(rings, _)| rings.iter().flatten().copied()),
     ))
     .reduce(emb_geom::BBox::union)?;
-    let size = b.width().max(b.height()).max(1.0);
-    let px = f64::from(px.clamp(1, MAX_PX));
     let margin = 1.0;
-    let draw = |px_per_mm: f64| {
-        // Thin threads at a small scale still show the colors.
-        let thread = (1.2 / px_per_mm).max(0.4);
-        emb_render::raster::picture_look(&segments, &areas, px_per_mm, thread, margin, None, &Look::three_d(None))
+    let b = b.expand(margin);
+    let px = f64::from(px.clamp(1, MAX_PX));
+    // The longest side is `px` pixels (the size is rounded up).
+    let px_per_mm = (px - 0.01) / b.width().max(b.height()).max(1e-3);
+    let e = match plan {
+        Some((d, spans)) => emb_render::picture::Embroidery::of_design(&d, &s, spans, None),
+        None => emb_render::picture::Embroidery::of_stitches(&s),
     };
-    let mut px_per_mm = px / (size + 2.0 * margin);
-    let mut p = draw(px_per_mm);
-    // The thread width adds to the size: make it smaller once more.
-    let longest = f64::from(p.width.max(p.height));
-    if longest > px {
-        px_per_mm *= (px - 1.0).max(1.0) / longest;
-        p = draw(px_per_mm);
-    }
+    let p = e.picture(
+        b,
+        px_per_mm,
+        &Look::three_d(None),
+        None,
+        emb_render::picture::FAST_DETAIL,
+        &|_| true,
+    );
     (p.width > 0 && p.height > 0).then_some(p)
 }
 

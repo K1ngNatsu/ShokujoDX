@@ -47,6 +47,8 @@ use crate::i18n::tr;
 
 /// The stitch picture of the Finish step is about this many pixels wide.
 const RESULT_PX: f64 = 700.0;
+/// The most pixels of a picture of the stitches.
+const RESULT_MAX_PIXELS: f64 = 4.0e6;
 /// Undo steps of the Background step (each keeps a copy of the picture).
 const HISTORY_MAX: usize = 40;
 /// Checks of the Finish step (P12 Milestone 2): more trims than this in
@@ -1506,7 +1508,27 @@ impl Work {
         let segs = emb_render::segments(&plan.stitches);
         let width = self.design_width_mm().max(1.0);
         let px_per_mm = (RESULT_PX / width).clamp(2.0, 20.0);
-        let p = emb_render::raster::picture(&segs, &[], px_per_mm, 0.35, 1.0, Some(Rgb(255, 255, 255)));
+        // The stitches with the surface of the 3D look (ADR 0130).
+        let e = emb_render::picture::Embroidery::of_design(
+            &d,
+            &plan.stitches,
+            plan.spans.iter().map(|s| (s.object, s.records.clone())),
+            None,
+        );
+        // No stitch: a small white picture (not `None`: that is a job that
+        // stopped).
+        let b = emb_render::picture::area_of(&segs, &[], 1.0)
+            .unwrap_or_else(|| emb_geom::BBox::new(Point::new(-1.0, -1.0), Point::new(1.0, 1.0)));
+        // At most a picture of RESULT_MAX_PIXELS (a very thin or tall picture).
+        let px_per_mm = px_per_mm.min((RESULT_MAX_PIXELS / (b.width() * b.height()).max(1e-6)).sqrt());
+        let p = e.picture(
+            b,
+            px_per_mm,
+            &emb_render::raster::Look::three_d(None),
+            Some(Rgb(255, 255, 255)),
+            emb_render::picture::FULL_DETAIL,
+            &|_| true,
+        );
         let img = RgbaImage::from_raw(p.width, p.height, p.rgba).unwrap_or_else(|| RgbaImage::new(1, 1));
         Some((img, plan.stitches))
     }

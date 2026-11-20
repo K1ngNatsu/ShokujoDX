@@ -61,6 +61,7 @@ const FILES: &[&str] = &[
     include_str!("../../../docs/help/machines-and-hoops.md"),
     include_str!("../../../docs/help/hooping.md"),
     include_str!("../../../docs/help/checking.md"),
+    include_str!("../../../docs/help/3d-view.md"),
     include_str!("../../../docs/help/files-and-output.md"),
     include_str!("../../../docs/help/quotes.md"),
     include_str!("../../../docs/help/thread-stock.md"),

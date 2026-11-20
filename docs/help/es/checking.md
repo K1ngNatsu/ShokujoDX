@@ -88,7 +88,7 @@ tejido, los rizos de una toalla o el grano del cuero, con la luz del
 aspecto de hilo). **Luz
 predeterminada** los restablece.
 
-Con **Superficie fina** (activada al inicio), el aspecto 3D muestra la
+Con la **Calidad** Buena o Mejor, el aspecto 3D muestra la
 superficie de las puntadas: el hilo sobre hilo es más alto, cada zona es
 más clara o más oscura según la dirección de sus puntadas respecto a la
 luz, y las partes altas proyectan sombras sobre la tela. Cada agujero de aguja es una pequeña
@@ -103,8 +103,8 @@ metálico tiene pequeños destellos con mucho zoom. **Luces apagadas**
 muestra una habitación oscura: solo se ve el hilo fosforescente, con su
 propia luz. El programa hace
 la superficie por partes mientras trabaja; una parte que aún no está
-lista muestra un momento el aspecto más rápido. Desactive **Superficie
-fina** en un equipo lento.
+lista muestra un momento el aspecto más rápido. En un equipo lento, elija
+la **Calidad** Rápida (consulte [La vista 3D](3d-view)).
 
 ## Comprobar el aspecto
 
