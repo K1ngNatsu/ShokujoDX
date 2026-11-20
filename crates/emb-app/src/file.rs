@@ -477,6 +477,20 @@ impl AppState {
         self.save_to(&p)
     }
 
+    /// Shows a notice if the document did not make the last change: the
+    /// change put an object out of the range of a project file (ADR 0139).
+    pub fn show_refused_change(&mut self) {
+        if let Some(why) = self.doc.take_refused() {
+            self.notice = Some(Notice {
+                title: "The change was not made".into(),
+                lines: vec![
+                    why,
+                    tr("All parts of a design must be less than 1 km from its center.").to_string(),
+                ],
+            });
+        }
+    }
+
     /// Writes the project file. The design name follows the file name.
     pub fn save_to(&mut self, path: &Path) -> bool {
         if let Some(stem) = path.file_stem().map(|s| s.to_string_lossy().into_owned())
@@ -797,6 +811,34 @@ mod tests {
         let mut st = state();
         st.open_path(&path);
         assert_eq!(st.notice.as_ref().unwrap().title, "Cannot open design");
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    /// A change that puts an object out of the range of a project file is
+    /// not made, a notice says so, and the design saves and opens again
+    /// (ADR 0139).
+    #[test]
+    fn a_change_out_of_range_gives_a_notice_and_the_design_still_saves() {
+        let dir = tmp_dir("far");
+        let path = dir.join("far.embproj");
+        let mut st = state();
+        st.add_sample_objects();
+        let ids: Vec<_> = st.doc.design().objects().iter().map(|o| o.id).collect();
+        let before = project::to_string(st.doc.design());
+        st.show_refused_change();
+        assert!(st.notice.is_none());
+        let far = emb_geom::Transform::translate(2.0 * emb_model::project::MAX_COORD_MM, 0.0);
+        st.doc.edit("Move", |d| d.transform_objects(&ids, &far));
+        st.show_refused_change();
+        let n = st.notice.take().expect("a notice");
+        assert_eq!(n.title, "The change was not made");
+        assert!(n.lines[0].contains("out of range"), "{:?}", n.lines);
+        assert_eq!(project::to_string(st.doc.design()), before);
+        // The notice shows one time.
+        st.show_refused_change();
+        assert!(st.notice.is_none());
+        assert!(st.save_to(&path));
+        assert!(project::load(&path).is_ok());
         std::fs::remove_dir_all(dir).ok();
     }
 

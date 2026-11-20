@@ -540,9 +540,9 @@ pub fn output(
         .and_then(|id| emb_model::FabricCatalog::builtin().get(id).cloned())
     {
         data.set_thread_use(&p.stitches, f.thickness_mm);
+        data.topping = f.topping_for(&design).map(str::to_string);
         data.fabric = Some(f.name);
         data.backing = Some(f.backing);
-        data.topping = f.topping;
     }
     data.stop_notes = p.stop_notes(&design);
     data.fabric_areas = sheet::fabric_areas(&design);

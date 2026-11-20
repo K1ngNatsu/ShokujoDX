@@ -4,6 +4,11 @@
 //! [`Document::edit`] (or its variants), so each change is in the history.
 //! Each history entry is a full snapshot of the design. Snapshots are cheap
 //! because objects are shared with `Arc` (see [`Design::object_mut`]).
+//!
+//! A change that puts the design out of the range of a project file is not
+//! made (ADR 0139): the design stays as it was, the history gets no step,
+//! and [`Document::take_refused`] says why. So a design in a document is
+//! always one that the program can save and open again.
 
 use crate::Design;
 
@@ -47,6 +52,8 @@ pub struct Document {
     /// Identifies the current design state. Each edit gives a new value.
     state: u64,
     saved_state: Option<u64>,
+    /// Why the last change was not made (`take_refused`).
+    refused: Option<String>,
 }
 
 impl Default for Document {
@@ -67,6 +74,7 @@ impl Document {
             merge_key: None,
             state,
             saved_state: Some(state),
+            refused: None,
         }
     }
 
@@ -81,14 +89,41 @@ impl Document {
         self.trim();
     }
 
-    /// Applies a change as one undo step with the given label.
+    /// Applies a change as one undo step with the given label. A change
+    /// that puts the design out of range is not made (`take_refused`).
     pub fn edit<R>(&mut self, label: impl Into<String>, f: impl FnOnce(&mut Design) -> R) -> R {
         self.merge_key = None;
-        self.push_snapshot(label.into());
+        let before = self.design.clone();
         let r = f(&mut self.design);
+        if let Some(before) = self.settle(before) {
+            self.push_snapshot(label.into(), before);
+        }
+        r
+    }
+
+    /// The reason why the last change was not made, one time: the change
+    /// put the hoop, an object or the product more than 1 km from the origin
+    /// (`project::out_of_range`), or gave it a number that is not a real
+    /// number. The design did not change, and the history has no new step.
+    pub fn take_refused(&mut self) -> Option<String> {
+        self.refused.take()
+    }
+
+    /// Ends a change of the design: makes the parts that follow the objects
+    /// again. Returns the design of before, for the history. If the change
+    /// put the design out of range, the design of before comes back, and
+    /// the result is `None`.
+    fn settle(&mut self, before: Design) -> Option<Design> {
         self.design.settle_knockouts();
         self.design.settle_hoop();
-        r
+        match crate::project::out_of_range(&self.design, Some(&before)) {
+            None => Some(before),
+            Some(why) => {
+                self.design = before;
+                self.refused = Some(why);
+                None
+            }
+        }
     }
 
     /// Applies a change that can fail. If `f` returns `Err`, the design does
@@ -102,9 +137,13 @@ impl Document {
         let r = f(&mut work)?;
         work.settle_knockouts();
         work.settle_hoop();
+        if let Some(why) = crate::project::out_of_range(&work, Some(&self.design)) {
+            self.refused = Some(why);
+            return Ok(r);
+        }
         self.merge_key = None;
-        self.push_snapshot(label.into());
-        self.design = work;
+        let before = std::mem::replace(&mut self.design, work);
+        self.push_snapshot(label.into(), before);
         Ok(r)
     }
 
@@ -112,16 +151,18 @@ impl Document {
     /// the same merge key. Use this for slider drags and node drags, then call
     /// [`Document::end_merge`] when the drag stops.
     pub fn edit_merged<R>(&mut self, label: impl Into<String>, key: MergeKey, f: impl FnOnce(&mut Design) -> R) -> R {
+        let before = self.design.clone();
+        let r = f(&mut self.design);
+        let Some(before) = self.settle(before) else {
+            return r;
+        };
         if self.merge_key.as_ref() != Some(&key) || self.undo.is_empty() {
-            self.push_snapshot(label.into());
+            self.push_snapshot(label.into(), before);
             self.merge_key = Some(key);
         } else {
             // Same continuous edit: keep the snapshot from before the first part.
             self.state = self.new_state();
         }
-        let r = f(&mut self.design);
-        self.design.settle_knockouts();
-        self.design.settle_hoop();
         r
     }
 
@@ -222,10 +263,11 @@ impl Document {
         fresh_state()
     }
 
-    fn push_snapshot(&mut self, label: String) {
+    /// Adds the design of before a change (`before`) to the history.
+    fn push_snapshot(&mut self, label: String, before: Design) {
         let entry = Entry {
             label,
-            design: self.design.clone(),
+            design: before,
             state: self.state,
         };
         self.undo.push(entry);
@@ -252,6 +294,64 @@ mod tests {
         let mut doc = Document::default();
         let id = doc.edit("Add line", |d| d.add_object(ThreadId(0), line(0.0, 10.0)));
         (doc, id)
+    }
+
+    #[test]
+    fn a_change_out_of_range_is_not_made() {
+        use emb_geom::Transform;
+        let (mut doc, id) = doc_with_object();
+        let (state, steps) = (doc.state_id(), doc.undo_len());
+        let far = Transform::translate(2.0 * crate::project::MAX_COORD_MM, 0.0);
+        // One step, a step of a drag, and a change that can fail.
+        assert!(doc.edit("Move", |d| d.transform_objects(&[id], &far)));
+        assert!(doc.take_refused().is_some_and(|w| w.contains("out of range")));
+        assert_eq!(doc.take_refused(), None, "the reason is given one time");
+        doc.edit_merged("Drag", MergeKey::new("drag"), |d| d.transform_objects(&[id], &far));
+        assert!(doc.take_refused().is_some());
+        let r: Result<bool, ()> = doc.try_edit("Move", |d| Ok(d.transform_objects(&[id], &far)));
+        assert_eq!(r, Ok(true));
+        assert!(doc.take_refused().is_some());
+        // A number that is not a real number.
+        doc.edit("Move", |d| {
+            d.transform_objects(&[id], &Transform::translate(f64::NAN, 0.0))
+        });
+        assert!(doc.take_refused().is_some());
+        assert_eq!(
+            (doc.state_id(), doc.undo_len()),
+            (state, steps),
+            "no step and the same design"
+        );
+        assert_eq!(crate::project::out_of_range(doc.design(), None), None);
+        // The next change in range is made.
+        doc.edit("Move", |d| d.transform_objects(&[id], &Transform::translate(5.0, 0.0)));
+        assert_eq!(doc.take_refused(), None);
+        assert_eq!(doc.undo_len(), steps + 1);
+        // A drag that goes out of range and comes back is one step.
+        let key = MergeKey::new("drag");
+        doc.edit_merged("Drag", key.clone(), |d| {
+            d.transform_objects(&[id], &Transform::translate(1.0, 0.0))
+        });
+        doc.edit_merged("Drag", key.clone(), |d| d.transform_objects(&[id], &far));
+        doc.edit_merged("Drag", key, |d| {
+            d.transform_objects(&[id], &Transform::translate(1.0, 0.0))
+        });
+        assert_eq!(doc.undo_len(), steps + 2);
+    }
+
+    #[test]
+    fn a_refused_change_keeps_the_redo_steps() {
+        use emb_geom::Transform;
+        let (mut doc, id) = doc_with_object();
+        doc.edit("Move", |d| d.transform_objects(&[id], &Transform::translate(5.0, 0.0)));
+        doc.undo();
+        assert!(doc.can_redo());
+        let far = Transform::translate(0.0, -2.0 * crate::project::MAX_COORD_MM);
+        doc.edit("Far", |d| d.transform_objects(&[id], &far));
+        assert!(doc.take_refused().is_some());
+        assert!(
+            doc.can_redo(),
+            "a change that was not made does not clear the redo steps"
+        );
     }
 
     fn stitch_len(doc: &Document, id: crate::ObjectId) -> f64 {

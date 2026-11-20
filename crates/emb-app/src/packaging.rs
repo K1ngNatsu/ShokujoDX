@@ -340,3 +340,43 @@ fn the_ci_skips_only_documents_and_checks_each_engine_crate() {
         );
     }
 }
+
+/// The numbers in the README are the numbers of the program (the audit of
+/// 2026-11-20: the README named thirty fonts, and the program had 65). A
+/// new font, machine, thread chart, tutorial or format needs the new
+/// number there.
+#[test]
+fn the_numbers_in_the_readme_are_the_numbers_of_the_program() {
+    let readme = read("README.md").split_whitespace().collect::<Vec<_>>().join(" ");
+    let has = |text: String| assert!(readme.contains(&text), "the README does not say: {text}");
+    has(format!("{} embroidery fonts", emb_letter::bundled::EMBROIDERY.len()));
+    has(format!(
+        "A machine library of {} profiles",
+        emb_model::MachineCatalog::builtin().machines.len()
+    ));
+    has(format!(
+        "Thread charts of {} brands",
+        emb_model::ThreadChart::builtin().len()
+    ));
+    let tutorials = std::fs::read_dir(root().join("docs/help"))
+        .unwrap()
+        .flatten()
+        .filter(|e| e.file_name().to_string_lossy().starts_with("tutorial-"))
+        .count();
+    assert_eq!(tutorials, 7, "the README says seven tutorials");
+    has("seven step-by-step tutorials".into());
+    // The formats table: the formats to write, eight more by name, and the
+    // number of the others.
+    let (read_n, write) = (emb_formats::READ_EXTENSIONS.len(), emb_formats::WRITE_EXTENSIONS);
+    let named = ["SEW", "HUS", "SHV", "DSB", "DSZ", "10O", "100", "DAT"];
+    let written: Vec<String> = write.iter().map(|e| e.to_uppercase()).collect();
+    has(format!("| **Write** | {} |", written.join(", ")));
+    has(format!(
+        "plus {} and {} more",
+        named.join(", "),
+        read_n - write.len() - named.len()
+    ));
+    for e in named {
+        assert!(emb_formats::READ_EXTENSIONS.contains(&e.to_lowercase().as_str()), "{e}");
+    }
+}

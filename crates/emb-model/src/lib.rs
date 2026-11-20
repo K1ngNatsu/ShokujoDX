@@ -139,6 +139,10 @@ pub enum ModelError {
     Invalid { what: &'static str, message: String },
     #[error("{}", text::fill("unsupported project file: {}", &[.0]))]
     UnsupportedProject(String),
+    /// The design is one that the program cannot read again from a project
+    /// file, so the file is not written (ADR 0139).
+    #[error("{}", text::fill("a project file cannot keep this design: {}", &[.0]))]
+    CannotKeep(String),
     #[error("{}", text::fill("cannot read {}: {}", &[.path, .source]))]
     Io {
         path: String,

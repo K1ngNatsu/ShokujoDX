@@ -32,8 +32,8 @@ ShokujoDX makes the stitches and writes the file for your machine.
 - **Easy to learn.** A ribbon of commands by task, a simple mode with large
   buttons, help on every button (push **F1**) and seven step-by-step
   tutorials, in English, German, Spanish and Japanese.
-- **Tested on real fabric.** The test designs of all 14 roadmap phases sew
-  correctly on a Husqvarna Viking Topaz 20.
+- **Tested on real fabric.** The test designs of the first 14 roadmap
+  phases sew correctly on a Husqvarna Viking Topaz 20.
 - **Your files stay yours.** No account and no subscription. The program
   uses the network for one thing only, and only if you permit it: it can
   ask GitHub if a new version is available (no data about you or your
@@ -56,8 +56,10 @@ ShokujoDX makes the stitches and writes the file for your machine.
   buttonholes and decorative borders.
 
 **Lettering**
-- Thirty embroidery fonts, plus the TrueType and OpenType fonts of your
-  computer.
+- 65 embroidery fonts, each with a quality score, and more in font
+  packages; plus the TrueType and OpenType fonts of your computer.
+- Text shaping: ligatures, the joined letters of script fonts, Arabic and
+  Devanagari.
 - Bold, italic, underline and stacked text; text on arcs, circles and
   lines; monograms, team names and a lettering kiosk for shops.
 
@@ -74,6 +76,14 @@ ShokujoDX makes the stitches and writes the file for your machine.
 - Draw with exact sizes, as in a CAD program: constraints, dimensions and
   parameters (`width = 60 mm`).
 - The regions of a sketch become fills and satins that change with it.
+
+**See it before you sew**
+- A 3D stitch view: the thread with its height, its sheen and its shadows
+  on the weave of the fabric; a view from an angle, a magnifier, and
+  checks for fabric that shows through and for thread that is too high.
+- The design on a product (shirts, caps, bags and towels, or a photo of
+  your own product): front and back, two colors, a turntable, and a page
+  on the approval sheet.
 
 **Production and shop**
 - A machine library of 41 profiles, your own machines, and the standard
@@ -169,10 +179,13 @@ first.
 
 ## Project status
 
-All 14 roadmap phases are done, and their sew-out tests passed on the
-reference machine, a Husqvarna Viking Topaz 20. Still open: tests with new
-users, and tests on cap frames, cutwork machines and other machines that
-the owner does not have. Sew-out results from **your** machine help a lot:
+Phases 1 to 14 of the roadmap are done, and their sew-out tests passed on
+the reference machine, a Husqvarna Viking Topaz 20. Phases 16 to 18 (the
+product view, better lettering, designs of other programs and the 3D
+stitch view) are done in software; their tests on fabric and with users
+are open. Also open: tests with new users, and tests on cap frames,
+cutwork machines and other machines that the owner does not have. Sew-out
+results from **your** machine help a lot:
 see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 The phases and the open tests are in the [roadmap](docs/design/roadmap.md).
@@ -246,10 +259,10 @@ batch work. Build it with `cargo build --release -p emb-cli`.
 | `emb-geom` | 2D geometry: paths, polygons, booleans, offsets |
 | `emb-model` | The design model, undo and redo, hoops, machines, the project format |
 | `emb-stitch` | Stitch generation: all stitch types, underlay, routing, sew order |
-| `emb-formats` | Machine file formats and artwork import |
-| `emb-render` | Stitch pictures, the 3D thread look, PDF output |
+| `emb-formats` | Machine file formats, artwork import, Ink/Stitch files |
+| `emb-render` | Stitch pictures, the 3D stitch view, products, sheets and PDF output |
 | `emb-letter` | Fonts, letters and text layout |
-| `emb-art` | Pictures: tracing, background removal, Picture to design |
+| `emb-art` | Pictures: tracing, background removal, Picture to design; the objects of a stitch file |
 | `emb-library` | The design library and thumbnails |
 | `emb-script` | Scripts in Rhai |
 | `emb-sketch` | Parametric sketches: constraints, the solver, sketch edits |

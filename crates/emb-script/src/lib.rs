@@ -786,6 +786,18 @@ pub fn run(
             messages: ctx.messages,
         });
     }
+    // A design that the program cannot save and open again (an object out
+    // of range, a number that is not a real number) is an error of the
+    // script (ADR 0139).
+    if ctx.changed
+        && let Err(e) = emb_model::project::checked_string(&ctx.design)
+    {
+        return Err(ScriptError {
+            message: e.to_string(),
+            line: None,
+            messages: ctx.messages,
+        });
+    }
     let selection = ctx
         .selection
         .into_iter()

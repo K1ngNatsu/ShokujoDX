@@ -349,7 +349,9 @@ impl AppState {
         let machine_file =
             emb_formats::write_machine_with(&ext, &plan.stitches, &name, &date, machine.as_ref(), needles.as_ref())
                 .ok_or_else(|| crate::i18n::fill("The program cannot write .{} files.", &[&ext]))?;
-        let project = emb_model::project::to_string(&d).into_bytes();
+        let project = emb_model::project::checked_string(&d)
+            .map_err(|e| e.to_string())?
+            .into_bytes();
         let look = self.settings.look.picture_look(Some(self.fabric_look(&d)));
         let pic = emb_render::picture::design_picture(
             &d,

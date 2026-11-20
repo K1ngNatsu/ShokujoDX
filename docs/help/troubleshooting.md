@@ -168,6 +168,13 @@ The × of a panel closes it. **View > Panels** opens it again.
 That is the start page. Clear **Show at start** on it if you want the
 empty design at the start.
 
+## A message says that a change was not made
+
+All parts of a design must be less than 1 km from its center, or the
+program cannot save the design. A change that puts an object farther (a
+very large number in a move, a scale or a script) is not made, and a
+message says so. Type a smaller value.
+
 ## The program stops or is slow
 
 The program saves backups and offers them at the next start. A crash

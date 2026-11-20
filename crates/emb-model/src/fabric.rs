@@ -129,12 +129,6 @@ impl Weave {
             Weave::Aida => "Aida (even weave)",
         }
     }
-
-    /// A pile stands up from the fabric: thin stitches sink into it (a
-    /// topping keeps them on top).
-    pub fn has_pile(self) -> bool {
-        matches!(self, Weave::Terry | Weave::Fleece)
-    }
 }
 
 /// A fabric preset.
@@ -338,6 +332,16 @@ impl Fabric {
     pub fn is_lace(&self) -> bool {
         self.underlay == UnderlayWeight::Lace
     }
+
+    /// The topping of the sew-out of `design` on this fabric: the topping
+    /// of the fabric, if the design does not say that it has none
+    /// (`Design::no_topping`). The sheets and the 3D view use it.
+    pub fn topping_for(&self, design: &Design) -> Option<&str> {
+        if design.no_topping {
+            return None;
+        }
+        self.topping.as_deref()
+    }
 }
 
 impl FabricCatalog {
@@ -386,15 +390,6 @@ impl FabricCatalog {
             .and_then(|id| self.get(id))
             .cloned()
             .unwrap_or_else(Fabric::base)
-    }
-
-    /// The topping of the sew-out of a design: the topping of its fabric,
-    /// if the design does not say that it has none (`Design::no_topping`).
-    pub fn topping_of(&self, design: &Design) -> Option<String> {
-        if design.no_topping {
-            return None;
-        }
-        self.of(design).topping
     }
 }
 
@@ -472,7 +467,6 @@ mod tests {
             let r: W = toml::from_str(&format!("weave = \"{}\"", w.id())).unwrap();
             assert_eq!(r.weave, w);
         }
-        assert!(Weave::Terry.has_pile() && !Weave::Plain.has_pile());
         // A size out of its range is refused.
         let bad = BUILTIN_FABRICS_TOML.replace("weave_mm = 0.25", "weave_mm = 9.0");
         assert!(FabricCatalog::from_toml_str(&bad).is_err());
@@ -483,9 +477,9 @@ mod tests {
         let c = FabricCatalog::builtin();
         let mut d = Design::new("towel");
         d.set_fabric(&c, Some("towel"), false);
-        assert!(c.topping_of(&d).is_some());
+        assert!(c.of(&d).topping_for(&d).is_some());
         d.no_topping = true;
-        assert_eq!(c.topping_of(&d), None);
+        assert_eq!(c.of(&d).topping_for(&d), None);
         // The project file keeps it, and the second color of the fabric.
         d.fabric_mix = Some(crate::Rgb(250, 250, 240));
         let back = crate::project::from_str(&crate::project::to_string(&d)).unwrap();

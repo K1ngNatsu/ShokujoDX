@@ -338,17 +338,6 @@ pub fn preset_stamps() -> Vec<Stamp> {
         .collect()
 }
 
-/// The built-in clipart items of the families.
-pub fn preset_clipart() -> Vec<Design> {
-    presets(Kind::Clipart)
-        .into_iter()
-        .filter_map(|i| match i {
-            Item::Clipart(d) => Some(*d),
-            _ => None,
-        })
-        .collect()
-}
-
 /// `n + 1` points of the curve `f(t)` for t from 0 to 1.
 pub(crate) fn curve(n: usize, f: impl Fn(f64) -> (f64, f64)) -> Vec<(f64, f64)> {
     let n = n.max(1);

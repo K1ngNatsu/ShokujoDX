@@ -18,7 +18,7 @@
 
 use std::ops::Not;
 
-use emb_geom::{BBox, Path, Point, Transform, math};
+use emb_geom::{Path, Point, Transform, math};
 use serde::{Deserialize, Serialize};
 
 use crate::mitre;
@@ -79,14 +79,6 @@ impl ButtonholeShape {
             ButtonholeShape::Stretch => "Open zigzag legs that stretch with the fabric: knits and jersey.",
             ButtonholeShape::Eyelet => "A round hole for a cord, a lace, a belt or a drawstring.",
         }
-    }
-
-    /// The shape has an eye (a keyhole) or is a round hole (an eyelet).
-    pub fn has_eye(self) -> bool {
-        matches!(
-            self,
-            ButtonholeShape::Keyhole | ButtonholeShape::TaperedKeyhole | ButtonholeShape::Eyelet
-        )
     }
 
     /// The legs and the bar tacks can sew as one ring with mitre corners
@@ -706,17 +698,10 @@ pub struct ButtonholeRecord {
     pub boxes: Vec<ObjectId>,
 }
 
-/// The size of the objects of a buttonhole of `spec` at the origin, along +X.
-pub fn local_size(spec: &ButtonholeSpec) -> Option<BBox> {
-    buttonhole(spec, Point::new(0.0, 0.0), 0.0)
-        .iter()
-        .filter_map(|k| k.control_bbox())
-        .reduce(BBox::union)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use emb_geom::BBox;
 
     fn bbox(objs: &[ObjectKind]) -> BBox {
         objs.iter()

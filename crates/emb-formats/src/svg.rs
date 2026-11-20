@@ -184,8 +184,7 @@ pub fn import_svg_vectors(data: &[u8]) -> Result<SvgImport, SvgError> {
 /// damaged file, or a transform of the file that is wrong. Such an object
 /// cannot be saved in a project. A warning gives their number.
 pub(crate) fn drop_far(mut out: SvgImport) -> SvgImport {
-    let m = emb_model::project::MAX_COORD_MM;
-    let near = |p: &Point| p.x.is_finite() && p.y.is_finite() && p.x.abs() <= m && p.y.abs() <= m;
+    let near = |p: &Point| emb_model::project::in_range(*p);
     let path_near = |path: &Path| {
         path.cmds.iter().all(|c| match c {
             emb_geom::PathCmd::MoveTo(p) | emb_geom::PathCmd::LineTo(p) => near(p),

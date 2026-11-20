@@ -441,7 +441,7 @@ impl Expr {
                             return Err(ExprError::Units);
                         }
                         Quantity {
-                            value: a.value.powf(b.value),
+                            value: emb_geom::math::pow(a.value, b.value),
                             length: a.length * b.value as i32,
                         }
                     }

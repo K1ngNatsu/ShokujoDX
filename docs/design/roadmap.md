@@ -28,7 +28,7 @@ Sizes are relative effort: S (days), M (one to two weeks), L (a month), XL (seve
 | Phase | State |
 | --- | --- |
 | 0. Foundation | Done: workspace, model with undo/redo, project files, egui app, Sequence panel, canvas editing, draw tools, SVG import |
-| 1. Stitch engine and core formats | Done in software: running, tatami fill, satin with underlay, VP3, DST, PES, `emb-cli`, golden tests. The exit test (corpus sew-outs) is covered by the later kits (owner decision, 2026-10-23). CI for three systems is in `.github/workflows` (it runs when the repository is on GitHub). The Ink/Stitch comparison is closed (owner, 2026-11-18: testers who used Ink/Stitch before report better results from this program, and their files sewed well). See `docs/design/export-plan.md`. |
+| 1. Stitch engine and core formats | Done in software: running, tatami fill, satin with underlay, VP3, DST, PES, `emb-cli`, golden tests. The exit test (corpus sew-outs) is covered by the later kits (owner decision, 2026-10-23). CI is in `.github/workflows`: Windows and Linux on each push, macOS for a release (ADR 0060). The Ink/Stitch comparison is closed (owner, 2026-11-18: testers who used Ink/Stitch before report better results from this program, and their files sewed well). See `docs/design/export-plan.md`. |
 | 2. Digitizing toolset | Done in software: all seven milestones (tracing, workspace, input methods, stitch angles and holes, split/join/select, arrange, viewing and travel). Open: the exit test with users. See `docs/design/p2-plan.md`. |
 | 3. Production, color and quality | Done in software: Milestones 1 (thread charts, Threads panel, colorways), 2 (machine functions, split at needle, stitch list) 3 (machine files: open as stitch objects; EXP, JEF, XXX, SEW, HUS, SHV) 4 (stitch player, thread look, design info, warnings, overview), 5 (worksheets, PDF, picture, Output design, batch output), 6 (fabrics, styles, templates, plain-language labels), 7 (appliqué) and 8 (design tabs, split view, backups and recovery, calibration, sew time, P2 carry-overs) done in software; the exit test with users is open. See `docs/design/p3-plan.md`. |
 | 4. Lettering | Done: Milestones 1 (TrueType lettering: satin letters from glyph strokes, fill letters, lines, spacing, kerning, alignment, bundled OFL fonts and the fonts of the computer) 2 (embroidery fonts: `.embfont` format, converter, four starter fonts, Fonts window with previews, size ranges and warnings) 3 (arc, circle and line baselines; kerning, move, scale, turn and reshape of single letters) 4 (envelopes and lettering art; stitch type and underlay for each letter; sew order with optimized connections) 5 (monograms: styles, borders, ornaments, templates), 6 (team names and keyboard design collections) and 7 (custom alphabets, bitmap fonts) done: all seven milestones, and the exit test (sew-outs on towel and cap, 2026-10-23). See `docs/design/p4-plan.md`. |
@@ -118,6 +118,144 @@ The audit of Stages 1 to 6 and the IP review of the release (the rules of the re
 - Docs: the README has the v0.3 features, the upgrade and start notes and a repaired install table; the spec has the machine library and a roadmap row for this work.
 - Open: the start test on the PC of the owner's friends. Passed (owner, 2026-11-16): endless pan with a real mouse, the My Machines window. The installer removes the older version before it asks to close a running ShokujoDX, so a Cancel at that question leaves no version installed (install again to fix).
 
+
+## Audit of the whole project (2026-11-20)
+
+After the audit of P18, a second check of all crates and documents (the
+first was on 2026-10-25, after P10). The owner asked for three things:
+code that the program does not need, documents that are out of date, and
+oversights of the architecture.
+
+**Fixed: architecture.**
+
+- **The program could save a design that it could not open again.** The
+  limit of a project file (all parts less than 1 km from the origin, and
+  real numbers) was a rule of the loader only. A script that moved the
+  objects 2 km (`move_objects(objects(), 2000000.0, 0.0)`), or that
+  divided 0.0 by 0.0, gave a design that the program saved; the file did
+  not open, and the save put it in the place of the good file. A typed
+  move or scale, and a machine file with a stitch km away, gave the same.
+  A writer of machine files splits a long move into the largest moves of
+  its format, so a move of 10^9 mm was 80 million records. Now
+  (ADR 0139):
+  - a document does not make a change that puts its design out of range:
+    the design of before comes back, the history gets no step, and a
+    notice says why ("The change was not made");
+  - `project::save` reads its text again before it writes the file: a
+    design that the loader refuses is not written, and the file that is
+    there stays;
+  - a script that makes such a design gets an error, and a machine file
+    with a stitch more than 1 km from the center of its design gives an
+    error;
+  - the loader, the document and the artwork readers use one check
+    (`project::in_range`, `project::out_of_range`).
+- **Two engine crates were not in the check for the same numbers on all
+  systems (ADR 0003).** The test `emb-geom/tests/determinism.rs` had the
+  eight engine crates of 2026-10-25; the sketch crate and the script
+  crate came later. The power of a parameter expression of a sketch
+  (`2 ^ 0.5`) used the math library of the system; it uses
+  `emb_geom::math::pow` now. The test also stopped at the first
+  `#[cfg(test)]` of a file, so the code after a test module of another
+  file (`#[cfg(test)] mod probe;`) was not checked. It reads each line
+  that is not a test now, and has a test of its own.
+- **The worksheet of the command-line tool named a topping for a design
+  with no topping.** `emb-cli output` copied the topping of the fabric;
+  the app left it out if the design says that it has none
+  (`Design::no_topping`). The rule was written three times (the app, the
+  tool, the 3D view), and a function for it was in the model with no user
+  but its test. All three use `Fabric::topping_for` now.
+
+**Fixed: code that the program does not need.** Removed, because no code
+used them, or only their own tests: `ButtonholeShape::has_eye`,
+`buttonhole::local_size`, `family::preset_clipart`, `CheckMap::thread_at`,
+`Weave::has_pile` (the 3D view takes the pile from the relief of the
+fabric), `FabricCatalog::topping_of` (see above), `Design::remove_knockout`
+and `Design::set_knockout_overlap` (`add_knockout` sets the overlap, and
+the Lettering window changes the knockout of the lettering). The three
+copies of the range check of a point are one function.
+
+**Fixed: documents.**
+
+- The spec. The list of the crates had 9 of the 13 crates (no
+  `emb-sketch`, `emb-script`, `emb-cli`, `emb-thumbnail`), and
+  `emb-render` was a "2D thread preview (later: 3D)". The order of the
+  crates did not show that `emb-model` uses `emb-sketch`. The ribbon had
+  5 of its 12 tabs. The fields of a machine profile and of a hoop preset
+  had no trim settings, needles, heads and cap frames, and the stitch
+  kinds had no speed functions. Phase 0 said that CI was deferred, and
+  P10 that the first release build was open (three releases are made).
+  The test table named two folders that do not exist
+  (`tests/differential`, `tests/sewouts`); the P5 plan and the P5 exit
+  text named the second one too (the photos of sew-outs stay with the
+  owner). The transfer method was an open
+  question (Send to USB passed on 2026-11-16).
+- The README: thirty embroidery fonts (the program has 65, and the font
+  packages 72 more); "all 14 roadmap phases" (P16 to P18 are done in
+  software); no product view, no 3D stitch view, no text shaping. A new
+  test compares its numbers (fonts, machines, thread charts, tutorials,
+  formats) with the program, as a test does for the help since the audit
+  of P17.
+- `CONTRIBUTING.md` said that the help topics are in English only (they
+  are in four languages, ADR 0084).
+- The roadmap (the P1 row: CI "runs when the repository is on GitHub"),
+  the export plan (Milestone 6 "Done, except CI and the Ink/Stitch
+  comparison": both are closed) and the inventory (the rows of the
+  viewing modes, of the asset management and of Recognize Objects did
+  not name the work of P17 and P18).
+- A help text for the new notice (*Questions and problems*, four
+  languages).
+
+**Checked, no change.**
+
+- Dependencies: each dependency of each crate is named in its code, and
+  none is used only by tests. No source file is out of the module tree.
+  Each tracked file of `data/`, `tests/`, `packaging/` and `tools/` has a
+  user; the fonts of the font packages are not in the repository a second
+  time.
+- Lints: 16 `too_many_arguments`, one `type_complexity`, one
+  `vec_init_then_push` and one `linker_messages`; no `dead_code`, no
+  `TODO` or `FIXME`, no `todo!`, nothing deprecated.
+- The other 25 public functions that only tests use are test helpers of
+  the app (`#[cfg(test)]`) or the measures of exit tests
+  (`parts::kinds_of_records`, `view::lay_design`, `Embroidery::of_segments`,
+  `Laid::max_height_in`, `write_machine`).
+- Rules 5 and 9: no cycle of crates. CI, the packaging test, the scan of
+  the translations and now the determinism test have the same ten engine
+  crates. Twelve crates forbid `unsafe` code; `emb-thumbnail` is the
+  exception (ADR 0046).
+- The 13 loops over a hash map or a hash set in the engine crates sort
+  their result or do not depend on the order.
+- The program starts another program only to show a folder, to open a
+  file or a mail, to ask for a new version (`curl`, ADR 0109) and to
+  start itself again with another renderer. No other code uses the
+  network.
+- `CLAUDE.md`: each code name and file path in it is in the code (a
+  script checked them, and those of the spec, the README,
+  `CONTRIBUTING.md`, the help and the inventory), and its rules are the
+  rules of the spec. The four language files have the same 4,313 texts.
+
+**Left as it is.**
+
+- `emb-app/src/sketch.rs` has 6,500 lines (sketch mode: tools, keys,
+  drawing), `AppState` has 185 fields, and `ribbon::commands::meta` is one
+  table of 1,560 lines. They work and have tests. A split of `sketch.rs`
+  into a folder module (as `ribbon/`, 2026-10-29) is the next step when
+  sketch mode gets more work.
+- The ADRs name the code as it was at their date (a name in each of
+  ADR 0042, 0124 and 0127 is gone or has another name now). An ADR is a
+  record, so they stay.
+- The math functions of Rhai (`sin`, `exp`) use the math library of the
+  system. A script runs one time, and its result is in the design
+  (ADR 0139).
+- The check for public functions with no user compares names: a method
+  with a common name (`new`, `width`) can pass it.
+- The open items of the audit of P18: a stitch file that sews one fill
+  many times at one place, and no EPS or AI file of another program is
+  tested.
+
+**Open: needs the owner or test users.** No change: the tables of exit
+tests in the audits of P16, P17 and P18, and the list in "Sew-out tests of
+2026-11-16".
 
 ## Audit of P18 (2026-11-20)
 
@@ -1217,7 +1355,7 @@ golden tests (spec, "Stitch engine requirements").
   and create pattern, carving stamps, gradient motifs, buttonholes, borders.
 
 **Exit:** every stitch type and effect has a corpus design, a golden test and a
-sew-out photo in `tests/sewouts/`.
+sew-out (the photos stay with the owner; they are not in the repository).
 
 ### P6. Artwork, vector tools and auto-digitizing (XL) — done (exit tests passed, 2026-11-16) (`docs/design/p6-plan.md`)
 

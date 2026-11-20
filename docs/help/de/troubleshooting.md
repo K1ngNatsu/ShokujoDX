@@ -188,6 +188,14 @@ wieder.
 Das ist die Startseite. Entfernen Sie darauf das Häkchen bei **Beim Start
 zeigen**, wenn Sie beim Start das leere Design wollen.
 
+## Eine Meldung sagt, dass eine Änderung nicht ausgeführt wurde
+
+Alle Teile eines Designs müssen weniger als 1 km von seiner Mitte entfernt
+sein, sonst kann das Programm das Design nicht speichern. Eine Änderung,
+die ein Objekt weiter weg setzt (eine sehr große Zahl beim Verschieben,
+beim Skalieren oder in einem Skript), wird nicht ausgeführt, und eine
+Meldung sagt das. Geben Sie einen kleineren Wert ein.
+
 ## Das Programm bricht ab oder ist langsam
 
 Das Programm speichert Sicherungen und bietet sie beim nächsten Start an.

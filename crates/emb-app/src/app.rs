@@ -1740,6 +1740,7 @@ impl EmbApp {
     /// draw the whole program with no window (`pictures.rs`).
     pub(crate) fn draw(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
+        self.state.show_refused_change();
         // Ctrl+Plus, Ctrl+Minus and Ctrl+0: the text size of the settings
         // (egui's own keyboard zoom is off, so the setting keeps it).
         ctx.options_mut(|o| o.zoom_with_keyboard = false);

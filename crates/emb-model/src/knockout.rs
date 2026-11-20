@@ -137,30 +137,6 @@ impl Design {
         self.settle_knockouts();
         true
     }
-
-    /// Removes the knockout of lettering `id`. Returns `false` if it has none.
-    pub fn remove_knockout(&mut self, id: ObjectId) -> bool {
-        let has = matches!(&self.object(id).map(|o| &o.kind), Some(ObjectKind::Lettering(l)) if l.knockout.is_some());
-        if has
-            && let Some(o) = self.object_mut(id)
-            && let ObjectKind::Lettering(l) = &mut o.kind
-        {
-            l.knockout = None;
-        }
-        has
-    }
-
-    /// Sets the overlap of the knockout of lettering `id`.
-    pub fn set_knockout_overlap(&mut self, id: ObjectId, overlap_mm: f64) {
-        let has = matches!(&self.object(id).map(|o| &o.kind), Some(ObjectKind::Lettering(l)) if l.knockout.as_ref().is_some_and(|k| k.overlap_mm != overlap_mm));
-        if has
-            && let Some(o) = self.object_mut(id)
-            && let ObjectKind::Lettering(l) = &mut o.kind
-            && let Some(k) = &mut l.knockout
-        {
-            k.overlap_mm = overlap_mm;
-        }
-    }
 }
 
 #[cfg(test)]
@@ -231,8 +207,7 @@ pub(crate) mod tests {
         let k = knockout(&d, text).unwrap();
         assert!((area(&k) - 25.0).abs() < 0.5);
         // The overlap makes the cut smaller.
-        d.set_knockout_overlap(text, 1.0);
-        d.settle_knockouts();
+        assert!(d.add_knockout(text, 1.0));
         assert!((area(&knockout(&d, text).unwrap()) - 9.0).abs() < 0.5);
     }
 
@@ -277,7 +252,5 @@ pub(crate) mod tests {
         assert!(d.add_knockout(text, 0.0));
         // The column is 20 x 4 mm.
         assert!((area(&knockout(&d, text).unwrap()) - 80.0).abs() < 1.0);
-        assert!(d.remove_knockout(text));
-        assert!(!d.remove_knockout(text));
     }
 }

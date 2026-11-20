@@ -8,7 +8,8 @@ The stitch catalog of a professional digitizer (roadmap P5): outline and
 fill stitch types, motifs, patterned stitching, stitch effects and color
 blends. Each stitch type and effect is a pure engine function with a
 golden test. The exit test: every stitch type and effect has a corpus
-design, a golden test and a sew-out photo in `tests/sewouts/`.
+design, a golden test and a sew-out (the photos stay with the owner;
+they are not in the repository).
 
 P4 passed its sew-out on 2026-10-23. The exit tests of P1 (sew-outs), P2
 and P3 (users) are still open. They run in parallel.
@@ -58,7 +59,7 @@ effect has a corpus design (`outline-types`, `curved-fills`,
 `buttonholes`, `borders`) with a golden snapshot. Sew-out part passed on the Topaz 20 (owner,
 2026-11-16): the
 files for the Topaz 20 (VP3, worksheet, picture) are in `out/p5-sewout`
-with a checklist; photos go to `tests/sewouts/`.
+with a checklist; the photos stay with the owner.
 
 ## Decisions for Milestone 7
 

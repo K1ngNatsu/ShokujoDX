@@ -171,11 +171,7 @@ impl Ground {
         Ground {
             lace: fabric.is_lace(),
             loft_mm: fabric.loft_mm.unwrap_or(0.0),
-            ..Ground::new(
-                fabric.weave,
-                fabric.weave_size(),
-                fabric.topping.is_some() && !design.no_topping,
-            )
+            ..Ground::new(fabric.weave, fabric.weave_size(), fabric.topping_for(design).is_some())
         }
     }
 

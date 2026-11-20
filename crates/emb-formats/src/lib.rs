@@ -57,8 +57,19 @@ pub const READ_EXTENSIONS: [&str; 40] = [
 /// Machine formats that can be written, by file extension.
 pub const WRITE_EXTENSIONS: [&str; 10] = ["dst", "vp3", "pes", "pec", "exp", "jef", "xxx", "tbf", "tap", "u01"];
 
-/// Reads a machine file. `ext` is the lower-case file extension.
+/// Reads a machine file. `ext` is the lower-case file extension. A file
+/// with a stitch farther than a project file can keep (1 km,
+/// `project::in_range`) is damaged: it gives an error (ADR 0139).
 pub fn read_machine(ext: &str, bytes: &[u8]) -> Result<StitchDesign, String> {
+    let design = read_format(ext, bytes)?;
+    if design.records.iter().any(|r| !emb_model::project::in_range(r.pos)) {
+        return Err(text::tr("the file has a stitch that is more than 1 km from the center of the design").into());
+    }
+    Ok(design)
+}
+
+/// Reads a machine file of the format `ext`.
+fn read_format(ext: &str, bytes: &[u8]) -> Result<StitchDesign, String> {
     match ext {
         "dst" => dst::read(bytes).map(|f| f.design).map_err(|e| e.to_string()),
         "vp3" => vp3::read(bytes).map_err(|e| e.to_string()),
@@ -154,6 +165,26 @@ pub fn write_machine_with(
 #[cfg(test)]
 mod lib_tests {
     use super::*;
+
+    #[test]
+    fn a_machine_file_with_a_far_stitch_is_refused() {
+        use emb_model::{StitchKind, StitchRecord};
+        let mut d = common::tests::sample();
+        assert!(read_machine("dst", &dst::write_with(&d, "near", dst::TrimCode::default())).is_ok());
+        // A jump of 2 km: 165,000 records of a DST file.
+        let far = emb_geom::Point::new(2.0 * emb_model::project::MAX_COORD_MM, 0.0);
+        let end = d.records.len() - 1;
+        d.records.insert(
+            end,
+            StitchRecord {
+                pos: far,
+                kind: StitchKind::Jump,
+            },
+        );
+        let file = dst::write_with(&d, "far", dst::TrimCode::default());
+        let e = read_machine("dst", &file).unwrap_err();
+        assert!(e.contains("1 km"), "{e}");
+    }
 
     #[test]
     fn needle_plans_go_in_tbf_and_u01() {

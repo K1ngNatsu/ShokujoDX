@@ -196,11 +196,6 @@ impl CheckMap {
         self.index(p).map_or(-1.0, |i| f64::from(self.open[i]))
     }
 
-    /// The height of the thread at `p`, mm.
-    pub fn thread_at(&self, p: Point) -> f64 {
-        self.index(p).map_or(0.0, |i| f64::from(self.thread[i]))
-    }
-
     /// The highest thread, mm.
     pub fn max_thread(&self) -> f64 {
         f64::from(self.thread.iter().copied().fold(0.0f32, f32::max))

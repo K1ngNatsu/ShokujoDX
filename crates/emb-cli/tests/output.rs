@@ -48,6 +48,14 @@ fn output_with_a_fabric() {
     });
     assert!(heavy, "the satin and fill objects have the towel underlay");
 
+    // A design that says that it has no topping: the worksheet names none.
+    let mut bare = corpus::build(name).unwrap();
+    bare.no_topping = true;
+    let bare_input = dir.join("bare.embproj");
+    project::save(&bare, &bare_input).unwrap();
+    let (_, data) = output(&bare_input, &out_dir, None, &o).unwrap();
+    assert_eq!(data.topping, None);
+
     let bad = OutputOptions {
         fabric: Some("velvet".into()),
         ..o

@@ -364,7 +364,7 @@ pub fn sheet_data(design: &Design, stitches: &StitchDesign, c: Catalogs, files: 
         d.set_thread_use(stitches, f.thickness_mm);
         d.fabric = Some(f.name.clone());
         d.backing = Some(f.backing.clone());
-        d.topping = f.topping.clone().filter(|_| !design.no_topping);
+        d.topping = f.topping_for(design).map(str::to_string);
     }
     d.fabric_areas = sheet::fabric_areas(design);
     (d.stones, d.stone_counts) = sheet::stones_of(design);

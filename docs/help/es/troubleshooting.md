@@ -184,6 +184,13 @@ La × de un panel lo cierra. **Ver > Paneles** lo abre de nuevo.
 Es la página de inicio. Desmarque en ella **Mostrar al inicio** si quiere
 el diseño vacío al empezar.
 
+## Un mensaje dice que un cambio no se hizo
+
+Todas las partes de un diseño deben estar a menos de 1 km de su centro; si
+no, el programa no puede guardar el diseño. Un cambio que pone un objeto
+más lejos (un número muy grande en un movimiento, una escala o un script)
+no se hace, y un mensaje lo dice. Escriba un valor más pequeño.
+
 ## El programa se cierra o va lento
 
 El programa guarda copias de seguridad y las ofrece en el próximo inicio.

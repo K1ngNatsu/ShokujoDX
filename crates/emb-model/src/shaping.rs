@@ -956,7 +956,11 @@ mod tests {
         assert!(knockout(&d, back).is_some());
         assert!(knockout(&d, front).is_none());
         // Only the one behind is selected: it sews round the one in front.
-        assert!(d.remove_knockout(back));
+        if let Some(o) = d.object_mut(back)
+            && let ObjectKind::Lettering(l) = &mut o.kind
+        {
+            l.knockout = None;
+        }
         assert_eq!(d.remove_overlaps(&[back], 0.0, false).unwrap(), vec![back]);
         assert!(knockout(&d, back).is_some());
         // Only the one in front is selected and nothing is in front of it.

@@ -8,6 +8,10 @@
 //!
 //! The loader rejects a file with a different `format` or a newer `version`.
 //! It migrates older versions step by step before it reads the design.
+//!
+//! A design that the loader rejects is not written (`save`, ADR 0139), and
+//! a document does not make a change that puts its design out of the range
+//! of a project file (`out_of_range`).
 
 use emb_geom::text;
 use std::collections::BTreeSet;
@@ -25,6 +29,50 @@ pub const FILE_EXTENSION: &str = "embproj";
 /// A larger coordinate comes from a damaged file: the stitches to go there
 /// would fill all the memory.
 pub const MAX_COORD_MM: f64 = 1_000_000.0;
+
+/// `true` if a project file can keep the point `p`: its numbers are real
+/// numbers, and it is not farther than `MAX_COORD_MM` from the origin.
+pub fn in_range(p: emb_geom::Point) -> bool {
+    p.x.is_finite() && p.y.is_finite() && p.x.abs() <= MAX_COORD_MM && p.y.abs() <= MAX_COORD_MM
+}
+
+/// The first part of `design` that is out of the range of a project file
+/// (`in_range`): the hoop center, an object, the product or a place on it.
+/// `None` if all is in range. `before` is the design before a change: an
+/// object that the change did not touch is not checked again.
+pub fn out_of_range(design: &Design, before: Option<&Design>) -> Option<String> {
+    if !in_range(design.hoop.center) {
+        return Some(text::tr("the hoop center is out of range").into());
+    }
+    let old = before.map(Design::objects).unwrap_or_default();
+    for (i, o) in design.objects().iter().enumerate() {
+        if old.get(i).is_some_and(|b| std::sync::Arc::ptr_eq(b, o)) {
+            continue;
+        }
+        if let Some(b) = o.control_bbox()
+            && !(in_range(b.min) && in_range(b.max))
+        {
+            return Some(text::fill("object {} is out of range", &[&o.id.0]));
+        }
+    }
+    design.product.as_ref().and_then(product_out_of_range)
+}
+
+/// The first place of a product view that is out of range.
+fn product_out_of_range(v: &crate::ProductView) -> Option<String> {
+    if !in_range(v.origin) {
+        return Some(text::tr("the product is out of range").into());
+    }
+    if let Some(p) = &v.picture
+        && p.placements.iter().any(|q| !in_range(q.at))
+    {
+        return Some(text::tr("a place on the photo is out of range").into());
+    }
+    v.extras
+        .iter()
+        .find(|e| !in_range(e.at))
+        .map(|e| text::fill("the design {} on the product is out of range", &[&e.name]))
+}
 
 #[derive(Serialize)]
 struct ProjectOut<'a> {
@@ -79,8 +127,26 @@ pub fn from_str(s: &str) -> Result<Design, ModelError> {
     Ok(design)
 }
 
+/// The project file string of a design that the program can read again.
+/// A design that the loader rejects (an object out of range, a number that
+/// is not a real number) gives `ModelError::CannotKeep` (ADR 0139).
+pub fn checked_string(design: &Design) -> Result<String, ModelError> {
+    let s = to_string(design);
+    match from_str(&s) {
+        Ok(_) => Ok(s),
+        Err(ModelError::Invalid { message, .. }) => Err(ModelError::CannotKeep(message)),
+        // The file has `null` where a number that is not a real number was.
+        Err(ModelError::Json(e)) if e.to_string().contains("null") => Err(ModelError::CannotKeep(
+            text::tr("a number of the design is not a real number").into(),
+        )),
+        Err(e) => Err(ModelError::CannotKeep(e.to_string())),
+    }
+}
+
+/// Writes a project file. A design that the program cannot open again is
+/// not written (`checked_string`), so the file that is there stays.
 pub fn save(design: &Design, path: &std::path::Path) -> Result<(), ModelError> {
-    std::fs::write(path, to_string(design)).map_err(|source| ModelError::Io {
+    std::fs::write(path, checked_string(design)?).map_err(|source| ModelError::Io {
         path: path.display().to_string(),
         source,
     })
@@ -141,18 +207,8 @@ fn validate(design: &Design) -> Result<(), ModelError> {
             )));
         }
     }
-    let far = |p: emb_geom::Point| {
-        !p.x.is_finite() || !p.y.is_finite() || p.x.abs() > MAX_COORD_MM || p.y.abs() > MAX_COORD_MM
-    };
-    if far(design.hoop.center) {
-        return Err(invalid(text::tr("the hoop center is out of range").into()));
-    }
-    for o in design.objects() {
-        if let Some(b) = o.control_bbox()
-            && (far(b.min) || far(b.max))
-        {
-            return Err(invalid(text::fill("object {} is out of range", &[&o.id.0])));
-        }
+    if let Some(why) = out_of_range(design, None) {
+        return Err(invalid(why));
     }
     if let Some(v) = &design.product {
         validate_product(v).map_err(invalid)?;
@@ -170,14 +226,11 @@ fn validate(design: &Design) -> Result<(), ModelError> {
 /// a real width with a mask of at most `PhotoMask::MAX_SIDE` cells on a
 /// side, and each other design.
 fn validate_product(v: &crate::ProductView) -> Result<(), String> {
-    let far = |p: emb_geom::Point| {
-        !p.x.is_finite() || !p.y.is_finite() || p.x.abs() > MAX_COORD_MM || p.y.abs() > MAX_COORD_MM
-    };
     let size = |s: (f64, f64)| {
         s.0.is_finite() && s.1.is_finite() && s.0 >= 0.0 && s.1 >= 0.0 && s.0.max(s.1) <= MAX_PRODUCT_MM
     };
-    if far(v.origin) {
-        return Err(text::tr("the product is out of range").into());
+    if let Some(why) = product_out_of_range(v) {
+        return Err(why);
     }
     if let Some(p) = &v.picture {
         if !(p.width_mm.is_finite()
@@ -193,14 +246,11 @@ fn validate_product(v: &crate::ProductView) -> Result<(), String> {
         {
             return Err(text::tr("the mask of the photo is too large").into());
         }
-        if p.placements.iter().any(|q| far(q.at) || !size(q.max)) {
+        if p.placements.iter().any(|q| !size(q.max)) {
             return Err(text::tr("a place on the photo is out of range").into());
         }
     }
     for e in &v.extras {
-        if far(e.at) {
-            return Err(text::fill("the design {} on the product is out of range", &[&e.name]));
-        }
         validate(&e.design).map_err(|e| e.to_string())?;
     }
     Ok(())
@@ -487,5 +537,47 @@ mod tests {
             "an object"
         );
         assert!(from_str(&to_string(&sample())).is_ok());
+    }
+
+    #[test]
+    fn a_design_that_cannot_be_read_again_is_not_written() {
+        let dir = std::env::temp_dir().join(format!("emb-project-save-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("patch.embproj");
+        save(&sample(), &path).unwrap();
+        let good = std::fs::read(&path).unwrap();
+        // An object 2 km away: the loader rejects it, so `save` does too,
+        // and the file of before stays.
+        let mut far = sample();
+        let id = far.objects()[0].id;
+        far.transform_objects(&[id], &emb_geom::Transform::translate(2.0 * MAX_COORD_MM, 0.0));
+        let e = save(&far, &path).unwrap_err();
+        assert!(matches!(e, ModelError::CannotKeep(_)), "{e}");
+        assert!(e.to_string().contains("out of range"), "{e}");
+        assert_eq!(std::fs::read(&path).unwrap(), good);
+        // A number that is not a real number.
+        let mut nan = sample();
+        nan.transform_objects(&[id], &emb_geom::Transform::translate(f64::NAN, 0.0));
+        let e = save(&nan, &path).unwrap_err();
+        assert!(matches!(e, ModelError::CannotKeep(_)), "{e}");
+        assert_eq!(std::fs::read(&path).unwrap(), good);
+        assert!(checked_string(&sample()).is_ok());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn out_of_range_skips_the_objects_that_did_not_change() {
+        let d = sample();
+        assert_eq!(out_of_range(&d, None), None);
+        let mut far = d.clone();
+        let id = far.objects()[1].id;
+        far.transform_objects(&[id], &emb_geom::Transform::translate(0.0, -3.0 * MAX_COORD_MM));
+        assert!(out_of_range(&far, None).is_some());
+        assert!(out_of_range(&far, Some(&d)).is_some(), "the object changed");
+        // Compared with itself, no object changed, so none is checked.
+        assert_eq!(out_of_range(&far, Some(&far.clone())), None);
+        let mut hoop = d.clone();
+        hoop.hoop.center = Point::new(f64::INFINITY, 0.0);
+        assert!(out_of_range(&hoop, Some(&d)).is_some());
     }
 }

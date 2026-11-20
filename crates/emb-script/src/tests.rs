@@ -311,3 +311,17 @@ fn info_gives_the_numbers_of_the_stitch_plan() {
     .unwrap();
     assert_eq!(out.messages, vec!["2 true".to_string()]);
 }
+
+#[test]
+fn a_design_that_cannot_be_saved_is_an_error_of_the_script() {
+    let d = design();
+    // 2 km away: a project file cannot keep the objects (ADR 0139).
+    let e = run_default("move_objects(objects(), 2000000.0, 0.0);", &d, &[]).unwrap_err();
+    assert!(e.message.contains("out of range"), "{e}");
+    // A number that is not a real number.
+    let e = run_default("let z = 0.0; move_objects(objects(), z / z, 0.0);", &d, &[]).unwrap_err();
+    assert!(e.message.contains("not a real number"), "{e}");
+    // A move in range is made.
+    let out = run_default("move_objects(objects(), 20.0, 0.0);", &d, &[]).unwrap();
+    assert!(out.changed);
+}

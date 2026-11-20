@@ -127,7 +127,10 @@ program (`FILES` in `crates/emb-app/src/i18n.rs`). To add a language, copy
 `template.toml` to `<code>.toml` (for example `fr.toml`), fill in the
 texts, add the file to `FILES` and to the test
 `the_languages_cover_the_program`, and open a pull request. To improve a
-translation, change its file. The help topics are in English only.
+translation, change its file. A translated help topic is a file of the
+same name in `docs/help/<code>/`; it keeps the blocks and the links of the
+English topic, and a change of an English topic needs the same change in
+its translations.
 
 ## License of your contribution
 
