@@ -129,6 +129,12 @@ places that differ; you can keep single objects as stitches. Options can
 do it each time that a machine file opens. See [Vector artwork and
 shaping](artwork).
 
+**Ink/Stitch files.** **File > Open** opens the SVG files of Ink/Stitch
+as designs: fills, satin columns and lines with their settings, the
+commands for trims, stops and start points, and the thread colors. A
+setting that the program does not read shows in a note. See [File
+formats](file-formats).
+
 **Stitch parts.** **View > Stitch Parts** colors the stitches of a
 design by the kind of their part: runs, columns and the rows of fills,
 with the underlay of each part. The program finds them in the stitches

@@ -16,11 +16,11 @@
 //! SVG user units are CSS pixels (96 per inch); `usvg` resolves physical
 //! units such as `mm`. The result is in mm with the SVG origin at (0, 0).
 
-use emb_geom::{BBox, Path, Point, region, text};
-use emb_model::{FillParams, ObjectKind, Rgb, RunningParams, VectorStyle};
+use emb_geom::{BBox, Path, Point, Transform, region, text};
+use emb_model::{Design, FillParams, Functions, ObjectId, ObjectKind, Rgb, RunningParams, ThreadChart, VectorStyle};
 
 /// mm per CSS pixel.
-const MM_PER_PX: f64 = 25.4 / 96.0;
+pub(crate) const MM_PER_PX: f64 = 25.4 / 96.0;
 /// Placeholder color for paints that are not a plain color.
 pub(crate) const FALLBACK: Rgb = Rgb(128, 128, 128);
 
@@ -36,6 +36,31 @@ pub struct ImportedObject {
     pub color: Rgb,
     /// The SVG element id, if it has one.
     pub name: Option<String>,
+    /// Where the object starts and stops sewing (the commands of an
+    /// Ink/Stitch file), in the coordinates of the import.
+    pub start: Option<Point>,
+    pub end: Option<Point>,
+    /// The machine functions (the settings of an Ink/Stitch file).
+    pub functions: Functions,
+    /// Objects with the same number go together as a group (the objects of
+    /// one shape of an Ink/Stitch file). The numbers are only for the import.
+    pub group: Option<u32>,
+}
+
+impl ImportedObject {
+    /// An object with the default machine functions, no start or end point
+    /// and no group.
+    pub fn new(kind: ObjectKind, color: Rgb, name: Option<String>) -> ImportedObject {
+        ImportedObject {
+            kind,
+            color,
+            name,
+            start: None,
+            end: None,
+            functions: Functions::default(),
+            group: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -44,6 +69,10 @@ pub struct SvgImport {
     pub objects: Vec<ImportedObject>,
     /// Things that were not imported or were changed, for the user.
     pub warnings: Vec<String>,
+    /// The thread chart that the file names (the thread palette of an
+    /// Ink/Stitch file): a new thread with a color of this chart gets its
+    /// name, brand and number.
+    pub chart: Option<String>,
 }
 
 impl SvgImport {
@@ -74,25 +103,73 @@ impl SvgImport {
 
     /// A new design with the imported objects, centered on the origin (the
     /// hoop center). Objects of one color share a thread.
-    pub fn to_design(&self, name: &str) -> emb_model::Design {
-        let mut d = emb_model::Design::new(name);
+    pub fn to_design(&self, name: &str) -> Design {
+        let mut d = Design::new(name);
         let shift = self.bbox().map(|b| Point::ZERO - b.center()).unwrap_or(Point::ZERO);
-        let t = emb_geom::Transform::translate(shift.x, shift.y);
+        self.add_to(&mut d, &Transform::translate(shift.x, shift.y));
+        d
+    }
+
+    /// Adds the objects to `d`, moved by `t`, and returns their ids. A
+    /// thread of the design with the same color is used again; a new thread
+    /// gets the name, brand and number of the chart of the file if the chart
+    /// has the color. The groups of the import get new group numbers.
+    pub fn add_to(&self, d: &mut Design, t: &Transform) -> Vec<ObjectId> {
+        let chart = self.chart.as_deref().and_then(|name| {
+            ThreadChart::builtin()
+                .into_iter()
+                .find(|c| c.name.eq_ignore_ascii_case(name.trim()))
+        });
+        let mut groups = std::collections::BTreeMap::new();
+        let mut next = d.new_group_id();
+        let mut ids = Vec::with_capacity(self.objects.len());
         for o in &self.objects {
-            let thread = d.thread_for_color(o.color);
+            let thread = match d.threads.iter().find(|th| th.color == o.color) {
+                Some(th) => th.id,
+                None => {
+                    let id = d.thread_for_color(o.color);
+                    if let Some(c) = &chart
+                        && let Some(k) = c.threads.iter().position(|ct| ct.color == o.color)
+                        && let Some(th) = d.threads.iter_mut().find(|th| th.id == id)
+                    {
+                        let look = emb_model::colorway::chart_look(c, k);
+                        th.name = look.name;
+                        th.brand = look.brand;
+                        th.code = look.code;
+                        th.kind = look.kind;
+                        th.weight = look.weight;
+                    }
+                    id
+                }
+            };
             let mut kind = o.kind.clone();
-            kind.transform(&t);
+            kind.transform(t);
             let id = d.add_object(thread, kind);
             if let Some(obj) = d.object_mut(id) {
                 obj.name = o.name.clone();
+                obj.start = o.start.map(|p| t.apply(p));
+                obj.end = o.end.map(|p| t.apply(p));
+                obj.functions = o.functions;
+                obj.group = o.group.map(|g| {
+                    *groups.entry(g).or_insert_with(|| {
+                        next += 1;
+                        next - 1
+                    })
+                });
             }
+            ids.push(id);
         }
-        d
+        ids
     }
 }
 
-/// Imports the paths of an SVG file as fill and running-stitch objects.
+/// Imports the paths of an SVG file as fill and running-stitch objects. A
+/// file with the settings of Ink/Stitch gives its objects with their stitch
+/// types ([`crate::inkstitch`]).
 pub fn import_svg(data: &[u8]) -> Result<SvgImport, SvgError> {
+    if crate::inkstitch::is_inkstitch(data) {
+        return crate::inkstitch::import_inkstitch(data);
+    }
     import(data, false)
 }
 
@@ -119,18 +196,19 @@ fn import(data: &[u8], vectors: bool) -> Result<SvgImport, SvgError> {
         counts.text = doc.descendants().filter(|n| n.tag_name().name() == "text").count();
     }
     if counts.text > 0 {
-        out.warnings.push(format!(
+        out.warnings.push(text::fill(
             "{} text element(s) not imported. Convert text to paths first.",
-            counts.text
+            &[&counts.text],
         ));
     }
     if counts.images > 0 {
-        out.warnings.push(format!("{} image(s) not imported.", counts.images));
+        out.warnings
+            .push(text::fill("{} image(s) not imported.", &[&counts.images]));
     }
     if counts.gradients > 0 {
-        out.warnings.push(format!(
+        out.warnings.push(text::fill(
             "{} gradient or pattern paint(s) imported as gray.",
-            counts.gradients
+            &[&counts.gradients],
         ));
     }
     Ok(out)
@@ -167,7 +245,7 @@ fn paint_color(paint: &usvg::Paint, counts: &mut Counts) -> Rgb {
 }
 
 /// Converts the path data with its absolute transform to subpaths in mm.
-fn subpaths(p: &usvg::Path) -> Vec<Path> {
+pub(crate) fn subpaths(p: &usvg::Path) -> Vec<Path> {
     let t = p.abs_transform();
     let map = |q: usvg::tiny_skia_path::Point| {
         let (x, y) = (f64::from(q.x), f64::from(q.y));
@@ -266,39 +344,39 @@ pub(crate) fn add_painted(out: &mut SvgImport, p: Painted, vectors: bool) {
             stroke: p.stroke.map(|s| s.0),
             stroke_mm: p.stroke.map_or(emb_model::vector::DEFAULT_STROKE_MM, |s| s.1),
         };
-        out.objects.push(ImportedObject {
-            kind: ObjectKind::Vector {
+        out.objects.push(ImportedObject::new(
+            ObjectKind::Vector {
                 path: Path::joined(&p.subs),
                 style,
             },
-            color: p.fill.or(style.stroke).unwrap_or(FALLBACK),
-            name: p.name,
-        });
+            p.fill.or(style.stroke).unwrap_or(FALLBACK),
+            p.name,
+        ));
         return;
     }
     if let Some(color) = p.fill {
         for (outer, holes) in region::nest(&p.subs) {
-            out.objects.push(ImportedObject {
-                kind: ObjectKind::Fill {
+            out.objects.push(ImportedObject::new(
+                ObjectKind::Fill {
                     outer: outer.closed(),
                     holes: holes.into_iter().map(Path::closed).collect(),
                     params: FillParams::default(),
                 },
                 color,
-                name: p.name.clone(),
-            });
+                p.name.clone(),
+            ));
         }
     }
     if let Some((color, _)) = p.stroke {
         for s in &p.subs {
-            out.objects.push(ImportedObject {
-                kind: ObjectKind::Running {
+            out.objects.push(ImportedObject::new(
+                ObjectKind::Running {
                     path: s.clone(),
                     params: RunningParams::default(),
                 },
                 color,
-                name: p.name.clone(),
-            });
+                p.name.clone(),
+            ));
         }
     }
 }

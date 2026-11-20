@@ -2,7 +2,7 @@
 //! and brushes, and a painter that collects the shapes of a drawing and
 //! paints them (P6 Milestone 5; ADR 0027).
 
-use emb_geom::{Path, Point};
+use emb_geom::{Path, Point, text};
 use emb_model::Rgb;
 
 use crate::svg::{Painted, SvgImport, add_painted};
@@ -235,7 +235,7 @@ impl Painter {
         if self.images > 0 {
             self.out
                 .warnings
-                .push(format!("{} image(s) not imported.", self.images));
+                .push(text::fill("{} image(s) not imported.", &[&self.images]));
         }
         self.out
     }

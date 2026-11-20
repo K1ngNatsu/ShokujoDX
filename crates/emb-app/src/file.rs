@@ -99,11 +99,13 @@ impl AppState {
                 let path = path.or_else(|| {
                     let mut all = vec![project::FILE_EXTENSION];
                     all.extend(emb_formats::READ_EXTENSIONS);
+                    all.push("svg");
                     rfd::FileDialog::new()
                         .set_title(tr("Open design"))
                         .add_filter(tr("Designs and machine files"), &all)
                         .add_filter(tr("Embroidery project"), &[project::FILE_EXTENSION])
                         .add_filter(tr("Machine files"), &emb_formats::READ_EXTENSIONS)
+                        .add_filter(tr("Ink/Stitch design (SVG)"), &["svg"])
                         .set_directory(self.dialog_dir())
                         .pick_file()
                 });
@@ -194,11 +196,12 @@ impl AppState {
     /// Opens a file of any kind that the program reads (from the command
     /// line, a double-click in the file manager or a drop on the window):
     /// artwork is imported into the design, a picture becomes the backdrop,
-    /// a project or a machine file opens in a new tab.
+    /// a project, a machine file or an Ink/Stitch file opens in a new tab.
     pub fn open_any(&mut self, p: &Path) {
         let ext = p.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase());
         match ext.as_deref() {
             Some("svg" | "pdf" | "ai" | "emf" | "wmf") => match std::fs::read(p) {
+                Ok(b) if emb_formats::inkstitch::is_inkstitch(&b) => self.open_path(p),
                 Ok(b) => self.import_svg_bytes(&b, &p.display().to_string()),
                 Err(e) => self.message = crate::i18n::fill("Cannot read {}: {}", &[&(p.display()), &e]),
             },
@@ -224,6 +227,10 @@ impl AppState {
         }
         if let Some(ext) = machine_ext(path) {
             self.open_machine_file(path, &ext);
+            return;
+        }
+        if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("svg")) {
+            self.open_svg_design(path);
             return;
         }
         match project::load(path) {
@@ -337,6 +344,69 @@ impl AppState {
                 &[&(path.display()), &n],
             ),
         };
+    }
+
+    /// Opens an SVG file as a new design: an Ink/Stitch file with its
+    /// objects and their settings (ADR 0135), other artwork as fills and
+    /// lines. The design has no project file until the user saves it.
+    pub fn open_svg_design(&mut self, path: &Path) {
+        let read = std::fs::read(path).map_err(|e| e.to_string()).and_then(|b| {
+            let inkstitch = emb_formats::inkstitch::is_inkstitch(&b);
+            emb_formats::svg::import_svg(&b)
+                .map(|i| (i, inkstitch))
+                .map_err(|e| e.to_string())
+        });
+        let (imported, inkstitch) = match read {
+            Ok(r) => r,
+            Err(e) => {
+                self.notice = Some(Notice {
+                    title: "Cannot open design".into(),
+                    lines: vec![path.display().to_string(), e],
+                });
+                return;
+            }
+        };
+        if imported.objects.is_empty() {
+            self.notice = Some(Notice {
+                title: "Nothing to import".into(),
+                lines: std::iter::once(tr("The file has no filled or stroked shapes.").to_string())
+                    .chain(imported.warnings)
+                    .collect(),
+            });
+            return;
+        }
+        let stem = path
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "Design".into());
+        let mut d = Design::new(&stem);
+        d.machine = self.doc.design().machine.clone();
+        d.hoop.selection = self.doc.design().hoop.selection.clone();
+        let shift = imported
+            .bbox()
+            .map(|b| d.hoop.center - b.center())
+            .unwrap_or(Point::ZERO);
+        let n = imported.add_to(&mut d, &Transform::translate(shift.x, shift.y)).len();
+        self.start_design(d);
+        self.add_recent(path);
+        self.fit_requested = true;
+        self.message = if inkstitch {
+            crate::i18n::fill(
+                "Opened the Ink/Stitch file {} as {} objects. Save it to keep it as a project.",
+                &[&(path.display()), &n],
+            )
+        } else {
+            crate::i18n::fill(
+                "Opened {} as {} objects. Save it to keep it as a project.",
+                &[&(path.display()), &n],
+            )
+        };
+        if !imported.warnings.is_empty() {
+            self.notice = Some(Notice {
+                title: "Opened with notes".into(),
+                lines: imported.warnings,
+            });
+        }
     }
 
     /// Asks for a machine file and adds its stitch objects to the design.
@@ -503,20 +573,9 @@ impl AppState {
         let target = self.doc.design().hoop.center;
         let shift = imported.bbox().map(|b| target - b.center()).unwrap_or(Point::ZERO);
         let t = Transform::translate(shift.x, shift.y);
-        let ids: Vec<ObjectId> = self.doc.edit(tr("Import Artwork"), |d| {
-            let mut ids = Vec::with_capacity(imported.objects.len());
-            for o in &imported.objects {
-                let thread = thread_for_color(d, o.color);
-                let mut kind = o.kind.clone();
-                kind.transform(&t);
-                let id = d.add_object(thread, kind);
-                if let Some(obj) = d.object_mut(id) {
-                    obj.name = o.name.clone();
-                }
-                ids.push(id);
-            }
-            ids
-        });
+        // The threads, the start and end points, the machine functions and
+        // the groups of the objects (Ink/Stitch files) come too.
+        let ids: Vec<ObjectId> = self.doc.edit(tr("Import Artwork"), |d| imported.add_to(d, &t));
         let n = ids.len();
         self.selection.set_all(ids);
         self.fit_requested = true;
@@ -626,7 +685,7 @@ pub fn machine_ext(path: &Path) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use emb_model::{HoopCatalog, MachineCatalog};
+    use emb_model::{HoopCatalog, MachineCatalog, ObjectKind};
 
     use super::*;
 
@@ -772,6 +831,59 @@ mod tests {
         let b = d.bbox_of(st.selection.ids()).unwrap();
         assert!(b.center().distance(d.hoop.center) < 1e-6);
         assert_eq!(st.doc.undo_len(), steps + 1);
+    }
+
+    /// An Ink/Stitch file: a fill with a trim command and a satin column.
+    const INKSTITCH: &[u8] = br##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+        xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:inkstitch="http://inkstitch.org/namespace"
+        width="60mm" height="40mm" viewBox="0 0 60 40">
+        <metadata><inkstitch:inkstitch_svg_version>4</inkstitch:inkstitch_svg_version></metadata>
+        <defs><symbol id="inkstitch_trim"><path d="M 0 0 L 2 2" style="stroke:#000000"/></symbol></defs>
+        <rect id="leaf" x="0" y="0" width="30" height="20" style="fill:#00aa00" inkstitch:angle="45"/>
+        <g><path id="c" d="M 5 5 L 0 0" style="fill:none;stroke:#000000" inkscape:connection-start="#u"
+        inkscape:connection-end="#leaf"/><use id="u" xlink:href="#inkstitch_trim" x="5" y="5"/></g>
+        <path id="stem" d="M 40 0 L 40 40 M 45 0 L 45 40" style="fill:none;stroke:#aa5500"
+        inkstitch:satin_column="true" inkstitch:zigzag_spacing_mm="0.45"/></svg>"##;
+
+    #[test]
+    fn open_an_inkstitch_file_as_a_new_design_with_its_objects() {
+        let dir = tmp_dir("inkstitch");
+        let path = dir.join("leaf.svg");
+        std::fs::write(&path, INKSTITCH).unwrap();
+        let mut st = state();
+        st.open_path(&path);
+        assert!(st.notice.is_none(), "{:?}", st.notice);
+        let d = st.doc.design();
+        assert_eq!(d.name, "leaf");
+        assert!(st.file_path.is_none());
+        assert_eq!(d.objects().len(), 2);
+        let ObjectKind::Fill { params, .. } = &d.objects()[0].kind else {
+            panic!("{:?}", d.objects()[0].kind)
+        };
+        // Rows at -45° are rows at 135° (a move gives the angle from 0° to 180°).
+        assert!((params.angle_deg.rem_euclid(180.0) - 135.0).abs() < 1e-6, "{params:?}");
+        assert_eq!(d.objects()[0].functions.trim, emb_model::TrimMode::Always);
+        assert!(matches!(d.objects()[1].kind, ObjectKind::Satin { .. }));
+        assert_eq!(d.threads.len(), 2);
+        let ids: Vec<_> = d.objects().iter().map(|o| o.id).collect();
+        let b = d.bbox_of(&ids).unwrap();
+        assert!(b.center().distance(d.hoop.center) < 1e-3);
+        // A drop opens it too; plain artwork is imported into the design.
+        let mut st = state();
+        st.open_any(&path);
+        assert_eq!(st.doc.design().name, "leaf");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn import_artwork_of_an_inkstitch_file_keeps_its_settings() {
+        let mut st = state();
+        st.import_svg_bytes(INKSTITCH, "leaf.svg");
+        assert!(st.notice.is_none(), "{:?}", st.notice);
+        let d = st.doc.design();
+        let n = d.objects().len();
+        assert!(matches!(d.objects()[n - 1].kind, ObjectKind::Satin { .. }));
+        assert_eq!(d.objects()[n - 2].functions.trim, emb_model::TrimMode::Always);
     }
 
     #[test]

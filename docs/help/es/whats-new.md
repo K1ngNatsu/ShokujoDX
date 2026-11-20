@@ -136,6 +136,12 @@ al lado del otro, con los lugares que difieren; puede mantener objetos
 sueltos como puntadas. Las opciones pueden hacerlo cada vez que se abre
 un archivo de máquina. Consulte [Gráficos vectoriales y formas](artwork).
 
+**Archivos de Ink/Stitch.** **Archivo > Abrir** abre los archivos SVG de
+Ink/Stitch como diseños: rellenos, columnas de satén y líneas con sus
+ajustes, los comandos de corte, parada y puntos de inicio, y los colores
+de hilo. Un ajuste que el programa no lee aparece en una nota. Vea
+[Formatos de archivo](file-formats).
+
 **Partes de puntadas.** **Ver > Partes de puntadas** colorea las
 puntadas de un diseño según el tipo de su parte: rectas, columnas y las
 filas de los rellenos, con la base de cada parte. El programa las

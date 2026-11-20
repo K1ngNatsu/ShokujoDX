@@ -23,7 +23,9 @@ El panel **Arte > Importar** lee archivos SVG, PDF, AI, EMF y WMF:
 - **Insertar puntadas** añade al diseño las puntadas de un archivo de
   máquina, como objetos de puntadas.
 
-También puede arrastrar un archivo SVG o PDF a la ventana.
+También puede arrastrar un archivo SVG o PDF a la ventana. Un archivo
+SVG de Ink/Stitch se abre como un diseño nuevo con sus ajustes (vea
+[Formatos de archivo](file-formats)).
 
 ## Dibujar arte
 

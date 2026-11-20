@@ -25,6 +25,7 @@ pub mod dsz;
 pub mod emf;
 pub mod exp;
 pub mod hus;
+pub mod inkstitch;
 pub mod jef;
 mod meta;
 pub mod minor;

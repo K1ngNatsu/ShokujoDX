@@ -416,11 +416,13 @@ pub fn import_pdf(data: &[u8], vectors: bool) -> Result<SvgImport, SvgError> {
         ));
     }
     if r.images > 0 {
-        out.warnings.push(format!("{} image(s) not imported.", r.images));
+        out.warnings.push(text::fill("{} image(s) not imported.", &[&r.images]));
     }
     if r.patterns > 0 {
-        out.warnings
-            .push(format!("{} gradient or pattern paint(s) imported as gray.", r.patterns));
+        out.warnings.push(text::fill(
+            "{} gradient or pattern paint(s) imported as gray.",
+            &[&r.patterns],
+        ));
     }
     Ok(out)
 }

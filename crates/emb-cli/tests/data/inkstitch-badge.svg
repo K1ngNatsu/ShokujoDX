@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- A badge in the file format of Ink/Stitch (SVG version 4), written by
+     hand for the tests of P18 Milestone 5 (ADR 0135). It is not a file of
+     Ink/Stitch: it has the structure that Inkscape and Ink/Stitch write
+     (layers, settings, command symbols with connectors, metadata). -->
+<svg
+   width="80mm"
+   height="80mm"
+   viewBox="0 0 80 80"
+   version="1.1"
+   id="svg1"
+   sodipodi:docname="badge.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns:inkstitch="http://inkstitch.org/namespace">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     inkscape:document-units="mm" />
+  <metadata
+     id="metadata1">
+    <inkstitch:min_stitch_len_mm>0.1</inkstitch:min_stitch_len_mm>
+    <inkstitch:collapse_len_mm>3</inkstitch:collapse_len_mm>
+    <inkstitch:min_satin_stroke_width_mm>1</inkstitch:min_satin_stroke_width_mm>
+    <inkstitch:inkstitch_svg_version>4</inkstitch:inkstitch_svg_version>
+    <inkstitch:thread-palette>"Madeira Polyneon"</inkstitch:thread-palette>
+  </metadata>
+  <defs
+     id="defs1">
+    <symbol
+       id="inkstitch_trim"
+       style="opacity:0.7"
+       transform="scale(0.25)">
+      <title
+         id="title-trim">Trim thread</title>
+      <path
+         id="path-trim"
+         d="m 0,0 v 10 h 10 z"
+         style="fill:#000000" />
+    </symbol>
+    <symbol
+       id="inkstitch_stop"
+       style="opacity:0.7"
+       transform="scale(0.25)">
+      <title
+         id="title-stop">Stop</title>
+      <path
+         id="path-stop"
+         d="m 0,0 h 10 v 10 h -10 z"
+         style="fill:#000000" />
+    </symbol>
+    <symbol
+       id="inkstitch_starting_point"
+       style="opacity:0.7"
+       transform="scale(0.25)">
+      <title
+         id="title-start">Starting position</title>
+      <circle
+         id="circle-start"
+         r="5"
+         style="fill:#000000" />
+    </symbol>
+    <symbol
+       id="inkstitch_ignore_layer"
+       style="opacity:0.7"
+       transform="scale(0.25)">
+      <title
+         id="title-ignore">Ignore layer</title>
+      <circle
+         id="circle-ignore"
+         r="5"
+         style="fill:#000000" />
+    </symbol>
+  </defs>
+  <g
+     inkscape:label="Background"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <circle
+       id="background"
+       inkscape:label="Background fill"
+       cx="40"
+       cy="40"
+       r="35"
+       style="fill:#b7c3c5;stroke:none"
+       inkstitch:angle="60"
+       inkstitch:row_spacing_mm="0.3"
+       inkstitch:max_stitch_length_mm="3.5"
+       inkstitch:fill_underlay_angle="-30 60"
+       inkstitch:fill_underlay_row_spacing_mm="1.5"
+       inkstitch:fill_underlay_inset_mm="0.4" />
+    <g
+       id="command_group1"
+       inkscape:label="Ink/Stitch Command: Starting position">
+      <path
+         id="command_connector1"
+         d="M 40,5.5 40,5"
+         style="display:none;fill:none;stroke:#000000;stroke-width:1"
+         inkscape:connector-type="polyline"
+         inkscape:connection-start="#command_use1"
+         inkscape:connection-end="#background"
+         inkscape:label="connector" />
+      <use
+         id="command_use1"
+         xlink:href="#inkstitch_starting_point"
+         x="40"
+         y="5.5"
+         width="100%"
+         height="100%"
+         inkscape:label="command marker" />
+    </g>
+  </g>
+  <g
+     inkscape:label="Border"
+     inkscape:groupmode="layer"
+     id="layer2">
+    <path
+       id="border"
+       inkscape:label="Border satin"
+       d="M 40,3 A 37,37 0 1 1 39.99,3 Z M 40,7 A 33,33 0 1 1 39.99,7 Z M 40,1 V 9 M 77,40 H 73 M 40,79 V 71 M 3,40 H 7"
+       style="fill:none;stroke:#1a1a1a;stroke-width:0.26"
+       inkstitch:satin_column="True"
+       inkstitch:zigzag_spacing_mm="0.4"
+       inkstitch:pull_compensation_mm="0.2"
+       inkstitch:contour_underlay="True"
+       inkstitch:zigzag_underlay="True" />
+    <g
+       id="command_group2"
+       inkscape:label="Ink/Stitch Command: Trim thread after sewing this object">
+      <path
+         id="command_connector2"
+         d="M 70,10 66,14"
+         style="fill:none;stroke:#000000;stroke-width:1;stroke-opacity:0.5"
+         inkscape:connector-type="polyline"
+         inkscape:connection-start="#command_use2"
+         inkscape:connection-end="#border"
+         inkscape:label="connector" />
+      <use
+         id="command_use2"
+         xlink:href="#inkstitch_trim"
+         x="70"
+         y="10"
+         width="100%"
+         height="100%"
+         inkscape:label="command marker" />
+    </g>
+  </g>
+  <g
+     inkscape:label="Details"
+     inkscape:groupmode="layer"
+     id="layer3">
+    <path
+       id="star"
+       inkscape:label="Star"
+       d="M 40,28 L 43.5,36.5 L 52.4,36.6 L 45.3,42 L 47.9,50.5 L 40,45.4 L 32.1,50.5 L 34.7,42 L 27.6,36.6 L 36.5,36.5 Z"
+       style="fill:#ffcc00;stroke:none"
+       inkstitch:fill_method="contour_fill"
+       inkstitch:contour_strategy="2"
+       inkstitch:row_spacing_mm="0.35"
+       inkstitch:max_stitch_length_mm="2" />
+    <g
+       id="command_group3"
+       inkscape:label="Ink/Stitch Command: Stop (pause machine) after sewing this object">
+      <path
+         id="command_connector3"
+         d="M 36,12 33,15"
+         style="fill:none;stroke:#000000;stroke-width:1;stroke-opacity:0.5"
+         inkscape:connector-type="polyline"
+         inkscape:connection-start="#letter"
+         inkscape:connection-end="#command_use3"
+         inkscape:label="connector" />
+      <use
+         id="command_use3"
+         xlink:href="#inkstitch_stop"
+         x="36"
+         y="12"
+         width="100%"
+         height="100%"
+         inkscape:label="command marker" />
+    </g>
+    <path
+       id="swoosh"
+       inkscape:label="Swoosh"
+       d="M 20,60 C 30,66 50,66 60,60"
+       style="fill:none;stroke:#1a1a1a;stroke-width:0.26;stroke-dasharray:0.5,0.5"
+       inkstitch:running_stitch_length_mm="2"
+       inkstitch:bean_stitch_repeats="1" />
+    <path
+       id="letter"
+       inkscape:label="Letter I"
+       d="M 30,15 L 30,25 M 33,15 L 33,25 M 29,20 L 34,20"
+       style="fill:none;stroke:#aa2222;stroke-width:0.26"
+       inkstitch:satin_column="True"
+       inkstitch:zigzag_spacing_mm="0.45"
+       inkstitch:center_walk_underlay="True" />
+    <path
+       id="zigzag"
+       inkscape:label="Zigzag line"
+       d="M 45,15 L 55,25"
+       style="fill:none;stroke:#aa2222;stroke-width:1.5"
+       inkstitch:stroke_method="zigzag_stitch"
+       inkstitch:zigzag_spacing_mm="0.8" />
+  </g>
+  <g
+     inkscape:label="Notes"
+     inkscape:groupmode="layer"
+     id="layer4">
+    <use
+       id="use_ignore"
+       xlink:href="#inkstitch_ignore_layer"
+       x="0"
+       y="-10"
+       width="100%"
+       height="100%"
+       inkscape:label="Ink/Stitch Command: Ignore layer" />
+    <rect
+       id="note"
+       x="60"
+       y="65"
+       width="15"
+       height="10"
+       style="fill:#ff00ff" />
+  </g>
+</svg>

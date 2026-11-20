@@ -3,7 +3,8 @@
 Date: 2026-11-18 · Status: Accepted (owner, 2026-11-18). Started by the
 owner on 2026-11-19, after the second part of P18 (the 3D stitch view).
 Milestones 1 to 3 are done (ADR 0131, ADR 0132, ADR 0133); Milestone 4 is
-done except the sew-out of the owner (ADR 0134).
+done except the sew-out of the owner (ADR 0134); Milestone 5 is done except
+the exit test of the owner (ADR 0135).
 
 ## Goal
 
@@ -153,6 +154,26 @@ part that is ported from its code gets the header of rule 4.
 
 **Exit test:** three Ink/Stitch files of testers open with the same
 objects, kinds and colors; one sews correctly.
+
+**Done except the exit test of the owner (2026-11-20, ADR 0135).**
+`emb_formats::inkstitch` reads the settings of each shape (by its id,
+after usvg) and the commands (by their connectors): fills (tatami, square,
+contour, guided, circular, meander, cross stitch, linear gradient; angle,
+row spacing, stitch length, end spacing, expand, underlay layers), satin
+columns (rails, rungs, spacing, pull compensation, short stitches, split,
+center walk, contour and zigzag underlay; E stitch and zigzag), lines
+(run, bean, passes, zigzag, ripple, manual, cut lines), trim, stop, start
+and end points, target points and ignored shapes and layers (vector
+objects); the files of earlier versions with the changes of
+`lib/update.py`. The thread colors are the colors of the shapes, with the
+names of the chart that the file names. A setting that the program does
+not read gives a warning. File > Open opens the file as a new design;
+Import Artwork adds its objects. The names and defaults are from the
+Ink/Stitch source (commit 42e771e9); the rail rules are ported with a
+header (rule 4). The automated part of the exit test
+(`crates/emb-cli/tests/inkstitch.rs`): a badge written by hand in the
+structure of Ink/Stitch files opens with its objects, kinds, settings and
+colors, and sews. The files of testers are for the owner.
 
 ## Milestone 6: write Ink/Stitch files and read its fonts (M)
 

@@ -2,7 +2,7 @@
 id: file-formats
 title: File formats
 group: reference
-keywords: format, file, extension, read, write, open, import, export, dst, vp3, pes, pec, exp, jef, xxx, sew, hus, shv, tbf, tap, u01, dsb, dsz, 10o, dat, embproj, svg, pdf, ai, emf, wmf, png, jpeg, bmp, tiff, gif, gpl, csv, dxf, zip
+keywords: format, file, extension, read, write, open, import, export, dst, vp3, pes, pec, exp, jef, xxx, sew, hus, shv, tbf, tap, u01, dsb, dsz, 10o, dat, embproj, svg, pdf, ai, emf, wmf, png, jpeg, bmp, tiff, gif, gpl, csv, dxf, zip, inkstitch, ink/stitch
 ---
 # File formats
 
@@ -41,12 +41,33 @@ density, use **Artwork > Convert > Recognize Objects** (running objects,
 satin columns and fills with their settings) or **Recognize Outlines**
 (fills of the area).
 
+## Ink/Stitch files
+
+Ink/Stitch keeps its settings in SVG files. **File > Open** opens an SVG
+file of Ink/Stitch as a new design, and **Import Artwork** adds its
+objects to the open design. The shapes become objects with their stitch
+types and settings:
+
+- Fills: tatami, contour, guided, circular, meander, cross stitch and
+  linear gradient, with the angle, the row spacing, the stitch length and
+  the underlay.
+- Satin columns: the rails and the rungs, the spacing, the pull
+  compensation and the underlay.
+- Lines: running stitch, bean stitch, zigzag, ripple and manual stitches.
+- Commands: trim, stop, the start and end points and the target point. A
+  shape or a layer that Ink/Stitch does not sew becomes a vector object.
+
+The thread colors are the colors of the shapes. If the file names a
+thread palette that is a chart of the program, the threads get their
+names and numbers. A setting that the program does not read is in the
+notes that show after the file opens.
+
 ## Other files
 
 | File | Read | Write | Use |
 |---|---|---|---|
 | EMBPROJ | yes | yes | The project of this program: all objects and settings. |
-| SVG | yes | yes | Vector artwork in; outlines, the design picture and cutter files out. |
+| SVG | yes | yes | Vector artwork and Ink/Stitch designs in; outlines, the design picture and cutter files out. |
 | PDF | yes | yes | Vector artwork in; worksheets, charts and templates out. |
 | AI, EMF, WMF | yes | EMF | Vector artwork. |
 | PNG, JPEG, BMP, TIFF, GIF | yes | PNG | Backdrop pictures in; design pictures out. |

@@ -23,7 +23,9 @@ The **Artwork > Import** panel reads SVG, PDF, AI, EMF and WMF files:
 - **Insert Stitches** adds the stitches of a machine file to the design,
   as stitch objects.
 
-You can also drag an SVG or PDF file onto the window.
+You can also drag an SVG or PDF file onto the window. An SVG file of
+Ink/Stitch opens as a new design with its settings (see [File
+formats](file-formats)).
 
 ## Draw artwork
 

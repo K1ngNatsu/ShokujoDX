@@ -24,7 +24,9 @@ WMF-Dateien:
 - **Stiche einfügen** fügt die Stiche einer Maschinendatei als
   Stichobjekte zum Design hinzu.
 
-Sie können eine SVG- oder PDF-Datei auch auf das Fenster ziehen.
+Sie können eine SVG- oder PDF-Datei auch auf das Fenster ziehen. Eine
+SVG-Datei von Ink/Stitch öffnet sich als neues Design mit ihren
+Einstellungen (siehe [Dateiformate](file-formats)).
 
 ## Grafik zeichnen
 

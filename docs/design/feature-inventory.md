@@ -219,7 +219,7 @@ the individual tools.
 | Feature | What it does | Status | Phase |
 | --- | --- | --- | --- |
 | Bitmap backdrops | Import, crop, adjust, dim, lock for tracing | ✅ Import, dim, lock, hide, move, size; crop to a box, an oval or a shape; brightness, contrast, sharpen (no finalize step: undo takes a crop back) | P2 (backdrop) / P6 (tools) |
-| Vector artwork | Import vectors, convert to embroidery objects | ✅ SVG, as objects (fills and lines), as lines only, or as vector objects to convert later PDF, AI, EMF and WMF the same way | P6 |
+| Vector artwork | Import vectors, convert to embroidery objects | ✅ SVG, as objects (fills and lines), as lines only, or as vector objects to convert later PDF, AI, EMF and WMF the same way; the SVG files of Ink/Stitch open as designs with their objects, stitch types, settings, commands and thread colors (P18 Milestone 5, ADR 0135; the files of testers open) | P6, P18 |
 | Auto-digitize shapes | Click a shape in the artwork to make a fill, satin, centerline or outline | ✅ Artwork > Trace > Click to stitch: a click on a color area of the backdrop makes a fill (with or without holes), satin columns, a center line or an outline (ADR 0028) | P6 |
 | Auto-digitize designs | Whole design from artwork (instant or guided) | ✅ Artwork > Import > Picture to design: a wizard (background, detail, colors, stitch types, sew order, a picture of the stitches); instant = the wizard with its defaults (ADR 0029) | P6 |
 | Auto-trace | Bitmap to vectors | ✅ Artwork > Trace picture: each color area becomes a vector shape (corners kept, smooth curves, no gaps between areas; the background left out) (ADR 0028) | P6 |

@@ -2,7 +2,7 @@
 id: file-formats
 title: Formatos de archivo
 group: reference
-keywords: formato, archivo, extensión, leer, escribir, abrir, importar, exportar, dst, vp3, pes, pec, exp, jef, xxx, sew, hus, shv, tbf, tap, u01, dsb, dsz, 10o, dat, embproj, svg, pdf, ai, emf, wmf, png, jpeg, bmp, tiff, gif, gpl, csv, dxf, zip
+keywords: formato, archivo, extensión, leer, escribir, abrir, importar, exportar, dst, vp3, pes, pec, exp, jef, xxx, sew, hus, shv, tbf, tap, u01, dsb, dsz, 10o, dat, embproj, svg, pdf, ai, emf, wmf, png, jpeg, bmp, tiff, gif, gpl, csv, dxf, zip, inkstitch, ink/stitch
 ---
 # Formatos de archivo
 
@@ -42,12 +42,34 @@ escalarlo y conservar la densidad, use **Arte > Convertir > Reconocer
 objetos** (objetos de puntada recta, columnas de satén y rellenos con sus
 ajustes) o **Reconocer contornos** (rellenos del área).
 
+## Archivos de Ink/Stitch
+
+Ink/Stitch guarda sus ajustes en archivos SVG. **Archivo > Abrir** abre un
+archivo SVG de Ink/Stitch como un diseño nuevo, e **Importar arte** añade
+sus objetos al diseño abierto. Las formas se convierten en objetos con sus
+tipos de puntada y sus ajustes:
+
+- Rellenos: tatami, contorno, guiado, circular, meandro, punto de cruz y
+  degradado lineal, con el ángulo, la separación de filas, el largo de
+  puntada y el refuerzo.
+- Columnas de satén: los rieles y los peldaños, la separación, la
+  compensación de tiro y el refuerzo.
+- Líneas: puntada recta, puntada triple, zigzag, onda y puntadas manuales.
+- Comandos: corte, parada, los puntos de inicio y de fin y el punto
+  objetivo. Una forma o una capa que Ink/Stitch no cose se convierte en un
+  objeto vectorial.
+
+Los colores de hilo son los colores de las formas. Si el archivo nombra
+una paleta de hilos que es una carta del programa, los hilos reciben sus
+nombres y números. Un ajuste que el programa no lee aparece en las notas
+que se muestran al abrir el archivo.
+
 ## Otros archivos
 
 | Archivo | Leer | Escribir | Uso |
 |---|---|---|---|
 | EMBPROJ | sí | sí | El proyecto de este programa: todos los objetos y ajustes. |
-| SVG | sí | sí | Arte vectorial de entrada; contornos, la imagen del diseño y archivos de plóter de salida. |
+| SVG | sí | sí | Arte vectorial y diseños de Ink/Stitch de entrada; contornos, la imagen del diseño y archivos de plóter de salida. |
 | PDF | sí | sí | Arte vectorial de entrada; hojas de trabajo, gráficos y plantillas de salida. |
 | AI, EMF, WMF | sí | EMF | Arte vectorial. |
 | PNG, JPEG, BMP, TIFF, GIF | sí | PNG | Imágenes de fondo de entrada; imágenes del diseño de salida. |

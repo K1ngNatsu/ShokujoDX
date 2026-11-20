@@ -2,7 +2,7 @@
 id: file-formats
 title: Dateiformate
 group: reference
-keywords: format, datei, endung, lesen, schreiben, öffnen, importieren, exportieren, dst, vp3, pes, pec, exp, jef, xxx, sew, hus, shv, tbf, tap, u01, dsb, dsz, 10o, dat, embproj, svg, pdf, ai, emf, wmf, png, jpeg, bmp, tiff, gif, gpl, csv, dxf, zip
+keywords: format, datei, endung, lesen, schreiben, öffnen, importieren, exportieren, dst, vp3, pes, pec, exp, jef, xxx, sew, hus, shv, tbf, tap, u01, dsb, dsz, 10o, dat, embproj, svg, pdf, ai, emf, wmf, png, jpeg, bmp, tiff, gif, gpl, csv, dxf, zip, inkstitch, ink/stitch
 ---
 # Dateiformate
 
@@ -42,12 +42,33 @@ und die Dichte zu behalten, benutzen Sie **Grafik > Umwandeln > Objekte
 erkennen** (Steppstichobjekte, Satinsäulen und Füllungen mit ihren
 Einstellungen) oder **Umrisse erkennen** (Füllungen der Fläche).
 
+## Ink/Stitch-Dateien
+
+Ink/Stitch speichert seine Einstellungen in SVG-Dateien. **Datei > Öffnen**
+öffnet eine SVG-Datei von Ink/Stitch als neues Design, und **Grafik
+importieren** fügt ihre Objekte zum offenen Design hinzu. Die Formen werden
+Objekte mit ihren Stichtypen und Einstellungen:
+
+- Füllungen: Tatami, Kontur, geführt, kreisförmig, Mäander, Kreuzstich und
+  linearer Verlauf, mit dem Winkel, dem Reihenabstand, der Stichlänge und
+  der Unterlage.
+- Satinsäulen: die Schienen und die Sprossen, der Abstand, die
+  Zugkompensation und die Unterlage.
+- Linien: Steppstich, Bohnenstich, Zickzack, Welle und manuelle Stiche.
+- Befehle: Schneiden, Stopp, Start- und Endpunkt und der Zielpunkt. Eine
+  Form oder eine Ebene, die Ink/Stitch nicht näht, wird ein Vektorobjekt.
+
+Die Garnfarben sind die Farben der Formen. Nennt die Datei eine
+Garnpalette, die eine Farbkarte des Programms ist, bekommen die Garne ihre
+Namen und Nummern. Eine Einstellung, die das Programm nicht liest, steht
+in den Notizen, die nach dem Öffnen erscheinen.
+
 ## Andere Dateien
 
 | Datei | Lesen | Schreiben | Verwendung |
 |---|---|---|---|
 | EMBPROJ | ja | ja | Das Projekt dieses Programms: alle Objekte und Einstellungen. |
-| SVG | ja | ja | Vektorgrafik hinein; Umrisse, das Designbild und Schneideplotter-Dateien hinaus. |
+| SVG | ja | ja | Vektorgrafik und Ink/Stitch-Designs hinein; Umrisse, das Designbild und Schneideplotter-Dateien hinaus. |
 | PDF | ja | ja | Vektorgrafik hinein; Arbeitsblätter, Zählmuster und Vorlagen hinaus. |
 | AI, EMF, WMF | ja | EMF | Vektorgrafik. |
 | PNG, JPEG, BMP, TIFF, GIF | ja | PNG | Hintergrundbilder hinein; Designbilder hinaus. |
