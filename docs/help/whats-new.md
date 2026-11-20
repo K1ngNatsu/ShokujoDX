@@ -139,6 +139,12 @@ for Ink/Stitch** writes a design as such a file, and **Lettering > Fonts >
 Ink/Stitch Font…** converts the lettering fonts of Ink/Stitch. See [File
 formats](file-formats).
 
+**EPS files.** **Artwork > Import** reads EPS and PostScript files, and AI
+files of the old kind, with no other program. Text and pictures in such a
+file are not imported. A CDR file gives a message: save it as SVG, PDF or
+EPS in the program that made it. See [Vector artwork and
+shaping](artwork).
+
 **Stitch parts.** **View > Stitch Parts** colors the stitches of a
 design by the kind of their part: runs, columns and the rows of fills,
 with the underlay of each part. The program finds them in the stitches

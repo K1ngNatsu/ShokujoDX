@@ -12,6 +12,7 @@ emb-model.workspace = true
 emb-geom.workspace = true
 usvg.workspace = true
 lopdf.workspace = true
+flate2.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]

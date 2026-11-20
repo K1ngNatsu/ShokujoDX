@@ -12,7 +12,8 @@ convert it to embroidery.
 
 ## Import artwork
 
-The **Artwork > Import** panel reads SVG, PDF, AI, EMF and WMF files:
+The **Artwork > Import** panel reads SVG, PDF, AI, EPS, PostScript, EMF
+and WMF files:
 
 - **Import as Vectors**: the paths become vector artwork. Convert them
   later.
@@ -22,6 +23,13 @@ The **Artwork > Import** panel reads SVG, PDF, AI, EMF and WMF files:
   a running-stitch line.
 - **Insert Stitches** adds the stitches of a machine file to the design,
   as stitch objects.
+
+The program reads EPS and PostScript files itself, also AI files of the
+old kind (before AI files had a PDF inside): no other program is
+necessary. Text and pictures in these files are not imported: convert
+text to outlines before you save the file. A CDR file has no public
+description, so the program cannot read it: in the program that made the
+file, save it as SVG, PDF or EPS.
 
 You can also drag an SVG or PDF file onto the window. An SVG file of
 Ink/Stitch opens as a new design with its settings (see [File

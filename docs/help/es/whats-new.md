@@ -147,6 +147,12 @@ Exportar para Ink/Stitch** escribe un diseño como un archivo así, y
 **Letras > Fuentes > Fuente de Ink/Stitch…** convierte las fuentes de
 letras de Ink/Stitch. Vea [Formatos de archivo](file-formats).
 
+**Archivos EPS.** **Arte > Importar** lee archivos EPS y PostScript, y
+archivos AI del tipo antiguo, sin otro programa. El texto y las imágenes
+de un archivo así no se importan. Un archivo CDR da un mensaje: guárdelo
+como SVG, PDF o EPS en el programa que lo creó. Consulte [Gráficos
+vectoriales y formas](artwork).
+
 **Partes de puntadas.** **Ver > Partes de puntadas** colorea las
 puntadas de un diseño según el tipo de su parte: rectas, columnas y las
 filas de los rellenos, con la base de cada parte. El programa las

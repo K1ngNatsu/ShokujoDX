@@ -1287,6 +1287,7 @@ version = "0.3.0"
 dependencies = [
  "emb-geom",
  "emb-model",
+ "flate2",
  "lopdf",
  "proptest",
  "thiserror 2.0.21",

@@ -12,7 +12,8 @@ como guía, o los convierte en bordado.
 
 ## Importar arte
 
-El panel **Arte > Importar** lee archivos SVG, PDF, AI, EMF y WMF:
+El panel **Arte > Importar** lee archivos SVG, PDF, AI, EPS, PostScript,
+EMF y WMF:
 
 - **Importar como vectores**: los trazados pasan a ser gráficos
   vectoriales. Conviértalos después.
@@ -22,6 +23,14 @@ El panel **Arte > Importar** lee archivos SVG, PDF, AI, EMF y WMF:
   ser una línea de puntada recta.
 - **Insertar puntadas** añade al diseño las puntadas de un archivo de
   máquina, como objetos de puntadas.
+
+El programa lee por sí mismo los archivos EPS y PostScript, también los
+archivos AI del tipo antiguo (antes de que los archivos AI tuvieran un PDF
+dentro): no hace falta otro programa. El texto y las imágenes de estos
+archivos no se importan: convierta el texto en contornos antes de guardar
+el archivo. Un archivo CDR no tiene una descripción pública, por eso el
+programa no puede leerlo: en el programa que creó el archivo, guárdelo
+como SVG, PDF o EPS.
 
 También puede arrastrar un archivo SVG o PDF a la ventana. Un archivo
 SVG de Ink/Stitch se abre como un diseño nuevo con sus ajustes (vea

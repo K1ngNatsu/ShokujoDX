@@ -1,0 +1,111 @@
+%!PS-Adobe-3.0 EPSF-3.0
+%%Creator: ShokujoDX test (printing procset)
+%%Title: badge
+%%BoundingBox: (atend)
+%%LanguageLevel: 2
+%%DocumentCustomColors: (Logo Red)
+%%Pages: 1
+%%EndComments
+%%BeginProlog
+%%BeginResource: procset ShopProcs 1.0 0
+currentglobal true setglobal
+/ShopProcs 120 dict dup begin
+/bdf { bind def } bind def
+/xdf { exch def } bdf
+/ldf { load def } bdf
+% Defines a name only if no dictionary has it.
+/ndf { 1 index where { pop pop pop } { dup xcheck { bind } if def } ifelse } bdf
+/level2 /languagelevel where { pop languagelevel 2 ge } { false } ifelse def
+/mo /moveto ldf
+/li /lineto ldf
+/cv /curveto ldf
+/cp /closepath ldf
+/np /newpath ldf
+/gs /gsave ldf
+/gr /grestore ldf
+/f /fill ldf
+/ef /eofill ldf
+/@ /stroke ldf
+/lw /setlinewidth ldf
+/ct { 6 array astore concat } bdf
+/clp /clip ldf
+/setcmykcolor where { pop /cmyk /setcmykcolor ldf } {
+  /cmyk { 4 1 roll 3 { 3 index add neg 1 add dup 0 lt { pop 0 } if 3 1 roll } repeat
+    setrgbcolor pop } bdf
+} ifelse
+/rgb /setrgbcolor ldf
+/setoverprint { pop } ndf
+% tint (name) c m y k spot: a spot color with its CMYK value.
+/spot {
+  4 array astore /_alt xdf /_name xdf
+  [ /Separation _name /DeviceCMYK
+    { dup _alt 0 get mul exch dup _alt 1 get mul exch dup _alt 2 get mul exch _alt 3 get mul } ]
+  setcolorspace setcolor
+} bdf
+/pagesize { currentpagedevice /PageSize get aload pop /_ph xdf /_pw xdf } bdf
+/trypagedevice { { setpagedevice } stopped { pop } if } bdf
+% Points of a polygon from an array.
+/poly { /_p xdf np _p 0 get _p 1 get mo
+  2 2 _p length 2 sub { dup _p exch get exch 1 add _p exch get li } for cp } bdf
+end
+/ProcSet defineresource pop
+setglobal
+%%EndResource
+%%EndProlog
+%%BeginSetup
+/ShopProcs /ProcSet findresource begin
+level2 not { (This file needs LanguageLevel 2.) print flush quit } if
+<< /PageSize [200 100] >> trypagedevice
+{ an_undefined_operator } stopped { /recovered true def } if
+%%BeginResource: font TestSans
+%!FontType1-1.0: TestSans 001.000
+12 dict begin
+/FontType 1 def
+/FontName /TestSans def
+/PaintType 0 def
+/FontMatrix [0.001 0 0 0.001 0 0] readonly def
+/FontBBox {0 0 1000 1000} readonly def
+/Encoding StandardEncoding def
+currentdict end
+currentfile eexec
+D9D66F633B846AB284BCF8B0411B772DE8F1C34A1F4A2B5FD0A1C2C3D4E5F6071829
+3A4B5C6D7E8F90A1B2C3D4E5F60718293A4B5C6D7E8F90A1B2C3D4E5F60718293A4B
+5C6D7E8F90A1B2C3D4E5F6
+0000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000000000000000
+cleartomark
+%%EndResource
+%%EndSetup
+%%Page: 1 1
+/pagesave save def
+pagesize
+np
+1 .5 0 0 cmyk
+20 10 mo 190 10 190 90 10 arct 190 90 10 90 10 arct
+10 90 10 10 10 arct 10 10 190 10 10 arct cp f
+1 (Logo Red) 0 1 1 0 spot
+np 90 50 mo 60 50 30 0 360 arc 75 50 mo 60 50 15 0 360 arc ef
+1 0 1 .4 cmyk
+110 20 mo 170 20 li 140 75 li cp gs f gr 0 0 0 1 cmyk 2 lw @
+0 0 0 1 cmyk 4 lw 20 95 mo 180 95 li @
+/TestSans findfont 14 scalefont setfont 40 30 mo (LOGO) show
+gs 100 40 translate 8 8 scale /DeviceGray setcolorspace
+<< /ImageType 1 /Width 4 /Height 4 /BitsPerComponent 8 /Decode [0 1]
+   /ImageMatrix [4 0 0 -4 0 4]
+   /DataSource currentfile /ASCII85Decode filter /FlateDecode filter >> image
+Gar7T:bZho818/=Y[GA"$P,E$!%O'8JH~>
+gr
+(0 0 1 0 cmyk) cvx exec
+[170 70 180 70 180 80 170 80] poly f
+pagesave restore
+showpage
+%%Trailer
+%%BoundingBox: 0 0 200 100
+end
+%%EOF

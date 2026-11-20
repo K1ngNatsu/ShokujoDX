@@ -80,7 +80,8 @@ de Ink/Stitch…** convierte una fuente de letras de Ink/Stitch: vea
 | EMBPROJ | sí | sí | El proyecto de este programa: todos los objetos y ajustes. |
 | SVG | sí | sí | Arte vectorial y diseños de Ink/Stitch de entrada; contornos, la imagen del diseño y archivos de plóter de salida. |
 | PDF | sí | sí | Arte vectorial de entrada; hojas de trabajo, gráficos y plantillas de salida. |
-| AI, EMF, WMF | sí | EMF | Arte vectorial. |
+| AI, EPS, PS, EMF, WMF | sí | EMF | Arte vectorial. |
+| CDR | no | no | Sin descripción pública: guarde el archivo como SVG, PDF o EPS. |
 | PNG, JPEG, BMP, TIFF, GIF | sí | PNG | Imágenes de fondo de entrada; imágenes del diseño de salida. |
 | DXF | no | sí | Archivos de plóter de apliques y plantillas de strass. |
 | CSV | sí | sí | Cartas de hilos y nombres de equipo de entrada; propiedades del diseño y la lista de diseños de salida. |

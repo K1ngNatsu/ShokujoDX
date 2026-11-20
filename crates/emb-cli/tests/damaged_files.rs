@@ -125,7 +125,7 @@ fn readers_do_not_crash_on_damaged_files() {
                 crashes.push(c);
             }
         }
-        for ext in ["svg", "pdf", "ai", "emf", "wmf"] {
+        for ext in emb_formats::artwork::ARTWORK_EXTENSIONS {
             if let Some(c) = check(&format!("random {len} as .{ext}"), || {
                 emb_formats::artwork::import_artwork(ext, &b, false)
             }) {

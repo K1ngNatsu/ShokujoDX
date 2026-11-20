@@ -146,6 +146,13 @@ Notiz. **Design > Für Ink/Stitch exportieren** schreibt ein Design als
 solche Datei, und **Schrift > Schriften > Ink/Stitch-Schrift…** wandelt
 die Schriften von Ink/Stitch um. Siehe [Dateiformate](file-formats).
 
+**EPS-Dateien.** **Grafik > Importieren** liest EPS- und
+PostScript-Dateien und AI-Dateien der alten Art ohne ein anderes Programm.
+Text und Bilder in einer solchen Datei werden nicht importiert. Eine
+CDR-Datei gibt eine Meldung: Speichern Sie sie in dem Programm, das sie
+gemacht hat, als SVG, PDF oder EPS. Siehe [Vektorgrafik und
+Formen](artwork).
+
 **Stichteile.** **Ansicht > Stichteile** färbt die Stiche eines Designs
 nach der Art ihres Teils: Steppstiche, Säulen und die Reihen von
 Füllungen, mit der Unterlage jedes Teils. Das Programm findet sie in den

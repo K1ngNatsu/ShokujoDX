@@ -407,7 +407,7 @@ pub fn import_pdf(data: &[u8], vectors: bool) -> Result<SvgImport, SvgError> {
     let mut out = r.out;
     if pages.len() > 1 {
         out.warnings
-            .push(format!("Only the first of {} pages imported.", pages.len()));
+            .push(text::fill("Only the first of {} pages imported.", &[&pages.len()]));
     }
     if r.text > 0 {
         out.warnings.push(format!(

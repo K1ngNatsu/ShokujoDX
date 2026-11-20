@@ -1,6 +1,7 @@
 # ADR 0027: Bitmap tools and vector artwork readers
 
-Date: 2026-10-23 · Status: Accepted (P6 Milestone 5)
+Date: 2026-10-23 · Status: Accepted (P6 Milestone 5); EPS and PostScript
+AI files: changed by ADR 0138 (the program reads them)
 
 ## Context
 

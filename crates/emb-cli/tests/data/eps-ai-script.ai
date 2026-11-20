@@ -1,0 +1,104 @@
+%!PS-Adobe-3.0 EPSF-3.0
+%%Creator: ShokujoDX test (AI script)
+%%Title: (badge)
+%%BoundingBox: 0 0 200 100
+%%HiResBoundingBox: 0 0 200 100
+%AI5_FileFormat 3.0
+%AI3_ColorUsage: Color
+%AI3_TileBox: 0 0 200 100
+%AI5_ArtSize: 200 100
+%AI5_NumLayers: 2
+%%EndComments
+%%BeginProlog
+%%EndProlog
+%%BeginSetup
+%AI5_BeginPalette
+0 0 Pb
+1 1 1 1 ([Registration]) 0 Xs
+PB
+%AI5_EndPalette
+%%EndSetup
+%AI5_BeginLayer
+1 1 1 1 0 0 0 79 128 255 Lb
+(Badge) Ln
+0 A
+u
+0 R
+1 0.5 0 0 k
+0 J 0 j 1 w 4 M []0 d
+0 D
+0 XR
+20 10 m
+180 10 L
+185.523 10 190 14.477 190 20 C
+190 80 L
+190 85.523 180 90 y
+20 90 L
+10 85.523 10 80 v
+10 20 L
+10 14.477 14.477 10 20 10 C
+f
+*u
+0 1 1 0 k
+90 50 m
+90 66.569 76.569 80 60 80 c
+43.431 80 30 66.569 30 50 c
+30 33.431 43.431 20 60 20 c
+76.569 20 90 33.431 90 50 c
+f
+75 50 m
+75 58.284 68.284 65 60 65 c
+51.716 65 45 58.284 45 50 c
+45 41.716 51.716 35 60 35 c
+68.284 35 75 41.716 75 50 c
+f
+*U
+1 0 1 0.4 k
+0 0 0 1 K
+2 w
+110 20 m
+170 20 L
+140 75 L
+b
+0 0 0 1 K
+4 w 1 J
+20 95 m
+180 95 L
+S
+q
+0 0 m 200 0 L 200 100 L 0 100 L h W n
+Q
+0 To
+1 0 0 1 40 30 0 Tp
+TP
+0 Tr
+0 0 0 1 k
+/_Helvetica 14 Tf
+(LOGO) Tx
+TO
+%AI5_File:
+%AI5_BeginRaster
+[ 2 0 0 2 100 40 ] 0 0 4 4 4 4 8 1 0 0 0 0
+XI
+%00102030405060708090A0B0C0D0E0F0
+%AI5_EndRaster
+0 0 1 0 (Logo Yellow) 0 x
+170 70 m
+180 70 L
+180 80 L
+170 80 L
+f
+U
+LB
+%AI5_EndLayer--
+%AI5_BeginLayer
+0 1 1 1 0 0 1 255 79 79 Lb
+(Sketch) Ln
+0 0 0 1 k
+0 0 m 50 0 L 50 50 L f
+LB
+%AI5_EndLayer--
+%%PageTrailer
+gsave annotatepage grestore showpage
+%%Trailer
+%%EOF

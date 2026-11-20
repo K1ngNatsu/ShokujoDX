@@ -910,7 +910,7 @@ impl Cmd {
             Cmd::ImportSvg => (
                 g(ph::FILE_SVG),
                 tr("Import Artwork"),
-                tr("Make objects from vector artwork: SVG, PDF, AI, EMF or WMF."),
+                tr("Make objects from vector artwork: SVG, PDF, AI, EPS, EMF or WMF."),
             ),
             Cmd::ImportSvgLines => (
                 g(ph::PATH),

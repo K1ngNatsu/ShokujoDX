@@ -461,7 +461,7 @@ impl AppState {
         let Some(p) = rfd::FileDialog::new()
             .set_title(tr("Outlines of the design"))
             .add_filter(
-                tr("Vector artwork (SVG, PDF, AI, EMF, WMF)"),
+                tr("Vector artwork (SVG, PDF, AI, EPS, EMF, WMF)"),
                 &emb_formats::artwork::ARTWORK_EXTENSIONS,
             )
             .set_directory(self.dialog_dir())
@@ -604,7 +604,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
             open_outlines = ui
                 .button(tr("Outlines…"))
                 .on_hover_text(tr(
-                    "Open the outlines of the same design (SVG, PDF, AI, EMF or WMF). Each outline takes the \
+                    "Open the outlines of the same design (SVG, PDF, AI, EPS, EMF or WMF). Each outline takes the \
                      kind and the settings of the stitches inside it.",
                 ))
                 .clicked();

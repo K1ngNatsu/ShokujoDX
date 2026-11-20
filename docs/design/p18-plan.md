@@ -6,7 +6,9 @@ Milestones 1 to 3 are done (ADR 0131, ADR 0132, ADR 0133); Milestone 4 is
 done except the sew-out of the owner (ADR 0134); Milestone 5 is done except
 the exit test of the owner (ADR 0135); Milestone 6 is done except the exit
 test of the owner and the bundled fonts (ADR 0136); Milestone 7 is done
-except the exit test of the owner (ADR 0137).
+except the exit test of the owner (ADR 0137); Milestone 8 (changed by the
+owner: EPS files, and a message for CDR files) is done except the exit
+test of the owner (ADR 0138).
 
 ## Goal
 
@@ -234,24 +236,45 @@ the corpus designs, saved with Export Outlines and as DST, give 92.8 % of
 the 1,819 measured objects an object of their kind, and every such fill
 has the angle of its source within 5°.
 
-## Milestone 8: import helpers (S)
+## Milestone 8: EPS files, and a message for CDR files (M)
 
-The program opens artwork formats that it cannot read, with the help of a
-program that the user has.
+Changed by the owner on 2026-11-20 (it was "import helpers": another
+program on the computer converts CDR and EPS files). The program does not
+depend on a second program: a shop must not install a vector editor to
+open the logo of a customer, and the program must not run another program
+on the files of customers.
 
-1. A table gives a command for a file type. The command runs as its own
-   process with a time limit, and makes an SVG or PDF file that the
-   program reads.
-2. Built in: Inkscape, when it is on the computer, for CDR, EPS and the
-   other formats that it reads. Options shows the helpers that the
-   program found, and the user can add one.
-3. No helper is a part of the program or of its packages.
+1. The program reads EPS and PostScript files itself: a PostScript
+   interpreter in pure Rust (from the public PostScript language
+   reference and the EPS file format specification) runs the drawing
+   operators of the file: paths, painting, colors, the transform, the
+   graphics state, procedures and dictionaries. Text and pictures give
+   warnings, as in the PDF import.
+2. AI files of the old kind (PostScript, not PDF inside) open with the
+   operators of the AI script.
+3. A CDR file gives a message: the format has no public description, so
+   save the file as SVG, PDF or EPS in the program that made it.
+4. No helper program. Another program can be added later as an option if
+   testers get files that they cannot convert.
 
 An ADR records the method (ADR 0027 said that EPS and CDR are not
 planned).
 
-**Exit test:** with Inkscape on the computer, a CDR file and an EPS file
-open as vector objects; with no helper, the program says what to install.
+**Exit test:** EPS files of three kinds (simple procedures, a large
+printing procset, an old AI script) open as vector objects with their
+colors and shapes; a CDR file gives the message. The test of the owner:
+the EPS and AI files of testers.
+
+**Done except the exit test of the owner (2026-11-20, ADR 0138).**
+`emb_formats::eps` is a PostScript interpreter in pure Rust (about 300
+operators, limits for steps, memory and errors) and runs the AI script of
+old AI files with its own operators; `artwork::import_artwork` takes EPS,
+PS and AI files of both kinds, and a CDR file gives the message. The
+automated part of the exit test (`crates/emb-cli/tests/eps.rs`): three
+files of the same badge, written in three ways, open as the same six
+objects with their colors and sizes, and sew. The published description
+of the AI format could not be read (its copies were offline), so the
+files of testers must check the AI operators.
 
 ## Not in this phase
 

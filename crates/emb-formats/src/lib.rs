@@ -10,7 +10,7 @@
 //!
 //! The formats follow pyembroidery (MIT, commit c16d1b4) where it has them:
 //! each module names its source file in its header. The others follow public
-//! descriptions (EMF, WMF, PDF) or are our own (artwork, metadata).
+//! descriptions (EMF, WMF, PDF, PostScript and EPS) or are our own (artwork, metadata).
 //! The native project format is in `emb_model::project`, not here.
 #![forbid(unsafe_code)]
 
@@ -23,6 +23,7 @@ pub mod dsb;
 pub mod dst;
 pub mod dsz;
 pub mod emf;
+pub mod eps;
 pub mod exp;
 pub mod hus;
 pub mod inkstitch;

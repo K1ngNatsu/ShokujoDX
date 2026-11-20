@@ -77,7 +77,8 @@ Font…** converts a lettering font of Ink/Stitch: see [Lettering](lettering).
 | EMBPROJ | yes | yes | The project of this program: all objects and settings. |
 | SVG | yes | yes | Vector artwork and Ink/Stitch designs in; outlines, the design picture and cutter files out. |
 | PDF | yes | yes | Vector artwork in; worksheets, charts and templates out. |
-| AI, EMF, WMF | yes | EMF | Vector artwork. |
+| AI, EPS, PS, EMF, WMF | yes | EMF | Vector artwork. |
+| CDR | no | no | No public description: save the file as SVG, PDF or EPS. |
 | PNG, JPEG, BMP, TIFF, GIF | yes | PNG | Backdrop pictures in; design pictures out. |
 | DXF | no | yes | Appliqué cutter files and rhinestone templates. |
 | CSV | yes | yes | Thread charts and team names in; design properties and the design list out. |

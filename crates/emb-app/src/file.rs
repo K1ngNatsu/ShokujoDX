@@ -200,7 +200,7 @@ impl AppState {
     pub fn open_any(&mut self, p: &Path) {
         let ext = p.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase());
         match ext.as_deref() {
-            Some("svg" | "pdf" | "ai" | "emf" | "wmf") => match std::fs::read(p) {
+            Some("svg" | "pdf" | "ai" | "eps" | "ps" | "emf" | "wmf" | "cdr") => match std::fs::read(p) {
                 Ok(b) if emb_formats::inkstitch::is_inkstitch(&b) => self.open_path(p),
                 Ok(b) => self.import_svg_bytes(&b, &p.display().to_string()),
                 Err(e) => self.message = crate::i18n::fill("Cannot read {}: {}", &[&(p.display()), &e]),
@@ -512,7 +512,7 @@ impl AppState {
                 ArtworkImport::Vectors => tr("Import artwork as vectors"),
             })
             .add_filter(
-                tr("Vector artwork (SVG, PDF, AI, EMF, WMF)"),
+                tr("Vector artwork (SVG, PDF, AI, EPS, EMF, WMF)"),
                 &emb_formats::artwork::ARTWORK_EXTENSIONS,
             )
             .add_filter(tr("DXF drawing (opens as a sketch)"), &["dxf"])

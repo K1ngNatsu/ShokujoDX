@@ -1,0 +1,67 @@
+%!PS-Adobe-3.0 EPSF-3.0
+%%Creator: ShokujoDX test (simple procedures)
+%%Title: badge
+%%BoundingBox: 0 0 200 100
+%%HiResBoundingBox: 0 0 200 100
+%%LanguageLevel: 2
+%%Pages: 1
+%%EndComments
+%%BeginProlog
+/badgedict 40 dict def
+badgedict begin
+/q { gsave } bind def
+/Q { grestore } bind def
+/cm { 6 array astore concat } bind def
+/w { setlinewidth } bind def
+/J { setlinecap } bind def
+/m { moveto } bind def
+/l { lineto } bind def
+/c { curveto } bind def
+/h { closepath } bind def
+% x y width height re: a rectangle.
+/re { 4 2 roll moveto 1 index 0 rlineto 0 exch rlineto neg 0 rlineto closepath } bind def
+/S { stroke } bind def
+/f { fill } bind def
+/n { newpath } bind def
+/W { clip } bind def
+/rg { setrgbcolor } bind def
+/k { setcmykcolor } bind def
+/g { setgray } bind def
+/picstr 4 string def
+end
+%%EndProlog
+%%BeginSetup
+badgedict begin
+%%EndSetup
+%%Page: 1 1
+%%BeginPageSetup
+%%PageBoundingBox: 0 0 200 100
+%%EndPageSetup
+q 0 0 200 100 re W n
+% The rest of the page has y down from the top.
+q 1 0 0 -1 0 100 cm
+1 0.5 0 0 k
+20 10 m 180 10 l 185.523 10 190 14.477 190 20 c 190 80 l
+190 85.523 185.523 90 180 90 c 20 90 l 14.477 90 10 85.523 10 80 c
+10 20 l 10 14.477 14.477 10 20 10 c h f
+1 0 0 rg
+90 50 m 60 50 30 0 360 arc h
+75 50 m 60 50 15 360 0 arcn h f
+0 0.6 0 rg
+110 80 m 170 80 l 140 25 l h q f Q 0 g 2 w S
+0 g 4 w 1 J 20 5 m 180 5 l S
+/Helvetica findfont 14 scalefont setfont 40 70 m (LOGO) show
+q 100 40 translate 8 8 scale
+4 4 8 [4 0 0 4 0 0] { currentfile picstr readhexstring pop } image
+00102030
+40506070
+8090A0B0
+C0D0E0F0
+Q
+1 1 0 rg 170 20 10 10 re f
+Q
+Q
+showpage
+%%Trailer
+end
+%%EOF

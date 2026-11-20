@@ -79,7 +79,8 @@ um: siehe [Schrift](lettering).
 | EMBPROJ | ja | ja | Das Projekt dieses Programms: alle Objekte und Einstellungen. |
 | SVG | ja | ja | Vektorgrafik und Ink/Stitch-Designs hinein; Umrisse, das Designbild und Schneideplotter-Dateien hinaus. |
 | PDF | ja | ja | Vektorgrafik hinein; Arbeitsblätter, Zählmuster und Vorlagen hinaus. |
-| AI, EMF, WMF | ja | EMF | Vektorgrafik. |
+| AI, EPS, PS, EMF, WMF | ja | EMF | Vektorgrafik. |
+| CDR | nein | nein | Keine öffentliche Beschreibung: Speichern Sie die Datei als SVG, PDF oder EPS. |
 | PNG, JPEG, BMP, TIFF, GIF | ja | PNG | Hintergrundbilder hinein; Designbilder hinaus. |
 | DXF | nein | ja | Schneideplotter-Dateien für Applikationen und Strassvorlagen. |
 | CSV | ja | ja | Garnkarten und Teamnamen hinein; Designeigenschaften und die Designliste hinaus. |

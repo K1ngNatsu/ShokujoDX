@@ -12,8 +12,8 @@ weg. Sie benutzen sie als Vorlage, oder Sie wandeln sie in Stickerei um.
 
 ## Grafik importieren
 
-Der Bereich **Grafik > Importieren** liest SVG-, PDF-, AI-, EMF- und
-WMF-Dateien:
+Der Bereich **Grafik > Importieren** liest SVG-, PDF-, AI-, EPS-,
+PostScript-, EMF- und WMF-Dateien:
 
 - **Als Vektoren importieren**: Die Pfade werden zu Vektorgrafik. Wandeln
   Sie sie später um.
@@ -23,6 +23,14 @@ WMF-Dateien:
   zu einer Steppstichlinie.
 - **Stiche einfügen** fügt die Stiche einer Maschinendatei als
   Stichobjekte zum Design hinzu.
+
+Das Programm liest EPS- und PostScript-Dateien selbst, auch AI-Dateien der
+alten Art (bevor AI-Dateien ein PDF enthielten): Ein anderes Programm ist
+nicht nötig. Text und Bilder in diesen Dateien werden nicht importiert:
+Wandeln Sie Text in Umrisse um, bevor Sie die Datei speichern. Eine
+CDR-Datei hat keine öffentliche Beschreibung, darum kann das Programm sie
+nicht lesen: Speichern Sie die Datei in dem Programm, das sie gemacht hat,
+als SVG, PDF oder EPS.
 
 Sie können eine SVG- oder PDF-Datei auch auf das Fenster ziehen. Eine
 SVG-Datei von Ink/Stitch öffnet sich als neues Design mit ihren
