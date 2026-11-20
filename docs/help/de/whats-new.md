@@ -134,7 +134,9 @@ Steppstichobjekte, Satinsäulen und Füllungen mit den Einstellungen, die
 die Stiche zeigen. Ein Fenster zeigt die Datei und die Objekte
 nebeneinander, mit den Stellen, die verschieden sind; einzelne Objekte
 können Stiche bleiben. Die Optionen können es bei jeder Maschinendatei
-tun, die Sie öffnen. Siehe [Vektorgrafik und Formen](artwork).
+tun, die Sie öffnen. Mit den Umrissen desselben Designs (einer
+Vektordatei) wird jeder Umriss ein Objekt mit der Art und den
+Einstellungen der Stiche darin. Siehe [Vektorgrafik und Formen](artwork).
 
 **Ink/Stitch-Dateien.** **Datei > Öffnen** öffnet die SVG-Dateien von
 Ink/Stitch als Designs: Füllungen, Satinsäulen und Linien mit ihren

@@ -134,7 +134,10 @@ puntada recta, columnas de satén y rellenos, con los ajustes que
 muestran las puntadas. Una ventana muestra el archivo y los objetos uno
 al lado del otro, con los lugares que difieren; puede mantener objetos
 sueltos como puntadas. Las opciones pueden hacerlo cada vez que se abre
-un archivo de máquina. Consulte [Gráficos vectoriales y formas](artwork).
+un archivo de máquina. Con los contornos del mismo diseño (un archivo
+vectorial), cada contorno pasa a ser un objeto con el tipo y los ajustes
+de las puntadas que hay dentro. Consulte [Gráficos vectoriales y
+formas](artwork).
 
 **Archivos de Ink/Stitch.** **Archivo > Abrir** abre los archivos SVG de
 Ink/Stitch como diseños: rellenos, columnas de satén y líneas con sus

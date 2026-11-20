@@ -60,7 +60,12 @@ Other commands of the panel:
   the list, clear the box of an object to keep its stitches as they are.
   **Accept** makes the change; one undo takes it back. To do it each time
   that you open a machine file, set **Recognize objects when a file
-  opens** in Options.
+  opens** in Options. With **Outlines…**, open the outlines of the same
+  design (a vector file that the other program saved). The outlines go on
+  the stitches by their sizes; if they do not fit, click **Align by Two
+  Points**, then a point of the outlines and the same point of the
+  stitches, two times. Each outline takes the kind and the settings of the
+  stitches inside it, so the objects have the shapes of the design.
 - **Recognize Outlines**: stitch objects (from a machine file or a photo
   stitch) become fills of the area that their stitches cover, so you can
   scale them and they keep their density.

@@ -5,7 +5,8 @@ owner on 2026-11-19, after the second part of P18 (the 3D stitch view).
 Milestones 1 to 3 are done (ADR 0131, ADR 0132, ADR 0133); Milestone 4 is
 done except the sew-out of the owner (ADR 0134); Milestone 5 is done except
 the exit test of the owner (ADR 0135); Milestone 6 is done except the exit
-test of the owner and the bundled fonts (ADR 0136).
+test of the owner and the bundled fonts (ADR 0136); Milestone 7 is done
+except the exit test of the owner (ADR 0137).
 
 ## Goal
 
@@ -219,6 +220,19 @@ the machine file of the same design, the outlines become objects.
 
 **Exit test:** a corpus design, saved as outlines and as DST, becomes
 objects of the same kinds as the source.
+
+**Done except the exit test of the owner (2026-11-20, ADR 0137).**
+`emb_art::part_outlines` puts the outlines on the stitches (by their
+sizes, or by two points) and gives each outline the kind and the settings
+of the made objects inside it: an area of fill stitches is a fill of the
+outline, an area of column stitches a satin column of the outline with the
+stitch directions of the column, a line a run or a satin along it. The
+Recognize Objects window has Outlines…, Fit by Size, Align by Two Points
+and Remove Outlines, and draws the outlines on the stitches of the file.
+The automated part of the exit test (`crates/emb-cli/tests/outlines.rs`):
+the corpus designs, saved with Export Outlines and as DST, give 92.8 % of
+the 1,819 measured objects an object of their kind, and every such fill
+has the angle of its source within 5°.
 
 ## Milestone 8: import helpers (S)
 

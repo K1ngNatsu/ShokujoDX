@@ -64,7 +64,13 @@ Andere Befehle des Bereichs:
   damit seine Stiche bleiben, wie sie sind. **Übernehmen** macht die
   Änderung; ein Rückgängig nimmt sie zurück. Um es bei jeder
   Maschinendatei zu tun, die Sie öffnen, wählen Sie in den Optionen
-  **Objekte beim Öffnen einer Datei erkennen**.
+  **Objekte beim Öffnen einer Datei erkennen**. Mit **Umrisse…** öffnen
+  Sie die Umrisse desselben Designs (eine Vektordatei, die das andere
+  Programm gespeichert hat). Die Umrisse kommen nach ihrer Größe auf die
+  Stiche; passen sie nicht, klicken Sie **An zwei Punkten ausrichten**,
+  dann einen Punkt der Umrisse und denselben Punkt der Stiche, zweimal.
+  Jeder Umriss erhält die Art und die Einstellungen der Stiche darin, so
+  haben die Objekte die Formen des Designs.
 - **Umrisse erkennen**: Stichobjekte (aus einer Maschinendatei oder einem
   Fotostich) werden zu Füllungen der Fläche, die ihre Stiche bedecken,
   damit Sie sie skalieren können und sie ihre Dichte behalten.

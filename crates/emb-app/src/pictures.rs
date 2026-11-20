@@ -669,6 +669,21 @@ fn scenes() -> Vec<Scene> {
         st.select_all();
         st.open_recognize_objects();
     }));
+    // With the outlines of the design (ADR 0137).
+    v.push(Scene::new("recognize objects with outlines", View::Windows, |st, _| {
+        let svg = emb_render::svg::outlines(st.doc.design()).unwrap_or_default();
+        let plan = st.plan_view().plan.clone();
+        let d = emb_model::design_from_stitches(&plan.stitches, "sample");
+        st.doc = emb_model::Document::new(d);
+        st.select_all();
+        st.open_recognize_objects();
+        if let (Some(w), Ok(read)) = (
+            st.recognize_dialog.as_mut(),
+            emb_formats::svg::import_svg_vectors(svg.as_bytes()),
+        ) {
+            w.set_outlines("sample outlines.svg", crate::recognize_objects::outlines_of(&read));
+        }
+    }));
     v.push(Scene::new("stitch parts", View::Screen, |st, _| {
         st.stitch_tiles.sync = true;
         st.parts_view.on = true;

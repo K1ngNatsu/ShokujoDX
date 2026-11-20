@@ -41,6 +41,7 @@ pub mod cutout;
 mod maxflow;
 pub mod part_fills;
 pub mod part_objects;
+pub mod part_outlines;
 pub mod parts;
 pub mod photo;
 pub mod recognize;

@@ -65,7 +65,13 @@ Otros comandos del panel:
   casilla de un objeto para mantener sus puntadas como están.
   **Aceptar** hace el cambio; un deshacer lo quita. Para hacerlo cada vez
   que abre un archivo de máquina, active **Reconocer objetos al abrir un
-  archivo** en las opciones.
+  archivo** en las opciones. Con **Contornos…**, abra los contornos del
+  mismo diseño (un archivo vectorial que guardó el otro programa). Los
+  contornos se colocan sobre las puntadas según sus tamaños; si no
+  coinciden, haga clic en **Alinear por dos puntos** y luego en un punto
+  de los contornos y en el mismo punto de las puntadas, dos veces. Cada
+  contorno toma el tipo y los ajustes de las puntadas que hay dentro, así
+  los objetos tienen las formas del diseño.
 - **Reconocer contornos**: los objetos de puntadas (de un archivo de
   máquina o de una puntada fotográfica) pasan a ser rellenos del área que
   cubren sus puntadas, para que pueda escalarlos y conserven su densidad.
