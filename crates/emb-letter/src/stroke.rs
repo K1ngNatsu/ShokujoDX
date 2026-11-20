@@ -101,6 +101,14 @@ const CROSS_PAST: f64 = 1.5;
 /// A side of a line across a stroke goes into another stroke when its end
 /// is nearer than this many half-widths of that stroke to its middle line.
 const INTO_OTHER: f64 = 0.8;
+/// At a free end, the rails follow the outline from a pair this far from
+/// the end (a factor of the width of the stroke) to the corners of the end,
+/// where the outline turns more than this (degrees) from the side.
+const END_BACK: f64 = 0.8;
+const END_TURN_DEG: f64 = 70.0;
+/// A traced end stops where the column is narrower than this part of the
+/// width of the stroke.
+const END_MIN_WIDTH: f64 = 0.3;
 /// The end of a column goes this far into the columns that it ends in (a
 /// factor of its width there), so that there is no gap between them.
 const END_OVERLAP: f64 = 0.08;
@@ -752,6 +760,9 @@ struct Piece {
     /// Near an end at a junction, the width is held for this length (the
     /// lines across the stroke would reach into the other stroke there).
     hold: [f64; 2],
+    /// The start and the end are the free ends of the pen stroke (not at
+    /// another stroke, not at a cut of a corner).
+    free: [bool; 2],
 }
 
 /// The corners of the outline: the points where it turns more than
@@ -1012,12 +1023,14 @@ fn split_piece(p: &Piece, k: usize, x: Point, hold: f64) -> Option<(Piece, Piece
             closed: false,
             ext: [p.ext[0], n1],
             hold: [p.hold[0], hold],
+            free: [p.free[0], false],
         },
         Piece {
             pts: second,
             closed: false,
             ext: [0, p.ext[1] - k],
             hold: [hold, p.hold[1]],
+            free: [false, p.free[1]],
         },
     ))
 }
@@ -1071,6 +1084,7 @@ fn extend(mut pts: Vec<Point>, free: [bool; 2], g: &Grid, reach: f64) -> Piece {
         closed: false,
         ext,
         hold: [0.0; 2],
+        free,
     }
 }
 
@@ -1195,9 +1209,12 @@ pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
         // Find the corners on a smoothed line, then smooth each piece alone,
         // so that the pieces stay straight up to the corner.
         let smoothed = smooth(&raw.pts, raw.closed, win);
-        let mut pieces: Vec<Piece> = cut_corners(&smoothed, raw.closed, raw.free, 1.5 * r_med, &corners)
+        let cuts = cut_corners(&smoothed, raw.closed, raw.free, 1.5 * r_med, &corners);
+        let count = cuts.len();
+        let mut pieces: Vec<Piece> = cuts
             .into_iter()
-            .map(|(idx, closed, free)| {
+            .enumerate()
+            .map(|(k, (idx, closed, free))| {
                 let p: Vec<Point> = idx.iter().map(|&i| raw.pts[i]).collect();
                 let p = smooth(&p, closed, win);
                 if closed {
@@ -1207,6 +1224,7 @@ pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
                         closed,
                         ext: [0, n],
                         hold: [0.0; 2],
+                        free: [false; 2],
                     }
                 } else {
                     let mut piece = extend(p, free, &g, r_med);
@@ -1215,6 +1233,12 @@ pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
                             *hold = 1.5 * r_med;
                         }
                     }
+                    // The ends of the pen stroke, not the ends at a cut of
+                    // a corner (they go on into the corner).
+                    piece.free = [
+                        k == 0 && !raw.closed && raw.free[0],
+                        k + 1 == count && !raw.closed && raw.free[1],
+                    ];
                     piece
                 }
             })
@@ -1304,7 +1328,7 @@ pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
             .filter(|(j, (l, _))| *j != k && l.len() >= 2)
             .map(|(_, (l, r))| (l.as_slice(), *r))
             .collect();
-        if let Some((a, b, closed, width)) = rails(piece, *r_med, width_at, &segs, cell, &others) {
+        if let Some((a, b, closed, width)) = rails(piece, *r_med, width_at, &segs, rings, cell, &others) {
             out.max_width = out.max_width.max(width);
             columns.push(Rails { a, b, closed });
         }
@@ -1367,6 +1391,7 @@ fn rails(
     r_med: f64,
     radius_at: &dyn Fn(Point) -> f64,
     segs: &[(Point, Point)],
+    rings: &[Vec<Point>],
     cell: f64,
     others: &[(&[Point], f64)],
 ) -> Option<(Vec<Point>, Vec<Point>, bool, f64)> {
@@ -1507,10 +1532,141 @@ fn rails(
             half[i] = (hp.max(0.25 * cell), hm.max(0.25 * cell));
         }
     }
-    let a: Vec<Point> = (0..n).map(|i| pts[i] + tangent(i).perp() * half[i].0).collect();
-    let b: Vec<Point> = (0..n).map(|i| pts[i] - tangent(i).perp() * half[i].1).collect();
+    let mut a: Vec<Point> = (0..n).map(|i| pts[i] + tangent(i).perp() * half[i].0).collect();
+    let mut b: Vec<Point> = (0..n).map(|i| pts[i] - tangent(i).perp() * half[i].1).collect();
     let width = half.iter().map(|h| h.0 + h.1).fold(0.0, f64::max);
+    // At a free end, each rail follows its side of the outline to the
+    // corner of the end: an end that the font cuts at a slant (or gives a
+    // shape) is covered to its corners. The middle line bends to the sharp
+    // corner of such an end, so the rails start from a pair farther back.
+    if !closed {
+        let w = 2.0 * r_med;
+        for end in [1, 0] {
+            if !piece.free[end] || total < 2.0 * END_BACK * w + w {
+                continue;
+            }
+            let tip = if end == 0 { 0 } else { n - 1 };
+            let from_tip = |i: usize| (along[i] - along[tip]).abs();
+            let order: Vec<usize> = if end == 0 { (0..n).collect() } else { (0..n).rev().collect() };
+            let Some(&k) = order.iter().find(|&&i| !is_ext[i] && from_tip(i) >= END_BACK * w) else {
+                continue;
+            };
+            let Some(dir) = (pts[tip] - pts[k]).normalized() else {
+                continue;
+            };
+            let reach = 1.5 * (from_tip(k) + w);
+            let (Some(path_a), Some(path_b)) = (
+                trace_side(rings, a[k], dir, reach, w),
+                trace_side(rings, b[k], dir, reach, w),
+            ) else {
+                continue;
+            };
+            // Pairs along the two paths, at the same parts of their lengths.
+            let (la, lb) = (length(&path_a), length(&path_b));
+            let m = ((la.max(lb) / step).ceil() as usize).max(1);
+            let mut pairs: Vec<(Point, Point)> = (1..=m)
+                .map(|q| {
+                    let f = q as f64 / m as f64;
+                    (point_at(&path_a, f * la), point_at(&path_b, f * lb))
+                })
+                .collect();
+            // Where the two paths come to one point (a pointed end), the
+            // stitches across would be too short: the column ends where it
+            // is still `END_MIN_WIDTH` of the stroke wide.
+            if let Some(narrow) = pairs.iter().position(|(p, q)| p.distance(*q) < END_MIN_WIDTH * w) {
+                pairs.truncate(narrow);
+            }
+            if pairs.is_empty() {
+                continue;
+            }
+            if end == 1 {
+                a.truncate(k + 1);
+                b.truncate(k + 1);
+                a.extend(pairs.iter().map(|p| p.0));
+                b.extend(pairs.iter().map(|p| p.1));
+            } else {
+                let mut na: Vec<Point> = pairs.iter().rev().map(|p| p.0).collect();
+                let mut nb: Vec<Point> = pairs.iter().rev().map(|p| p.1).collect();
+                na.extend_from_slice(&a[k..]);
+                nb.extend_from_slice(&b[k..]);
+                a = na;
+                b = nb;
+            }
+        }
+    }
     Some((a, b, closed, width))
+}
+
+/// The path along the outline from `from` (a point of a rail, on the
+/// outline) in the direction `dir` (along the stroke, to its end), to the
+/// corner where the outline turns from the side of the stroke: the first
+/// place where it goes more than `END_TURN_DEG` off the direction of the
+/// side, at most `reach` long. `None` if `from` is not on the outline or the
+/// outline there does not go along the stroke.
+fn trace_side(rings: &[Vec<Point>], from: Point, dir: Point, reach: f64, w: f64) -> Option<Vec<Point>> {
+    // The nearest segment of the outline.
+    let mut best: Option<(usize, usize, Point, f64)> = None;
+    for (r, ring) in rings.iter().enumerate() {
+        let n = ring.len();
+        for j in 0..n {
+            let q = from.nearest_on_segment(ring[j], ring[(j + 1) % n]);
+            let d = q.distance(from);
+            if best.is_none_or(|b| d < b.3) {
+                best = Some((r, j, q, d));
+            }
+        }
+    }
+    let (r, j, start, d) = best?;
+    if d > 0.15 * w {
+        return None;
+    }
+    let ring = &rings[r];
+    let n = ring.len();
+    let seg = ring[(j + 1) % n] - ring[j];
+    let side = seg.normalized()?;
+    // Along the ring in the direction of the end of the stroke.
+    let forward = side.dot(dir) >= 0.0;
+    let side = if forward { side } else { side * -1.0 };
+    if side.dot(dir) < 0.5 {
+        return None;
+    }
+    let max_cos = emb_geom::math::cos(emb_geom::math::to_radians(END_TURN_DEG));
+    let mut path = vec![start];
+    let mut walked = 0.0;
+    let mut v = if forward { (j + 1) % n } else { j };
+    for _ in 0..n {
+        let c = path[path.len() - 1];
+        let next = ring[v];
+        let Some(s) = (next - c).normalized() else {
+            v = if forward { (v + 1) % n } else { (v + n - 1) % n };
+            continue;
+        };
+        if s.dot(side) < max_cos {
+            break;
+        }
+        let step = c.distance(next);
+        if walked + step > reach {
+            path.push(c + s * (reach - walked));
+            break;
+        }
+        walked += step;
+        path.push(next);
+        v = if forward { (v + 1) % n } else { (v + n - 1) % n };
+    }
+    (path.len() >= 2).then_some(path)
+}
+
+/// The point at the length `at` along a line.
+fn point_at(line: &[Point], at: f64) -> Point {
+    let mut left = at;
+    for w in line.windows(2) {
+        let d = w[0].distance(w[1]);
+        if left <= d {
+            return w[0].lerp(w[1], if d > 0.0 { left / d } else { 0.0 });
+        }
+        left -= d;
+    }
+    line[line.len() - 1]
 }
 
 /// Cuts back the ends of columns that lie in other columns again

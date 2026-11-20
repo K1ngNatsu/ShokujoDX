@@ -48,18 +48,19 @@ fn lettering_bench() {
     let unsplit: Vec<&Measure> = b.rows.iter().filter(|m| m.wide_unsplit > 0).collect();
     assert!(unsplit.is_empty(), "wide satin with no split stitches: {unsplit:?}");
     // P20 Milestone 3: crossings and junctions have one layer, and the
-    // columns cover the characters. The levels of today (the exit test of
-    // the plan is at most 3 % two layers and at least 95 % covered for each
-    // character; 17 and 11 of the 248 characters are not there yet).
+    // columns cover the characters to the corners of their ends. The exit
+    // test of the plan: at least 95 % covered for each character (met), and
+    // at most 3 % two layers (17 of the 248 characters are not there yet:
+    // the levels of today).
     let mean = |f: fn(&Measure) -> f64| b.rows.iter().map(f).sum::<f64>() / b.rows.len() as f64;
     assert!(mean(|m| m.overlap) < 0.02, "two layers: {}", mean(|m| m.overlap));
-    assert!(mean(|m| m.coverage) > 0.97, "covered: {}", mean(|m| m.coverage));
+    assert!(mean(|m| m.coverage) > 0.98, "covered: {}", mean(|m| m.coverage));
     let bad: Vec<String> = b
         .rows
         .iter()
-        .filter(|m| m.overlap > 0.06 || m.coverage < 0.93)
+        .filter(|m| m.overlap > 0.06 || m.coverage < 0.95)
         .map(|m| format!("{} {} mm: {:.3} {:.3}", m.c, m.size_mm, m.overlap, m.coverage))
         .collect();
-    assert!(bad.is_empty(), "two layers over 6 % or covered under 93 %: {bad:?}");
+    assert!(bad.is_empty(), "two layers over 6 % or covered under 95 %: {bad:?}");
     insta::assert_snapshot!(lettering_bench::report(&b, false));
 }

@@ -61,7 +61,19 @@ After Milestone 2, the owner looked at pictures of 刺繍東京 at 50 mm and
 5. **Dots.** A short stroke gets more rail points (a step of at most a
    twelfth of its length), and `GlyphShapes::new` gives a round part one
    column to its edge (`tune::round_parts`, as the converter does).
-6. **The sew-out** (item 4 of the plan). `tools/make-sewout-kit-p20.py`
+6. **The ends of strokes to their corners** (owner, after the pictures of
+   this milestone: the columns did not reach the corners of many stroke
+   ends). Near an end that the font cuts at a slant, the middle line bends
+   to the sharp corner, and the last line across the stroke was square to
+   it. At a free end of a pen stroke (not an end at the cut of a corner,
+   `Piece::free`), each rail now follows its side of the outline
+   (`stroke::trace_side`) from a pair `END_BACK` (0.8) widths back to the
+   corner of the end, where the outline turns more than `END_TURN_DEG`
+   (70°) from the side; the pairs between are at the same parts of the two
+   paths, so the stitches turn to the slant of the end. Where the two paths
+   come to one point, the column ends where it is still `END_MIN_WIDTH`
+   (30 %) of the stroke wide (no stitches shorter than 0.3 mm).
+7. **The sew-out** (item 4 of the plan). `tools/make-sewout-kit-p20.py`
    makes `out/p20-sewout` (not in the repository): 20 characters at 25 mm,
    4 at 50 mm, the words 刺繍 and 東京 at 40 mm, in the test font, with
    the machine files, the worksheets, the pictures and a checklist. `emb-cli
@@ -74,31 +86,32 @@ Tried and not kept:
   other strokes (two layers 1.9 %, 12.5 % for サ).
 - Free ends that go straight from the body of the column to the outline:
   hooks and short strokes lost more than the slanted ends got (95.8 %
-  covered on average, 85 % for ふ).
+  covered on average, 85 % for ふ). Following the outline (decision 6)
+  covers both.
 
 ## Consequences
 
 - The bench at 25 mm: two layers 1.4 % of the area of the parts on
-  average (6.3 % before), 5.1 % at most (本; 24.9 % before), 19 characters
-  over 3 % (170 before). Covered 97.6 % on average (97.2 %), 93.8 % at
-  least (く; 83.6 % before), 11 characters under 95 %. Fewer thin columns:
+  average (6.3 % before), 5.1 % at most (本; 24.9 % before), 17 characters
+  over 3 % (170 before). Covered 98.9 % on average (97.2 %), 95.9 % at
+  least (愛; 83.6 % before): no character under 95 %. Fewer thin columns:
   at 15 mm, 4 characters have a column under 0.8 mm (9 before).
-- The exit test of the plan (at most 3 % two layers and at least 95 %
-  covered for each character) is not met yet. The characters over 3 % have
-  junctions of three or four strokes at a slant (本, 桜, 海, 繍); the
-  characters under 95 % have stroke ends that the font cuts at a slant (a
-  small corner with no stitches; ミ, ハ) or a sharp outer corner (く). The
-  bench test keeps the levels of today (two layers under 2 % on average,
-  none over 6 %; covered over 97 % on average, none under 93 %).
+- The exit test of the plan: at least 95 % covered for each character is
+  met; at most 3 % two layers for each character is not met yet. The
+  characters over 3 % have junctions of three or four strokes at a slant
+  (本, 桜, 海, 繍). The bench test checks the coverage and keeps the levels
+  of today for two layers (under 2 % on average, none over 6 %).
 - A cut crossing is two columns, so a letter has more parts and more trims
   until the letters of TrueType fonts get routes (Milestone 4): 刺繍 at
   15 mm 29 trims (26), 東京 19 (17).
 - The engine is the same for all scripts. Latin, Arabic and Devanagari
-  letters of TrueType fonts sew fewer stitches where strokes cross (the
-  golden designs `lettering-names` 2,498 to 2,444 stitches, 17 to 18
-  trims; `shaped-text` 6,913 to 6,786, 37 to 40 trims; `mitre-corners`
-  7,544 to 7,532), and the picture bench covers 98.1 % (98.0 %; Click to
-  stitch uses the stroke finder).
+  letters of TrueType fonts sew fewer stitches where strokes cross and
+  reach the corners of their ends (the golden designs `lettering-names`
+  2,498 to 2,443 stitches, 17 trims; `shaped-text` 6,913 to 6,679, 37 to
+  41 trims; `mitre-corners` 7,544 to 7,532). Auto-trace and Click to
+  stitch use the stroke finder: the designs `autotrace`, `rhinestones` and
+  `smart-logo` change a little, and the picture bench covers 98.1 %
+  (98.0 %).
 - The bundled embroidery fonts are not made again yet. Their letters are
   routed (ADR 0113: the route cuts columns at junctions). The rule of
   which stroke goes through (item 3 of the plan) is chosen after the

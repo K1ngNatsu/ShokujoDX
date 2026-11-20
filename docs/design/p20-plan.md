@@ -185,16 +185,20 @@ now. Item 4: `tools/make-sewout-kit-p20.py` makes the kit
 | Measure (25 mm) | Milestone 2 | Now |
 | --- | --- | --- |
 | Two layers, mean (highest) | 6.3 % (24.9 %, ャ) | 1.4 % (5.1 %, 本) |
-| Characters with two layers on more than 3 % | 170 | 19 |
-| Covered, mean (lowest) | 97.2 % (83.6 %, ・) | 97.6 % (93.8 %, く) |
-| Characters covered less than 95 % | (not counted) | 11 |
+| Characters with two layers on more than 3 % | 170 | 17 |
+| Covered, mean (lowest) | 97.2 % (83.6 %, ・) | 98.9 % (95.9 %, 愛) |
+| Characters covered less than 95 % | (not counted) | 0 |
 | Characters with a column under 0.8 mm (15 mm) | 9 | 4 |
-| Trims of 刺繍 / 東京 / 龍 (15 mm) | 26 / 17 / 17 | 29 / 19 / 17 |
+| Trims of 刺繍 / 東京 / 龍 (15 mm) | 26 / 17 / 17 | 28 / 19 / 16 |
 
-Open: the exit test numbers for each character (junctions of three or
-four strokes at a slant, as 本 and 桜; stroke ends that the font cuts at a
-slant, as ミ), the rule of item 3 from the sew-out, and then the bundled
-embroidery fonts made again with the new stroke finder.
+The ends of the strokes reach the corners of the outline (owner, after
+the pictures: each rail follows its side of the outline to the corner of
+the end, `stroke::trace_side`), so each character is covered 95 % or more.
+
+Open: two layers on at most 3 % of each character (17 characters with
+junctions of three or four strokes at a slant, as 本 and 桜), the rule of
+item 3 from the sew-out, and then the bundled embroidery fonts made again
+with the new stroke finder.
 
 ## Milestone 4: routes for the fonts of the computer (M)
 
