@@ -1547,7 +1547,11 @@ fn rails(
             }
             let tip = if end == 0 { 0 } else { n - 1 };
             let from_tip = |i: usize| (along[i] - along[tip]).abs();
-            let order: Vec<usize> = if end == 0 { (0..n).collect() } else { (0..n).rev().collect() };
+            let order: Vec<usize> = if end == 0 {
+                (0..n).collect()
+            } else {
+                (0..n).rev().collect()
+            };
             let Some(&k) = order.iter().find(|&&i| !is_ext[i] && from_tip(i) >= END_BACK * w) else {
                 continue;
             };
