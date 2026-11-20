@@ -1,4 +1,4 @@
-# Makes the sew-out kit of phase P20, Milestone 3 (docs/design/p20-plan.md):
+# Makes the sew-out kit of phase P20, Milestones 3 and 4 (docs/design/p20-plan.md):
 # test sheets of Japanese characters in the test font of the lettering
 # bench, with the files for the machine, a worksheet and a picture of each
 # one, and a checklist.
@@ -71,7 +71,7 @@ def output(project, folder):
     }
 
 
-CHECKLIST = """# Sew-out of P20 Milestone 3: crossings and junctions
+CHECKLIST = """# Sew-out of P20 Milestones 3 and 4: crossings, junctions and sew order
 
 Made on {date} by `tools/make-sewout-kit-p20.py`, with the font Noto Sans
 JP Bold (the test font of the lettering bench). Machine files for the
@@ -102,9 +102,12 @@ fabric with a tear-away stabilizer, as a normal job.
    be tatami?
 7. **The words** (40 mm): all strokes have the same stitch. Do the letters
    look the same, and the mirrored strokes (the legs of 東 and 本)?
-8. **The ends of strokes** that the font cuts at a slant (the end of a
-   stroke of ミ, the start of 東): a small corner of the end can have no
-   stitches. Does it show?
+8. **The ends of strokes** that the font cuts at a slant (the ends of 女
+   and わ, the start of 東): the last stitches turn to the slant of the
+   end, so the corners have stitches. Do the ends look like the font?
+9. **The sew order** (Milestone 4): the needle goes from one stroke to the
+   next under strokes that sew later, so there are few trims. Does a
+   travel stitch show anywhere, or pull the fabric?
 
 Write the answers in the session or in a file next to this one, with
 photos if you can.
