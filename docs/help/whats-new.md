@@ -52,13 +52,16 @@ now shapes its text: ligatures, the joined letters of script fonts, Arabic
 Poppins (Devanagari) come with the program. See [Lettering](lettering).
 
 **Stitches that follow the strokes.** With a TrueType or OpenType font
-and the stitch type **Automatic**, each stroke of a letter gets its own
-stitch: satin, with split stitches in strokes wider than 7 mm, and rows
-of tatami in strokes wider than 12 mm. Before, a letter with one wide
-stroke was all fill: in a bold font, most kanji and kana at 50 mm were
-fill. Fonts with strokes that overlap (many fonts from the web) now give
-letters with no holes and with no stitches outside the letter. See
-[Lettering](lettering).
+and the stitch type **Automatic**, the strokes of the letters are
+columns: satin, with split stitches in strokes wider than 7 mm, or rows of
+tatami if the strokes of the text are wider than 12 mm. All the letters
+of a text get the same stitch. Before, a letter with one wide stroke was
+all fill: in a bold font, most kanji and kana at 50 mm were fill. Where
+two strokes cross, one goes through and the other stops at its sides, and
+where a stroke ends on another, it stops a little inside it: no lumps of
+thread there. Fonts with strokes that overlap (many fonts from the web)
+now give letters with no holes and with no stitches outside the letter.
+See [Lettering](lettering).
 
 **More fonts, with a quality score.** The program has 65 embroidery fonts
 (30 before), and the font packages on the page of the program have 68

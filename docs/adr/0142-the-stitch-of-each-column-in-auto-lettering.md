@@ -1,7 +1,8 @@
 # ADR 0142: The stitch of each column in Auto lettering
 
 Date: 2026-11-20 · Status: Accepted (P20 Milestone 2,
-`docs/design/p20-plan.md`)
+`docs/design/p20-plan.md`). Decision 2 (a stitch for each column) is
+replaced by one stitch for the text (ADR 0143).
 
 ## Context
 

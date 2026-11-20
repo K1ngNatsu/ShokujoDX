@@ -122,12 +122,14 @@ Usage:
       Convert a lettering font of Ink/Stitch (a folder with font.json,
       LICENSE and ltr.svg) to an embroidery font (ADR 0136). It prints the
       license of the font: check that it lets you use the font.
-  emb-cli font-sheet <font.embfont> <out.embproj> [--sizes <mm>,<mm>,...]
+  emb-cli font-sheet <font.embfont|font.ttf> <out.embproj> [--sizes <mm>,<mm>,...]
                      [--chars basic|all|capitals|lowercase|digits|accented]
-                     [--text <text>] [--row <mm>] [--corrections <file>]
+                     [--text <text>] [--row <mm>] [--corrections <file>] [--face <n>]
       Write the test sheet of an embroidery font: its letters at its
       smallest, middle and largest size (or at --sizes), in rows not
-      wider than --row (180 mm), with the size at each group.
+      wider than --row (180 mm), with the size at each group. With a
+      TrueType or OpenType font, the letters that lettering makes from it
+      (the stitch type Automatic).
   emb-cli font-audit <font.embfont> [--source <font.ttf>] [--chars ...]
                      [--sizes <mm>,...] [--corrections <file>] [--proof <out.json>]
       Print the measures of each letter of an embroidery font: how much of
@@ -783,28 +785,40 @@ fn run(args: &[String]) -> Result<(), String> {
         }
         ["font-sheet", input, output] => {
             use emb_letter::LetterSource;
-            let mut f = emb_letter::EmbFont::load(Path::new(input))?;
-            if let Some(file) = &corrections {
-                println!("{}", correct(&mut f, file)?);
-            }
+            // An embroidery font, or a TrueType or OpenType font (its
+            // letters as lettering makes them, the stitch type Auto).
+            let true_type = ["ttf", "otf", "ttc", "otc"]
+                .iter()
+                .any(|e| Path::new(input).extension().is_some_and(|x| x.eq_ignore_ascii_case(e)));
+            let source: Box<dyn LetterSource> = if true_type {
+                let data = std::fs::read(input).map_err(|e| format!("{input}: {e}"))?;
+                Box::new(emb_letter::Font::from_bytes(data, face).map_err(|e| format!("{input}: {e}"))?)
+            } else {
+                let mut f = emb_letter::EmbFont::load(Path::new(input))?;
+                if let Some(file) = &corrections {
+                    println!("{}", correct(&mut f, file)?);
+                }
+                Box::new(f)
+            };
+            let family = source.font_ref().family.clone();
             let label = emb_letter::bundled::embroidery("Atkinson Hyperlegible");
             let sizes = if sheet_sizes.is_empty() {
-                emb_letter::sheet::sizes(f.size_range(emb_model::LetterStitch::Satin)).to_vec()
+                emb_letter::sheet::sizes(source.size_range(emb_model::LetterStitch::Satin)).to_vec()
             } else {
                 sheet_sizes
             };
             let spec = emb_letter::sheet::Spec {
-                name: &f.family,
+                name: &family,
                 sizes: &sizes,
                 characters: &sheet_chars,
                 width_mm: sheet_row,
             };
-            let made = emb_letter::sheet::sheet(&f, label.as_ref().map(|l| l as &dyn LetterSource), &spec);
+            let made = emb_letter::sheet::sheet(source.as_ref(), label.as_ref().map(|l| l as &dyn LetterSource), &spec);
             let (letters, b) = (
                 made.letters(),
                 made.bbox().ok_or("the font has none of these characters")?,
             );
-            let design = made.into_design(&format!("{} test sheet", f.family));
+            let design = made.into_design(&format!("{family} test sheet"));
             emb_model::project::save(&design, Path::new(output)).map_err(|e| format!("{output}: {e}"))?;
             println!(
                 "wrote {output}: {letters} letters at {} sizes, {:.0} x {:.0} mm",

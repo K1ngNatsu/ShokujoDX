@@ -7,49 +7,49 @@ Lettering bench: Noto Sans JP Bold; 248 characters of the reference set
 15 mm
   characters all fill: 0 
   characters partly fill: 0 
-  parts: satin 1249, split satin 0, tatami column 0, fill 0, run 0
-  covered: mean 97.2 %, lowest 84.0 % (・)
-  outside: mean 0.4 %, highest 1.6 % (タ)
-  two layers: mean 6.3 %, highest 24.9 % (ャ); characters over 3 %: 171
-  narrowest column: 0.06 mm (ろ); characters with a column under 0.8 mm: 9
-  widest column: 3.20 mm (糸); columns over 8 mm: 0, satin with no split stitches: 0
+  parts: satin 1397, split satin 0, tatami column 0, fill 0, run 0
+  covered: mean 97.6 %, lowest 93.9 % (く)
+  outside: mean 0.3 %, highest 1.1 % (ア)
+  two layers: mean 1.4 %, highest 5.0 % (本); characters over 3 %: 17
+  narrowest column: 0.44 mm (校); characters with a column under 0.8 mm: 4
+  widest column: 3.15 mm (ツ); columns over 8 mm: 0, satin with no split stitches: 0
 
 25 mm
   characters all fill: 0 
   characters partly fill: 0 
-  parts: satin 1241, split satin 8, tatami column 0, fill 0, run 0
-  covered: mean 97.2 %, lowest 83.6 % (・)
-  outside: mean 0.4 %, highest 1.6 % (タ)
-  two layers: mean 6.3 %, highest 24.9 % (ャ); characters over 3 %: 170
-  narrowest column: 0.10 mm (ろ); characters with a column under 0.8 mm: 6
-  widest column: 5.34 mm (糸); columns over 8 mm: 0, satin with no split stitches: 0
+  parts: satin 1390, split satin 7, tatami column 0, fill 0, run 0
+  covered: mean 97.6 %, lowest 93.8 % (く)
+  outside: mean 0.3 %, highest 1.1 % (ア)
+  two layers: mean 1.4 %, highest 5.1 % (本); characters over 3 %: 19
+  narrowest column: 0.78 mm (年); characters with a column under 0.8 mm: 1
+  widest column: 5.25 mm (ツ); columns over 8 mm: 0, satin with no split stitches: 0
 
 50 mm
   characters all fill: 0 
   characters partly fill: 0 
-  parts: satin 176, split satin 1073, tatami column 0, fill 0, run 0
-  covered: mean 97.2 %, lowest 83.7 % (・)
-  outside: mean 0.4 %, highest 1.6 % (タ)
-  two layers: mean 6.3 %, highest 24.8 % (ャ); characters over 3 %: 170
-  narrowest column: 0.18 mm (り); characters with a column under 0.8 mm: 6
-  widest column: 10.68 mm (糸); columns over 8 mm: 615, satin with no split stitches: 0
+  parts: satin 212, split satin 1185, tatami column 0, fill 0, run 0
+  covered: mean 97.6 %, lowest 93.9 % (く)
+  outside: mean 0.3 %, highest 1.0 % (ア)
+  two layers: mean 1.4 %, highest 5.1 % (本); characters over 3 %: 19
+  narrowest column: 1.55 mm (年); characters with a column under 0.8 mm: 0
+  widest column: 10.49 mm (ツ); columns over 8 mm: 670, satin with no split stitches: 0
 
 80 mm
   characters all fill: 0 
   characters partly fill: 0 
-  parts: satin 19, split satin 394, tatami column 836, fill 0, run 0
-  covered: mean 97.2 %, lowest 83.7 % (・)
-  outside: mean 0.4 %, highest 1.6 % (タ)
-  two layers: mean 6.3 %, highest 24.9 % (ャ); characters over 3 %: 170
-  narrowest column: 0.29 mm (り); characters with a column under 0.8 mm: 6
-  widest column: 17.09 mm (糸); columns over 8 mm: 1183, satin with no split stitches: 0
+  parts: satin 5, split satin 325, tatami column 1067, fill 0, run 0
+  covered: mean 97.6 %, lowest 93.9 % (く)
+  outside: mean 0.3 %, highest 1.0 % (ア)
+  two layers: mean 1.4 %, highest 5.1 % (本); characters over 3 %: 19
+  narrowest column: 2.65 mm (年); characters with a column under 0.8 mm: 0
+  widest column: 16.79 mm (ツ); columns over 8 mm: 1343, satin with no split stitches: 0
 
 Trims of the words at 15, 25, 50, 80 mm
-  刺繍: 26, 27, 25, 27
-  東京: 17, 14, 17, 18
-  ありがとう: 14, 15, 15, 15
-  サムライ: 10, 10, 10, 10
-  龍: 17, 18, 18, 18
-  山田太郎: 25, 25, 25, 25
-  さくら: 7, 7, 7, 7
-  日本: 9, 9, 9, 9
+  刺繍: 29, 28, 28, 28
+  東京: 19, 20, 19, 22
+  ありがとう: 16, 16, 16, 16
+  サムライ: 12, 12, 12, 12
+  龍: 16, 18, 18, 18
+  山田太郎: 24, 26, 26, 26
+  さくら: 8, 8, 8, 8
+  日本: 11, 11, 11, 11

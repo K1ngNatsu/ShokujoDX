@@ -14,14 +14,24 @@
 //!    stroke, not at its middle, so the thread does not build up at the
 //!    join (P11 Milestone 2; the density map of ADR 0044 showed 6 to 9
 //!    layers there).
-//! 5. At points along each stroke, lines across the stroke meet the outline:
-//!    these points are the rails of a satin column.
+//! 5. Where two strokes cross, the longer one goes through, and the other
+//!    is cut into two strokes that end a little inside its edge (P20
+//!    Milestone 3): one layer of thread at a crossing, not two.
+//! 6. At points along each stroke, lines across the stroke meet the outline:
+//!    these points are the rails of a satin column. Where a line goes into
+//!    another stroke (at a crossing or a junction), that side takes the
+//!    width of the stroke before and after it, so the column has the width
+//!    of its stroke there and not the size of the junction.
+//! 7. The end of a column that lies in other columns (a corner, a
+//!    junction, an end that was extended through another stroke) is cut
+//!    back to [`END_OVERLAP`] inside them.
 //!
 //! A part of the shape with almost no middle line (a dot) gets one stroke
 //! along its long axis.
 
 use std::collections::HashMap;
 
+use emb_geom::region::ring_contains;
 use emb_geom::{BBox, Path, Point};
 use emb_model::SatinGeometry;
 
@@ -83,6 +93,23 @@ const MAX_REACH: f64 = 1.6;
 /// A stroke that ends where another stroke goes through goes into it this
 /// part of its half-width (from its edge), so there is no gap at the join.
 const JOIN_OVERLAP: f64 = 0.3;
+/// Two strokes cross (and the shorter is cut) where their middle lines
+/// cross and each goes on past the other on both sides, at least this many
+/// half-widths of the other from the crossing. Else one ends on the other
+/// (a T or an L), and the cut of [`trim_start_out_of`] is for it.
+const CROSS_PAST: f64 = 1.5;
+/// A side of a line across a stroke goes into another stroke when its end
+/// is nearer than this many half-widths of that stroke to its middle line.
+const INTO_OTHER: f64 = 0.8;
+/// The end of a column goes this far into the columns that it ends in (a
+/// factor of its width there), so that there is no gap between them.
+const END_OVERLAP: f64 = 0.08;
+/// The points of [`trim_ends`] across a column are this part of its width
+/// in from its sides.
+const SIDE_IN: f64 = 0.12;
+/// Near its end (this many times its width), a column of [`trim_ends`] can
+/// be out of the others before it goes into them.
+const END_LEAD: f64 = 0.6;
 
 const NONE: usize = usize::MAX;
 
@@ -883,6 +910,118 @@ fn cut_corners(
 }
 
 /// Extends free ends along their direction to the edge of the shape.
+/// One piece of a stroke: the stroke, its fixed half-width, its middle
+/// half-width and the piece.
+type Placed = (usize, Option<f64>, f64, Piece);
+
+/// Cuts the shorter of two strokes that cross (P20 Milestone 3): it is two
+/// pieces that end a little inside the edge of the longer one
+/// ([`trim_start_out_of`]), so the crossing has one layer of thread. A
+/// stroke along the long axis of a dot and a closed stroke are not cut.
+fn cut_crossings(all: &mut Vec<Placed>, radius_at: &dyn Fn(Point) -> f64, cell: f64) {
+    // Each cut removes one crossing; the guard is for a case that does not
+    // end.
+    for _ in 0..4 * all.len() + 8 {
+        let Some((cut, through, k, x)) = next_crossing(all) else {
+            return;
+        };
+        let (_, _, r_cut, ref piece) = all[cut];
+        let hold = 1.5 * r_cut;
+        let Some((mut a, mut b)) = split_piece(piece, k, x, hold) else {
+            return;
+        };
+        let through_line = all[through].3.pts.clone();
+        let other = [(through_line.as_slice(), Some(all[through].2))];
+        let gone = trim_start_out_of(&mut b.pts, &other, radius_at, cell, r_cut);
+        b.ext[1] = b.ext[1].saturating_sub(gone).max(1);
+        a.pts.reverse();
+        trim_start_out_of(&mut a.pts, &other, radius_at, cell, r_cut);
+        a.pts.reverse();
+        a.ext[1] = a.pts.len();
+        a.ext[0] = a.ext[0].min(a.ext[1].saturating_sub(1));
+        let stroke = all[cut].0;
+        all[cut].3 = a;
+        all.insert(cut + 1, (stroke, None, r_cut, b));
+    }
+}
+
+/// The first crossing of two pieces: the piece to cut, the piece that goes
+/// through, the segment of the cut piece and the point.
+fn next_crossing(all: &[Placed]) -> Option<(usize, usize, usize, Point)> {
+    let boxes: Vec<Option<BBox>> = all.iter().map(|p| BBox::from_points(p.3.pts.iter().copied())).collect();
+    for a in 0..all.len() {
+        for b in a + 1..all.len() {
+            let (Some(ba), Some(bb)) = (boxes[a], boxes[b]) else {
+                continue;
+            };
+            if ba.max.x < bb.min.x || bb.max.x < ba.min.x || ba.max.y < bb.min.y || bb.max.y < ba.min.y {
+                continue;
+            }
+            if all[a].1.is_some() || all[b].1.is_some() {
+                continue;
+            }
+            let (la, lb) = (length(&all[a].3.pts), length(&all[b].3.pts));
+            let (through, cut) = if la >= lb { (a, b) } else { (b, a) };
+            let (t, c) = (&all[through], &all[cut]);
+            if c.3.closed || c.3.pts.len() < 2 || t.3.pts.len() < 2 {
+                continue;
+            }
+            let (lc, lt) = (length(&c.3.pts), length(&t.3.pts));
+            for (k, j, x) in crossings(&c.3.pts, &t.3.pts) {
+                let on_c = length(&c.3.pts[..=k]) + c.3.pts[k].distance(x);
+                let on_t = length(&t.3.pts[..=j]) + t.3.pts[j].distance(x);
+                let past = |on: f64, total: f64, r: f64| on > CROSS_PAST * r && total - on > CROSS_PAST * r;
+                if past(on_c, lc, t.2) && (t.3.closed || past(on_t, lt, c.2)) {
+                    return Some((cut, through, k, x));
+                }
+            }
+        }
+    }
+    None
+}
+
+/// The points where two lines cross: the segment of `a`, the segment of
+/// `b` and the point.
+fn crossings(a: &[Point], b: &[Point]) -> Vec<(usize, usize, Point)> {
+    let mut out = Vec::new();
+    for i in 0..a.len().saturating_sub(1) {
+        for j in 0..b.len().saturating_sub(1) {
+            if let Some((u, _)) = Point::crossing(a[i], a[i + 1], b[j], b[j + 1]) {
+                out.push((i, j, a[i].lerp(a[i + 1], u)));
+            }
+        }
+    }
+    out
+}
+
+/// A piece cut at `x` on its segment `k` into two pieces. The new ends hold
+/// their width for `hold` (they are in another stroke). `None` if the cut
+/// is in an extension of the piece.
+fn split_piece(p: &Piece, k: usize, x: Point, hold: f64) -> Option<(Piece, Piece)> {
+    if k < p.ext[0] || k + 1 >= p.ext[1] || k + 1 >= p.pts.len() {
+        return None;
+    }
+    let mut first = p.pts[..=k].to_vec();
+    first.push(x);
+    let mut second = vec![x];
+    second.extend_from_slice(&p.pts[k + 1..]);
+    let n1 = first.len();
+    Some((
+        Piece {
+            pts: first,
+            closed: false,
+            ext: [p.ext[0], n1],
+            hold: [p.hold[0], hold],
+        },
+        Piece {
+            pts: second,
+            closed: false,
+            ext: [0, p.ext[1] - k],
+            hold: [hold, p.hold[1]],
+        },
+    ))
+}
+
 fn extend(mut pts: Vec<Point>, free: [bool; 2], g: &Grid, reach: f64) -> Piece {
     let n0 = pts.len();
     let step = g.cell * 0.5;
@@ -1148,16 +1287,35 @@ pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
             piece.ext[1] = piece.pts.len().saturating_sub(tail).max(piece.ext[0] + 1);
         }
     }
-    for (_, fixed, r_med, piece) in &all {
+    cut_crossings(&mut all, &radius_at, cell);
+    let mut columns: Vec<Rails> = Vec::new();
+    // The middle line and the half-width of each piece, for the lines
+    // across the other pieces.
+    let lines: Vec<(Vec<Point>, f64)> = all
+        .iter()
+        .map(|(_, fixed, r_med, p)| (p.pts.clone(), fixed.unwrap_or(*r_med)))
+        .collect();
+    for (k, (_, fixed, r_med, piece)) in all.iter().enumerate() {
         let fixed_at = |_: Point| fixed.unwrap_or(0.0);
         let width_at: &dyn Fn(Point) -> f64 = if fixed.is_some() { &fixed_at } else { &radius_at };
-        if let Some(s) = rails(piece, *r_med, width_at, &segs, cell) {
-            out.max_width = out.max_width.max(s.1);
-            for q in &s.2 {
-                fill_into(&g, std::slice::from_ref(q), &mut cover);
-            }
-            out.satins.push(s.0);
+        let others: Vec<(&[Point], f64)> = lines
+            .iter()
+            .enumerate()
+            .filter(|(j, (l, _))| *j != k && l.len() >= 2)
+            .map(|(_, (l, r))| (l.as_slice(), *r))
+            .collect();
+        if let Some((a, b, closed, width)) = rails(piece, *r_med, width_at, &segs, cell, &others) {
+            out.max_width = out.max_width.max(width);
+            columns.push(Rails { a, b, closed });
         }
+    }
+    trim_ends(&mut columns);
+    for c in columns.iter().filter(|c| c.a.len() >= 2) {
+        let (satin, quads) = c.geometry();
+        for q in &quads {
+            fill_into(&g, std::slice::from_ref(q), &mut cover);
+        }
+        out.satins.push(satin);
     }
     let covered = (0..cover.len()).filter(|&k| cover[k] && g.inside[k]).count();
     out.coverage = covered as f64 / inside_count as f64;
@@ -1210,8 +1368,11 @@ fn rails(
     radius_at: &dyn Fn(Point) -> f64,
     segs: &[(Point, Point)],
     cell: f64,
-) -> Option<(SatinGeometry, f64, Vec<Vec<Point>>)> {
-    let step = (0.7 * r_med).max(cell);
+    others: &[(&[Point], f64)],
+) -> Option<(Vec<Point>, Vec<Point>, bool, f64)> {
+    // A short stroke (a dot) gets more points, so that its round sides
+    // are round.
+    let step = (0.7 * r_med).min(length(&piece.pts) / 12.0).max(cell);
     // Resample the middle part and the extensions apart, so the extension
     // flags stay right.
     let mid = &piece.pts[piece.ext[0]..piece.ext[1].max(piece.ext[0])];
@@ -1286,6 +1447,53 @@ fn rails(
         let hm = ray(pts[i], -nrm, reach, segs).unwrap_or(r);
         half[i] = (hp.max(0.25 * cell), hm.max(0.25 * cell));
     }
+    // A side of a line across the stroke that goes into another stroke (a
+    // crossing, a junction) takes the width of that side before and after
+    // it, along the stroke: the column has the width of its stroke there.
+    for side in 0..2 {
+        let get = |h: &(f64, f64)| if side == 0 { h.0 } else { h.1 };
+        let sign = if side == 0 { 1.0 } else { -1.0 };
+        let into: Vec<bool> = (0..n)
+            .map(|i| {
+                if is_ext[i] {
+                    return false;
+                }
+                let end = pts[i] + tangent(i).perp() * (sign * get(&half[i]));
+                others.iter().any(|(l, r)| nearest(l, end).1 < INTO_OTHER * r)
+            })
+            .collect();
+        let mut i = 0;
+        while i < n {
+            if !into[i] {
+                i += 1;
+                continue;
+            }
+            let start = i;
+            while i < n && into[i] {
+                i += 1;
+            }
+            let before = (0..start).rev().find(|&j| !is_ext[j] && !into[j]);
+            let after = (i..n).find(|&j| !is_ext[j] && !into[j]);
+            for j in start..i {
+                let v = match (before, after) {
+                    (Some(a), Some(b)) => {
+                        let t = (along[j] - along[a]) / (along[b] - along[a]).max(1e-9);
+                        get(&half[a]) + (get(&half[b]) - get(&half[a])) * t
+                    }
+                    (Some(a), None) => get(&half[a]),
+                    (None, Some(b)) => get(&half[b]),
+                    (None, None) => continue,
+                };
+                // Not wider than the outline there.
+                let h = &mut half[j];
+                if side == 0 {
+                    h.0 = h.0.min(v);
+                } else {
+                    h.1 = h.1.min(v);
+                }
+            }
+        }
+    }
     // Extensions take the width of the nearest middle point.
     let first = (0..n).find(|&i| !is_ext[i])?;
     let last = (0..n).rev().find(|&i| !is_ext[i]).unwrap_or(first);
@@ -1302,34 +1510,265 @@ fn rails(
     let a: Vec<Point> = (0..n).map(|i| pts[i] + tangent(i).perp() * half[i].0).collect();
     let b: Vec<Point> = (0..n).map(|i| pts[i] - tangent(i).perp() * half[i].1).collect();
     let width = half.iter().map(|h| h.0 + h.1).fold(0.0, f64::max);
-    let mut quads = Vec::new();
-    let m = if closed { n } else { n - 1 };
-    for i in 0..m {
-        let j = (i + 1) % n;
-        quads.push(vec![a[i], a[j], b[j], b[i]]);
-    }
-    let path = |p: &[Point]| {
-        if closed {
-            Path::polygon(p)
-        } else {
-            let mut path = Path::new().move_to(p[0]);
-            for &q in &p[1..] {
-                path = path.line_to(q);
+    Some((a, b, closed, width))
+}
+
+/// Cuts back the ends of columns that lie in other columns again
+/// ([`trim_ends`]), after a step that makes ends longer (the ends that go
+/// on to the outline, `glyph::tune_ends`) or adds columns (the second pass
+/// of the stroke finder). A closed column stays as it is.
+pub fn trim_column_ends(satins: &mut Vec<SatinGeometry>) {
+    let mut columns: Vec<Rails> = satins
+        .iter()
+        .map(|g| {
+            let closed = g.rail_a.is_closed();
+            let total: f64 = crate::quality::column_widths(g, f64::INFINITY)
+                .iter()
+                .map(|(_, l)| l)
+                .sum();
+            let pairs = if closed || total.is_nan() || total <= 0.0 {
+                Vec::new()
+            } else {
+                crate::quality::column_pairs(g, total / 80.0)
+            };
+            Rails {
+                a: pairs.iter().map(|p| p.0).collect(),
+                b: pairs.iter().map(|p| p.1).collect(),
+                closed,
             }
-            path
+        })
+        .collect();
+    // Closed columns are in the others as their rails.
+    for (c, g) in columns.iter_mut().zip(satins.iter()) {
+        if c.closed {
+            let flat = |p: &Path| -> Vec<Point> { p.flatten(1e-3).into_iter().flat_map(|l| l.points).collect() };
+            c.a = flat(&g.rail_a);
+            c.b = flat(&g.rail_b);
         }
-    };
-    // A rung at every second point keeps the stitches across the stroke.
-    let rungs = (1..n.saturating_sub(1)).step_by(2).map(|i| (a[i], b[i])).collect();
-    Some((
-        SatinGeometry {
-            rail_a: path(&a),
-            rail_b: path(&b),
-            rungs,
-        },
-        width,
-        quads,
-    ))
+    }
+    let before: Vec<(Vec<Point>, Vec<Point>)> = columns.iter().map(|c| (c.a.clone(), c.b.clone())).collect();
+    trim_ends(&mut columns);
+    let mut out = Vec::new();
+    for ((c, g), (a, b)) in columns.iter().zip(satins.iter()).zip(before) {
+        // A column that did not change keeps its rails and rungs.
+        if c.closed || (c.a == a && c.b == b) {
+            out.push(g.clone());
+        } else if c.a.len() >= 2 {
+            out.push(c.geometry().0);
+        }
+    }
+    *satins = out;
+}
+
+/// The two rails of a column: the points of rail A and of rail B, in pairs
+/// across the column.
+struct Rails {
+    a: Vec<Point>,
+    b: Vec<Point>,
+    closed: bool,
+}
+
+impl Rails {
+    /// The satin column and the quads that it covers.
+    fn geometry(&self) -> (SatinGeometry, Vec<Vec<Point>>) {
+        let (a, b, closed) = (&self.a, &self.b, self.closed);
+        let n = a.len();
+        let mut quads = Vec::new();
+        let m = if closed { n } else { n - 1 };
+        for i in 0..m {
+            let j = (i + 1) % n;
+            quads.push(vec![a[i], a[j], b[j], b[i]]);
+        }
+        let path = |p: &[Point]| {
+            if closed {
+                Path::polygon(p)
+            } else {
+                let mut path = Path::new().move_to(p[0]);
+                for &q in &p[1..] {
+                    path = path.line_to(q);
+                }
+                path
+            }
+        };
+        // A rung at every second point keeps the stitches across the stroke.
+        let rungs = (1..n.saturating_sub(1)).step_by(2).map(|i| (a[i], b[i])).collect();
+        (
+            SatinGeometry {
+                rail_a: path(a),
+                rail_b: path(b),
+                rungs,
+            },
+            quads,
+        )
+    }
+
+    /// The pair of points at `u` along the column (a pair index and a part
+    /// of the way to the next pair).
+    fn at(&self, u: f64) -> (Point, Point) {
+        let n = self.a.len();
+        let i = (u.floor().max(0.0) as usize).min(n - 1);
+        let j = (i + 1).min(n - 1);
+        let t = (u - i as f64).clamp(0.0, 1.0);
+        (self.a[i].lerp(self.a[j], t), self.b[i].lerp(self.b[j], t))
+    }
+
+    /// `true` if `p` is in the column, at least `depth` from its edge.
+    fn holds(&self, p: Point, depth: f64) -> bool {
+        let inside = if self.closed {
+            ring_contains(&self.a, p) != ring_contains(&self.b, p)
+        } else {
+            let ring: Vec<Point> = self.a.iter().chain(self.b.iter().rev()).copied().collect();
+            ring_contains(&ring, p)
+        };
+        if !inside {
+            return false;
+        }
+        let near = |line: &[Point], closed: bool| -> f64 {
+            let n = line.len();
+            let m = if closed { n } else { n - 1 };
+            (0..m)
+                .map(|i| p.distance_to_segment(line[i], line[(i + 1) % n]))
+                .fold(f64::MAX, f64::min)
+        };
+        let mut edge = near(&self.a, self.closed).min(near(&self.b, self.closed));
+        if !self.closed {
+            let (na, nb) = (self.a.len(), self.b.len());
+            edge = edge
+                .min(p.distance_to_segment(self.a[0], self.b[0]))
+                .min(p.distance_to_segment(self.a[na - 1], self.b[nb - 1]));
+        }
+        edge > depth
+    }
+}
+
+/// Cuts back the ends of the columns that lie in other columns (P20
+/// Milestone 3): the end of a stroke at a corner or a junction, or an end
+/// that was extended through another stroke. A pair of points across the
+/// column is in the others if its two points and its middle are in them,
+/// more than [`END_OVERLAP`] of the width from their edge; the end moves to
+/// the first pair that is not. The columns in order: a column that is cut
+/// does not cut the one after it at the same place (a corner stays
+/// covered). A column that lies all in others goes.
+fn trim_ends(columns: &mut [Rails]) {
+    for k in 0..columns.len() {
+        if columns[k].closed || columns[k].a.len() < 2 {
+            continue;
+        }
+        let (before, rest) = columns.split_at_mut(k);
+        let (this, after) = rest.split_first_mut().expect("column k");
+        let others: Vec<&Rails> = before.iter().chain(after.iter()).filter(|c| c.a.len() >= 2).collect();
+        if others.is_empty() {
+            continue;
+        }
+        // Points a little in from the sides: at a corner, the sides of the
+        // two columns are the same edge of the letter.
+        let in_others = |p: Point, depth: f64| others.iter().any(|o| o.holds(p, depth));
+        let covered = |pa: Point, pb: Point| {
+            let depth = END_OVERLAP * pa.distance(pb);
+            [pa.lerp(pb, SIDE_IN), pa.lerp(pb, 0.5), pa.lerp(pb, 1.0 - SIDE_IN)]
+                .iter()
+                .all(|&p| in_others(p, depth))
+        };
+        // One side (0: rail A, 1: rail B) of the pair at `u` is in the others.
+        let side_in = |r: &Rails, u: f64, side: usize| {
+            let (pa, pb) = r.at(u);
+            let t = if side == 0 { SIDE_IN } else { 1.0 - SIDE_IN };
+            in_others(pa.lerp(pb, t), END_OVERLAP * pa.distance(pb))
+        };
+        for end in 0..2 {
+            if end == 1 {
+                this.a.reverse();
+                this.b.reverse();
+            }
+            let n = this.a.len();
+            // The pairs near the end can be out of the others: at a corner
+            // the end of a column is on the side of the other column.
+            let mut along = 0.0;
+            let mut any = false;
+            let mut s = n;
+            for i in 0..n {
+                if i > 0 {
+                    along += this.a[i - 1]
+                        .lerp(this.b[i - 1], 0.5)
+                        .distance(this.a[i].lerp(this.b[i], 0.5));
+                }
+                if covered(this.a[i], this.b[i]) {
+                    any = true;
+                } else if any || along >= END_LEAD * this.a[i].distance(this.b[i]) {
+                    s = i;
+                    break;
+                }
+            }
+            if !any {
+                if end == 1 {
+                    this.a.reverse();
+                    this.b.reverse();
+                }
+                continue;
+            }
+            if s == n {
+                this.a.clear();
+                this.b.clear();
+                break;
+            }
+            if s > 0 {
+                // The place between the last pair in the others and the
+                // first that is not.
+                let (mut lo, mut hi) = (0.0, 1.0);
+                for _ in 0..12 {
+                    let t = 0.5 * (lo + hi);
+                    if covered(this.a[s - 1].lerp(this.a[s], t), this.b[s - 1].lerp(this.b[s], t)) {
+                        lo = t;
+                    } else {
+                        hi = t;
+                    }
+                }
+                let u = (s - 1) as f64 + lo;
+                // Each side goes on to where it comes out of the others: the
+                // end follows an edge that is not square to the column (a
+                // stroke that meets another at a slant).
+                let width = {
+                    let (pa, pb) = this.at(u);
+                    pa.distance(pb)
+                };
+                let mut ends = [u; 2];
+                for (side, end_u) in ends.iter_mut().enumerate() {
+                    let mut j = u.floor() as usize + 1;
+                    while j < n && side_in(this, j as f64, side) {
+                        j += 1;
+                    }
+                    let (mut lo, mut hi) = (u.max((j - 1) as f64), j.min(n - 1) as f64);
+                    for _ in 0..12 {
+                        let t = 0.5 * (lo + hi);
+                        if side_in(this, t, side) {
+                            lo = t;
+                        } else {
+                            hi = t;
+                        }
+                    }
+                    // Not more slant than the width of the column.
+                    let mid = |v: f64| {
+                        let (pa, pb) = this.at(v);
+                        pa.lerp(pb, 0.5)
+                    };
+                    while lo > u && mid(lo).distance(mid(u)) > width {
+                        lo = u + 0.8 * (lo - u);
+                    }
+                    *end_u = lo;
+                }
+                let first = (this.at(ends[0]).0, this.at(ends[1]).1);
+                let keep = (ends[0].max(ends[1]).floor() as usize + 1).min(n - 1);
+                this.a.drain(..keep);
+                this.b.drain(..keep);
+                this.a.insert(0, first.0);
+                this.b.insert(0, first.1);
+            }
+            if end == 1 {
+                this.a.reverse();
+                this.b.reverse();
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1398,6 +1837,80 @@ mod tests {
         assert_eq!(turn(75.0, true).satins.len(), 1);
         // A small turn is no cut, also at a sharp corner of the outline.
         assert_eq!(turn(40.0, false).satins.len(), 1);
+    }
+
+    /// The part of the area of the columns that two columns cover.
+    fn two_layers(s: &Strokes) -> f64 {
+        use emb_geom::region::{self, Region};
+        let flat = |p: &Path| -> Vec<Point> { p.flatten(0.5).into_iter().flat_map(|l| l.points).collect() };
+        let areas: Vec<Region> = s
+            .satins
+            .iter()
+            .map(|g| {
+                let mut ring = flat(&g.rail_a);
+                ring.extend(flat(&g.rail_b).into_iter().rev());
+                Region::new(ring, Vec::new())
+            })
+            .collect();
+        let all: f64 = region::union(&areas, &[]).iter().map(Region::area).sum();
+        let mut two = 0.0;
+        for i in 0..areas.len() {
+            for j in i + 1..areas.len() {
+                two += region::intersection(std::slice::from_ref(&areas[i]), std::slice::from_ref(&areas[j]))
+                    .iter()
+                    .map(Region::area)
+                    .sum::<f64>();
+            }
+        }
+        two / all
+    }
+
+    fn ring(points: &[(f64, f64)]) -> Vec<Point> {
+        points.iter().map(|&(x, y)| Point::new(x, y)).collect()
+    }
+
+    #[test]
+    fn a_crossing_has_one_layer() {
+        // A cross: a bar 100 wide and 700 high, and a bar 100 wide and 500
+        // long across it. The longer bar goes through, the other is cut
+        // into two columns that stop at its sides (P20 Milestone 3), and
+        // the column that goes through has the width of its bar there.
+        let cross = ring(&[
+            (300.0, -700.0),
+            (400.0, -700.0),
+            (400.0, -400.0),
+            (550.0, -400.0),
+            (550.0, -300.0),
+            (400.0, -300.0),
+            (400.0, 0.0),
+            (300.0, 0.0),
+            (300.0, -300.0),
+            (50.0, -300.0),
+            (50.0, -400.0),
+            (300.0, -400.0),
+        ]);
+        let s = strokes(&[cross], 700.0);
+        assert_eq!(s.satins.len(), 3);
+        assert!(s.coverage > 0.95, "{}", s.coverage);
+        assert!((s.max_width - 100.0).abs() < 15.0, "a bulge: {}", s.max_width);
+        assert!(two_layers(&s) < 0.02, "two layers: {}", two_layers(&s));
+    }
+
+    #[test]
+    fn a_corner_has_one_layer() {
+        // An "L": the end of one column stops a little inside the other.
+        let l = ring(&[
+            (0.0, -700.0),
+            (100.0, -700.0),
+            (100.0, -100.0),
+            (500.0, -100.0),
+            (500.0, 0.0),
+            (0.0, 0.0),
+        ]);
+        let s = strokes(&[l], 700.0);
+        assert_eq!(s.satins.len(), 2);
+        assert!(s.coverage > 0.95, "{}", s.coverage);
+        assert!(two_layers(&s) < 0.02, "two layers: {}", two_layers(&s));
     }
 
     #[test]

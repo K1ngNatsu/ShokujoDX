@@ -161,6 +161,9 @@ pub fn measure(font: &Font, c: char, size_mm: f64) -> Option<Measure> {
     for p in &mut parts {
         p.transform(&to_mm);
     }
+    // The stitch of the columns, as the layout chooses it for a text of
+    // this one character.
+    emb_letter::glyph::auto_stitches(&mut parts.iter_mut().collect::<Vec<_>>());
     let ring = |r: &Vec<Point>| -> Vec<Point> { r.iter().map(|p| to_mm.apply(*p)).collect() };
     let outline: Vec<(Vec<Point>, Vec<Vec<Point>>)> = font
         .shapes(g)

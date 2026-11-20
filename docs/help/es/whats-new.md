@@ -54,11 +54,14 @@ fuentes Tajawal (árabe) y Poppins (devanagari) vienen con el programa.
 Consulte [Letras](lettering).
 
 **Puntadas que siguen los trazos.** Con una fuente TrueType u OpenType y
-el tipo de puntada **Automático**, cada trazo de una letra tiene su propia
-puntada: satén, con puntadas divididas en los trazos de más de 7 mm de
-ancho, y filas de tatami en los trazos de más de 12 mm. Antes, una letra
-con un trazo ancho era toda de relleno: en una fuente negrita, la mayoría
-de los kanji y kana de 50 mm eran de relleno. Las fuentes con trazos que
+el tipo de puntada **Automático**, los trazos de las letras son columnas:
+satén, con puntadas divididas en los trazos de más de 7 mm de ancho, o
+filas de tatami si los trazos del texto tienen más de 12 mm. Todas las
+letras de un texto tienen la misma puntada. Antes, una letra con un trazo
+ancho era toda de relleno: en una fuente negrita, la mayoría de los kanji
+y kana de 50 mm eran de relleno. Donde se cruzan dos trazos, uno pasa y el
+otro termina en sus lados; donde un trazo termina en otro, termina un poco
+dentro de él: no hay bultos de hilo allí. Las fuentes con trazos que
 se superponen (muchas fuentes de internet) dan ahora letras sin agujeros y
 sin puntadas fuera de la letra. Consulte [Letras](lettering).
 

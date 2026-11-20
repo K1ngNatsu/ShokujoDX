@@ -34,9 +34,11 @@ There are two kinds of fonts:
   embroidery fonts come with the program.
 - **TrueType** and OpenType fonts of the computer. The program makes the
   letters from their outlines: columns that follow the strokes
-  (**Automatic**: satin, with split stitches in strokes wider than 7 mm,
-  and rows of tatami in strokes wider than 12 mm), or all **Satin** or all
-  **Fill**.
+  (**Automatic**: satin, with split stitches in strokes wider than 7 mm;
+  if the strokes of the text are wider than 12 mm, rows of tatami), or all
+  **Satin** or all **Fill**. Where two strokes cross, one goes through
+  and the other stops at its sides, so the thread does not lie two times
+  there.
 
 **Lettering > Fonts** opens the font list: search, see a preview and the
 size range, and show **All**, **Embroidery**, **TrueType**, **For small

@@ -155,9 +155,10 @@ impl Underline {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LetterStitch {
-    /// Columns that follow the strokes, with the stitch of each column from
-    /// its width (satin; split stitches; a tatami column for a very wide
-    /// stroke, P20). A letter that the columns do not cover well is a fill.
+    /// Columns that follow the strokes, with one stitch for the text from
+    /// the typical width of its columns (satin, with split stitches; tatami
+    /// columns for very wide strokes; P20). A letter that the columns do
+    /// not cover well is a fill.
     #[default]
     Auto,
     Satin,

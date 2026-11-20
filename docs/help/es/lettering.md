@@ -36,8 +36,10 @@ Hay dos tipos de fuentes:
 - Fuentes **TrueType** y OpenType del ordenador. El programa crea las
   letras a partir de sus contornos: columnas que siguen los trazos
   (**Automático**: satén, con puntadas divididas en los trazos de más de
-  7 mm de ancho, y filas de tatami en los trazos de más de 12 mm), o todo
-  **Satén** o todo **Relleno**.
+  7 mm de ancho; si los trazos del texto tienen más de 12 mm, filas de
+  tatami), o todo **Satén** o todo **Relleno**. Donde se cruzan dos
+  trazos, uno pasa y el otro termina en sus lados, para que el hilo no
+  quede dos veces allí.
 
 **Letras > Fuentes** abre la lista de fuentes: busque, vea una vista
 previa y el rango de tamaños, y muestre **Todo**, **Bordado**,

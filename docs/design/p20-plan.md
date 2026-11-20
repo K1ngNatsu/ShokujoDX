@@ -1,7 +1,8 @@
 # Plan: Japanese lettering (phase P20)
 
 Date: 2026-11-20 · Status: Accepted (owner, 2026-11-20: before v0.4.0).
-Milestones 1 and 2 are done (ADR 0141, ADR 0142).
+Milestones 1 and 2 are done (ADR 0141, ADR 0142). Milestone 3 is made
+(ADR 0143) and waits for the sew-out of the owner.
 
 ## Goal
 
@@ -143,6 +144,14 @@ trims of the columns, as at 15 mm: Milestones 3 and 4.)
 This milestone gives the largest gain on fabric, and it needs the most
 care.
 
+0. **One stitch for the text** (owner, 2026-11-20, after the pictures of
+   Milestone 2). With a stitch for each column, strokes of almost the same
+   width got satin or tatami (at 80 mm the strokes of 東 are 9.3 to 13.6
+   mm: seven tatami columns, two satin columns), so letters and mirrored
+   strokes did not look the same. In Auto, the stitch comes from the
+   typical width of the columns of the text: all satin (split stitches
+   above 7 mm), or all tatami columns. Only a column much wider than the
+   satin limit is a tatami column in satin letters.
 1. Where two columns cross, one column goes through, and the other is
    cut into two columns that stop at its sides, with a small overlap so
    that there is no gap. The column that goes through has the width of
@@ -160,6 +169,32 @@ care.
 character of the reference set (today 5 % to 16 % on kanji), and at least
 95 % of each shape covered. The sew-out of the test sheet has no lumps at
 crossings and no gaps (owner).
+
+**Made (2026-11-20, ADR 0143); the sew-out is open.** Item 0: the layout
+chooses the stitch of the text (`glyph::auto_stitches`). Item 1: the
+shorter of two strokes that cross is cut (`stroke::cut_crossings`), and a
+column has the width of its stroke where it meets another stroke (the
+lines across it that go into the other stroke take the width before and
+after). Item 2: the end of a column that lies in other columns is cut
+back to a little inside them (`stroke::trim_ends`), also at corners and at
+strokes that meet at a slant. Item 3: the longer stroke goes through, for
+now. Item 4: `tools/make-sewout-kit-p20.py` makes the kit
+(`out/p20-sewout`: 20 characters at 25 mm, 4 at 50 mm, 刺繍 and 東京 at
+40 mm, with a checklist).
+
+| Measure (25 mm) | Milestone 2 | Now |
+| --- | --- | --- |
+| Two layers, mean (highest) | 6.3 % (24.9 %, ャ) | 1.4 % (5.1 %, 本) |
+| Characters with two layers on more than 3 % | 170 | 19 |
+| Covered, mean (lowest) | 97.2 % (83.6 %, ・) | 97.6 % (93.8 %, く) |
+| Characters covered less than 95 % | (not counted) | 11 |
+| Characters with a column under 0.8 mm (15 mm) | 9 | 4 |
+| Trims of 刺繍 / 東京 / 龍 (15 mm) | 26 / 17 / 17 | 29 / 19 / 17 |
+
+Open: the exit test numbers for each character (junctions of three or
+four strokes at a slant, as 本 and 桜; stroke ends that the font cuts at a
+slant, as ミ), the rule of item 3 from the sew-out, and then the bundled
+embroidery fonts made again with the new stroke finder.
 
 ## Milestone 4: routes for the fonts of the computer (M)
 

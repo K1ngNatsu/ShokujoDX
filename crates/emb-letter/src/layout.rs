@@ -218,6 +218,7 @@ pub fn layout_with_box(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> (Ve
             });
         }
     }
+    auto_stitches(l, &mut letters);
     let warp = !l.envelope.is_none() && l.baseline.is_straight();
     let Some((x0, x1)) = span.filter(|_| warp) else {
         return (letters, None);
@@ -227,6 +228,23 @@ pub fn layout_with_box(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> (Ve
         l.envelope.warp_kind(&b, q);
     }
     (letters, Some(b))
+}
+
+/// The stitch of the columns of the letters with the stitch type Auto, one
+/// for the whole text ([`crate::glyph::auto_stitches`]). The letters of an
+/// edit with its own shape and the underline keep theirs.
+fn auto_stitches(l: &Lettering, letters: &mut [Letter]) {
+    let mut parts: Vec<&mut ObjectKind> = letters
+        .iter_mut()
+        .filter(|x| {
+            let edit = l.edit(x.index);
+            !x.text.is_empty()
+                && edit.and_then(|e| e.stitch).unwrap_or(l.stitch) == emb_model::LetterStitch::Auto
+                && edit.and_then(|e| e.shape.as_ref()).is_none_or(|s| s.text != x.text)
+        })
+        .flat_map(|x| x.parts.iter_mut())
+        .collect();
+    crate::glyph::auto_stitches(&mut parts);
 }
 
 /// The parts of one letter in letter space (the baseline at y = 0, scaled
@@ -393,6 +411,7 @@ fn stacked(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> Vec<Letter> {
             });
         }
     }
+    auto_stitches(l, &mut letters);
     letters
 }
 

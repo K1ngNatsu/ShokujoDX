@@ -8,12 +8,14 @@ use crate::stroke::{Strokes, strokes};
 
 /// Satin is used in `Auto` only when the strokes cover this much of the glyph.
 pub const AUTO_MIN_COVERAGE: f64 = 0.85;
-/// In `Auto`, a column up to this width (mm, [`column_width`]) is a satin
-/// column, and its stitches longer than `SATIN_SPLIT_MM` (7 mm) are split.
-/// A wider column is a tatami column (P20 Milestone 2): rows across the
-/// column that follow the stroke. The value is the longest satin stitch
-/// ([`crate::quality::LONG_MM`]).
+/// In `Auto`, the columns of a text with a typical width up to this (mm,
+/// [`auto_stitches`]) are satin columns, and their stitches longer than
+/// `SATIN_SPLIT_MM` (7 mm) are split. Wider: tatami columns (P20), rows
+/// across the column that follow the stroke. The value is the longest
+/// satin stitch ([`crate::quality::LONG_MM`]).
 pub const AUTO_MAX_SATIN_MM: f64 = crate::quality::LONG_MM;
+/// In satin text, a column wider than this (mm) is a tatami column.
+pub const AUTO_ALONE_MM: f64 = 1.5 * AUTO_MAX_SATIN_MM;
 /// The stitch length of the rows of a tatami column of `Auto`, in mm.
 pub const AUTO_TATAMI_STITCH_MM: f64 = 3.5;
 /// A part of the glyph that the strokes do not cover is broad (a stroke
@@ -49,6 +51,7 @@ impl GlyphShapes {
         let fills = regions(rings);
         let mut strokes = strokes(rings, cap_height);
         add_missed_strokes(&fills, &mut strokes, cap_height);
+        tune_ends(&fills, &mut strokes, cap_height);
         GlyphShapes { fills, strokes }
     }
 
@@ -62,18 +65,15 @@ impl GlyphShapes {
         !self.strokes.satins.is_empty() && self.strokes.coverage >= AUTO_MIN_COVERAGE
     }
 
-    /// The parts of the glyph in `Auto` at `scale` (mm for each font unit),
-    /// in font units: the columns, each with its stitch
-    /// ([`auto_column`]), if they cover the glyph; else fills.
-    pub fn auto_parts(&self, scale: f64) -> Vec<ObjectKind> {
-        if !self.columns_cover() {
-            return self.fill_parts();
+    /// The parts of the glyph in `Auto`, in font units: the satin columns
+    /// if they cover the glyph, else fills. The layout chooses the stitch
+    /// of the columns for the whole text ([`auto_stitches`]).
+    pub fn auto_parts(&self) -> Vec<ObjectKind> {
+        if self.columns_cover() {
+            self.satin_parts()
+        } else {
+            self.fill_parts()
         }
-        let mut parts = self.satin_parts();
-        for p in &mut parts {
-            auto_column(p, scale);
-        }
-        parts
     }
 
     /// Satin parts in font units.
@@ -101,22 +101,59 @@ impl GlyphShapes {
     }
 }
 
-/// The stitch of a column in `Auto` (P20 Milestone 2), chosen for each
-/// column and not for the whole letter: a satin column of the standard
-/// type that is wider than [`AUTO_MAX_SATIN_MM`] at `scale` (mm for each
-/// unit of the part) becomes a tatami column. Other parts do not change.
-pub fn auto_column(part: &mut ObjectKind, scale: f64) {
-    let ObjectKind::Satin { geometry, params } = part else {
-        return;
-    };
-    if !params.pattern.is_satin() {
+/// The stitch of the columns of a text in `Auto` (P20 Milestones 2 and 3),
+/// for the parts in mm of all the letters of the text with the stitch type
+/// Auto. One stitch for all, so that the letters and their strokes look
+/// the same: the typical width of the satin columns of the standard type
+/// (the width that half of their length is narrower than,
+/// [`column_width`]) decides. Up to [`AUTO_MAX_SATIN_MM`] they stay satin
+/// (their long stitches are split), and only a column wider than
+/// [`AUTO_ALONE_MM`] is a tatami column; wider, all are tatami columns.
+/// Other parts do not change.
+pub fn auto_stitches(parts: &mut [&mut ObjectKind]) {
+    let widths: Vec<Option<(f64, f64)>> = parts
+        .iter()
+        .map(|p| match &**p {
+            ObjectKind::Satin { geometry, params } if params.pattern.is_satin() => column_measure(geometry),
+            _ => None,
+        })
+        .collect();
+    let mut sorted: Vec<(f64, f64)> = widths.iter().flatten().copied().collect();
+    if sorted.is_empty() {
         return;
     }
-    if column_width(geometry).is_some_and(|w| w * scale > AUTO_MAX_SATIN_MM) {
-        *params = params.with_type(ColumnPattern::Tatami {
-            stitch_mm: AUTO_TATAMI_STITCH_MM,
-        });
+    sorted.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let half = sorted.iter().map(|(_, l)| l).sum::<f64>() / 2.0;
+    let mut sum = 0.0;
+    let typical = sorted
+        .iter()
+        .find(|(_, l)| {
+            sum += l;
+            sum >= half
+        })
+        .map_or(sorted[0].0, |(w, _)| *w);
+    let all = typical > AUTO_MAX_SATIN_MM;
+    for (p, w) in parts.iter_mut().zip(widths) {
+        let Some((w, _)) = w else { continue };
+        if (all || w > AUTO_ALONE_MM)
+            && let ObjectKind::Satin { params, .. } = &mut **p
+        {
+            *params = params.with_type(ColumnPattern::Tatami {
+                stitch_mm: AUTO_TATAMI_STITCH_MM,
+            });
+        }
     }
+}
+
+/// The width of a column ([`column_width`]) and its length along its
+/// middle.
+fn column_measure(g: &emb_model::SatinGeometry) -> Option<(f64, f64)> {
+    let width = column_width(g)?;
+    let length: f64 = crate::quality::column_widths(g, f64::INFINITY)
+        .iter()
+        .map(|(_, l)| l)
+        .sum();
+    Some((width, length))
 }
 
 /// A column keeps its width ([`column_width`]) over at least this many
@@ -189,6 +226,35 @@ pub fn column_width(g: &emb_model::SatinGeometry) -> Option<f64> {
         }
     }
     Some(sorted[lo])
+}
+
+/// A round part of the letter (a dot) gets a column to its edge
+/// ([`crate::tune::round_parts`], as the converter does for the embroidery
+/// fonts; P20 Milestone 3).
+fn tune_ends(fills: &[(Vec<Point>, Vec<Vec<Point>>)], s: &mut Strokes, cap_height: f64) {
+    if s.satins.is_empty() {
+        return;
+    }
+    let mut parts: Vec<ObjectKind> = s
+        .satins
+        .iter()
+        .map(|g| ObjectKind::Satin {
+            geometry: g.clone(),
+            params: SatinParams::default(),
+        })
+        .collect();
+    if crate::tune::round_parts(&mut parts, fills, cap_height) == 0 {
+        // The second pass of the stroke finder can add columns.
+        crate::stroke::trim_column_ends(&mut s.satins);
+        return;
+    }
+    for (g, p) in s.satins.iter_mut().zip(parts) {
+        if let ObjectKind::Satin { geometry, .. } = p {
+            *g = geometry;
+        }
+    }
+    // The ends that went on into other columns stop at them again.
+    crate::stroke::trim_column_ends(&mut s.satins);
 }
 
 /// The area of a satin: its two rails as one ring.
@@ -449,42 +515,65 @@ mod tests {
     }
 
     #[test]
-    fn auto_chooses_the_stitch_of_each_column() {
-        let part = |g: emb_model::SatinGeometry, params: SatinParams| ObjectKind::Satin { geometry: g, params };
-        let pattern = |p: &ObjectKind| match p {
-            ObjectKind::Satin { params, .. } => params.pattern,
-            _ => unreachable!(),
+    fn auto_chooses_one_stitch_for_the_text() {
+        let part = |len: f64, w: f64, params: SatinParams| ObjectKind::Satin {
+            geometry: column(len, w, None),
+            params,
         };
-        // 10 units wide, 10 mm at a scale of 1: satin (its long stitches
-        // are split). The crossing does not count.
-        let mut p = part(column(100.0, 10.0, Some((45.0, 55.0, 20.0))), SatinParams::default());
-        auto_column(&mut p, 1.0);
-        assert_eq!(pattern(&p), ColumnPattern::Satin);
-        // 13 mm: a tatami column, with the underlay of the satin.
-        let satin = SatinParams {
+        let patterns = |parts: &[ObjectKind]| -> Vec<ColumnPattern> {
+            parts
+                .iter()
+                .map(|p| match p {
+                    ObjectKind::Satin { params, .. } => params.pattern,
+                    _ => unreachable!(),
+                })
+                .collect()
+        };
+        let run = |parts: &mut Vec<ObjectKind>| {
+            let mut refs: Vec<&mut ObjectKind> = parts.iter_mut().collect();
+            auto_stitches(&mut refs);
+        };
+        let tatami = ColumnPattern::Tatami {
+            stitch_mm: AUTO_TATAMI_STITCH_MM,
+        };
+        let satin = ColumnPattern::Satin;
+        // Strokes of 11 to 13 mm: the typical width is 11.5 mm, so all are
+        // satin (not one stitch for each column).
+        let mut parts = vec![
+            part(100.0, 11.0, SatinParams::default()),
+            part(100.0, 11.5, SatinParams::default()),
+            part(60.0, 13.0, SatinParams::default()),
+        ];
+        run(&mut parts);
+        assert_eq!(patterns(&parts), [satin, satin, satin]);
+        // A typical width of 12.5 mm: all are tatami columns, also the
+        // narrow one, with the underlay of each.
+        let no_underlay = SatinParams {
             underlay: emb_model::Underlay::None,
             ..SatinParams::default()
         };
-        let mut p = part(column(100.0, 10.0, None), satin);
-        auto_column(&mut p, 1.3);
-        let ObjectKind::Satin { params, .. } = &p else {
+        let mut parts = vec![
+            part(100.0, 12.5, no_underlay),
+            part(100.0, 13.0, SatinParams::default()),
+            part(60.0, 9.0, SatinParams::default()),
+        ];
+        run(&mut parts);
+        assert_eq!(patterns(&parts), [tatami, tatami, tatami]);
+        let ObjectKind::Satin { params, .. } = &parts[0] else {
             unreachable!()
         };
-        assert_eq!(
-            params.pattern,
-            ColumnPattern::Tatami {
-                stitch_mm: AUTO_TATAMI_STITCH_MM
-            }
-        );
         assert_eq!(params.underlay, emb_model::Underlay::None);
         assert!(!params.short_stitches);
-        // A column of another type keeps it.
-        let mut p = part(
-            column(100.0, 10.0, None),
-            SatinParams::with_pattern(ColumnPattern::Zigzag),
-        );
-        auto_column(&mut p, 2.0);
-        assert_eq!(pattern(&p), ColumnPattern::Zigzag);
+        // In satin text, only a column much wider than the limit is a
+        // tatami column; a column of another type keeps it.
+        let mut parts = vec![
+            part(100.0, 6.0, SatinParams::default()),
+            part(100.0, 6.0, SatinParams::default()),
+            part(60.0, 20.0, SatinParams::default()),
+            part(60.0, 20.0, SatinParams::with_pattern(ColumnPattern::Zigzag)),
+        ];
+        run(&mut parts);
+        assert_eq!(patterns(&parts), [satin, satin, tatami, ColumnPattern::Zigzag]);
     }
 
     #[test]

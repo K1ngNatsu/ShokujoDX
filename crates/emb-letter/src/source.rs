@@ -123,12 +123,12 @@ impl LetterSource for Font {
         Font::kerning(self, left as u16, right as u16)
     }
 
-    fn parts(&self, letter: u32, stitch: LetterStitch, scale: f64) -> Vec<ObjectKind> {
+    fn parts(&self, letter: u32, stitch: LetterStitch, _scale: f64) -> Vec<ObjectKind> {
         let shapes = self.shapes(letter as u16);
         match stitch {
             LetterStitch::Satin if !shapes.strokes.satins.is_empty() => shapes.satin_parts(),
             LetterStitch::Satin | LetterStitch::Fill => shapes.fill_parts(),
-            LetterStitch::Auto => shapes.auto_parts(scale),
+            LetterStitch::Auto => shapes.auto_parts(),
         }
     }
 

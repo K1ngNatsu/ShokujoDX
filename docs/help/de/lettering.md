@@ -38,8 +38,10 @@ Es gibt zwei Arten von Schriften:
 - **TrueType**- und OpenType-Schriften des Computers. Das Programm
   erstellt die Buchstaben aus ihren Umrissen: Säulen, die den Strichen
   folgen (**Automatisch**: Satin, mit geteilten Stichen in Strichen, die
-  breiter als 7 mm sind, und Tatami-Reihen in Strichen, die breiter als
-  12 mm sind), oder alles **Satin** oder alles **Füllung**.
+  breiter als 7 mm sind; wenn die Striche des Textes breiter als 12 mm
+  sind, Tatami-Reihen), oder alles **Satin** oder alles **Füllung**. Wo
+  sich zwei Striche kreuzen, geht einer durch, und der andere endet an
+  seinen Seiten, damit das Garn dort nicht doppelt liegt.
 
 **Schrift > Schriften** öffnet die Schriftliste: Suchen, eine Vorschau und
 den Größenbereich sehen, und **Alle**, **Stickerei**, **TrueType**,
