@@ -2,7 +2,7 @@
 id: checking
 title: Comprobar un diseño
 group: production
-keywords: comprobar, vista previa, reproductor de puntadas, reproducir, bordado, simular, cursor de puntada, desplazamiento, lista de puntadas, funciones, información del diseño, advertencias, mapa de densidad, capas, acumulación, aspecto de hilo, 3d, luz, penetraciones de aguja, saltos, cortes, producto, camiseta, maqueta, repeticiones, continuo, aprobación, tiempo de bordado, número de puntadas
+keywords: comprobar, inclinar, vista inclinada, girar, lupa, comparar, antes y después, se ve la tela, hilo alto, roturas del hilo, luces predefinidas, vista previa, reproductor de puntadas, reproducir, bordado, simular, cursor de puntada, desplazamiento, lista de puntadas, funciones, información del diseño, advertencias, mapa de densidad, capas, acumulación, aspecto de hilo, 3d, luz, penetraciones de aguja, saltos, cortes, producto, camiseta, maqueta, repeticiones, continuo, aprobación, tiempo de bordado, número de puntadas
 ---
 # Comprobar un diseño
 
@@ -106,6 +106,44 @@ la superficie por partes mientras trabaja; una parte que aún no está
 lista muestra un momento el aspecto más rápido. Desactive **Superficie
 fina** en un equipo lento.
 
+## Comprobar el aspecto
+
+El grupo **Comprobar** de la pestaña Ver tiene herramientas para
+comprobar un diseño antes de bordarlo.
+
+- **Iluminación**: los ajustes **Desde arriba a la izquierda** (el
+  predeterminado), **Plana desde arriba**, **Baja desde el lado** (muestra
+  cada altura y cada hueco) y **Dos luces**, y la dirección y la altura
+  de la luz. Mantenga pulsada **L** y arrastre sobre el diseño para mover
+  la luz: en el centro de la vista está justo arriba; en el borde, baja.
+- **Vista inclinada** muestra el bordado en ángulo en el lienzo. Arrastre
+  hacia arriba y hacia abajo para inclinarlo y a lo ancho para girarlo;
+  arrastre con el botón derecho para moverlo y gire la rueda para hacer
+  zoom. **Alturas** hace mayores las alturas (×1 es la altura real). La
+  luz se queda en su lugar cuando el diseño gira, como cuando gira un
+  bastidor bajo una lámpara. Las herramientas del lienzo esperan hasta
+  que haga clic en **Cerrar**. **Ventana inclinada** muestra la misma
+  vista en una ventana, para cambiar el diseño y verlo en ángulo.
+- **Lupa** muestra el hilo a 20 veces su tamaño real en una ventana
+  redonda en el puntero.
+- **Comparar 3D** muestra las puntadas en el lienzo y el aspecto 3D en
+  la vista dividida, en el mismo lugar y con el mismo zoom (**Mismo
+  lugar** en la vista dividida).
+- **Antes y después** conserva las puntadas tal como están ahora. Cambie
+  un ajuste y luego arrastre la línea en el lienzo: el lado izquierdo
+  muestra las puntadas de antes; el derecho, las de ahora.
+- **Se ve la tela** marca los lugares donde la tela se ve a través de un
+  relleno o un satén, a partir de los hilos colocados (sus anchos,
+  alturas y huecos). Los rellenos abiertos a propósito (una mezcla, una
+  textura, motivos) no se comprueban. Aumente la densidad o cambie el
+  ángulo de las filas hasta que el lugar se cierre.
+- **Hilo alto** marca los lugares donde el hilo es más alto que el
+  límite sobre la tela (la espuma y el relleno no cuentan): un riesgo de
+  roturas del hilo.
+
+Defina los límites de las dos comprobaciones en **Opciones** (**La tela
+se ve** y **Límite de altura del hilo**).
+
 ## Otras vistas de las puntadas
 
 **Ver > Mostrar** tiene **Saltos** (saltos y líneas de desplazamiento),
@@ -124,7 +162,8 @@ producto** lo muestra u oculta. **Imagen en el producto** guarda una
 imagen PNG del diseño con el aspecto de hilo sobre el producto, para un
 cliente. El producto no se borda. Un producto dibujado tiene luz y
 sombra, pliegues y la textura de su tejido, con la luz del aspecto de
-hilo; en la imagen, el bordado tiene una sombra suave sobre él; en una
+hilo; con el aspecto 3D, el bordado sobre él tiene sus alturas, su
+brillo y sus sombras con la misma luz; en una
 gorra, la imagen muestra el diseño un poco curvado alrededor de la copa.
 **Añadir un diseño…** muestra un diseño más (un proyecto o un archivo
 de máquina) en el producto, por ejemplo un nombre en una manga con este

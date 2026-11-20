@@ -175,6 +175,7 @@ pub const WINDOW_HELP: &[(&str, &str)] = &[
     ("Product", "checking"),
     ("Product Photo", "checking"),
     ("Turntable", "checking"),
+    ("Tilt View", "checking"),
     ("Check for Updates", "options"),
     ("New Versions", "options"),
     ("Repeats", "checking"),

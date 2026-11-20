@@ -128,6 +128,16 @@ pequeños destellos con mucho zoom, y **Ver > Aspecto de hilo > Luces
 apagadas** solo muestra el hilo fosforescente. Consulte [Comprobar un
 diseño](checking).
 
+**Comprobar el aspecto.** El grupo **Comprobar** de la pestaña Ver tiene
+herramientas nuevas: luces predefinidas y una luz que se mueve (mantenga
+pulsada **L** y arrastre), una **Vista inclinada** que muestra el
+bordado en ángulo con sus alturas (en el lienzo o en una ventana), una
+**Lupa** a 20 veces, **Comparar 3D** y **Antes y después**, y dos
+comprobaciones de la superficie: **Se ve la tela** e **Hilo alto**. El
+producto y el plato giratorio muestran las puntadas con sus alturas y su
+brillo, con la luz del producto. Consulte [Comprobar un
+diseño](checking).
+
 **Diseños con muchísimas puntadas.** El programa podía cerrarse cuando el
 lienzo mostraba unas 350 000 puntadas o más a la vez con el aspecto de
 hilo. Ahora el lienzo las muestra con un aspecto más simple con ese zoom,

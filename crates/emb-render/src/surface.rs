@@ -682,6 +682,8 @@ struct LaidStrand {
     key: u64,
     /// The record of the plan at its end ([`Strand::record`]).
     record: u32,
+    /// The foam under it, mm ([`Strand::lift_mm`]).
+    lift: f32,
 }
 
 impl LaidStrand {
@@ -1088,15 +1090,8 @@ fn lay_one(
         let p = Point::new(s.a.x + dir.0 * t, s.a.y + dir.1 * t);
         let (mut h, l) = under_at(p);
         // The foam is cut at the needle points and round across the column.
-        let edge = FOAM_EDGE_MM.min(len / 2.0);
-        if s.lift_mm > 0.0 && t.min(len - t) >= edge {
-            let rise = FOAM_ROUND_MM.min(len / 2.0 - edge);
-            let x = if rise > 1e-9 {
-                (t.min(len - t) - edge) / rise
-            } else {
-                1.0
-            };
-            h = h.max(s.lift_mm * round_rise(x));
+        if s.lift_mm > 0.0 {
+            h = h.max(foam_at(s.lift_mm, len, t));
         }
         sc.ts.push(t);
         sc.under.push(if k == 0 || k == n - 1 { 0.0 } else { h });
@@ -1130,7 +1125,21 @@ fn lay_one(
         bbox: BBox::from_points([s.a, s.b]).expect("two points").expand(half),
         key: key(s),
         record: s.record,
+        lift: s.lift_mm as f32,
     })
+}
+
+/// The height of the foam under a stitch `len` mm long with the foam
+/// `lift` mm high, `t` mm from its start (as [`lay_one`] makes it).
+fn foam_at(lift: f64, len: f64, t: f64) -> f64 {
+    let edge = FOAM_EDGE_MM.min(len / 2.0);
+    let d = t.min(len - t);
+    if lift <= 0.0 || d < edge {
+        return 0.0;
+    }
+    let rise = FOAM_ROUND_MM.min(len / 2.0 - edge);
+    let x = if rise > 1e-9 { (d - edge) / rise } else { 1.0 };
+    lift * round_rise(x)
 }
 
 /// The floors of the pads of `pieces` on the cells of `grid`.
@@ -1460,6 +1469,48 @@ impl Laid {
     /// The height of the top at `p`, mm (from the grid of 0.1 mm).
     pub fn height_at(&self, p: Point) -> f64 {
         self.grid.height_at(p)
+    }
+
+    /// The height of what is not thread under the threads (the pieces,
+    /// the padding and the foam) at the pixels of the grid of `ppm` pixels
+    /// for each mm from the corner `area.min` (`w` × `h` pixels, row by row),
+    /// mm (the surface check of thread heights, ADR 0129).
+    pub fn floor_in(&self, area: BBox, ppm: f64, w: u32, h: u32) -> Vec<f32> {
+        let (w, h) = (w as usize, h as usize);
+        let mut out = vec![0.0f32; w * h];
+        let center =
+            |x: usize, y: usize| Point::new(area.min.x + (x as f64 + 0.5) / ppm, area.min.y + (y as f64 + 0.5) / ppm);
+        if !self.pieces.is_empty() {
+            let mut g = Grid::new(self.bounds(), self.grid.cell);
+            put_pieces(&mut g, &self.pieces, &self.floors);
+            for y in 0..h {
+                for x in 0..w {
+                    out[y * w + x] = g.height_at(center(x, y)).max(0.0) as f32;
+                }
+            }
+        }
+        // The foam under the strands, on all their length: the thread that
+        // goes down into the fabric at a needle point is not a stack of
+        // thread.
+        let px = |v: f64, o: f64, n: usize| (((v - o) * ppm).floor().max(0.0) as usize).min(n);
+        for s in self.strands.iter().filter(|s| s.lift > 0.0) {
+            let b = s.bbox;
+            let (x0, x1) = (px(b.min.x, area.min.x, w), px(b.max.x, area.min.x, w - 1) + 1);
+            let (y0, y1) = (px(b.min.y, area.min.y, h), px(b.max.y, area.min.y, h - 1) + 1);
+            for y in y0..y1.min(h) {
+                for x in x0..x1.min(w) {
+                    let q = center(x, y);
+                    let (rx, ry) = (q.x - s.a.x, q.y - s.a.y);
+                    let t = rx * s.dir.0 + ry * s.dir.1;
+                    if !(0.0..=s.len).contains(&t) || (ry * s.dir.0 - rx * s.dir.1).abs() > s.half {
+                        continue;
+                    }
+                    let o = &mut out[y * w + x];
+                    *o = o.max(s.lift);
+                }
+            }
+        }
+        out
     }
 
     /// The heights of the cells in `b`.
@@ -2297,7 +2348,7 @@ impl Tile {
     /// [`Surface::finish`] makes it).
     fn flat(x0: u32, y0: u32, w: u32, h: u32, lighting: &Lighting) -> Tile {
         let mut t = Tile::new(x0, y0, w, h);
-        let lit = crate::sheen::diffuse([0.0, 0.0, 1.0], lighting.vector());
+        let lit = crate::sheen::diffuse_in([0.0, 0.0, 1.0], &lighting.lights());
         t.diffuse.fill((lit / 2.0 * 255.0).round().clamp(0.0, 255.0) as u8);
         t
     }
@@ -2548,9 +2599,9 @@ impl Surface {
             }
         }
         let bare = &bare;
-        let flat_light = crate::sheen::diffuse([0.0, 0.0, 1.0], self.light.vector());
-        // The direction of the light, one time (not for each pixel).
-        let lv = light.vector();
+        let flat_light = crate::sheen::diffuse_in([0.0, 0.0, 1.0], &self.light.lights());
+        // The directions of the lights, one time (not for each pixel).
+        let lv = light.lights();
         let work = move |chunk: &mut [Tile]| {
             for t in chunk {
                 for row in 0..t.h {
@@ -2576,17 +2627,23 @@ impl Surface {
                             let hide = ((top - at(x, y)) / PILE_SOFT_MM).clamp(0.0, 1.0) * PILE_HIDE;
                             t.cover[k] = (f64::from(t.cover[k]) * (1.0 - hide)).round() as u8;
                         }
-                        let dark = shadow_with(
-                            &at,
-                            Some(tops),
-                            (0, 0, w as i64, h as i64),
-                            x,
-                            y,
-                            lv,
-                            light.strength,
-                            ppm,
-                            top,
-                        );
+                        let mut dark = 0.0;
+                        for (v, part) in lv {
+                            if part > 0.0 {
+                                dark += part
+                                    * shadow_with(
+                                        &at,
+                                        Some(tops),
+                                        (0, 0, w as i64, h as i64),
+                                        x,
+                                        y,
+                                        v,
+                                        light.strength,
+                                        ppm,
+                                        top,
+                                    );
+                            }
+                        }
                         t.shadow[k] = (dark * 255.0).round() as u8;
                         let mut shade = open * (1.0 - crate::sheen::SHADOW_DARK * dark);
                         // The slope of the fabric: from the heights of the
@@ -2605,7 +2662,7 @@ impl Surface {
                             let gy = (g(x, y + 1) - g(x, y - 1)) / d;
                             if gx != 0.0 || gy != 0.0 {
                                 let len = (gx * gx + gy * gy + 1.0).sqrt();
-                                let lit = crate::sheen::diffuse([-gx / len, -gy / len, 1.0 / len], lv);
+                                let lit = crate::sheen::diffuse_in([-gx / len, -gy / len, 1.0 / len], &lv);
                                 shade *= (lit / flat_light).min(1.0);
                             }
                         }
@@ -2615,7 +2672,7 @@ impl Surface {
                         }
                         t.fabric_shade[k] = (shade * 255.0).round() as u8;
                         let n = [-dzdx / len, -dzdy / len, 1.0 / len];
-                        let lit = crate::sheen::diffuse(n, lv);
+                        let lit = crate::sheen::diffuse_in(n, &lv);
                         t.diffuse[k] = (lit / 2.0 * 255.0).round().clamp(0.0, 255.0) as u8;
                     }
                 }

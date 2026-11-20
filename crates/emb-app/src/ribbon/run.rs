@@ -176,6 +176,7 @@ impl AppState {
             Cmd::AutoHoop => !d.objects().is_empty(),
             Cmd::SaveDecoration => d.product.is_some(),
             Cmd::Turntable => crate::turntable::can_turn(d),
+            Cmd::TiltWindow | Cmd::Compare3d => !d.objects().is_empty(),
             Cmd::TurnProduct => d
                 .product
                 .as_ref()
@@ -250,6 +251,11 @@ impl AppState {
             Flag::HoopingMode => self.hoopings_ui.mode,
             Flag::Product => self.doc.design().product.as_ref().is_some_and(|v| v.visible),
             Flag::Repeats => self.doc.design().repeat.is_some_and(|r| r.show),
+            Flag::Tilt => self.tilt.on_canvas,
+            Flag::Magnifier => self.magnifier.on,
+            Flag::BeforeAfter => self.before_after.is_some(),
+            Flag::ShowThrough => self.show_through,
+            Flag::HighThread => self.show_high_thread,
         }
     }
 
@@ -316,6 +322,22 @@ impl AppState {
             Flag::SplitView => {
                 self.show_split = !self.show_split;
                 self.split.fit_requested = true;
+            }
+            Flag::Tilt => {
+                self.tilt.on_canvas = !self.tilt.on_canvas;
+                if self.tilt.on_canvas {
+                    self.tilt.window = false;
+                }
+            }
+            Flag::Magnifier => self.magnifier.on = !self.magnifier.on,
+            Flag::BeforeAfter => self.toggle_before_after(),
+            Flag::ShowThrough => {
+                self.show_through = !self.show_through;
+                self.show_plan |= self.show_through;
+            }
+            Flag::HighThread => {
+                self.show_high_thread = !self.show_high_thread;
+                self.show_plan |= self.show_high_thread;
             }
         }
         self.set_settings(s);
@@ -534,6 +556,11 @@ impl AppState {
             Cmd::SaveDecoration => self.save_decoration_dialog(),
             Cmd::TurnProduct => self.turn_product(),
             Cmd::Turntable => self.turntable.open = true,
+            Cmd::TiltWindow => {
+                self.tilt.window = true;
+                self.tilt.on_canvas = false;
+            }
+            Cmd::Compare3d => self.compare_3d(),
             Cmd::RepeatsWindow => self.open_repeats(),
             Cmd::About => self.about_window = true,
             Cmd::CheckUpdates => self.check_updates_now(ctx),

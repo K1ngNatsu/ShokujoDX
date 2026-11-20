@@ -555,8 +555,26 @@ impl AppState {
         }
         let b = BBox::from_points(segments.iter().flat_map(|s| [s.a, s.b]))?.expand(1.0);
         let px = EXTRA_PX_PER_MM.min(EXTRA_MAX_PX / b.width().max(b.height()).max(1.0));
-        let pic = emb_render::raster::picture_at_look(&segments, &[], b, px, THREAD_MM, None, &look);
-        let image = egui::ColorImage::from_rgba_unmultiplied([pic.width as usize, pic.height as usize], &pic.rgba);
+        // The 3D look: the surface of the stitches in the light of the
+        // product, with their shadows on it (ADR 0129); else the flat look.
+        let (image, b) = match look.lighting {
+            Some(l) => {
+                let b = b.expand(1.0);
+                let (pic, x0, y0) = emb_render::product::stitch_surface(&segments, b, px, &l)?;
+                let min = Point::new(b.min.x + f64::from(x0) / px, b.min.y + f64::from(y0) / px);
+                let area = BBox::new(
+                    min,
+                    Point::new(min.x + f64::from(pic.width) / px, min.y + f64::from(pic.height) / px),
+                );
+                let size = [pic.width as usize, pic.height as usize];
+                (egui::ColorImage::from_rgba_premultiplied(size, &pic.rgba), area)
+            }
+            None => {
+                let pic = emb_render::raster::picture_at_look(&segments, &[], b, px, THREAD_MM, None, &look);
+                let size = [pic.width as usize, pic.height as usize];
+                (egui::ColorImage::from_rgba_unmultiplied(size, &pic.rgba), b)
+            }
+        };
         let t = crate::resources::load_texture(ctx, format!("product-extra-{}", e.key), image, TextureOptions::LINEAR);
         l.texture = Some((t.clone(), b, look));
         Some((t, b))

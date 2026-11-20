@@ -655,6 +655,16 @@ fn scenes() -> Vec<Scene> {
         st.set_product(emb_model::ProductKind::ALL[0]);
         run_command(st, ctx, Cmd::Turntable);
     }));
+    // The tilt view on the canvas and the checks of the surface (ADR 0129).
+    v.push(Scene::new("tilt view on the canvas", View::Screen, |st, _| {
+        st.stitch_tiles.sync = true;
+        st.tilt.on_canvas = true;
+    }));
+    v.push(Scene::new("surface checks", View::Screen, |st, _| {
+        st.stitch_tiles.sync = true;
+        st.show_through = true;
+        st.show_high_thread = true;
+    }));
     v.push(Scene::new("product photo", View::Windows, |st, _| {
         let data = crate::product_photo::tests::shirt_png();
         if st.set_product_picture(data, "shirt.png", 500.0).is_ok() {

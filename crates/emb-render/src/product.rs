@@ -412,15 +412,15 @@ fn light_factors_with(
             add_ridge(&mut hf, w, h, &pts, width * px_per_mm, height * FOLD_GAIN, taper);
         }
     }
-    let l = lighting.vector();
-    let flat_light = AMBIENT + DIFFUSE * l[2];
+    let lights = lighting.lights();
+    let flat_light = AMBIENT + DIFFUSE * lights.iter().map(|(l, w)| w * l[2]).sum::<f64>();
     let strength = lighting.strength.clamp(0.0, 1.0);
     // The fabric of the product: the same surface as on the canvas (ADR
     // 0127), its mean light in each pixel, as a part of the light of a flat
     // fabric (the light of the product is a part of it too).
     let weave = weave(view.kind);
     let shade = Fabric::shared(weave, weave.default_mm()).shade(lighting);
-    let flat = |l: &Lighting| crate::sheen::diffuse([0.0, 0.0, 1.0], l.vector());
+    let flat = |l: &Lighting| crate::sheen::diffuse_in([0.0, 0.0, 1.0], &l.lights());
     let relative = 1.0 + (flat(&Lighting::default()) / flat(lighting) - 1.0) * strength;
     let step = 2.0 / px_per_mm;
     let height_at = |x: usize, y: usize| f64::from(if mask[y * w + x] { hf[y * w + x] } else { 0.0 });
@@ -436,7 +436,10 @@ fn light_factors_with(
             let hx = (height_at(xr, y) - height_at(xl, y)) / step;
             let hy = (height_at(x, yd) - height_at(x, yu)) / step;
             let len = (hx * hx + hy * hy + 1.0).sqrt();
-            let ndl = ((-hx * l[0] - hy * l[1] + l[2]) / len).max(0.0);
+            let ndl: f64 = lights
+                .iter()
+                .map(|(l, w)| w * ((-hx * l[0] - hy * l[1] + l[2]) / len).max(0.0))
+                .sum();
             let mut f = 1.0 + ((AMBIENT + DIFFUSE * ndl) / flat_light - 1.0) * strength;
             let e = f64::from(dist[i]) / px_per_mm / EDGE_MM;
             if round {
@@ -623,8 +626,7 @@ fn decoration_with(
             let factors = light_factors_with(view, &pic, b, px_per_mm, &lighting, round);
             apply_factors(&mut pic, &factors);
             if !round {
-                embroidery_shadow(&mut pic, b, segments, px_per_mm, thread_mm, &lighting);
-                stitches_onto_look(&mut pic, b, segments, px_per_mm, thread_mm, look.lighting.as_ref());
+                stitches_onto_product(&mut pic, b, segments, px_per_mm, thread_mm, look);
                 return pic;
             }
             // White round the product.
@@ -636,9 +638,100 @@ fn decoration_with(
             pic
         }
     };
-    embroidery_shadow(&mut pic, b, segments, px_per_mm, thread_mm, &lighting);
-    stitches_onto_look(&mut pic, b, segments, px_per_mm, thread_mm, look.lighting.as_ref());
+    stitches_onto_product(&mut pic, b, segments, px_per_mm, thread_mm, look);
     pic
+}
+
+/// The stitches on the picture of the product: with the 3D look, their
+/// surface in the light of the product (ADR 0129: one light); with the
+/// flat look, flat stitches with a soft shadow.
+fn stitches_onto_product(
+    pic: &mut Picture,
+    b: BBox,
+    segments: &[Segment],
+    px_per_mm: f64,
+    thread_mm: f64,
+    look: &Look,
+) {
+    match look.lighting {
+        Some(l) => surface_onto(pic, b, segments, px_per_mm, &l),
+        None => {
+            embroidery_shadow(pic, b, segments, px_per_mm, thread_mm, &Lighting::default());
+            stitches_onto_look(pic, b, segments, px_per_mm, thread_mm, None);
+        }
+    }
+}
+
+/// The surface of the stitches `segments` (the coordinates of `b`) in the
+/// light `lighting` (ADR 0124 to 0129): their heights, the sheen of their
+/// thread and their shadows on what is under them, as a picture of the
+/// part of `b` that they reach at `px_per_mm` (premultiplied alpha: the
+/// threads, and a dark layer for their shadows and gaps), and the place of
+/// its top left pixel in the pixels of `b`. `None` if no stitch is in `b`.
+pub fn stitch_surface(
+    segments: &[Segment],
+    b: BBox,
+    px_per_mm: f64,
+    lighting: &Lighting,
+) -> Option<(Picture, u32, u32)> {
+    let strands: Vec<crate::strand::Strand> = segments
+        .iter()
+        .filter(|s| s.kind == crate::SegmentKind::Stitch)
+        .enumerate()
+        .map(|(i, s)| crate::strand::Strand {
+            a: s.a,
+            b: s.b,
+            color: s.color,
+            kind: s.thread_kind,
+            weight: s.thread_weight,
+            lift_mm: 0.0,
+            record: i as u32,
+        })
+        .collect();
+    let laid = crate::surface::lay(&strands, &[]);
+    if laid.is_empty() {
+        return None;
+    }
+    // The pixels of `b` that the stitches and their shadows reach.
+    let reach = laid.bounds().expand(laid.apron(lighting, None));
+    let (w, h) = (
+        (b.width() * px_per_mm).ceil().max(1.0),
+        (b.height() * px_per_mm).ceil().max(1.0),
+    );
+    let x0 = ((reach.min.x - b.min.x) * px_per_mm).floor().clamp(0.0, w);
+    let y0 = ((reach.min.y - b.min.y) * px_per_mm).floor().clamp(0.0, h);
+    let x1 = ((reach.max.x - b.min.x) * px_per_mm).ceil().clamp(0.0, w);
+    let y1 = ((reach.max.y - b.min.y) * px_per_mm).ceil().clamp(0.0, h);
+    if x1 <= x0 || y1 <= y0 {
+        return None;
+    }
+    let area = BBox::new(
+        Point::new(b.min.x + x0 / px_per_mm, b.min.y + y0 / px_per_mm),
+        Point::new(b.min.x + x1 / px_per_mm, b.min.y + y1 / px_per_mm),
+    );
+    let s = laid.surface_in(area, px_per_mm, lighting);
+    Some((crate::sheen::overlay(&s, lighting), x0 as u32, y0 as u32))
+}
+
+/// Puts the surface of the stitches `segments` on `pic` (which shows `b` at
+/// `px_per_mm`), see [`stitch_surface`].
+pub fn surface_onto(pic: &mut Picture, b: BBox, segments: &[Segment], px_per_mm: f64, lighting: &Lighting) {
+    let Some((over, x0, y0)) = stitch_surface(segments, b, px_per_mm, lighting) else {
+        return;
+    };
+    for y in 0..over.height.min(pic.height.saturating_sub(y0)) {
+        for x in 0..over.width.min(pic.width.saturating_sub(x0)) {
+            let s = ((y * over.width + x) * 4) as usize;
+            let d = (((y0 + y) * pic.width + x0 + x) * 4) as usize;
+            let a = f64::from(over.rgba[s + 3]) / 255.0;
+            for k in 0..3 {
+                let v = f64::from(over.rgba[s + k]) + f64::from(pic.rgba[d + k]) * (1.0 - a);
+                pic.rgba[d + k] = v.round().min(255.0) as u8;
+            }
+            let da = f64::from(pic.rgba[d + 3]) / 255.0;
+            pic.rgba[d + 3] = ((a + da * (1.0 - a)) * 255.0).round() as u8;
+        }
+    }
 }
 
 /// The pictures `a` and `b` next to each other (`a` on the left) with a
@@ -959,6 +1052,54 @@ mod tests {
     }
 
     #[test]
+    fn the_stitches_on_the_product_have_their_surface_in_its_light() {
+        // A satin block on a light cushion: with the 3D look the stitches
+        // are the surface, in the light of the product (ADR 0129).
+        let v = ProductView::new(ProductKind::Cushion, Rgb(230, 230, 230));
+        let segs: Vec<Segment> = (0..40)
+            .map(|k| {
+                let y = 200.0 + f64::from(k) * 0.4;
+                Segment {
+                    a: Point::new(-20.0, y),
+                    b: Point::new(20.0, y),
+                    color: Rgb(0, 0, 200),
+                    kind: SegmentKind::Stitch,
+                    ..Default::default()
+                }
+            })
+            .collect();
+        let b = v.bbox().expand(10.0);
+        let lit = |l: Lighting| decoration(&v, None, &segs, 8.0, 0.4, &Look::three_d(None).with_light(l));
+        let (a, c) = (
+            lit(Lighting::default()),
+            lit(crate::thread3d::LightPreset::LowSide.apply(&Lighting::default())),
+        );
+        // The block is blue, and a low light changes its light.
+        let blue = pixel(&a, b, 8.0, Point::new(0.0, 208.0));
+        assert!(blue[2] > blue[0] + 80, "{blue:?}");
+        assert_ne!(pixel(&c, b, 8.0, Point::new(0.0, 208.0)), blue);
+        // A low light from the left puts a shadow on the right of the block;
+        // from the right it does not (the mean of the 0.5 mm of fabric
+        // beside the end: one layer of thread is about 0.2 mm high).
+        let from_right = lit(Lighting {
+            azimuth_deg: 0.0,
+            ..crate::thread3d::LightPreset::LowSide.apply(&Lighting::default())
+        });
+        let beside = |p: &Picture| {
+            let mut sum = 0.0;
+            for i in 0..4 {
+                for j in 0..64 {
+                    let at = Point::new(20.05 + 0.125 * f64::from(i), 204.0 + 0.125 * f64::from(j));
+                    sum += luma(pixel(p, b, 8.0, at));
+                }
+            }
+            sum / 256.0
+        };
+        let (shadow, light) = (beside(&c), beside(&from_right));
+        assert!(shadow < light - 3.0, "{shadow} {light}");
+    }
+
+    #[test]
     fn the_decoration_has_the_3d_look() {
         let v = ProductView::new(ProductKind::Tote, Rgb(240, 230, 200));
         let seg = Segment {
@@ -971,11 +1112,12 @@ mod tests {
         let flat = decoration(&v, None, &[seg], 8.0, 1.0, &Look::default());
         let lit = decoration(&v, None, &[seg], 8.0, 1.0, &Look::three_d(None));
         let b = v.bbox().expand(10.0);
-        // The top edge of the thread is lighter than the bottom edge (light from the top left).
-        let top = pixel(&lit, b, 8.0, Point::new(0.0, 229.75))[2];
-        let bottom = pixel(&lit, b, 8.0, Point::new(0.0, 230.25))[2];
-        let flat_top = pixel(&flat, b, 8.0, Point::new(0.0, 229.75))[2];
-        let flat_bottom = pixel(&flat, b, 8.0, Point::new(0.0, 230.25))[2];
+        // The top edge of the thread (0.4 mm wide) is lighter than the bottom
+        // edge (light from the top left).
+        let top = pixel(&lit, b, 8.0, Point::new(0.0, 229.85))[2];
+        let bottom = pixel(&lit, b, 8.0, Point::new(0.0, 230.15))[2];
+        let flat_top = pixel(&flat, b, 8.0, Point::new(0.0, 229.85))[2];
+        let flat_bottom = pixel(&flat, b, 8.0, Point::new(0.0, 230.15))[2];
         assert!(
             i32::from(top) - i32::from(bottom) > (i32::from(flat_top) - i32::from(flat_bottom)).abs() + 20,
             "{top} {bottom} {flat_top} {flat_bottom}"

@@ -571,6 +571,16 @@ impl TileCache {
         self.designs.remove(&doc);
     }
 
+    /// The stitches of `scene` laid (canvas coordinates) and a number for
+    /// the lay (another lay has another number), when the lay of its plan
+    /// is there; starts the lay if it is not (ADR 0129: the tilt view, the
+    /// magnifier and the check views use the lay of the tiles).
+    pub fn laid_for(&mut self, ctx: &egui::Context, scene: &Scene) -> Option<(u64, Arc<Laid>)> {
+        self.update_lay(ctx, scene);
+        let lay = self.designs.get(&scene.doc)?.lay.as_ref()?;
+        (lay.state == scene.state).then(|| (hash_of((scene.doc, lay.generation)), lay.laid.clone()))
+    }
+
     /// Waits until the threads have made what the views asked for and
     /// takes their results (the tests), at most `limit`.
     #[cfg(test)]
@@ -623,6 +633,7 @@ impl TileCache {
                 scene.lighting.elevation_deg.to_bits(),
                 scene.lighting.strength.to_bits(),
                 scene.lighting.lights_off,
+                scene.lighting.two,
                 scene.ground.as_ref().map(Ground::key),
                 shown.key,
             )),
@@ -1426,6 +1437,29 @@ pub fn tiles_of(ctx: &egui::Context, rect: Rect, view: &CanvasView, st: &mut App
         moving: &moving,
     };
     st.stitch_tiles.draw(ctx, rect, view, &scene)
+}
+
+/// The stitches of the design of `st` laid, when the lay is there (see
+/// [`TileCache::laid_for`]).
+pub fn laid_of(ctx: &egui::Context, st: &mut AppState) -> Option<(u64, Arc<Laid>)> {
+    let (state, plan) = {
+        let pv = st.shown_plan();
+        (pv.state, pv.plan.clone())
+    };
+    let ground = st.ground_of(st.doc.design());
+    let filter = ViewFilter::default();
+    let scene = Scene {
+        doc: st.doc_id,
+        state,
+        plan: &plan,
+        design: st.doc.design(),
+        lighting: st.settings.look.light,
+        ground,
+        filter: &filter,
+        cursor: None,
+        moving: &[],
+    };
+    st.stitch_tiles.laid_for(ctx, &scene)
 }
 
 /// Paints the tiles of the canvas: the look of today under them where a

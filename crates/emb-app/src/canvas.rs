@@ -26,7 +26,8 @@ pub fn set_calibration(factor: f64) {
     CALIBRATION.with(|c| c.set(factor.clamp(0.5, 2.0)));
 }
 
-fn points_per_mm() -> f64 {
+/// Screen points for each mm at 100 % (the real size).
+pub fn points_per_mm() -> f64 {
     POINTS_PER_MM * CALIBRATION.with(std::cell::Cell::get)
 }
 pub const MIN_ZOOM: f64 = 0.1;
@@ -235,9 +236,13 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
     st.mods = mods;
     // A draw tool takes the left and right clicks (see `draw`).
     let drawing = !matches!(st.tool, Tool::Select | Tool::Reshape);
+    // L held: a drag moves the light (ADR 0129), not a tool.
+    let lighting = crate::viewer::light_drag(ui, &response, rect, st);
     // Rulers and guides first: a drag from a ruler or on a guide is not for the tool.
-    let by_guides = st.sketch.is_none() && !st.hoopings_ui.mode && crate::workspace::guide_input(ui, &response, st);
-    if st.sketch.is_some() {
+    let by_guides =
+        !lighting && st.sketch.is_none() && !st.hoopings_ui.mode && crate::workspace::guide_input(ui, &response, st);
+    if lighting {
+    } else if st.sketch.is_some() {
         crate::sketch::handle_input(ui, &response, st, &map);
     } else if st.hoopings_ui.mode {
         crate::hooping::handle_input(ui, &response, st, &map);
@@ -406,16 +411,25 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
         } else {
             None
         };
+        // Before and After: the stitches of now on the right of its line.
+        let now = match crate::viewer::before_after_line(rect, st) {
+            Some(x) => painter
+                .with_clip_rect(Rect::from_min_max(Pos2::new(x, rect.top()), rect.max).intersect(painter.clip_rect())),
+            None => painter.clone(),
+        };
         match tiles {
-            Some(frame) => crate::stitch_tiles::paint(&painter, rect, st, frame, &segs, look, &table),
+            Some(frame) => crate::stitch_tiles::paint(&now, rect, st, frame, &segs, look, &table),
             None => {
                 let mesh = fitted_mesh(rect, &st.view, &segs, st.show_jumps, look, &table).0;
-                painter.add(Shape::mesh(mesh));
+                now.add(Shape::mesh(mesh));
             }
         }
+        // The stitches before a change, on the left of the line (ADR 0129).
+        crate::viewer::draw_before_after(ui, &painter, rect, st);
         if st.show_density {
             crate::density::draw(&painter, ui.ctx(), rect, st);
         }
+        crate::checks::draw(&painter, ui.ctx(), rect, st);
         crate::repeats::draw(&painter, rect, st);
         crate::viewing::draw_overlay(&painter, rect, st);
         if waits {
@@ -465,6 +479,11 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
     crate::guides::draw(&painter, rect, st);
     crate::workspace::draw_rulers(&painter, rect, st, visuals.dark_mode);
     crate::guides::draw_ruler_markers(&painter, rect, st);
+    // The magnifier and the light by hand (ADR 0129), over all.
+    if let Some(pos) = response.hover_pos() {
+        crate::viewer::draw_magnifier(&painter, ui.ctx(), rect, pos, st);
+    }
+    crate::viewer::draw_light(&painter, ui.ctx(), rect, st, response.hovered());
 }
 
 /// Returns the topmost object at the point (view mm), by its real shape.

@@ -82,6 +82,17 @@ pub struct AppState {
     /// View > Density map (P11 Milestone 1).
     pub show_density: bool,
     pub density_cache: Option<crate::density::DensityCache>,
+    /// The check views of the surface (ADR 0129): the fabric that shows
+    /// through, the high thread, and their map.
+    pub show_through: bool,
+    pub show_high_thread: bool,
+    pub check_cache: crate::checks::CheckCache,
+    /// The tilt view (ADR 0129).
+    pub tilt: crate::tilt::TiltView,
+    /// The magnifier of the canvas (ADR 0129).
+    pub magnifier: crate::viewer::Magnifier,
+    /// Before and After: the stitches of the design before (ADR 0129).
+    pub before_after: Option<crate::viewer::BeforeAfter>,
     pub cursor_mm: Option<Point>,
     /// A jump of the pointer that the endless pan asked for and that has
     /// not come yet, with the frames that it can still take
@@ -659,6 +670,12 @@ impl AppState {
             show_jumps: false,
             show_density: false,
             density_cache: None,
+            show_through: false,
+            show_high_thread: false,
+            check_cache: Default::default(),
+            tilt: Default::default(),
+            magnifier: Default::default(),
+            before_after: None,
             cursor_mm: None,
             fit_requested: true,
             message,
@@ -1631,7 +1648,11 @@ impl TabViewer for AppState {
         match tab {
             Tab::Canvas => {
                 self.library_drawn = Some(false);
-                canvas::show(ui, self)
+                if self.tilt.on_canvas {
+                    crate::tilt::canvas(ui, self)
+                } else {
+                    canvas::show(ui, self)
+                }
             }
             Tab::Properties => panels::properties(ui, self),
             Tab::Sequence => sequence_panel::show(ui, self),
@@ -1790,6 +1811,7 @@ impl EmbApp {
         crate::product::window(&ctx, st);
         crate::product_photo::window(&ctx, st);
         crate::turntable::window(&ctx, st);
+        crate::tilt::window(&ctx, st);
         crate::repeats::window(&ctx, st);
         crate::about::window(&ctx, st);
         crate::first_start::window(&ctx, st);

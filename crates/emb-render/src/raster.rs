@@ -36,6 +36,14 @@ impl Look {
             fabric,
         }
     }
+
+    /// This look in the light `l` (the 3D look).
+    pub fn with_light(self, l: Lighting) -> Look {
+        Look {
+            lighting: Some(l),
+            ..self
+        }
+    }
 }
 
 /// RGBA pixels, row by row from the top.

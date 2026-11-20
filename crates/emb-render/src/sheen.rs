@@ -93,10 +93,28 @@ fn hash(x: i64, y: i64, seed: u64) -> f64 {
     (h & 0xFFFF) as f64 / 65535.0
 }
 
-/// The diffuse light of a surface with the normal `n` in the light `l`: a
-/// factor of the color of its thread.
-pub(crate) fn diffuse(n: [f64; 3], l: [f64; 3]) -> f64 {
-    AMBIENT + DIFFUSE * (n[0] * l[0] + n[1] * l[1] + n[2] * l[2]).max(0.0)
+/// The diffuse light of a surface with the normal `n` in the lights
+/// `lights` (`Lighting::lights`): a factor of the color of its thread.
+pub(crate) fn diffuse_in(n: [f64; 3], lights: &[([f64; 3], f64); 2]) -> f64 {
+    AMBIENT
+        + DIFFUSE
+            * lights
+                .iter()
+                .map(|(l, w)| w * (n[0] * l[0] + n[1] * l[1] + n[2] * l[2]).max(0.0))
+                .sum::<f64>()
+}
+
+/// The half vector of the light `l` and the eye (straight above).
+pub(crate) fn half_vector(l: [f64; 3]) -> [f64; 3] {
+    let v = [l[0], l[1], l[2] + 1.0];
+    let len = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt().max(1e-9);
+    v.map(|c| c / len)
+}
+
+/// `true` if the shadows of the surface in the light `a` are those in the
+/// light `b`.
+pub(crate) fn same_shadows(a: &Lighting, b: &Lighting) -> bool {
+    a.azimuth_deg == b.azimuth_deg && a.elevation_deg == b.elevation_deg && a.two == b.two
 }
 
 /// The highlight of a kind of thread: its strength and its sharpness (a
@@ -147,25 +165,30 @@ pub(crate) fn tone(c: [f64; 3]) -> [f64; 3] {
 
 /// The shadow at the pixel (`x`, `y`): the shadow of the surface when its
 /// light is `l` (made at the detail and halved), else from the heights of
-/// this zoom level.
-/// `v` is the direction of the light `l` (`Lighting::vector`).
-fn shadow(s: &Surface, x: i64, y: i64, l: &Lighting, v: [f64; 3], top: f64) -> f64 {
-    if l.azimuth_deg == s.light.azimuth_deg && l.elevation_deg == s.light.elevation_deg {
+/// this zoom level (the mean of the shadows of the lights, by their parts).
+fn shadow(s: &Surface, x: i64, y: i64, l: &Lighting, top: f64) -> f64 {
+    if same_shadows(l, &s.light) {
         let (t, i) = s.at(x as u32, y as u32);
         return f64::from(t.shadow[i]) / 255.0;
     }
     let at = |x: i64, y: i64| f64::from(s.height(x, y));
-    crate::surface::shadow_at(
-        &at,
-        i64::from(s.width),
-        i64::from(s.height),
-        x,
-        y,
-        v,
-        l.strength,
-        s.px_per_mm,
-        top,
-    )
+    l.lights()
+        .iter()
+        .filter(|(_, w)| *w > 0.0)
+        .map(|(v, w)| {
+            w * crate::surface::shadow_at(
+                &at,
+                i64::from(s.width),
+                i64::from(s.height),
+                x,
+                y,
+                *v,
+                l.strength,
+                s.px_per_mm,
+                top,
+            )
+        })
+        .sum()
 }
 
 /// The light of a surface: for each pixel the color in linear light (it
@@ -389,63 +412,70 @@ struct Pixel {
 struct Lit<'a> {
     s: &'a Surface,
     lighting: &'a Lighting,
-    l: [f64; 3],
+    /// The direction of each light and its part (`Lighting::lights`).
+    lights: [([f64; 3], f64); 2],
     k: f64,
     same_light: bool,
     top: f64,
-    /// The mean highlight over all directions, for each kind.
-    means: Vec<f64>,
+    /// The mean highlight over all directions, for each kind and each
+    /// light.
+    means: Vec<[f64; 2]>,
     twist: f64,
     /// The heights round the surface for the shadows in another light.
     around: Option<&'a Around<'a>>,
     /// What shows through a hole (linear light).
     behind: [f64; 3],
-    /// The half vector of the light and the eye (straight above).
-    half: [f64; 3],
+    /// The half vector of each light and the eye (straight above).
+    half: [[f64; 3]; 2],
 }
 
 impl<'a> Lit<'a> {
     fn new(s: &'a Surface, lighting: &'a Lighting) -> Lit<'a> {
-        let l = lighting.vector();
+        let lights = lighting.lights();
         Lit {
             s,
             lighting,
-            l,
+            lights,
             k: lighting.strength.clamp(0.0, 1.0),
-            same_light: lighting.azimuth_deg == s.light.azimuth_deg && lighting.elevation_deg == s.light.elevation_deg,
+            same_light: same_shadows(lighting, &s.light),
             top: f64::from(s.max_height()),
-            means: ThreadKind::ALL.iter().map(|&kd| mean_lobe(l, sheen_of(kd).1)).collect(),
+            means: ThreadKind::ALL
+                .iter()
+                .map(|&kd| lights.map(|(l, _)| mean_lobe(l, sheen_of(kd).1)))
+                .collect(),
             twist: math::to_radians(TWIST_DEG),
             around: None,
             behind: [BEHIND.0, BEHIND.1, BEHIND.2]
                 .map(|c| to_linear(c) * if lighting.lights_off { LIGHTS_OFF } else { 1.0 }),
-            half: {
-                let v = [l[0], l[1], l[2] + 1.0];
-                let len = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt().max(1e-9);
-                v.map(|c| c / len)
-            },
+            half: lights.map(|(l, _)| half_vector(l)),
         }
     }
 
     /// The light of the pixel (`x`, `y`).
     fn at(&self, x: usize, y: usize) -> Pixel {
-        let (s, k, l) = (self.s, self.k, self.l);
+        let (s, k, lights) = (self.s, self.k, &self.lights);
         let (t, i) = s.at(x as u32, y as u32);
         let open = f64::from(t.open[i]) / 255.0;
         let dark = match self.around {
             _ if k <= 0.0 => 0.0,
-            Some(a) => crate::surface::shadow_with(
-                &|x, y| (a.height)(x, y),
-                None,
-                a.pixels,
-                x as i64,
-                y as i64,
-                l,
-                self.lighting.strength,
-                s.px_per_mm,
-                a.top,
-            ),
-            None => shadow(s, x as i64, y as i64, self.lighting, l, self.top),
+            Some(a) => lights
+                .iter()
+                .filter(|(_, w)| *w > 0.0)
+                .map(|(l, w)| {
+                    w * crate::surface::shadow_with(
+                        &|x, y| (a.height)(x, y),
+                        None,
+                        a.pixels,
+                        x as i64,
+                        y as i64,
+                        *l,
+                        self.lighting.strength,
+                        s.px_per_mm,
+                        a.top,
+                    )
+                })
+                .sum(),
+            None => shadow(s, x as i64, y as i64, self.lighting, self.top),
         };
         let shade = 1.0 + (open * (1.0 - SHADOW_DARK * dark) - 1.0) * k;
         let fabric = if self.same_light {
@@ -469,7 +499,7 @@ impl<'a> Lit<'a> {
         let lit = if self.same_light {
             f64::from(t.diffuse[i]) / 255.0 * 2.0
         } else {
-            diffuse(t.normal[i].map(|v| f64::from(v) / 127.0), l)
+            diffuse_in(t.normal[i].map(|v| f64::from(v) / 127.0), lights)
         };
         let factor = lit * (1.0 + PLY_LIGHT * ply);
         let factor = 1.0 + (factor - 1.0) * k;
@@ -479,17 +509,22 @@ impl<'a> Lit<'a> {
         // faces the light.
         if t.material[i] == crate::surface::material::STONE {
             let n = t.normal[i].map(|v| f64::from(v) / 127.0);
-            let h = self.half;
-            let nh = (n[0] * h[0] + n[1] * h[1] + n[2] * h[2]).max(0.0);
             // The light that the foil at the back of the stone sends back
             // through it: the facets on the far side from the light.
             let back = [-n[0] * FOIL, -n[1] * FOIL, n[2]];
             let bl = (back[0] * back[0] + back[1] * back[1] + back[2] * back[2])
                 .sqrt()
                 .max(1e-9);
-            let bh = ((back[0] * h[0] + back[1] * h[1] + back[2] * h[2]) / bl).max(0.0);
-            let shine =
-                STONE_SHINE * (math::pow(nh, STONE_SHARP) + FOIL_SHINE * math::pow(bh, STONE_SHARP)) * shade * k;
+            let mut sparkle = 0.0;
+            for (h, (_, w)) in self.half.iter().zip(lights) {
+                if *w <= 0.0 {
+                    continue;
+                }
+                let nh = (n[0] * h[0] + n[1] * h[1] + n[2] * h[2]).max(0.0);
+                let bh = ((back[0] * h[0] + back[1] * h[1] + back[2] * h[2]) / bl).max(0.0);
+                sparkle += w * (math::pow(nh, STONE_SHARP) + FOIL_SHINE * math::pow(bh, STONE_SHARP));
+            }
+            let shine = STONE_SHINE * sparkle * shade * k;
             c = base.map(|v| v * (STONE_DIFFUSE + (1.0 - STONE_DIFFUSE) * factor) * shade + shine);
         }
         // The sheen of the fibers (a piece of fabric has the diffuse light
@@ -499,8 +534,13 @@ impl<'a> Lit<'a> {
             let a = t.axis[i].map(|v| f64::from(v) / 127.0);
             let one = (a[0] * a[0] + a[1] * a[1]).sqrt().min(1.0);
             let angle = math::atan2(a[1], a[0]) / 2.0 + self.twist;
-            let mean = self.means[ThreadKind::ALL.iter().position(|x| *x == kind).unwrap_or(0)];
-            let hl = one * lobe(angle, l, sharp) + (1.0 - one) * mean;
+            let means = self.means[ThreadKind::ALL.iter().position(|x| *x == kind).unwrap_or(0)];
+            let hl: f64 = lights
+                .iter()
+                .zip(means)
+                .filter(|((_, w), _)| *w > 0.0)
+                .map(|((l, w), mean)| w * (one * lobe(angle, *l, sharp) + (1.0 - one) * mean))
+                .sum();
             let mut hl = strength * hl * (0.6 + 0.4 * ply) * shade * k;
             // Metallic thread: glints of its foil, each at a place along the
             // thread and turned a little, so they change with the light.
@@ -514,7 +554,12 @@ impl<'a> Lit<'a> {
                 if hash(gx, gy, 1) > 0.55 {
                     let turn = (hash(gx, gy, 2) - 0.5) * 1.2;
                     let fade = ((s.px_per_mm - GLINT_FROM_PX) / 10.0).clamp(0.0, 1.0);
-                    hl += GLINT * one * lobe(angle + turn, l, GLINT_SHARP) * shade * k * fade;
+                    let glint: f64 = lights
+                        .iter()
+                        .filter(|(_, w)| *w > 0.0)
+                        .map(|(l, w)| w * lobe(angle + turn, *l, GLINT_SHARP))
+                        .sum();
+                    hl += GLINT * one * glint * shade * k * fade;
                 }
             }
             // Metallic thread reflects in its own color.

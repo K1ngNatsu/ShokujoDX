@@ -304,6 +304,10 @@ pub fn run(r: &Reference, flat: bool) -> Measure {
     };
     let mut surface_shots = Vec::new();
     let mut bare_shots = Vec::new();
+    // The viewer (ADR 0129): a low light from the side at the close zoom,
+    // and the design tilted.
+    let mut viewer_shots = Vec::new();
+    let low = emb_render::thread3d::LightPreset::LowSide.apply(&Default::default());
     let mut shots = Vec::new();
     for z in ZOOMS {
         let b = z.close_mm.map_or(all, |s| BBox::from_center_size(at, s, s));
@@ -358,6 +362,38 @@ pub fn run(r: &Reference, flat: bool) -> Measure {
             ms,
             bytes: p.rgba.len(),
         });
+        if z.name == "close" {
+            let s = laid.surface_on(b, z.px_per_mm, &low, Some(&ground));
+            let p = emb_render::sheen::light(&s, &low, fabric);
+            viewer_shots.push(Shot {
+                name: format!("{}-{}-low", r.name, z.name),
+                hash: hash(&p),
+                picture: p,
+            });
+        }
+        if z.name == "normal" {
+            let relief = emb_render::tilt::Relief::of(&surface, &Default::default(), fabric);
+            let camera = emb_render::tilt::Camera {
+                center: b.center(),
+                px_per_mm: z.px_per_mm * 0.9,
+                turn_deg: 20.0,
+                tilt_deg: 55.0,
+                lift: 4.0,
+            };
+            let (p, ms) = timed(|| {
+                emb_render::tilt::project(&relief, &camera, surface.width, surface.height, [128, 128, 128, 255])
+            });
+            steps.push(Step {
+                name: format!("tilt {}", z.name),
+                ms,
+                bytes: p.rgba.len(),
+            });
+            viewer_shots.push(Shot {
+                name: format!("{}-tilt", r.name),
+                hash: hash(&p),
+                picture: p,
+            });
+        }
         surface_shots.push(Shot {
             name: format!("{}-{}-surface", r.name, z.name),
             hash: hash(&p),
@@ -366,6 +402,7 @@ pub fn run(r: &Reference, flat: bool) -> Measure {
     }
     shots.extend(surface_shots);
     shots.extend(bare_shots);
+    shots.extend(viewer_shots);
     Measure {
         name: r.name.to_string(),
         stitches: plan.stitches.stitch_count(),

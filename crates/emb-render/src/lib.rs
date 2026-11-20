@@ -26,6 +26,7 @@
 #![forbid(unsafe_code)]
 
 pub mod barcode;
+pub mod check;
 pub mod compare;
 pub mod cross_chart;
 pub mod density;
@@ -46,6 +47,7 @@ pub mod surface;
 pub mod svg;
 pub mod template;
 pub mod thread3d;
+pub mod tilt;
 pub mod turntable;
 
 use emb_geom::{BBox, Point};

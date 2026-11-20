@@ -121,6 +121,15 @@ cloth**. Puff columns are round over their foam. Metallic thread has
 small glints at a large zoom, and **View > Thread Look > Lights off**
 shows only glow-in-the-dark thread. See [Checking a design](checking).
 
+**Check the look.** The **Check** panel of the View tab has new tools:
+light presets and a light that you move (hold **L** and drag), a **Tilt
+View** that shows the embroidery from an angle with its heights (on the
+canvas or in a window), a **Magnifier** at 20 times, **Compare 3D** and
+**Before and After**, and two checks of the surface: **Fabric Shows
+Through** and **High Thread**. The product and the turntable show the
+stitches with their heights and their sheen, in the light of the
+product. See [Checking a design](checking).
+
 **Designs with very many stitches.** The program could stop when the
 canvas showed about 350,000 stitches or more at one time in the thread
 look. Now the canvas shows them in a simpler look at that zoom, and in

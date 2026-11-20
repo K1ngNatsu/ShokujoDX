@@ -320,37 +320,8 @@ pub fn look_ui(ui: &mut egui::Ui, st: &mut AppState) {
             ui.radio_value(&mut l.three_d, true, tr("3D (light and shade)"));
         });
         ui.add_enabled_ui(l.three_d, |ui| {
-            egui::Grid::new("look").num_columns(2).show(ui, |ui| {
-                ui.label(tr("Light from"));
-                ui.add(
-                    egui::Slider::new(&mut l.light.azimuth_deg, 0.0..=360.0)
-                        .clamping(egui::SliderClamping::Edits)
-                        .suffix("°")
-                        .fixed_decimals(0),
-                )
-                .on_hover_text(tr(
-                    "The direction of the light: 0° from the right, 90° from the top, 135° from the top left.",
-                ));
-                ui.end_row();
-                ui.label(tr("Light height"));
-                ui.add(
-                    egui::Slider::new(&mut l.light.elevation_deg, 10.0..=90.0)
-                        .clamping(egui::SliderClamping::Edits)
-                        .suffix("°")
-                        .fixed_decimals(0),
-                )
-                .on_hover_text(tr(
-                    "Low light gives long shadows and strong shade; 90° is straight above.",
-                ));
-                ui.end_row();
-                ui.label(tr("Strength"));
-                ui.add(
-                    egui::Slider::new(&mut l.light.strength, 0.0..=1.0)
-                        .clamping(egui::SliderClamping::Edits)
-                        .fixed_decimals(2),
-                );
-                ui.end_row();
-            });
+            crate::viewer::light_ui(ui, &mut l.light);
+            ui.separator();
             ui.checkbox(&mut l.surface, tr("Fine surface")).on_hover_text(tr(
                 "Shows the surface of the stitches: their heights, the sheen of the thread and the shadows. Clear it on a slow computer for the faster look.",
             ));

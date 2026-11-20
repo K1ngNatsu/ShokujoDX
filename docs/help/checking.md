@@ -2,7 +2,7 @@
 id: checking
 title: Checking a design
 group: production
-keywords: check, preview, stitch player, play, sew-out, simulate, stitch cursor, travel, stitch list, functions, design info, warnings, density map, layers, build up, thread look, 3d, light, needle points, jumps, trims, product, t-shirt, mockup, repeats, continuous, approval, sew time, stitch count
+keywords: check, preview, stitch player, play, sew-out, simulate, stitch cursor, travel, stitch list, functions, design info, warnings, density map, layers, build up, thread look, 3d, light, light presets, tilt, tilt view, turn, magnifier, compare, before and after, show through, gaps, high thread, thread breaks, needle points, jumps, trims, product, t-shirt, mockup, repeats, continuous, approval, sew time, stitch count
 ---
 # Checking a design
 
@@ -102,6 +102,44 @@ program makes the surface in parts while you
 work; a part that is not ready yet shows the faster look for a moment.
 Clear **Fine surface** on a slow computer.
 
+## Check the look
+
+The **Check** panel of the View tab has tools to check a design before
+you sew it.
+
+- **Light**: the presets **From the top left** (the default), **Flat
+  from above**, **Low from the side** (it shows each height and each
+  gap) and **Two lights**, and the direction and the height of the
+  light. Hold **L** and drag on the design to move the light: in the
+  middle of the view it is straight above, at the edge it is low.
+- **Tilt View** shows the embroidery from an angle on the canvas. Drag
+  up and down to tilt it and across to turn it, drag with the right
+  button to move it, and turn the wheel to zoom. **Heights** makes the
+  heights larger (×1 is the real height). The light stays in its place
+  when the design turns, as when you turn a hoop under a lamp. The tools
+  of the canvas wait until you click **Close**. **Tilt Window** shows
+  the same view in a window, so you can change the design and see it
+  from an angle.
+- **Magnifier** shows the thread at 20 times its real size in a round
+  window at the pointer.
+- **Compare 3D** shows the stitches on the canvas and the 3D look in the
+  split view, at the same place and zoom (**Same Place** in the split
+  view).
+- **Before and After** keeps the stitches as they are now. Change a
+  setting, then drag the line on the canvas: the left side shows the
+  stitches before, the right side the stitches now.
+- **Fabric Shows Through** marks the places where the fabric shows
+  through a fill or a satin, from the laid threads (their widths,
+  heights and gaps). Fills that are open by design (a blend, a texture,
+  motifs) are not checked. Make the density higher, or change the angle
+  of the rows, until the place closes.
+- **High Thread** marks the places where the thread is higher than the
+  limit over the fabric (foam and padding do not count): a risk of
+  thread breaks.
+
+Set the limits of the two checks in **Options** (**Fabric shows
+through** and **Thread height limit**).
+
 ## Other views of the stitches
 
 **View > Show** has **Jumps** (jumps and travel lines), **Needle Points**
@@ -117,8 +155,9 @@ the design goes (**Put the design at**). **Show Product** shows or hides
 it. **Picture on Product** saves a PNG picture of the design with the
 thread look on the product, for a customer. The product does not sew.
 A drawn product has light and shade, folds and the texture of its
-fabric, in the light of the thread look; in the picture, the embroidery
-has a soft shadow on it; on a cap, the picture shows the design a little
+fabric, in the light of the thread look; with the 3D look, the
+embroidery on it has its heights, its sheen and its shadows in the same
+light; on a cap, the picture shows the design a little
 curved round the crown. **Add a design…** shows one more design (a
 project or a machine file) on the product, for example a name on a
 sleeve with this design at the left chest: set its place in the list

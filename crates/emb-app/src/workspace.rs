@@ -452,6 +452,12 @@ pub struct Settings {
     /// The layers of thread over which the density map shows red and
     /// Design info lists the place (P11 Milestone 1).
     pub density_limit: f64,
+    /// The part of the fabric that can show through a fill or a satin
+    /// before View > Fabric Shows Through marks the place (ADR 0129).
+    pub show_through_limit: f64,
+    /// The height of the thread over which View > High Thread marks the
+    /// place, mm (ADR 0129).
+    pub thread_height_limit_mm: f64,
     /// The prices of the thread, for the cost in Design info.
     pub thread_prices: emb_model::thread_use::ThreadPrices,
     /// The price lists of the Quote window (ADR 0064).
@@ -511,6 +517,8 @@ impl Default for Settings {
             needles: Default::default(),
             my_stones: Vec::new(),
             density_limit: emb_render::density::DEFAULT_LIMIT,
+            show_through_limit: emb_render::check::DEFAULT_SHOW_LIMIT,
+            thread_height_limit_mm: emb_render::check::DEFAULT_HEIGHT_MM,
             thread_prices: Default::default(),
             price_lists: vec![Default::default()],
             thread_stock: Default::default(),
@@ -1444,6 +1452,8 @@ pub fn options_window(ctx: &egui::Context, st: &mut AppState) {
             crate::viewtools::display_colors_ui(ui, &mut s.display);
             ui.separator();
             crate::density::options_ui(ui, &mut s);
+            ui.separator();
+            crate::checks::options_ui(ui, &mut s);
             ui.separator();
             crate::setup::calibration_ui(ui, &mut s);
             ui.separator();

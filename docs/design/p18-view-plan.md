@@ -15,7 +15,8 @@ of a small computer are open (`docs/design/p18-view-m5-report.md`, ADR
 0126). Milestone 6 is done except the compare with the photos
 (`docs/design/p18-view-m6-report.md`, ADR 0127). Milestone 7 is done
 except the compare with the sew-outs (`docs/design/p18-view-m7-report.md`,
-ADR 0128).
+ADR 0128). Milestone 8 is done except the check of the owner
+(`docs/design/p18-view-m8-report.md`, ADR 0129).
 
 ## Goal
 
@@ -474,6 +475,23 @@ tilt, finds a place where the fabric shows through, changes the density
 and sees the place closed; the tilt view of a design with 100,000
 stitches moves at 20 frames in a second or more on the development
 computer.
+
+**Done (2026-11-19, ADR 0129), except the check of the owner.** Two
+lights and the light presets (`Lighting::two`, `LightPreset`), and the
+light by hand (hold L and drag; `emb-app/src/viewer.rs`). The tilt view
+(`emb_render::tilt`: a relief of the surface in a light, a parallel
+projection column by column; `emb-app/src/tilt.rs`: on the canvas or in a
+window, the light of the room on the turned design, half the pixels
+while it moves). The magnifier (20 times the real size). Compare 3D and
+Same Place for the split view and the views, and Before and After. The
+check views of the surface (`emb_render::check`: the fabric that shows
+through a fill or a satin, and the thread over a height limit; limits in
+Options). The product, its picture and the turntable show the stitches
+as their surface in the light of the product. The tilt view of the
+stress design of 100,000 stitches turns at 45 frames in a second (22 ms
+with a new light for each frame) and tilts at 1.6 ms a frame; the test
+`checks::tests::a_place_where_the_fabric_shows_closes_with_more_density`
+does the steps of the owner (`docs/design/p18-view-m8-report.md`).
 
 ## Milestone 9: all pictures, quality settings and the graphics card (M)
 

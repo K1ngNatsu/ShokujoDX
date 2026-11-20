@@ -572,6 +572,15 @@ pub(super) const VIEW: &[Panel] = &[
         ],
     },
     Panel {
+        title: "Check",
+        items: &[
+            Large(f(Flag::Tilt)),
+            Small(&[Cmd::TiltWindow, f(Flag::Magnifier), Cmd::Compare3d]),
+            Small(&[f(Flag::BeforeAfter), f(Flag::ShowThrough), f(Flag::HighThread)]),
+            Custom(light_column, &[]),
+        ],
+    },
+    Panel {
         title: "Stitch Cursor",
         items: &[
             Large(f(Flag::Player)),

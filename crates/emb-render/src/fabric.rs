@@ -617,16 +617,20 @@ impl Fabric {
     /// The light of a texel in the light `l`, before it is divided by the
     /// mean (`norm`).
     fn light(&self, t: &Texel, l: &Lighting) -> f64 {
-        let v = l.vector();
+        let lights = l.lights();
         let n = t.normal.map(f64::from);
-        let mut f = f64::from(t.open) * crate::sheen::diffuse(n, v);
+        let mut f = f64::from(t.open) * crate::sheen::diffuse_in(n, &lights);
         let gloss = params(self.weave).gloss;
         if gloss > 0.0 {
-            // The half vector of the light and the eye (straight above).
-            let hv = [v[0], v[1], v[2] + 1.0];
-            let len = (hv[0] * hv[0] + hv[1] * hv[1] + hv[2] * hv[2]).sqrt().max(1e-9);
-            let nh = ((n[0] * hv[0] + n[1] * hv[1] + n[2] * hv[2]) / len).max(0.0);
-            f += gloss * pow16(nh);
+            for (v, w) in lights {
+                if w <= 0.0 {
+                    continue;
+                }
+                // The half vector of the light and the eye (straight above).
+                let hv = crate::sheen::half_vector(v);
+                let nh = (n[0] * hv[0] + n[1] * hv[1] + n[2] * hv[2]).max(0.0);
+                f += w * gloss * pow16(nh);
+            }
         }
         f
     }

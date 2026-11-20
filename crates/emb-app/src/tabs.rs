@@ -46,6 +46,9 @@ pub struct SplitView {
     pub fit_requested: bool,
     pub thread_look: bool,
     pub canvas_rect: Option<egui::Rect>,
+    /// Same Place: the view has the place and the zoom of the canvas (ADR
+    /// 0129: compare the stitch view and the 3D look).
+    pub follow: bool,
 }
 
 impl Default for SplitView {
@@ -55,6 +58,7 @@ impl Default for SplitView {
             fit_requested: true,
             thread_look: true,
             canvas_rect: None,
+            follow: false,
         }
     }
 }
@@ -249,15 +253,28 @@ pub fn canvas_with(ui: &mut egui::Ui, st: &mut AppState, v: &mut SplitView) {
     // the view under the pointer.
     let zoom_to = st.zoom_to.take();
     let cursor = st.cursor_mm;
+    if v.follow {
+        crate::viewer::same_place(&mut v.view, &st.view);
+        v.fit_requested = false;
+    }
     swap(st, v);
+    let mut follow = v.follow;
     ui.horizontal(|ui| {
         ui.toggle_value(&mut st.show_thread_look, tr("Thread Look"));
         if ui.small_button(tr("Zoom to design")).clicked() {
             st.fit_requested = true;
         }
+        ui.toggle_value(&mut follow, tr("Same Place")).on_hover_text(tr(
+            "This view has the place and the zoom of the canvas, and moves with it.",
+        ));
     });
     crate::canvas::show(ui, st);
     swap(st, v);
+    v.follow = follow;
+    if v.follow {
+        // A move in this view moves the canvas too.
+        crate::viewer::same_place(&mut st.view, &v.view);
+    }
     st.zoom_to = zoom_to;
     if st.cursor_mm.is_none() {
         st.cursor_mm = cursor;

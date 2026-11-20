@@ -330,6 +330,16 @@ pub enum Flag {
     HoopingMode,
     Product,
     Repeats,
+    /// The tilt view on the canvas (ADR 0129).
+    Tilt,
+    /// The magnifier at the pointer (ADR 0129).
+    Magnifier,
+    /// The stitches before a change on the left of a line (ADR 0129).
+    BeforeAfter,
+    /// The check view: the fabric that shows through (ADR 0129).
+    ShowThrough,
+    /// The check view: the thread higher than the limit (ADR 0129).
+    HighThread,
 }
 
 /// A ribbon command.
@@ -531,6 +541,11 @@ pub enum Cmd {
     TurnProduct,
     /// The Turntable window: the product turns in steps.
     Turntable,
+    /// The tilt view in a window (ADR 0129).
+    TiltWindow,
+    /// The stitch view on the canvas and the 3D look in the split view, at
+    /// the same place (ADR 0129).
+    Compare3d,
     /// The Repeats window.
     RepeatsWindow,
     /// The About window: version, build, folders.
@@ -819,6 +834,39 @@ impl Cmd {
                     g(ph::COPY_SIMPLE),
                     tr("Show Repeats"),
                     tr("Show the repeats of the design (pale; they do not sew)."),
+                ),
+                Flag::Tilt => (
+                    g(ph::PERSPECTIVE),
+                    tr("Tilt View"),
+                    tr(
+                        "See the embroidery from an angle on the canvas, with its heights (made larger if you like): drag to tilt and turn it, hold L and drag to move the light. The tools wait until you close it.",
+                    ),
+                ),
+                Flag::Magnifier => (
+                    g(ph::MICROSCOPE),
+                    tr("Magnifier"),
+                    tr("A round window at the pointer with the thread at 20 times its real size."),
+                ),
+                Flag::BeforeAfter => (
+                    g(ph::SPLIT_HORIZONTAL),
+                    tr("Before and After"),
+                    tr(
+                        "Keep the stitches as they are now; after a change of a setting, drag the line on the canvas to compare before (left) and after (right).",
+                    ),
+                ),
+                Flag::ShowThrough => (
+                    g(ph::BINOCULARS),
+                    tr("Fabric Shows Through"),
+                    tr(
+                        "Mark the places where the fabric shows through a fill or a satin, from the laid threads (their widths, heights and gaps). Set the limit in Options.",
+                    ),
+                ),
+                Flag::HighThread => (
+                    g(ph::STAIRS),
+                    tr("High Thread"),
+                    tr(
+                        "Mark the places where the thread is higher than the limit in Options (foam and padding do not count): a risk of thread breaks.",
+                    ),
                 ),
                 Flag::HoopingMode => (
                     g(ph::FRAME_CORNERS),
@@ -1659,6 +1707,18 @@ impl Cmd {
                 g(ph::CAMERA_ROTATE),
                 tr("Turntable"),
                 tr("See the product with its designs turn in steps, and save the turn as a GIF."),
+            ),
+            Cmd::TiltWindow => (
+                g(ph::APP_WINDOW),
+                tr("Tilt Window"),
+                tr(
+                    "The tilt view in a window next to the canvas, so you can change the design and see it from an angle.",
+                ),
+            ),
+            Cmd::Compare3d => (
+                g(ph::CUBE),
+                tr("Compare 3D"),
+                tr("The stitches on the canvas and the 3D look in the split view, at the same place and zoom."),
             ),
             Cmd::TurnProduct => (
                 g(ph::ARROW_U_DOWN_RIGHT),

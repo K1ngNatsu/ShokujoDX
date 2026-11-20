@@ -243,6 +243,18 @@ pub(super) fn look_column(ui: &mut egui::Ui, st: &mut AppState, s: &SelInfo) {
     egui::Popup::menu(&resp).show(|ui| crate::viewtools::look_ui(ui, st));
 }
 
+/// The Light menu: the light presets and the light (ADR 0129).
+pub(super) fn light_column(ui: &mut egui::Ui, st: &mut AppState, _s: &SelInfo) {
+    let resp = small(ui, Icon::Glyph(ph::SUN), tr("Lighting"), false, true, true).on_hover_text(tr(
+        "The light of the 3D look: presets (from the top left, flat from above, low from the side, two lights), its direction and height. Hold L and drag on the design to move it.",
+    ));
+    egui::Popup::menu(&resp).show(|ui| {
+        let mut s = st.settings.clone();
+        crate::viewer::light_ui(ui, &mut s.look.light);
+        st.set_settings(s);
+    });
+}
+
 /// Overview, the Views menu (split view, new view, other design) and
 /// Previous view, in one column.
 pub(super) fn views_column(ui: &mut egui::Ui, st: &mut AppState, s: &SelInfo) {

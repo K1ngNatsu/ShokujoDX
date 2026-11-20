@@ -2,7 +2,7 @@
 id: checking
 title: Ein Design prüfen
 group: production
-keywords: prüfen, vorschau, stich-player, abspielen, stickablauf, simulieren, stichcursor, verbindungsstiche, stichliste, funktionen, designinfo, warnungen, dichtekarte, lagen, aufbau, garnansicht, 3d, licht, einstichpunkte, sprünge, fadenschnitte, produkt, t-shirt, mockup, wiederholungen, endlos, freigabe, stickzeit, stichzahl
+keywords: prüfen, neigen, neigeansicht, drehen, lupe, vergleichen, vorher und nachher, durchscheinen, hohes garn, fadenrisse, lichtvorgaben, vorschau, stich-player, abspielen, stickablauf, simulieren, stichcursor, verbindungsstiche, stichliste, funktionen, designinfo, warnungen, dichtekarte, lagen, aufbau, garnansicht, 3d, licht, einstichpunkte, sprünge, fadenschnitte, produkt, t-shirt, mockup, wiederholungen, endlos, freigabe, stickzeit, stichzahl
 ---
 # Ein Design prüfen
 
@@ -110,6 +110,48 @@ Teilen, während Sie arbeiten; ein Teil, der noch nicht fertig ist, zeigt
 kurz die schnellere Ansicht. Schalten Sie **Feine Oberfläche** auf einem
 langsamen Computer aus.
 
+## Die Ansicht prüfen
+
+Die Gruppe **Prüfen** der Registerkarte Ansicht hat Werkzeuge, um ein
+Design zu prüfen, bevor Sie es sticken.
+
+- **Beleuchtung**: die Vorgaben **Von oben links** (der Standard),
+  **Flach von oben**, **Flach von der Seite** (sie zeigt jede Höhe und
+  jede Lücke) und **Zwei Lichter**, und die Richtung und die Höhe des
+  Lichts. Halten Sie **L** gedrückt und ziehen Sie auf dem Design, um das
+  Licht zu bewegen: In der Mitte der Ansicht ist es genau oben, am Rand
+  ist es flach.
+- **Neigeansicht** zeigt die Stickerei auf der Arbeitsfläche schräg.
+  Ziehen Sie nach oben und unten, um sie zu neigen, und quer, um sie zu
+  drehen; ziehen Sie mit der rechten Taste, um sie zu verschieben, und
+  drehen Sie das Rad, um zu zoomen. **Höhen** macht die Höhen größer (×1
+  ist die echte Höhe). Das Licht bleibt an seiner Stelle, wenn sich das
+  Design dreht, wie wenn Sie einen Rahmen unter einer Lampe drehen. Die
+  Werkzeuge der Arbeitsfläche warten, bis Sie auf **Schließen** klicken.
+  **Neigefenster** zeigt die gleiche Ansicht in einem Fenster, damit Sie
+  das Design ändern und es schräg sehen können.
+- **Lupe** zeigt das Garn in 20-facher echter Größe in einem runden
+  Fenster am Zeiger.
+- **3D vergleichen** zeigt die Stiche auf der Arbeitsfläche und die
+  3D-Ansicht in der geteilten Ansicht, an der gleichen Stelle und mit dem
+  gleichen Zoom (**Gleiche Stelle** in der geteilten Ansicht).
+- **Vorher und nachher** behält die Stiche so, wie sie jetzt sind.
+  Ändern Sie eine Einstellung und ziehen Sie dann die Linie auf der
+  Arbeitsfläche: Die linke Seite zeigt die Stiche vorher, die rechte
+  Seite die Stiche jetzt.
+- **Stoff scheint durch** markiert die Stellen, an denen der Stoff durch
+  eine Füllung oder einen Satin scheint, aus den gelegten Garnen (ihren
+  Breiten, Höhen und Lücken). Füllungen, die absichtlich offen sind (ein
+  Verlauf, eine Struktur, Motive), werden nicht geprüft. Machen Sie die
+  Dichte höher oder ändern Sie den Winkel der Reihen, bis sich die Stelle
+  schließt.
+- **Hohes Garn** markiert die Stellen, an denen das Garn höher als die
+  Grenze über dem Stoff ist (Schaum und Polster zählen nicht): ein Risiko
+  für Fadenrisse.
+
+Legen Sie die Grenzen der beiden Prüfungen in den **Optionen** fest
+(**Stoff scheint durch** und **Grenze der Garnhöhe**).
+
 ## Andere Ansichten der Stiche
 
 **Ansicht > Zeigen** hat **Sprünge** (Sprünge und Verbindungslinien),
@@ -126,8 +168,9 @@ kommt (**Das Design setzen auf**). **Produkt zeigen** zeigt oder verbirgt
 es. **Bild auf Produkt** speichert ein PNG-Bild des Designs mit der
 Garnansicht auf dem Produkt, für einen Kunden. Das Produkt wird nicht
 gestickt. Ein gezeichnetes Produkt hat Licht und Schatten, Falten und
-die Struktur seines Stoffs, im Licht der Garnansicht; im Bild wirft die
-Stickerei einen weichen Schatten darauf; auf einer Kappe zeigt das Bild
+die Struktur seines Stoffs, im Licht der Garnansicht; mit der 3D-Ansicht
+hat die Stickerei darauf ihre Höhen, ihren Glanz und ihre Schatten im
+gleichen Licht; auf einer Kappe zeigt das Bild
 das Design ein wenig um die Krone gebogen. **Ein Design hinzufügen…**
 zeigt ein weiteres Design (ein Projekt oder eine Maschinendatei) auf
 dem Produkt, zum Beispiel einen Namen auf einem Ärmel mit diesem Design

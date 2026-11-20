@@ -39,6 +39,9 @@ pub struct Lighting {
     /// The lights of the room are off (ADR 0128): the surface of the view
     /// shows only glow thread, in its own light.
     pub lights_off: bool,
+    /// Two lights (ADR 0129): a second light at the same height from the
+    /// opposite side, with [`SECOND_LIGHT`] of the light of the first one.
+    pub two: bool,
 }
 
 impl Default for Lighting {
@@ -48,7 +51,67 @@ impl Default for Lighting {
             elevation_deg: 45.0,
             strength: 1.0,
             lights_off: false,
+            two: false,
         }
+    }
+}
+
+/// The light of the second light of [`Lighting::two`], as a part of the
+/// light of the first one.
+pub const SECOND_LIGHT: f64 = 0.5;
+
+/// The lights of the light presets (ADR 0129).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LightPreset {
+    /// From the top left, 45° high (the default).
+    TopLeft,
+    /// Flat light from straight above: no shadows.
+    Above,
+    /// A low light from the left side: each height and each gap shows.
+    LowSide,
+    /// The light from the top left and a second, weaker light from the
+    /// bottom right.
+    Two,
+}
+
+impl LightPreset {
+    pub const ALL: [LightPreset; 4] = [
+        LightPreset::TopLeft,
+        LightPreset::Above,
+        LightPreset::LowSide,
+        LightPreset::Two,
+    ];
+
+    /// The name (English; the program translates it where it shows).
+    pub fn label(self) -> &'static str {
+        match self {
+            LightPreset::TopLeft => "From the top left",
+            LightPreset::Above => "Flat from above",
+            LightPreset::LowSide => "Low from the side",
+            LightPreset::Two => "Two lights",
+        }
+    }
+
+    /// The light of the preset, with the strength and the lights off of
+    /// `l`.
+    pub fn apply(self, l: &Lighting) -> Lighting {
+        let (azimuth_deg, elevation_deg, two) = match self {
+            LightPreset::TopLeft => (135.0, 45.0, false),
+            LightPreset::Above => (135.0, 90.0, false),
+            LightPreset::LowSide => (180.0, 15.0, false),
+            LightPreset::Two => (135.0, 45.0, true),
+        };
+        Lighting {
+            azimuth_deg,
+            elevation_deg,
+            two,
+            ..*l
+        }
+    }
+
+    /// The preset of the light `l`, if it is one.
+    pub fn of(l: &Lighting) -> Option<LightPreset> {
+        LightPreset::ALL.into_iter().find(|p| p.apply(l) == *l)
     }
 }
 
@@ -76,11 +139,32 @@ pub fn shine_of(kind: ThreadKind) -> f64 {
 }
 
 impl Lighting {
-    /// The unit vector toward the light.
+    /// The unit vector toward the light (the first light).
     pub(crate) fn vector(&self) -> [f64; 3] {
         let (sa, ca) = math::sin_cos_deg(self.azimuth_deg);
         let (se, ce) = math::sin_cos_deg(self.elevation_deg.clamp(5.0, 90.0));
         [ca * ce, -sa * ce, se]
+    }
+
+    /// The unit vector toward each light and its part of the light (the
+    /// parts add up to 1; the second part is 0 with one light).
+    pub fn lights(&self) -> [([f64; 3], f64); 2] {
+        let v = self.vector();
+        if !self.two {
+            return [(v, 1.0), (v, 0.0)];
+        }
+        let w = 1.0 / (1.0 + SECOND_LIGHT);
+        [(v, w), ([-v[0], -v[1], v[2]], SECOND_LIGHT * w)]
+    }
+
+    /// The light in the coordinates of a design that is turned `turn_deg`
+    /// counterclockwise on the screen (the tilt view, ADR 0129): the light
+    /// stays in the room.
+    pub fn turned(&self, turn_deg: f64) -> Lighting {
+        Lighting {
+            azimuth_deg: (self.azimuth_deg - turn_deg).rem_euclid(360.0),
+            ..*self
+        }
     }
 
     /// The direction (unit, picture coordinates) that shadows fall: away from the light.
@@ -105,17 +189,23 @@ impl Lighting {
         let (nx, ny) = (u.1, -u.0);
         let z = (1.0 - s * s).max(0.0).sqrt();
         let n = [nx * s, ny * s, z];
-        let l = self.vector();
-        let diffuse = (n[0] * l[0] + n[1] * l[1] + n[2] * l[2]).max(0.0);
-        let h = {
-            let v = [l[0], l[1], l[2] + 1.0];
-            let len = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt().max(1e-9);
-            [v[0] / len, v[1] / len, v[2] / len]
-        };
-        let nh = (n[0] * h[0] + n[1] * h[1] + n[2] * h[2]).max(0.0);
+        let (mut diffuse, mut highlight) = (0.0, 0.0);
+        for (l, w) in self.lights() {
+            if w <= 0.0 {
+                continue;
+            }
+            diffuse += w * (n[0] * l[0] + n[1] * l[1] + n[2] * l[2]).max(0.0);
+            let h = {
+                let v = [l[0], l[1], l[2] + 1.0];
+                let len = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt().max(1e-9);
+                [v[0] / len, v[1] / len, v[2] / len]
+            };
+            let nh = (n[0] * h[0] + n[1] * h[1] + n[2] * h[2]).max(0.0);
+            highlight += w * math::pow(nh, SHINE_POWER);
+        }
         let along = END_DARK + (1.0 - END_DARK) * math::sin(std::f64::consts::PI * t.clamp(0.0, 1.0));
         let factor = (AMBIENT + DIFFUSE * diffuse) * along;
-        let shine = SHINE * math::pow(nh, SHINE_POWER) * along;
+        let shine = SHINE * highlight * along;
         let k = self.strength.clamp(0.0, 1.0);
         (1.0 + (factor - 1.0) * k, shine * k)
     }
@@ -255,6 +345,25 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn the_presets_are_lights_and_two_lights_light_both_sides() {
+        let l = Lighting::default();
+        assert_eq!(LightPreset::of(&l), Some(LightPreset::TopLeft));
+        for p in LightPreset::ALL {
+            assert_eq!(LightPreset::of(&p.apply(&l)), Some(p));
+        }
+        let two = LightPreset::Two.apply(&l);
+        let parts: f64 = two.lights().iter().map(|(_, w)| w).sum();
+        assert!((parts - 1.0).abs() < 1e-12);
+        // With one light the edge away from it is dark; with two lights it
+        // gets the second light.
+        let away = |l: &Lighting| l.shade((1.0, 0.0), -0.9, 0.5).0;
+        assert!(away(&two) > away(&l) + 0.1, "{} {}", away(&two), away(&l));
+        // The light stays in the room when the design turns.
+        assert_eq!(l.turned(90.0).azimuth_deg, 45.0);
+        assert_eq!(l.turned(180.0).azimuth_deg, 315.0);
     }
 
     #[test]

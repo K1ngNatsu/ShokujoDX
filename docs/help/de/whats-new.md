@@ -128,6 +128,16 @@ ihrem Schaumstoff rund. Metallgarn hat bei großem Zoom kleine
 Glanzpunkte, und **Ansicht > Garnansicht > Licht aus** zeigt nur
 nachtleuchtendes Garn. Siehe [Ein Design prüfen](checking).
 
+**Die Ansicht prüfen.** Die Gruppe **Prüfen** der Registerkarte Ansicht
+hat neue Werkzeuge: Lichtvorgaben und ein Licht, das Sie bewegen (**L**
+gedrückt halten und ziehen), eine **Neigeansicht**, die die Stickerei
+schräg mit ihren Höhen zeigt (auf der Arbeitsfläche oder in einem
+Fenster), eine **Lupe** mit 20-facher Größe, **3D vergleichen** und
+**Vorher und nachher**, und zwei Prüfungen der Oberfläche: **Stoff
+scheint durch** und **Hohes Garn**. Das Produkt und der Drehteller
+zeigen die Stiche mit ihren Höhen und ihrem Glanz, im Licht des
+Produkts. Siehe [Ein Design prüfen](checking).
+
 **Designs mit sehr vielen Stichen.** Das Programm konnte abbrechen, wenn
 die Arbeitsfläche etwa 350.000 Stiche oder mehr auf einmal in der
 Garnansicht zeigte. Jetzt zeigt die Arbeitsfläche sie bei diesem Zoom
