@@ -161,7 +161,8 @@ Farben** (ein Symbol an jedem Fadenschnitt und Farbwechsel).
 (blau), Säulen (orange), Reihen einer Füllung (grün) und andere Stiche
 (violett); die Unterlage eines Teils hat seine Farbe, blasser. Linien
 zeigen die Objekte, die aus den Teilen werden: die Linie eines
-Steppstichobjekts und die zwei Seiten einer Satinsäule. So sehen Sie, wie
+Steppstichobjekts, die zwei Seiten einer Satinsäule und der Umriss und die
+Löcher einer Füllung. So sehen Sie, wie
 das Programm die Stiche einer Maschinendatei eines anderen Programms
 liest, der erste Schritt, um Objekte daraus zu machen.
 

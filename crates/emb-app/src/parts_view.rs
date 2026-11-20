@@ -2,8 +2,9 @@
 //! design colored by the kind of their part (`emb_art::parts`): runs,
 //! columns, rows and other stitches, the underlay of a part paler in its
 //! color. Lines show the objects that the parts become
-//! (`emb_art::part_objects`, P18 Milestone 2, ADR 0132): the line of a
-//! running object and the two rails of a satin column. It shows how the
+//! (`emb_art::part_objects`, P18 Milestones 2 and 3, ADR 0132, ADR 0133):
+//! the line of a running object, the two rails of a satin column and the
+//! outline of a fill. It shows how the
 //! program reads the stitches of a machine file before it makes objects of
 //! them. A thread finds the parts of each new stitch plan.
 
@@ -79,6 +80,7 @@ fn find(s: &emb_model::StitchDesign) -> Found {
         let paths: Vec<&emb_geom::Path> = match &m.kind {
             ObjectKind::Running { path, .. } => vec![path],
             ObjectKind::Satin { geometry, .. } => vec![&geometry.rail_a, &geometry.rail_b],
+            ObjectKind::Fill { outer, holes, .. } => std::iter::once(outer).chain(holes).collect(),
             _ => Vec::new(),
         };
         for path in paths {
@@ -282,8 +284,8 @@ mod tests {
         // The sample design has a fill, a satin and a run: their colors show.
         let has = |k: PartKind| segs.iter().any(|(_, c)| *c == color(k, false));
         assert!(has(PartKind::Rows) && has(PartKind::Column) && has(PartKind::Run));
-        // The satin and the run become objects: their lines show (two rails
-        // and a line at least).
-        assert!(shown.lines.len() >= 3, "{}", shown.lines.len());
+        // The fill, the satin and the run become objects: their lines show
+        // (an outline, two rails and a line at least).
+        assert!(shown.lines.len() >= 4, "{}", shown.lines.len());
     }
 }

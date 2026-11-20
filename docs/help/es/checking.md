@@ -153,7 +153,8 @@ se ve** y **Límite de altura del hilo**).
 rectas (azul), columnas (naranja), filas de un relleno (verde) y otras
 puntadas (violeta); la base de una parte tiene su color, más pálido.
 Las líneas muestran los objetos que salen de las partes: la línea de un
-objeto de puntada recta y los dos lados de una columna de satén. Muestra
+objeto de puntada recta, los dos lados de una columna de satén y el
+contorno y los agujeros de un relleno. Muestra
 cómo lee el programa las puntadas de un archivo de máquina de otro
 programa, el primer paso para hacer objetos con ellas.
 

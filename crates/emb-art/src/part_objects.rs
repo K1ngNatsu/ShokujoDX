@@ -1,7 +1,8 @@
 //! Objects from the parts of a stitch file (P18 Milestone 2, ADR 0132): a
 //! run becomes a running object and a column a satin column, with the
-//! settings that its stitches show. The other parts stay stitches (the
-//! fills are Milestone 3).
+//! settings that its stitches show. The rows of a fill become a fill
+//! object (`crate::part_fills`, P18 Milestone 3, ADR 0133). The other
+//! parts stay stitches.
 //!
 //! Not a port. The method:
 //!
@@ -41,6 +42,7 @@ use emb_model::{
     UnderlayLayer,
 };
 
+use crate::part_fills::{FillGroup, can_be_travel, fill_items, part_members};
 use crate::parts::{self, BACK, Leg, Part, PartKind, TINY_MM, dot};
 
 /// The points of a lock stitch stay this near to their first point, mm.
@@ -122,7 +124,7 @@ impl Made {
 }
 
 /// An item while the objects are made.
-enum Item {
+pub(crate) enum Item {
     Object(Box<ObjectKind>, usize, Vec<Range<usize>>),
     Stitches(usize, Range<usize>),
 }
@@ -146,34 +148,101 @@ pub fn objects(s: &StitchDesign, parts: &[Part]) -> Vec<Made> {
             k
         })
         .collect();
-    let of_column = |i: usize| root[i] != i && parts[root[i]].kind == PartKind::Column;
+    // The parts that sew for a column or for rows go with it.
+    let of_root = |i: usize| root[i] != i && matches!(parts[root[i]].kind, PartKind::Column | PartKind::Rows);
     let mut under: Vec<Vec<usize>> = vec![Vec::new(); n];
     for i in 0..n {
-        if of_column(i) {
+        if of_root(i) {
             under[root[i]].push(i);
         }
     }
     let mut items = Vec::new();
+    // The parts of rows of one fill, and the short runs after them (travel
+    // if more rows of the fill come after them).
+    let mut group: Option<FillGroup> = None;
+    let mut runs: Vec<usize> = Vec::new();
+    let close = |group: &mut Option<FillGroup>, runs: &mut Vec<usize>, items: &mut Vec<Item>| {
+        if let Some(g) = group.take() {
+            fill_items(s, parts, &g, items);
+        }
+        for r in runs.drain(..) {
+            run_item(s, &parts[r], items);
+        }
+    };
     for (i, p) in parts.iter().enumerate() {
-        if of_column(i) {
-            // With its column.
+        if of_root(i) {
+            // With its column or its rows.
             continue;
         }
+        if p.kind == PartKind::Rows && root[i] == i {
+            match part_members(s, parts, i, &under[i]) {
+                Some(members) => {
+                    for (shape, member) in members {
+                        if let Some(g) = group.as_mut()
+                            && g.thread == p.thread
+                            && g.shape.same_fill(&shape)
+                        {
+                            g.members.push(member);
+                            g.travel.append(&mut runs);
+                            continue;
+                        }
+                        close(&mut group, &mut runs, &mut items);
+                        group = Some(FillGroup {
+                            thread: p.thread,
+                            shape,
+                            members: vec![member],
+                            travel: Vec::new(),
+                        });
+                    }
+                }
+                None => {
+                    close(&mut group, &mut runs, &mut items);
+                    for &u in &under[i] {
+                        items.push(Item::Stitches(parts[u].thread, parts[u].records.clone()));
+                    }
+                    items.push(Item::Stitches(p.thread, p.records.clone()));
+                }
+            }
+            continue;
+        }
+        // A column part with the rows of the open fill (rows of one stitch
+        // in a narrow section) is rows of the fill.
+        if p.kind == PartKind::Column && root[i] == i {
+            let fill_rows = group.as_ref().filter(|g| g.thread == p.thread).and_then(|g| {
+                part_members(s, parts, i, &under[i]).filter(|ms| ms.iter().all(|(shape, _)| g.shape.same_fill(shape)))
+            });
+            if let (Some(ms), Some(g)) = (fill_rows, group.as_mut()) {
+                g.members.extend(ms.into_iter().map(|(_, m)| m));
+                g.travel.append(&mut runs);
+                continue;
+            }
+        }
+        if root[i] == i && can_be_travel(p) && group.as_ref().is_some_and(|g| g.thread == p.thread) {
+            runs.push(i);
+            continue;
+        }
+        close(&mut group, &mut runs, &mut items);
         match p.kind {
-            PartKind::Run if root[i] == i => match run_object(&points_of(s, &p.records)) {
-                Some(kind) => items.push(Item::Object(Box::new(kind), p.thread, vec![p.records.clone()])),
-                None => items.push(Item::Stitches(p.thread, p.records.clone())),
-            },
+            PartKind::Run if root[i] == i => run_item(s, p, &mut items),
             PartKind::Column if root[i] == i => column_items(s, parts, i, &under[i], &mut items),
             _ => items.push(Item::Stitches(p.thread, p.records.clone())),
         }
     }
+    close(&mut group, &mut runs, &mut items);
     finish(s, items)
+}
+
+/// A running object of a run part, or its stitches.
+pub(crate) fn run_item(s: &StitchDesign, p: &Part, items: &mut Vec<Item>) {
+    match run_object(&points_of(s, &p.records)) {
+        Some(kind) => items.push(Item::Object(Box::new(kind), p.thread, vec![p.records.clone()])),
+        None => items.push(Item::Stitches(p.thread, p.records.clone())),
+    }
 }
 
 /// The needle points of the stitches `r` of `s`: where the needle is before
 /// the first, then the end of each stitch.
-fn points_of(s: &StitchDesign, r: &Range<usize>) -> Vec<Point> {
+pub(crate) fn points_of(s: &StitchDesign, r: &Range<usize>) -> Vec<Point> {
     let before = if r.start > 0 {
         s.records[r.start - 1].pos
     } else {
@@ -255,7 +324,7 @@ fn stitches_kind(s: &StitchDesign, records: &[Range<usize>]) -> ObjectKind {
 
 /// The points without the lock stitches at the ends and without the tiny
 /// stitches, and the index of each point in `points`.
-fn clean(points: &[Point]) -> (Vec<Point>, Vec<usize>) {
+pub(crate) fn clean(points: &[Point]) -> (Vec<Point>, Vec<usize>) {
     let n = points.len();
     if n < 2 {
         return (points.to_vec(), (0..n).collect());
@@ -1009,11 +1078,7 @@ fn column_items(s: &StitchDesign, parts: &[Part], i: usize, under: &[usize], ite
                 // Travel under the column: runs of their own, before it.
                 let travel: Vec<usize> = travel.into_iter().filter_map(|k| of[k]).collect();
                 for &u in &travel {
-                    let r = parts[u].records.clone();
-                    match run_object(&points_of(s, &r)) {
-                        Some(run) => items.push(Item::Object(Box::new(run), parts[u].thread, vec![r])),
-                        None => items.push(Item::Stitches(parts[u].thread, r)),
-                    }
+                    run_item(s, &parts[u], items);
                 }
                 let mut own: Vec<Range<usize>> = records
                     .into_iter()

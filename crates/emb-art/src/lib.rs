@@ -20,6 +20,8 @@
 //!   Milestone 1, ADR 0131).
 //! - `part_objects`: running and satin objects from the parts (P18
 //!   Milestone 2, ADR 0132).
+//! - `part_fills`: fill objects from the parts of rows (P18 Milestone 3,
+//!   ADR 0133).
 //! - `smart`: picture to design (the steps of the guided wizard: detail,
 //!   colors, stitch types, sew order; ADR 0029).
 //!
@@ -37,6 +39,7 @@ pub mod crop;
 pub mod cross;
 pub mod cutout;
 mod maxflow;
+pub mod part_fills;
 pub mod part_objects;
 pub mod parts;
 pub mod photo;

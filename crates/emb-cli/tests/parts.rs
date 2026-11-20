@@ -1,4 +1,4 @@
-//! The exit tests of P18 Milestones 1 and 2 (ADR 0131, ADR 0132): each
+//! The exit tests of P18 Milestones 1 to 3 (ADR 0131 to ADR 0133): each
 //! design of the corpus, written as DST and read again, is cut into parts
 //! (`emb_art::parts`) and made into objects (`emb_art::part_objects`).
 //! Lettering is cut into its letter parts first (as Break Apart), so each
@@ -8,6 +8,8 @@
 //!   parts know (runs, satin columns, fills of rows) are in a part of the
 //!   kind of their source object.
 //! - Milestone 2: the width of a recognized column is within 0.2 mm and its
+//!   spacing within 10 % of its source object.
+//! - Milestone 3: the angle of a recognized fill is within 5° and its row
 //!   spacing within 10 % of its source object.
 //!
 //! `cargo test --release -p emb-cli --test parts -- --nocapture` prints the
@@ -473,9 +475,133 @@ fn recognized_columns_have_the_width_and_spacing_of_their_source() {
     assert!(share >= 0.90, "{share}");
 }
 
-/// Pictures of the recognized columns of a corpus design: the stitches of
-/// the file (gray), the rails (red and blue) and the rungs (green) of each
-/// satin, and the stitches that the satin sews again (orange). Run with
+/// The angle of a fill (as the fill angle) in the coordinates of the file.
+fn file_angle(d: &Design, angle_deg: f64) -> f64 {
+    let (sin, cos) = emb_geom::math::sin_cos_deg(angle_deg);
+    let v = d.output_transform().apply_vector(Point::new(cos, sin));
+    emb_geom::math::to_degrees(emb_geom::math::atan2(v.y, v.x))
+}
+
+#[test]
+fn recognized_fills_have_the_angle_and_spacing_of_their_source() {
+    use emb_art::part_fills::line_diff;
+    // Stitches of measured fills that pass, and all; the fills that do not.
+    let (mut pass, mut all) = (0usize, 0usize);
+    let mut failed: Vec<String> = Vec::new();
+    // Stitches of source fills of rows in a recognized fill, and all.
+    let (mut in_fill, mut rows_stitches) = (0usize, 0usize);
+    // Measured fills of tatami and square: with the type and the stitch
+    // length (10 %) of their source, and all.
+    let (mut type_right, mut typed) = (0usize, 0usize);
+    // Measured fills with the underlay setting of their source, and all.
+    let (mut under_right, mut unders) = (0usize, 0usize);
+    for name in corpus::NAMES {
+        let Some(t) = RoundTrip::new(name) else { continue };
+        let made = objects(&t.read, &parts(&t.read));
+        let mut fill = vec![false; t.read.records.len()];
+        let (mut p, mut a) = (0usize, 0usize);
+        for m in &made {
+            let ObjectKind::Fill { params, .. } = &m.kind else {
+                continue;
+            };
+            for r in m.records.iter().flat_map(|r| r.clone()) {
+                fill[r] = true;
+            }
+            let Some((o, purity)) = t.source_of(m) else { continue };
+            let Some(ObjectKind::Fill { params: sp, .. }) = t.design.object(o).map(|o| &o.kind) else {
+                continue;
+            };
+            let rows = matches!(
+                sp.pattern,
+                FillPattern::Tatami
+                    | FillPattern::Square
+                    | FillPattern::ProgramSplit { .. }
+                    | FillPattern::UserSplit { .. }
+            );
+            if !rows || sp.accordion.is_some() || sp.jagged_mm != 0.0 || sp.hand_mm != 0.0 {
+                continue;
+            }
+            let stitches: usize = m.records.iter().map(|r| r.len()).sum();
+            let angle = file_angle(&t.design, sp.angle_deg);
+            let da = line_diff(params.angle_deg, angle);
+            let ratio = params.spacing_mm / sp.spacing_mm;
+            a += stitches;
+            if da <= 5.0 && (ratio - 1.0).abs() <= 0.1 {
+                p += stitches;
+            } else {
+                failed.push(format!(
+                    "{name}: object {} ({stitches} stitches, {:.0} % of it): angle {:.1} for {angle:.1}, spacing {:.2} for {:.2} mm",
+                    o.0,
+                    100.0 * purity,
+                    params.angle_deg,
+                    params.spacing_mm,
+                    sp.spacing_mm
+                ));
+            }
+            unders += 1;
+            if params.underlay == sp.underlay {
+                under_right += 1;
+            } else if std::env::var("PARTS_FILLS").is_ok() {
+                println!(
+                    "  underlay {name} object {}: {:?} for {:?}",
+                    o.0, params.underlay, sp.underlay
+                );
+            }
+            if matches!(sp.pattern, FillPattern::Tatami | FillPattern::Square) {
+                typed += 1;
+                if params.pattern == sp.pattern && (params.stitch_length_mm / sp.stitch_length_mm - 1.0).abs() <= 0.1 {
+                    type_right += 1;
+                } else if std::env::var("PARTS_FILLS").is_ok() {
+                    println!(
+                        "  type {name} object {}: {:?} {} for {:?} {}",
+                        o.0, params.pattern, params.stitch_length_mm, sp.pattern, sp.stitch_length_mm
+                    );
+                }
+            }
+        }
+        for (i, f) in fill.iter().enumerate() {
+            let Some(o) = t.source(i) else { continue };
+            if t.design.object(o).map(|o| expected(&o.kind)) == Some(Some(PartKind::Rows)) {
+                rows_stitches += 1;
+                if *f {
+                    in_fill += 1;
+                }
+            }
+        }
+        if a > 0 {
+            println!(
+                "{name:<28} {:>6.1} % of {:>6} stitches of measured fills",
+                100.0 * p as f64 / a as f64,
+                a
+            );
+        }
+        pass += p;
+        all += a;
+    }
+    for f in &failed {
+        println!("  {f}");
+    }
+    let share = pass as f64 / all.max(1) as f64;
+    println!(
+        "all: {:.1} % of {all} stitches of measured fills; {:.1} % of {rows_stitches} stitches of fills of rows are in a fill",
+        100.0 * share,
+        100.0 * in_fill as f64 / rows_stitches.max(1) as f64
+    );
+    println!(
+        "type: {:.1} % of {typed} tatami and square fills have the type and the stitch length of their source",
+        100.0 * type_right as f64 / typed.max(1) as f64
+    );
+    println!(
+        "underlay: {:.1} % of {unders} measured fills have the underlay setting of their source",
+        100.0 * under_right as f64 / unders.max(1) as f64
+    );
+    assert!(share >= 0.90, "{share}");
+}
+
+/// Pictures of the recognized columns and fills of a corpus design: the
+/// stitches of the file (gray), the rails (red and blue) and the rungs
+/// (green) of each satin, the outline of each fill (red), and the stitches
+/// that the object sews again (orange). Run with
 /// `PARTS_DESIGN=<name> [PARTS_OBJECT=<id>] cargo test --release -p emb-cli
 /// --test parts -- --ignored write_part_pictures --nocapture`; the pictures
 /// are in `target/tmp/parts`.
@@ -499,9 +625,9 @@ fn write_part_pictures() {
         ..Default::default()
     };
     for (k, m) in made.iter().enumerate() {
-        let ObjectKind::Satin { geometry, params } = &m.kind else {
+        if !matches!(m.kind, ObjectKind::Satin { .. } | ObjectKind::Fill { .. }) {
             continue;
-        };
+        }
         let source = t.source_of(m).map(|x| x.0);
         if only.is_some_and(|o| source.map(|s| s.0) != Some(o)) {
             continue;
@@ -516,7 +642,7 @@ fn write_part_pictures() {
                 ));
             }
         }
-        // The stitches of the satin, sewn again.
+        // The stitches of the object, sewn again.
         let mut d = Design::new("");
         let th = d.add_thread("t", Rgb(0, 0, 0));
         d.insert_object(0, th, m.kind.clone());
@@ -526,29 +652,48 @@ fn write_part_pictures() {
                 segs.push(seg(w[0].pos, w[1].pos, Rgb(240, 140, 20)));
             }
         }
-        for (rail, color) in [
-            (&geometry.rail_a, Rgb(220, 30, 30)),
-            (&geometry.rail_b, Rgb(30, 60, 220)),
-        ] {
-            let pts: Vec<Point> = rail.points().collect();
-            for w in pts.windows(2) {
-                segs.push(seg(w[0], w[1], color));
+        let summary = match &m.kind {
+            ObjectKind::Satin { geometry, params } => {
+                for (rail, color) in [
+                    (&geometry.rail_a, Rgb(220, 30, 30)),
+                    (&geometry.rail_b, Rgb(30, 60, 220)),
+                ] {
+                    let pts: Vec<Point> = rail.points().collect();
+                    for w in pts.windows(2) {
+                        segs.push(seg(w[0], w[1], color));
+                    }
+                }
+                for (a, b) in &geometry.rungs {
+                    segs.push(seg(*a, *b, Rgb(30, 160, 60)));
+                }
+                format!("spacing {} {:?}", params.spacing_mm, params.underlay)
             }
-        }
-        for (a, b) in &geometry.rungs {
-            segs.push(seg(*a, *b, Rgb(30, 160, 60)));
-        }
+            ObjectKind::Fill { outer, holes, params } => {
+                for path in std::iter::once(outer).chain(holes) {
+                    for l in path.flatten(0.05) {
+                        let mut pts = l.points;
+                        if let Some(&first) = pts.first() {
+                            pts.push(first);
+                        }
+                        for w in pts.windows(2) {
+                            segs.push(seg(w[0], w[1], Rgb(220, 30, 30)));
+                        }
+                    }
+                }
+                format!(
+                    "angle {} spacing {} length {} {:?} {:?}",
+                    params.angle_deg, params.spacing_mm, params.stitch_length_mm, params.pattern, params.underlay
+                )
+            }
+            _ => String::new(),
+        };
         let pic = emb_render::raster::picture(&segs, &[], 30.0, 0.06, 0.5, Some(Rgb(255, 255, 255)));
         let file = dir.join(format!("{name}-{k:03}-object-{}.png", source.map(|s| s.0).unwrap_or(0)));
         std::fs::write(&file, pic.png()).unwrap();
-        println!(
-            "{} {:?} spacing {} {:?}",
-            file.display(),
-            m.records,
-            params.spacing_mm,
-            params.underlay
-        );
-        if std::env::var("PARTS_LIST").is_ok() {
+        println!("{} {:?} {summary}", file.display(), m.records);
+        if std::env::var("PARTS_LIST").is_ok()
+            && let ObjectKind::Satin { geometry, .. } = &m.kind
+        {
             let len = |p: &emb_geom::Path| rail_points(p).windows(2).map(|w| w[0].distance(w[1])).sum::<f64>();
             println!(
                 "  rec rails {:.2} {:.2}, rungs {}",
@@ -586,8 +731,8 @@ fn write_part_pictures() {
 }
 
 /// A picture of a corpus design as its file (left) and as the objects that
-/// its parts become, sewn again (right; runs blue, satins orange, stitches
-/// gray). Run with `PARTS_DESIGN=<name> cargo test --release -p emb-cli
+/// its parts become, sewn again (right; runs blue, satins orange, fills
+/// green, stitches gray). Run with `PARTS_DESIGN=<name> cargo test --release -p emb-cli
 /// --test parts -- --ignored write_whole_picture --nocapture`; the picture
 /// is in `target/tmp/parts`.
 #[test]
@@ -597,7 +742,16 @@ fn write_whole_picture() {
     use emb_render::{Segment, SegmentKind};
     let name = std::env::var("PARTS_DESIGN").unwrap_or_else(|_| "view-lettering".into());
     let t = RoundTrip::new(&name).expect("the design");
-    let made = objects(&t.read, &parts(&t.read));
+    let t0 = std::time::Instant::now();
+    let p = parts(&t.read);
+    let t1 = std::time::Instant::now();
+    let made = objects(&t.read, &p);
+    println!(
+        "{} records: parts {:?}, objects {:?}",
+        t.read.records.len(),
+        t1 - t0,
+        t1.elapsed()
+    );
     let seg = |a: Point, b: Point, color: Rgb| Segment {
         a,
         b,
@@ -614,12 +768,18 @@ fn write_whole_picture() {
     let bb = emb_geom::BBox::from_points(t.read.records.iter().map(|r| r.pos)).expect("stitches");
     let dx = bb.width() + 10.0;
     let mut d = Design::new("");
-    let colors = [Rgb(150, 150, 150), Rgb(40, 110, 235), Rgb(240, 140, 20)];
+    let colors = [
+        Rgb(150, 150, 150),
+        Rgb(40, 110, 235),
+        Rgb(240, 140, 20),
+        Rgb(30, 170, 80),
+    ];
     let threads: Vec<_> = colors.iter().map(|c| d.add_thread("t", *c)).collect();
     for m in &made {
         let k = match m.kind {
             ObjectKind::Stitches { .. } => 0,
             ObjectKind::Running { .. } => 1,
+            ObjectKind::Fill { .. } => 3,
             _ => 2,
         };
         let mut kind = m.kind.clone();

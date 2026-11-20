@@ -18,7 +18,12 @@
 //!    piece of a chain that is none of these is **other**.
 //! 4. **Underlay**: a part that a later part of the same color covers (the
 //!    area of its stitches, [`COVER_CELL_MM`] cells) goes with that part:
-//!    the underlay and the travel under a column or a fill. A run or a
+//!    the underlay and the travel under a column or a fill. A column or
+//!    rows is underlay if it is lighter: less thread in a cell, or (under
+//!    rows) a row spacing 1.25 times as open as the rows over them, or (under
+//!    rows) a short part, too short to show its spacing. A run,
+//!    a short part or a lighter part between two parts of the underlay of a
+//!    part goes with it too. A run or a
 //!    lighter part between two parts of the underlay of a part goes with it
 //!    too.
 //!
@@ -44,6 +49,9 @@ const COVERED: f64 = 0.85;
 /// An underlay has less thread in a cell than this part of the thread of
 /// the part over it.
 const LIGHTER: f64 = 0.8;
+/// A part of at most this many stitches between two parts of the underlay
+/// of a part goes with that part, and under rows it is underlay.
+const BETWEEN_STITCHES: usize = 16;
 /// Two legs go back and forth if the cosine of their angle is below this.
 pub(crate) const BACK: f64 = -0.6;
 /// The turn legs between two rows are at most this long, and at most half
@@ -458,6 +466,23 @@ fn find_underlay(s: &StitchDesign, parts: &mut [Part]) {
         .iter()
         .map(|(c, len)| if c.is_empty() { 0.0 } else { len / c.len() as f64 })
         .collect();
+    // The row spacing of each part that goes back and forth: rows sew each
+    // cell once, so rows (or a zigzag) under rows are lighter by their
+    // spacing, not by the thread in a cell.
+    let spacing: Vec<Option<f64>> = parts
+        .iter()
+        .map(|p| {
+            matches!(p.kind, PartKind::Rows | PartKind::Column)
+                .then(|| crate::part_fills::part_shape(s, p))
+                .flatten()
+                .map(|r| r.spacing_mm)
+        })
+        .collect();
+    let rows: Vec<bool> = parts.iter().map(|p| p.kind == PartKind::Rows).collect();
+    let lighter = |i: usize, j: usize| match (spacing[i], spacing[j]) {
+        (Some(a), Some(b)) if rows[j] => a * LIGHTER > b,
+        _ => density[i] < LIGHTER * density[j],
+    };
     let mut next: std::collections::HashMap<(i64, i64), usize> = std::collections::HashMap::new();
     for i in (0..n).rev() {
         if i + 1 < n && parts[i + 1].thread != parts[i].thread {
@@ -481,7 +506,9 @@ fn find_underlay(s: &StitchDesign, parts: &mut [Part]) {
             }
             if covered as f64 >= COVERED * own.len() as f64
                 && let Some((&j, _)) = by.iter().max_by_key(|(j, c)| (**c, std::cmp::Reverse(**j)))
-                && (parts[i].kind == PartKind::Run || density[i] < LIGHTER * density[j])
+                && (parts[i].kind == PartKind::Run
+                    || lighter(i, j)
+                    || (rows[j] && parts[i].records.len() <= BETWEEN_STITCHES))
             {
                 parts[i].underlay_of = Some(j);
             }
@@ -493,9 +520,10 @@ fn find_underlay(s: &StitchDesign, parts: &mut [Part]) {
             }
         }
     }
-    // A run or a lighter part between two parts of the underlay of one part
-    // (or the underlay and the part) goes with it too: a piece of a zigzag
-    // that its cells do not cover.
+    // A run, a short part or a lighter part between two parts of the
+    // underlay of one part (or the underlay and the part) goes with it too:
+    // a piece of an underlay that its cells do not cover, or that is too
+    // short to show its spacing.
     for i in 1..n.saturating_sub(1) {
         let thread = parts[i].thread;
         if parts[i].underlay_of.is_some() || parts[i - 1].thread != thread || parts[i + 1].thread != thread {
@@ -504,7 +532,7 @@ fn find_underlay(s: &StitchDesign, parts: &mut [Part]) {
         if let Some(j) = parts[i - 1].underlay_of
             && j > i
             && (parts[i + 1].underlay_of == Some(j) || i + 1 == j)
-            && (parts[i].kind == PartKind::Run || density[i] < LIGHTER * density[j])
+            && (parts[i].kind == PartKind::Run || parts[i].records.len() <= BETWEEN_STITCHES || lighter(i, j))
         {
             parts[i].underlay_of = Some(j);
         }

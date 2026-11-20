@@ -2,7 +2,7 @@
 
 Date: 2026-11-18 · Status: Accepted (owner, 2026-11-18). Started by the
 owner on 2026-11-19, after the second part of P18 (the 3D stitch view).
-Milestones 1 and 2 are done (ADR 0131, ADR 0132).
+Milestones 1 to 3 are done (ADR 0131, ADR 0132, ADR 0133).
 
 ## Goal
 
@@ -94,6 +94,19 @@ stitches are in a recognized satin.
 
 **Exit test:** on the corpus round trip, the angle is within 5° and the
 row spacing within 10 % of the source object.
+
+**Done (2026-11-20, ADR 0133).** `emb_art::part_fills` cuts the rows of a
+part into layers by their direction (a denser layer after a layer makes
+it underlay) and makes a fill of each layer of rows: the angle, the row
+spacing, the stitch length and the offset of the needle points (tatami
+or square) from the rows; the area from the ends of the rows (traced as
+in ADR 0030), with its holes; the underlay as tatami layers and edge
+walks, or the setting that has them. Sections of one fill are one fill; a
+fill with rows in more than one direction becomes more than one fill.
+View > Stitch Parts draws the outlines. The exit test (the third test of
+`crates/emb-cli/tests/parts.rs`): 99.9 % of the stitches of the measured
+fills have the angle within 5° and the row spacing within 10 % of their
+source; 98.7 % of the stitches of fills of rows are in a recognized fill.
 
 ## Milestone 4: Recognize Objects (M)
 

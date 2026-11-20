@@ -133,8 +133,9 @@ puntadas de un diseño según el tipo de su parte: rectas, columnas y las
 filas de los rellenos, con la base de cada parte. El programa las
 encuentra en las puntadas de un archivo de máquina de otro programa: el
 primer paso para hacer objetos con tipos de puntada de un archivo así.
-Las líneas muestran los objetos de puntada recta y las columnas de satén
-(con sus ajustes de base) que salen de las rectas y de las columnas.
+Las líneas muestran los objetos de puntada recta, las columnas de satén y
+los rellenos (con sus ajustes de base) que salen de las rectas, de las
+columnas y de las filas.
 Consulte [Comprobar un diseño](checking).
 
 **Todas las imágenes con el aspecto 3D.** La imagen del diseño, la hoja
