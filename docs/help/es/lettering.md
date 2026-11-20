@@ -17,7 +17,12 @@ arco](tutorial-lettering) muestra los primeros pasos.
    nueva. El lienzo muestra las letras mientras escribe.
 3. Seleccione una fuente, defina la **Altura** y el **Tipo de puntada**.
    La lista de fuentes muestra cada nombre en su propia fuente. Señale un
-   nombre, y el lienzo muestra su texto en esa fuente.
+   nombre, y el lienzo muestra su texto en esa fuente. La altura es la
+   altura de las letras mayúsculas; en un texto japonés, chino o coreano,
+   es la altura de sus caracteres. Para ese texto en una fuente TrueType,
+   la ventana muestra la altura más pequeña a la que sus trazos se bordan
+   bien; con **Automático**, un trazo de menos de 0,8 mm se borda como
+   puntada recta.
 4. Haga clic en **Aceptar** (o **Ctrl+Intro**). **Esc** o **Cancelar**
    cierra la ventana y quita lo que muestra.
 

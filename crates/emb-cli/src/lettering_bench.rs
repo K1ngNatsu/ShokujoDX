@@ -2,8 +2,9 @@
 //! the lettering engine sews Japanese text in a TrueType or OpenType font.
 //!
 //! For each character of the reference set ([`characters`]) at each size
-//! of [`SIZES`] (the height of the lettering), [`measure`] takes the parts
-//! that the lettering gets in Auto and measures:
+//! of [`SIZES`] (the height of the lettering: the height of the characters,
+//! ADR 0145), [`measure`] takes the parts that the lettering gets in Auto
+//! (before the route) and measures:
 //!
 //! - the stitch of each part: a satin column, a satin column with split
 //!   stitches (wider than its split length), a tatami column, a fill or a
@@ -24,8 +25,9 @@ use emb_geom::{Point, Transform};
 use emb_letter::{Font, LetterSource, quality};
 use emb_model::{ColumnPattern, Design, Lettering, ObjectKind, Rgb};
 
-/// The heights of the lettering, mm.
-pub const SIZES: [f64; 4] = [15.0, 25.0, 50.0, 80.0];
+/// The heights of the lettering, mm: the height of the characters (P20
+/// Milestone 5).
+pub const SIZES: [f64; 5] = [10.0, 15.0, 25.0, 50.0, 80.0];
 /// A column narrower than this does not sew well as satin, mm (P20
 /// Milestone 5).
 pub const NARROW_MM: f64 = 0.8;
@@ -155,7 +157,7 @@ fn widths(g: &emb_model::SatinGeometry) -> Option<(f64, f64)> {
 /// Auto. `None` if the font has no such character or it has no shape.
 pub fn measure(font: &Font, c: char, size_mm: f64) -> Option<Measure> {
     let g = font.glyph(c)?;
-    let scale = size_mm / font.cap_height;
+    let scale = size_mm / emb_letter::layout::height_unit(font, &c.to_string(), true);
     let to_mm = Transform::scale(scale, scale);
     // The parts before the route (P20 Milestone 4): the route changes
     // their order, not their areas. The trims of the words are with routes.
@@ -165,7 +167,7 @@ pub fn measure(font: &Font, c: char, size_mm: f64) -> Option<Measure> {
     }
     // The stitch of the columns, as the layout chooses it for a text of
     // this one character.
-    emb_letter::glyph::auto_stitches(&mut parts.iter_mut().collect::<Vec<_>>());
+    emb_letter::glyph::auto_stitches(&mut parts.iter_mut().collect::<Vec<_>>(), true);
     let ring = |r: &Vec<Point>| -> Vec<Point> { r.iter().map(|p| to_mm.apply(*p)).collect() };
     let outline: Vec<(Vec<Point>, Vec<Vec<Point>>)> = font
         .shapes(g)

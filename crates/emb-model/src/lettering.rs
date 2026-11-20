@@ -340,8 +340,16 @@ pub struct Lettering {
     /// The text; `\n` starts a new line.
     pub text: String,
     pub font: FontRef,
-    /// Capital height (the height of "H"), in mm.
+    /// Capital height (the height of "H"), in mm; for text with Japanese,
+    /// Chinese or Korean characters, the height of those characters (see
+    /// `character_height`).
     pub height_mm: f64,
+    /// The height of text with Japanese, Chinese or Korean characters is the
+    /// height of those characters, not the height of a Latin capital (P20
+    /// Milestone 5). Lettering of a design saved before has `false` and
+    /// keeps its size.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub character_height: bool,
     /// Extra space after each letter, in mm (can be negative).
     #[serde(default)]
     pub letter_spacing_mm: f64,
@@ -480,6 +488,7 @@ impl Lettering {
             text: text.to_string(),
             font,
             height_mm,
+            character_height: true,
             letter_spacing_mm: 0.0,
             line_spacing: 1.0,
             justify: Justify::default(),
@@ -1091,6 +1100,10 @@ cd",
         let min: Lettering =
             serde_json::from_str(r#"{"text":"A","font":{"family":"F","style":""},"height_mm":5}"#).unwrap();
         assert!(min.kerning && min.line_spacing == 1.0 && min.letters.is_empty());
+        // Lettering of a design saved before P20 Milestone 5 keeps the
+        // capital height; new lettering has the height of its characters.
+        assert!(!min.character_height);
+        assert!(Lettering::new("A", FontRef::new("F", ""), 5.0, Point::ZERO).character_height);
         assert_eq!(min.lines(), ["A"]);
     }
 }

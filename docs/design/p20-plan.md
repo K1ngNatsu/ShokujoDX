@@ -1,8 +1,8 @@
 # Plan: Japanese lettering (phase P20)
 
 Date: 2026-11-20 · Status: Accepted (owner, 2026-11-20: before v0.4.0).
-Milestones 1, 2 and 4 are done (ADR 0141, 0142, 0144). Milestone 3 is
-made (ADR 0143) and waits for the sew-out of the owner.
+Milestones 1, 2, 4 and 5 are done (ADR 0141, 0142, 0144, 0145).
+Milestone 3 is made (ADR 0143) and waits for the sew-out of the owner.
 
 ## Goal
 
@@ -249,6 +249,18 @@ the test font has 48 with no routes, so half is 24.)
 
 **Exit test:** 刺繍 at a height of 20 mm is 20 mm high (± 5 %); at 10 mm,
 no satin column of the reference set is narrower than 0.8 mm.
+
+**Done (2026-11-20, ADR 0145).** New lettering has
+`Lettering::character_height`: the height of text with Japanese, Chinese
+or Korean characters is the middle height of the kanji 国永東字書漢日 of
+the font (`LetterSource::character_height`); a saved design keeps its
+size. In Auto, a column narrower than 0.8 mm in its middle sews as a run
+along its middle (a bean stitch from 2 mm long). For such text in a
+TrueType font, the size range starts where the columns are 0.8 mm wide
+(`LetterSource::text_size_range`), and the Lettering window shows it. The
+bench has 10 mm too, and its test checks the exit test: 刺繍 at 20 mm is
+20.1 mm high (25.7 mm before); at 10 mm the narrowest satin column is
+0.81 mm (36 columns are runs).
 
 ## Milestone 6: a Japanese embroidery font (L)
 

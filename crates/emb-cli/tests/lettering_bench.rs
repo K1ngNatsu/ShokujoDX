@@ -55,10 +55,12 @@ fn lettering_bench() {
     let mean = |f: fn(&Measure) -> f64| b.rows.iter().map(f).sum::<f64>() / b.rows.len() as f64;
     assert!(mean(|m| m.overlap) < 0.02, "two layers: {}", mean(|m| m.overlap));
     assert!(mean(|m| m.coverage) > 0.98, "covered: {}", mean(|m| m.coverage));
+    // From 15 mm: at 10 mm the thin strokes are runs (Milestone 5), which
+    // cover a line, not an area.
     let bad: Vec<String> = b
         .rows
         .iter()
-        .filter(|m| m.overlap > 0.06 || m.coverage < 0.95)
+        .filter(|m| m.overlap > 0.06 || (m.size_mm >= 15.0 && m.coverage < 0.95))
         .map(|m| format!("{} {} mm: {:.3} {:.3}", m.c, m.size_mm, m.overlap, m.coverage))
         .collect();
     assert!(bad.is_empty(), "two layers over 6 % or covered under 95 %: {bad:?}");
@@ -67,5 +69,29 @@ fn lettering_bench() {
     // (48).
     let trims = lettering_bench::trims(&f, "刺繍東京", 20.0);
     assert!(trims <= 24, "刺繍東京 at 20 mm: {trims} trims");
+    // P20 Milestone 5, the exit test: at 10 mm no satin column is narrower
+    // than 0.8 mm (narrower columns are runs), and 刺繍 at a height of
+    // 20 mm is 20 mm high (± 5 %).
+    let narrow: Vec<&Measure> = b
+        .rows
+        .iter()
+        .filter(|m| m.size_mm == 10.0 && m.narrowest_mm.is_some_and(|w| w < lettering_bench::NARROW_MM))
+        .collect();
+    assert!(narrow.is_empty(), "satin columns under 0.8 mm at 10 mm: {narrow:?}");
+    let mut l = emb_model::Lettering::new(
+        "刺繍",
+        emb_letter::LetterSource::font_ref(&f),
+        20.0,
+        emb_geom::Point::ZERO,
+    );
+    emb_letter::relayout(&mut l, &f);
+    let high = l
+        .letters
+        .iter()
+        .flat_map(|x| x.parts.iter())
+        .filter_map(|p| p.paths().filter_map(|q| q.control_bbox()).reduce(emb_geom::BBox::union))
+        .reduce(emb_geom::BBox::union)
+        .map_or(0.0, |b| b.height());
+    assert!((high - 20.0).abs() <= 1.0, "刺繍 at 20 mm is {high:.2} mm high");
     insta::assert_snapshot!(lettering_bench::report(&b, false));
 }

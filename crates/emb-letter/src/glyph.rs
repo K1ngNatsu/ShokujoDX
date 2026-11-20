@@ -2,7 +2,7 @@
 
 use emb_geom::region::{self, Join, Region, ring_contains};
 use emb_geom::{Path, Point, Polyline};
-use emb_model::{ColumnPattern, FillParams, ObjectKind, SatinParams};
+use emb_model::{ColumnPattern, FillParams, ObjectKind, RunningParams, SatinParams};
 
 use crate::stroke::{Strokes, strokes};
 
@@ -16,6 +16,17 @@ pub const AUTO_MIN_COVERAGE: f64 = 0.85;
 pub const AUTO_MAX_SATIN_MM: f64 = crate::quality::LONG_MM;
 /// In satin text, a column wider than this (mm) is a tatami column.
 pub const AUTO_ALONE_MM: f64 = 1.5 * AUTO_MAX_SATIN_MM;
+/// In `Auto`, a column narrower than this in its middle (mm) sews as a run
+/// (P20 Milestone 5): the narrowest satin of the fonts for small text.
+pub const AUTO_MIN_SATIN_MM: f64 = crate::source::SMALL_TEXT_MIN_SATIN_MM;
+/// The run of a narrow column at least this long (mm) is a bean stitch (a
+/// stroke of its own); a shorter one is a single run.
+pub const AUTO_BEAN_MM: f64 = 2.0;
+/// The stitch length of the run of a narrow column, in mm.
+pub const AUTO_RUN_STITCH_MM: f64 = 1.8;
+/// The step along a column for its middle width, in mm (as the lettering
+/// bench measures it).
+const THIN_STEP_MM: f64 = 0.25;
 /// The stitch length of the rows of a tatami column of `Auto`, in mm.
 pub const AUTO_TATAMI_STITCH_MM: f64 = 3.5;
 /// A part of the glyph that the strokes do not cover is broad (a stroke
@@ -109,8 +120,22 @@ impl GlyphShapes {
 /// [`column_width`]) decides. Up to [`AUTO_MAX_SATIN_MM`] they stay satin
 /// (their long stitches are split), and only a column wider than
 /// [`AUTO_ALONE_MM`] is a tatami column; wider, all are tatami columns.
-/// Other parts do not change.
-pub fn auto_stitches(parts: &mut [&mut ObjectKind]) {
+/// With `thin`, a column narrower than [`AUTO_MIN_SATIN_MM`] in its middle
+/// sews as a run first ([`thin_run`], P20 Milestone 5): for the columns that
+/// the stroke finder makes from the outlines of a TrueType font (the letters
+/// of an embroidery font were checked at their sizes). Other parts do not
+/// change.
+pub fn auto_stitches(parts: &mut [&mut ObjectKind], thin: bool) {
+    // A column narrower than the narrowest satin sews as a run along its
+    // middle (P20 Milestone 5).
+    for p in parts.iter_mut().filter(|_| thin) {
+        if let ObjectKind::Satin { geometry, params } = &**p
+            && params.pattern.is_satin()
+            && let Some(run) = thin_run(geometry)
+        {
+            **p = run;
+        }
+    }
     let widths: Vec<Option<(f64, f64)>> = parts
         .iter()
         .map(|p| match &**p {
@@ -143,6 +168,44 @@ pub fn auto_stitches(parts: &mut [&mut ObjectKind]) {
             });
         }
     }
+}
+
+/// The run of a column (in mm) that is narrower than
+/// [`AUTO_MIN_SATIN_MM`] in its middle (the width that half of its length
+/// is narrower than): its middle line, a bean stitch if it is at least
+/// [`AUTO_BEAN_MM`] long. `None` for a wider column.
+fn thin_run(g: &emb_model::SatinGeometry) -> Option<ObjectKind> {
+    let pairs = crate::quality::column_pairs(g, THIN_STEP_MM);
+    let mut widths: Vec<(f64, f64)> = pairs
+        .iter()
+        .map(|(a, b, l)| (a.distance(*b), *l))
+        .filter(|(w, l)| w.is_finite() && *l > 0.0)
+        .collect();
+    widths.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let half = widths.iter().map(|(_, l)| l).sum::<f64>() / 2.0;
+    let mut sum = 0.0;
+    let middle = widths.iter().find(|(_, l)| {
+        sum += l;
+        sum >= half
+    })?;
+    if middle.0 >= AUTO_MIN_SATIN_MM {
+        return None;
+    }
+    let line: Vec<Point> = pairs.iter().map(|(a, b, _)| a.lerp(*b, 0.5)).collect();
+    let (first, rest) = line.split_first()?;
+    let mut path = Path::new().move_to(*first);
+    for p in rest {
+        path = path.line_to(*p);
+    }
+    let long: f64 = line.windows(2).map(|w| w[0].distance(w[1])).sum();
+    Some(ObjectKind::Running {
+        path,
+        params: RunningParams {
+            stitch_length_mm: AUTO_RUN_STITCH_MM,
+            repeats: if long >= AUTO_BEAN_MM { 3 } else { 1 },
+            ..Default::default()
+        },
+    })
 }
 
 /// The width of a column ([`column_width`]) and its length along its
@@ -531,7 +594,7 @@ mod tests {
         };
         let run = |parts: &mut Vec<ObjectKind>| {
             let mut refs: Vec<&mut ObjectKind> = parts.iter_mut().collect();
-            auto_stitches(&mut refs);
+            auto_stitches(&mut refs, true);
         };
         let tatami = ColumnPattern::Tatami {
             stitch_mm: AUTO_TATAMI_STITCH_MM,
@@ -574,6 +637,29 @@ mod tests {
         ];
         run(&mut parts);
         assert_eq!(patterns(&parts), [satin, satin, tatami, ColumnPattern::Zigzag]);
+    }
+
+    #[test]
+    fn a_thin_column_sews_as_a_run() {
+        // P20 Milestone 5: a column narrower than the narrowest satin is a
+        // run along its middle; a long one is a bean stitch.
+        let runs = |len: f64, w: f64| -> Option<(usize, u32)> {
+            let mut parts = [ObjectKind::Satin {
+                geometry: column(len, w, None),
+                params: SatinParams::default(),
+            }];
+            let mut refs: Vec<&mut ObjectKind> = parts.iter_mut().collect();
+            auto_stitches(&mut refs, true);
+            match &parts[0] {
+                ObjectKind::Running { path, params } => Some((path.points().count(), params.repeats)),
+                _ => None,
+            }
+        };
+        assert!(runs(10.0, 1.0).is_none(), "a satin of 1 mm stays");
+        let (points, repeats) = runs(10.0, 0.5).expect("a run");
+        assert!(points >= 2);
+        assert_eq!(repeats, 3, "a stroke of 10 mm: a bean stitch");
+        assert_eq!(runs(1.0, 0.5).map(|r| r.1), Some(1), "a short piece: one run");
     }
 
     #[test]

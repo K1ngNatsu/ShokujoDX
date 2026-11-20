@@ -92,7 +92,7 @@ pub fn layout_with_box(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> (Ve
     if l.direction.is_stacked() {
         return (stacked(l, src), None);
     }
-    let scale = l.height_mm / src.cap_height();
+    let scale = l.height_mm / height_unit(src, &l.text, l.character_height);
     // A made bold makes each letter wider on both sides (v0.3 plan, Stage 5).
     let bold_w = if l.bold { style::bold_width(l.height_mm) } else { 0.0 };
     let line_step = src.line_height() * scale * l.line_spacing.max(0.0);
@@ -218,7 +218,7 @@ pub fn layout_with_box(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> (Ve
             });
         }
     }
-    auto_stitches(l, &mut letters);
+    auto_stitches(l, src, &mut letters);
     let warp = !l.envelope.is_none() && l.baseline.is_straight();
     let Some((x0, x1)) = span.filter(|_| warp) else {
         return (letters, None);
@@ -233,7 +233,7 @@ pub fn layout_with_box(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> (Ve
 /// The stitch of the columns of the letters with the stitch type Auto, one
 /// for the whole text ([`crate::glyph::auto_stitches`]). The letters of an
 /// edit with its own shape and the underline keep theirs.
-fn auto_stitches(l: &Lettering, letters: &mut [Letter]) {
+fn auto_stitches(l: &Lettering, src: &(impl LetterSource + ?Sized), letters: &mut [Letter]) {
     let mut parts: Vec<&mut ObjectKind> = letters
         .iter_mut()
         .filter(|x| {
@@ -244,7 +244,9 @@ fn auto_stitches(l: &Lettering, letters: &mut [Letter]) {
         })
         .flat_map(|x| x.parts.iter_mut())
         .collect();
-    crate::glyph::auto_stitches(&mut parts);
+    // Thin columns become runs in the letters of a TrueType font.
+    let thin = src.font_ref().kind == emb_model::FontKind::TrueType;
+    crate::glyph::auto_stitches(&mut parts, thin);
 }
 
 /// The parts of one letter in letter space (the baseline at y = 0, scaled
@@ -340,7 +342,7 @@ const STACK_SPACE: f64 = 0.6;
 /// (Left), the middle (Center) or the bottom (Right) of each column at the
 /// origin. A straight baseline only: no envelope and no underline.
 fn stacked(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> Vec<Letter> {
-    let scale = l.height_mm / src.cap_height();
+    let scale = l.height_mm / height_unit(src, &l.text, l.character_height);
     let bold_w = if l.bold { style::bold_width(l.height_mm) } else { 0.0 };
     let step = l.height_mm * (1.0 + STACK_GAP) + l.letter_spacing_mm;
     // The columns are as far apart as the widest letter of the text.
@@ -417,15 +419,43 @@ fn stacked(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> Vec<Letter> {
             });
         }
     }
-    auto_stitches(l, &mut letters);
+    auto_stitches(l, src, &mut letters);
     letters
+}
+
+/// `true` for a Japanese, Chinese or Korean character: kana, a kanji (a
+/// Han ideograph) or a Hangul syllable (P20 Milestone 5).
+pub fn is_cjk(c: char) -> bool {
+    matches!(
+        c as u32,
+        0x3040..=0x30FF | 0x3400..=0x4DBF | 0x4E00..=0x9FFF | 0xF900..=0xFAFF | 0xFF66..=0xFF9F | 0xAC00..=0xD7AF | 0x20000..=0x3134F
+    )
+}
+
+/// The height in the units of `src` that the height of lettering is: for
+/// text with Japanese, Chinese or Korean characters in a source that has
+/// them, the height of the characters ([`LetterSource::character_height`]),
+/// if `characters` (new lettering, `Lettering::character_height`); else
+/// the capital height.
+pub fn height_unit(src: &(impl LetterSource + ?Sized), text: &str, characters: bool) -> f64 {
+    if characters
+        && text.chars().any(is_cjk)
+        && let Some(h) = src.character_height()
+    {
+        return h;
+    }
+    src.cap_height()
 }
 
 /// Makes the letters of `l` again from `src`, in place, with the size range
 /// of the font.
 pub fn relayout(l: &mut Lettering, src: &(impl LetterSource + ?Sized)) {
     let (letters, b) = layout_with_box(l, src);
-    l.range_mm = src.size_range(l.stitch);
+    l.range_mm = if l.character_height {
+        src.text_size_range(&l.text, l.stitch)
+    } else {
+        src.size_range(l.stitch)
+    };
     l.envelope_box = b;
     l.set_letters(letters);
 }
@@ -526,6 +556,26 @@ mod tests {
 
     fn x_of(letters: &[Letter], i: usize) -> f64 {
         bbox(&letters[i..=i]).min.x
+    }
+
+    #[test]
+    fn japanese_text_has_the_height_of_its_characters() {
+        // P20 Milestone 5: the height unit is the height of the characters
+        // for text with Japanese, Chinese or Korean characters, if the font
+        // has them, for new lettering; else the capital height.
+        assert!(is_cjk('刺') && is_cjk('あ') && is_cjk('サ') && is_cjk('한'));
+        assert!(!is_cjk('A') && !is_cjk('。') && !is_cjk('1'));
+        let f = bundled::font("Lato", "Bold").unwrap();
+        assert_eq!(f.character_height, None, "Lato has no kanji");
+        assert_eq!(height_unit(&f, "刺繍", true), f.cap_height);
+        let height = crate::font::character_height_of(|c| match c {
+            '国' => Some(900.0),
+            '永' => Some(940.0),
+            '東' => Some(920.0),
+            _ => None,
+        });
+        assert_eq!(height, Some(920.0));
+        assert_eq!(crate::font::character_height_of(|_| None), None);
     }
 
     #[test]

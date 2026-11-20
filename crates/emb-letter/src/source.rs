@@ -31,6 +31,12 @@ pub const MAX_HEIGHT_MM: f64 = 300.0;
 pub trait LetterSource {
     fn font_ref(&self) -> FontRef;
     fn cap_height(&self) -> f64;
+    /// The height of the Japanese, Chinese or Korean characters of the
+    /// source (the middle height of some common kanji), if it has them
+    /// (P20 Milestone 5).
+    fn character_height(&self) -> Option<f64> {
+        None
+    }
     /// The distance between two baselines.
     fn line_height(&self) -> f64;
     /// The advance of a space when the source has no space letter.
@@ -44,6 +50,15 @@ pub trait LetterSource {
     fn parts(&self, letter: u32, stitch: LetterStitch, scale: f64) -> Vec<ObjectKind>;
     /// The recommended capital height range in mm.
     fn size_range(&self, stitch: LetterStitch) -> Option<(f64, f64)>;
+    /// The recommended height range in mm for lettering of `text` whose
+    /// height is the height of its characters (`Lettering::character_height`):
+    /// [`LetterSource::size_range`], and for text with Japanese, Chinese or
+    /// Korean characters in a TrueType font, a range from the narrowest
+    /// columns of those characters (P20 Milestone 5).
+    fn text_size_range(&self, text: &str, stitch: LetterStitch) -> Option<(f64, f64)> {
+        let _ = text;
+        self.size_range(stitch)
+    }
     /// The parts of the letter sew in the order of the source, each column
     /// from its start to its end (a letter that a person put in order).
     /// `stitch` and `scale` are those of [`LetterSource::parts`]: the
@@ -102,6 +117,10 @@ impl LetterSource for Font {
         self.cap_height
     }
 
+    fn character_height(&self) -> Option<f64> {
+        self.character_height
+    }
+
     fn line_height(&self) -> f64 {
         Font::line_height(self)
     }
@@ -146,6 +165,55 @@ impl LetterSource for Font {
 
     fn size_range(&self, stitch: LetterStitch) -> Option<(f64, f64)> {
         size_range(self.stroke_ratio()?, stitch)
+    }
+
+    /// For text with Japanese, Chinese or Korean characters: the smallest
+    /// height at which the columns of these characters are at least
+    /// [`SMALL_TEXT_MIN_SATIN_MM`] wide, all but the narrowest
+    /// [`crate::quality::RANGE_TAIL`] of their length (narrower columns sew
+    /// as runs, `glyph::auto_stitches`); the largest height of
+    /// [`LetterSource::size_range`].
+    fn text_size_range(&self, text: &str, stitch: LetterStitch) -> Option<(f64, f64)> {
+        let range = self.size_range(stitch);
+        let Some(h) = self.character_height else {
+            return range;
+        };
+        if !text.chars().any(crate::layout::is_cjk) {
+            return range;
+        }
+        let mut seen = Vec::new();
+        let mut widths: Vec<(f64, f64)> = Vec::new();
+        for c in text.chars().filter(|c| crate::layout::is_cjk(*c)) {
+            if seen.contains(&c) {
+                continue;
+            }
+            seen.push(c);
+            let Some(g) = self.glyph(c) else { continue };
+            let shapes = self.shapes(g);
+            if !columns(&shapes, stitch) {
+                continue;
+            }
+            for s in &shapes.strokes.satins {
+                widths.extend(crate::quality::column_widths(s, h / 200.0));
+            }
+        }
+        widths.retain(|(w, l)| w.is_finite() && *w > 0.0 && *l > 0.0);
+        if widths.is_empty() {
+            return range;
+        }
+        widths.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let tail = crate::quality::RANGE_TAIL * widths.iter().map(|(_, l)| l).sum::<f64>();
+        let mut sum = 0.0;
+        let narrow = widths
+            .iter()
+            .find(|(_, l)| {
+                sum += l;
+                sum > tail
+            })
+            .map_or(widths[0].0, |(w, _)| *w);
+        let lo = ((SMALL_TEXT_MIN_SATIN_MM * h / narrow * 2.0).ceil() / 2.0).max(MIN_HEIGHT_MM);
+        let hi = range.map_or(MAX_HEIGHT_MM, |r| r.1).max(lo);
+        Some((lo, hi))
     }
 
     fn shape(&self, line: &str, kerning: bool) -> Option<Vec<ShapedGlyph>> {

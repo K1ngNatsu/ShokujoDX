@@ -17,7 +17,11 @@ arc](tutorial-lettering) shows the first steps.
    The canvas shows the lettering as you type.
 3. Select a font, set the **Height** and the **Stitch type**. The font
    list shows each name in its own font. Point to a name, and the canvas
-   shows your text in that font.
+   shows your text in that font. The height is the height of the capital
+   letters; for Japanese, Chinese or Korean text, it is the height of its
+   characters. For such text in a TrueType font, the window shows the
+   smallest height at which its strokes sew well; with **Automatic**, a
+   stroke thinner than 0.8 mm sews as a run.
 4. Click **OK** (or **Ctrl+Enter**). **Esc** or **Cancel** closes the
    window and takes back what it shows.
 

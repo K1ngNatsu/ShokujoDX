@@ -579,9 +579,11 @@ pub struct LetteringDialog {
     original: Option<Box<Lettering>>,
     /// The font under the pointer in the font list: the canvas shows it.
     pub hover: Option<FontRef>,
-    /// The note about characters that the font does not have, for the
-    /// text and the font that it was made for.
-    missing: Option<(String, FontRef, Option<String>)>,
+    /// The note about characters that the font does not have, and the
+    /// smallest height at which the characters of the text sew well (text
+    /// with Japanese, Chinese or Korean characters, P20 Milestone 5), for
+    /// the text and the font that they were made for.
+    missing: Option<(String, FontRef, Option<String>, Option<f64>)>,
 }
 
 /// Makes the merge keys of the Lettering windows different.
@@ -1025,8 +1027,9 @@ pub fn windows(ctx: &egui::Context, st: &mut AppState) {
             .filter(|(salt, _)| salt == "dialog")
             .map(|(_, f)| f);
         ui.horizontal(|ui| {
-            ui.label(tr("Height"))
-                .on_hover_text(tr("The height of the capital letters."));
+            ui.label(tr("Height")).on_hover_text(tr(
+                "The height of the capital letters, or of the Japanese, Chinese or Korean characters of the text.",
+            ));
             ui.add(
                 egui::DragValue::new(&mut d.height_mm)
                     .range(2.0..=300.0)
@@ -1043,16 +1046,35 @@ pub fn windows(ctx: &egui::Context, st: &mut AppState) {
         // after a change of the text or the font.
         if d.missing
             .as_ref()
-            .is_none_or(|(t, f, _)| *t != d.text || !f.same(&d.font))
+            .is_none_or(|(t, f, _, _)| *t != d.text || !f.same(&d.font))
         {
-            let note = st.fonts.get(&d.font).and_then(|font| {
-                let mut l = Lettering::new(&d.text, d.font.clone(), d.height_mm, Point::ZERO);
-                emb_letter::relayout(&mut l, font.source());
-                l.missing_warning()
-            });
-            d.missing = Some((d.text.clone(), d.font.clone(), note));
+            let (note, from) = st
+                .fonts
+                .get(&d.font)
+                .map(|font| {
+                    let mut l = Lettering::new(&d.text, d.font.clone(), d.height_mm, Point::ZERO);
+                    emb_letter::relayout(&mut l, font.source());
+                    let from = l
+                        .range_mm
+                        .filter(|_| l.font.kind == FontKind::TrueType && d.text.chars().any(emb_letter::layout::is_cjk))
+                        .map(|r| r.0);
+                    (l.missing_warning(), from)
+                })
+                .unwrap_or((None, None));
+            d.missing = Some((d.text.clone(), d.font.clone(), note, from));
         }
-        if let Some((_, _, Some(text))) = &d.missing {
+        if let Some((_, _, _, Some(from))) = &d.missing {
+            let text = crate::i18n::fill(
+                "The characters of this text sew well from a height of {} mm.",
+                &[&format!("{from:.1}")],
+            );
+            if d.height_mm < from - 1e-6 {
+                ui.colored_label(ui.visuals().warn_fg_color, text);
+            } else {
+                ui.weak(text);
+            }
+        }
+        if let Some((_, _, Some(text), _)) = &d.missing {
             missing_note(ui, text);
         }
         ui.separator();
@@ -1672,7 +1694,7 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, l: &Letter
     slider(
         ui,
         tr("Height"),
-        tr("The height of the capital letters."),
+        tr("The height of the capital letters, or of the Japanese, Chinese or Korean characters of the text."),
         &mut n.height_mm,
         2.0..=150.0,
         tr(" mm"),

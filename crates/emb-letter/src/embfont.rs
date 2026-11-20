@@ -649,6 +649,18 @@ impl LetterSource for EmbFont {
         self.cap_height_mm
     }
 
+    fn character_height(&self) -> Option<f64> {
+        crate::font::character_height_of(|c| {
+            let letter = self.letters.get(&c)?;
+            let b = letter
+                .parts
+                .iter()
+                .filter_map(|p| p.paths().filter_map(|q| q.control_bbox()).reduce(emb_geom::BBox::union))
+                .reduce(emb_geom::BBox::union)?;
+            Some(b.height())
+        })
+    }
+
     fn line_height(&self) -> f64 {
         self.line_height_mm
     }

@@ -170,6 +170,9 @@ pub struct Font {
     pub units_per_em: f64,
     /// Height of the capitals (of "H").
     pub cap_height: f64,
+    /// The height of the Japanese, Chinese or Korean characters, if the
+    /// font has them ([`character_height_of`]).
+    pub character_height: Option<f64>,
     pub ascender: f64,
     /// Negative: below the baseline.
     pub descender: f64,
@@ -230,6 +233,11 @@ impl Font {
             .and_then(|h| face.glyph_bounding_box(h))
             .map(|b| f64::from(b.y_max));
         let cap_height = cap_height_of(face.capital_height().map(f64::from), h_top, units_per_em);
+        let character_height = character_height_of(|c| {
+            face.glyph_index(c)
+                .and_then(|g| face.glyph_bounding_box(g))
+                .map(|b| f64::from(b.y_max) - f64::from(b.y_min))
+        });
         let (ascender, descender, line_gap) = (
             f64::from(face.ascender()),
             f64::from(face.descender()),
@@ -252,6 +260,7 @@ impl Font {
             style,
             units_per_em,
             cap_height,
+            character_height,
             ascender,
             descender,
             line_gap,
@@ -485,6 +494,22 @@ impl ttf_parser::OutlineBuilder for Builder {
     fn close(&mut self) {
         self.path = std::mem::take(&mut self.path).close();
     }
+}
+
+/// Kanji that fill the box of the characters (the ideographic character
+/// face): their middle height is the height of the characters.
+pub const HEIGHT_KANJI: &str = "国永東字書漢日";
+
+/// The middle height of the kanji of [`HEIGHT_KANJI`] that `height` gives
+/// (the height of a character, if the source has it); `None` with fewer than
+/// three of them.
+pub fn character_height_of(height: impl Fn(char) -> Option<f64>) -> Option<f64> {
+    let mut v: Vec<f64> = HEIGHT_KANJI.chars().filter_map(height).filter(|h| *h > 0.0).collect();
+    if v.len() < 3 {
+        return None;
+    }
+    v.sort_by(f64::total_cmp);
+    Some(v[v.len() / 2])
 }
 
 /// The height of the capitals in font units: the value of the font (OS/2),

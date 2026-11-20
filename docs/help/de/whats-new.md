@@ -67,7 +67,13 @@ endet an seinen Seiten; wo ein Strich auf einem anderen endet, endet er
 etwas darin: Dort gibt es keine Garnknoten. Die Buchstaben dieser
 Schriften bekommen auch eine Stickreihenfolge mit wenigen Fadenschnitten,
 wie die Stickschriften des Programms: 刺繍東京 bei 20 mm hat 23
-Fadenschnitte, nicht 48. Schriften mit Strichen, die sich überlappen
+Fadenschnitte, nicht 48. Die Höhe von japanischem, chinesischem oder
+koreanischem Text ist jetzt die Höhe seiner Zeichen (vorher die Höhe eines
+lateinischen Großbuchstabens, die Zeichen waren also etwa ein Viertel
+größer); Schriftzüge in Designs, die Sie vorher gespeichert haben, behalten
+ihre Größe. Striche, die dünner als 0,8 mm sind, sticken als Steppstich,
+und das Schrift-Fenster zeigt die kleinste Höhe, bei der der Text gut
+stickt. Schriften mit Strichen, die sich überlappen
 (viele Schriften aus dem Internet), geben jetzt Buchstaben ohne Löcher und
 ohne Stiche außerhalb des Buchstabens. Siehe [Schrift](lettering).
 

@@ -18,7 +18,11 @@ Bogen](tutorial-lettering) zeigt die ersten Schritte.
 3. Wählen Sie eine Schrift, legen Sie die **Höhe** und die **Stichart**
    fest. Die Schriftliste zeigt jeden Namen in seiner eigenen Schrift.
    Zeigen Sie auf einen Namen, und die Arbeitsfläche zeigt Ihren Text in
-   dieser Schrift.
+   dieser Schrift. Die Höhe ist die Höhe der Großbuchstaben; bei
+   japanischem, chinesischem oder koreanischem Text ist sie die Höhe seiner
+   Zeichen. Bei solchem Text in einer TrueType-Schrift zeigt das Fenster die
+   kleinste Höhe, bei der seine Striche gut sticken; mit **Automatisch**
+   stickt ein Strich, der dünner als 0,8 mm ist, als Steppstich.
 4. Klicken Sie auf **OK** (oder **Strg+Eingabe**). **Esc** oder
    **Abbrechen** schließt das Fenster und nimmt zurück, was es zeigt.
 
