@@ -64,7 +64,11 @@ ShokujoDX makes the stitches and writes the file for your machine.
 **Pictures and artwork**
 - **Picture to design:** a wizard that removes the background, finds the
   colors and makes the stitches; also photo stitch and cross stitch.
-- Trace pictures, and import SVG, PDF, AI, EMF and WMF artwork.
+- Trace pictures, and import SVG, PDF, AI, EPS, EMF and WMF artwork.
+- **Designs of other programs:** Recognize Objects makes the stitches of a
+  machine file into runs, satin columns and fills again (also with the
+  outlines of the design); read and write Ink/Stitch files, and convert its
+  fonts.
 
 **Parametric sketch**
 - Draw with exact sizes, as in a CAD program: constraints, dimensions and
@@ -99,7 +103,8 @@ your own machine and share it.
 | **Write** | DST, VP3, PES, PEC, EXP, JEF, XXX, TBF, TAP, U01 |
 | **Read** | All of the above, plus SEW, HUS, SHV, DSB, DSZ, 10O, 100, DAT and 22 more |
 | **Project** | `.embproj` (every object and setting, to change later) |
-| **Artwork** | SVG, PDF, AI, EMF and WMF in; SVG, EMF, DXF, PDF, PNG and CSV out |
+| **Artwork** | SVG, PDF, AI, EPS, EMF and WMF in; SVG, EMF, DXF, PDF, PNG and CSV out |
+| **Ink/Stitch** | SVG files with Ink/Stitch settings in and out; its fonts in |
 
 The full list is in [the file formats help](docs/help/file-formats.md).
 

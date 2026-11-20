@@ -364,7 +364,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
     }
     let mut open = true;
     egui::Window::new(tr("Product Photo"))
-        .id(egui::Id::new("ProductPhoto"))
+        .id(egui::Id::new("Product Photo"))
         .open(&mut open)
         .resizable(false)
         .show(ctx, |ui| contents(ui, st));

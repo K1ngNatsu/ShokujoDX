@@ -1375,7 +1375,7 @@ fn bind(vm: &mut Vm) -> R {
 fn save(vm: &mut Vm) -> R {
     let id = vm.saves.len() as u32;
     vm.saves.push(vm.gstack.len());
-    super::graphics::gsave_by(vm, true);
+    super::graphics::gsave_by(vm, true)?;
     vm.push(Obj::Save(id))
 }
 

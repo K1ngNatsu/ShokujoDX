@@ -47,8 +47,11 @@ another program on the files of customers.
   - The page is the bounding box (`%%HiResBoundingBox`, else
     `%%BoundingBox`, also at the end); a file with a binary header gives
     its PostScript part; the first page with artwork is imported.
-  - Limits: 40 million steps, 256 MB, 2,000 errors; the import keeps what
-    the program drew before it stopped, and a warning says why.
+  - Limits: 40 million steps, 256 MB, 2,000 errors, 100,000 painted
+    paths; a painted path and a copy of the path (`gsave`) count for the
+    memory, and the path keeps its length (the audit of P18); the import
+    keeps what the program drew before it stopped, and a warning says
+    why.
 - **The AI script** (`eps/ai.rs`): AI files of the old kind (PostScript,
   before AI files had a PDF inside) draw with the short operators of a
   procedure set that the file does not always contain. A file with the
@@ -91,3 +94,11 @@ another program on the files of customers.
   missing operator is a small addition.
 - Text in an EPS file must be outlines, as in the PDF import.
 - `emb-formats` uses `flate2` (already in the build through `lopdf`).
+- The audit of P18 (2026-11-20, roadmap): a probe
+  (`emb_formats::eps::probe`) runs each operator with wrong operands and
+  50 heavy programs (each in a process of its own: a program that is not
+  stopped takes all the memory). It found programs that used more than
+  4 GB in 4 s and a path that took minutes; now each stops in less than
+  1 s. All artwork readers now leave out a shape that is farther than
+  1 km or has a wrong number (`svg::drop_far`): a project with such a
+  shape does not open.

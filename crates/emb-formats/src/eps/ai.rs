@@ -164,30 +164,35 @@ fn paint(vm: &mut Vm, close: bool, fill: bool, stroke: bool) -> R {
         graphics::new_path(vm);
         return Ok(());
     }
-    if let Some(comp) = vm.ai.compound.as_mut() {
-        // A part of a compound path: painted at `*U`.
-        comp.subs
-            .extend(std::mem::take(&mut vm.g.path).into_iter().filter(|s| s.els.len() > 1));
+    if vm.ai.compound.is_some() {
+        // A part of a compound path: painted at `*U`. It counts for the
+        // memory limit now, as it is not in the path.
+        vm.charge(vm.g.path_len * 56)?;
+        let part = std::mem::take(&mut vm.g.path).into_iter().filter(|s| s.els.len() > 1);
+        let Some(comp) = vm.ai.compound.as_mut() else {
+            return Ok(());
+        };
+        comp.subs.extend(part);
         comp.fill = fill;
         comp.stroke = stroke;
         graphics::new_path(vm);
         return Ok(());
     }
-    paint_now(vm, fill, stroke);
-    Ok(())
+    paint_now(vm, fill, stroke)
 }
 
-fn paint_now(vm: &mut Vm, fill: bool, stroke: bool) {
+fn paint_now(vm: &mut Vm, fill: bool, stroke: bool) -> R {
     if !(fill || stroke) {
         graphics::new_path(vm);
-        return;
+        return Ok(());
     }
     let keep = vm.g.fill;
     if vm.ai.gradient && fill {
         vm.g.fill = Paint::Pattern;
     }
-    graphics::paint(vm, fill, stroke);
+    let painted = graphics::paint(vm, fill, stroke);
     vm.g.fill = keep;
+    painted
 }
 
 fn no_paint(vm: &mut Vm) -> R {
@@ -238,8 +243,9 @@ fn compound_end(vm: &mut Vm) -> R {
     vm.ops.clear();
     if let Some(comp) = vm.ai.compound.take() {
         graphics::new_path(vm);
+        vm.g.path_len = comp.subs.iter().map(|s| s.els.len()).sum();
         vm.g.path = comp.subs;
-        paint_now(vm, comp.fill, comp.stroke);
+        return paint_now(vm, comp.fill, comp.stroke);
     }
     Ok(())
 }

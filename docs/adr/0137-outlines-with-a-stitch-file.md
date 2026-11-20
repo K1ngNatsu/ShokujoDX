@@ -69,3 +69,8 @@ the objects can have the exact shapes of the design.
   nothing, and two points align the outlines when their boxes differ.
 - Open: the exit test of the owner (a machine file and the outlines of a
   design of another program).
+- The audit of P18 (2026-11-20): each stitch object (one for each color)
+  is matched alone, so an outline round the design gave its shape to a
+  small object of each color. An outline takes objects only if they
+  cover a quarter of its box (`MIN_COVER`); the exit test gives 92.5 %
+  (92.8 % before).

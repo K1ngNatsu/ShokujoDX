@@ -57,6 +57,9 @@ const CLAIM: f64 = 0.7;
 const NEARLY: f64 = 0.05;
 /// The most needle points of a made object that the match looks at.
 const SAMPLES: usize = 300;
+/// The objects that an outline takes cover at least this part of the box of
+/// the outline.
+const MIN_COVER: f64 = 0.25;
 /// Sizes that differ by less than this part are the same size.
 const SAME_SIZE: f64 = 0.05;
 /// Tolerance to flatten the outlines, mm.
@@ -298,6 +301,24 @@ pub fn with_outlines(s: &StitchDesign, made: Vec<Made>, outlines: &[Outline]) ->
             .into_iter()
             .filter(|&i| kind_of(&made[i].kind) == Some(kind))
             .collect();
+        // Objects that cover only a small part of the outline do not take
+        // it: the outline is of an object of another color (each stitch
+        // object is matched alone), or of an object that is not in the file.
+        let together = BBox::from_points(mine.iter().flat_map(|&i| samples(s, &made[i].records)));
+        let covered = together.map_or(0.0, |b| {
+            let w = (b.max.x.min(sh.bbox.max.x) - b.min.x.max(sh.bbox.min.x)).max(0.0);
+            let h = (b.max.y.min(sh.bbox.max.y) - b.min.y.max(sh.bbox.min.y)).max(0.0);
+            let (ow, oh) = (sh.bbox.width(), sh.bbox.height());
+            // A line (or an outline of no width): the cover along it.
+            if ow.min(oh) < 1e-6 {
+                (w.max(h)) / ow.max(oh).max(1e-9)
+            } else {
+                (w * h) / (ow * oh)
+            }
+        });
+        if covered < MIN_COVER {
+            continue;
+        }
         let Some(kinds) = object_of(o, kind, &made[lead].kind) else {
             continue;
         };

@@ -30,6 +30,9 @@ mod vm;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+mod probe;
+
 use emb_geom::{Path, Point, Transform, text};
 use emb_model::Rgb;
 
@@ -243,6 +246,10 @@ fn import_with(data: &[u8], vectors: bool, limits: Limits) -> Result<SvgImport, 
             text::tr("The PostScript program used too much memory; the import has what it drew before it stopped.")
                 .into(),
         ),
+        Some(PsError::TooManyShapes) => w.push(text::fill(
+            "The PostScript program painted more than {} shapes; the import has the first {}.",
+            &[&graphics::MAX_SHAPES, &graphics::MAX_SHAPES],
+        )),
         _ => {}
     }
     if r.errors > 0 {
@@ -251,5 +258,5 @@ fn import_with(data: &[u8], vectors: bool, limits: Limits) -> Result<SvgImport, 
             &[&r.errors, &r.first_error.as_deref().unwrap_or("?")],
         ));
     }
-    Ok(out)
+    Ok(crate::svg::drop_far(out))
 }

@@ -64,6 +64,16 @@ const SHAPE_TAGS: &[&str] = &["path", "line", "polyline", "polygon", "rect", "el
 /// The prefix of the ids that the reader gives to elements with no id.
 const ID_PREFIX: &str = "emb-inkstitch-";
 
+/// The most repeats of a center walk that the reader takes (a center walk
+/// sews two repeats for each layer).
+const MAX_WALKS: i64 = 10;
+/// The most back-and-forth passes of a bean stitch that the reader takes
+/// (the stitch engine sews at most 9 passes).
+const MAX_BEANS: i64 = 4;
+/// The largest change of the size of a fill (`expand_mm`) that the reader
+/// takes, mm.
+const MAX_EXPAND_MM: f64 = 100.0;
+
 /// All the settings of Ink/Stitch (`INKSTITCH_ATTRIBS` of `lib/svg/tags.py`).
 /// A setting that is not in this list is from a newer version: it gives a
 /// warning.
@@ -1488,7 +1498,11 @@ impl Ctx<'_> {
         };
         // The outlines: one fill for each outer shape, with its holes.
         let mut outlines = region::nest(&self.shape.subs);
-        if let Some(d) = p.float("expand_mm").filter(|d| *d != 0.0) {
+        let expand = p.float("expand_mm").filter(|d| *d != 0.0);
+        if expand.is_some_and(|d| d.abs() > MAX_EXPAND_MM) {
+            warnings.add(Warning::Setting("expand_mm".into()));
+        }
+        if let Some(d) = expand.map(|d| d.clamp(-MAX_EXPAND_MM, MAX_EXPAND_MM)) {
             let regions: Vec<region::Region> = outlines
                 .iter()
                 .filter_map(|(o, hs)| {
@@ -1609,8 +1623,13 @@ impl Ctx<'_> {
         // The underlay, in the order of Ink/Stitch: center walk, contour, zigzag.
         let mut layers = Vec::new();
         if p.bool("center_walk_underlay") == Some(true) {
+            // More than `MAX_WALKS` comes from a damaged file: each two
+            // repeats are a layer.
             let repeats = p.int("center_walk_underlay_repeats").unwrap_or(2).max(1);
-            for _ in 0..(repeats + 1) / 2 {
+            if repeats > MAX_WALKS {
+                warnings.add(Warning::Setting("center_walk_underlay_repeats".into()));
+            }
+            for _ in 0..(repeats.min(MAX_WALKS) + 1) / 2 {
                 layers.push(UnderlayLayer::CenterWalk);
             }
         }
@@ -1754,7 +1773,7 @@ impl Ctx<'_> {
         let beans: Vec<i64> = p
             .floats("bean_stitch_repeats")
             .iter()
-            .map(|b| b.max(0.0) as i64)
+            .map(|b| b.clamp(0.0, MAX_BEANS as f64) as i64)
             .collect();
         match beans.as_slice() {
             [] | [0] => {}

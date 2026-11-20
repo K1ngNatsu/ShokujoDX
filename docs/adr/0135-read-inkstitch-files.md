@@ -113,3 +113,7 @@ of the commands as more shapes.
   corners of a star.
 - The plain readers of SVG, PDF, EMF and WMF now give their warnings
   through `text::fill`, so they are translated.
+- The audit of P18 (2026-11-20): a probe sets each setting that the
+  reader reads to wrong values. A center walk with 10^9 repeats took all
+  the memory. The reader takes at most 10 repeats of a center walk, 4 of a
+  bean stitch and 100 mm of `expand_mm`; a larger value gives a warning.

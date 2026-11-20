@@ -230,6 +230,11 @@ pub(super) struct Sub {
 
 /// The most elements of one path.
 const MAX_PATH: usize = 2_000_000;
+/// The most paths that a program can paint: a logo has some thousands. More
+/// paths stop the run (a program that paints in a loop with no end).
+pub(super) const MAX_SHAPES: usize = 100_000;
+/// The memory of an element of a path, bytes (for the memory limit).
+const EL_BYTES: usize = 56;
 
 #[derive(Debug, Clone)]
 pub(super) struct GState {
@@ -247,6 +252,8 @@ pub(super) struct GState {
     pub dash: Option<Obj>,
     pub dash_offset: f64,
     pub path: Vec<Sub>,
+    /// The number of elements of `path` (for the limit `MAX_PATH`).
+    pub path_len: usize,
     pub cur: Option<[f64; 2]>,
     /// After `closepath`: the next line starts a new subpath here.
     pub reopen: Option<[f64; 2]>,
@@ -277,6 +284,7 @@ impl Default for GState {
             dash: None,
             dash_offset: 0.0,
             path: Vec::new(),
+            path_len: 0,
             cur: None,
             reopen: None,
             path_is_clip: false,
@@ -486,19 +494,22 @@ fn showpage(vm: &mut Vm) -> R {
 
 // ----- The graphics state -----
 
-pub(super) fn gsave_by(vm: &mut Vm, by_save: bool) {
+/// Pushes a copy of the graphics state. The copy of the path counts for the
+/// memory limit.
+pub(super) fn gsave_by(vm: &mut Vm, by_save: bool) -> R {
+    vm.charge(vm.g.path_len * EL_BYTES)?;
     vm.gstack.push(Pushed {
         g: vm.g.clone(),
         by_save,
     });
+    Ok(())
 }
 
 fn gsave(vm: &mut Vm) -> R {
     if vm.gstack.len() > 10_000 {
         return Err(PsError::LimitCheck);
     }
-    gsave_by(vm, false);
-    Ok(())
+    gsave_by(vm, false)
 }
 
 /// `grestore`: a state that `save` pushed stays on the stack.
@@ -1123,6 +1134,7 @@ fn invertmatrix(vm: &mut Vm) -> R {
 /// Ends the current path (with no paint).
 pub(super) fn new_path(vm: &mut Vm) {
     vm.g.path.clear();
+    vm.g.path_len = 0;
     vm.g.cur = None;
     vm.g.reopen = None;
     vm.g.path_is_clip = false;
@@ -1135,7 +1147,7 @@ fn newpath(vm: &mut Vm) -> R {
 }
 
 fn path_len(vm: &Vm) -> usize {
-    vm.g.path.iter().map(|s| s.els.len()).sum()
+    vm.g.path_len
 }
 
 /// Starts a subpath at device point `p`.
@@ -1147,10 +1159,13 @@ pub(super) fn move_device(vm: &mut Vm, p: [f64; 2]) -> R {
     match vm.g.path.last_mut() {
         // Two moves: the second one is the start.
         Some(s) if s.els.len() == 1 && !s.closed => s.els[0] = El::Move(p),
-        _ => vm.g.path.push(Sub {
-            els: vec![El::Move(p)],
-            closed: false,
-        }),
+        _ => {
+            vm.g.path.push(Sub {
+                els: vec![El::Move(p)],
+                closed: false,
+            });
+            vm.g.path_len += 1;
+        }
     }
     vm.g.cur = Some(p);
     vm.g.reopen = None;
@@ -1172,6 +1187,7 @@ pub(super) fn add_device(vm: &mut Vm, el: El, end: [f64; 2]) -> R {
         Some(s) => s.els.push(el),
         None => return Err(PsError::RangeCheck),
     }
+    vm.g.path_len += 1;
     vm.g.cur = Some(end);
     Ok(())
 }
@@ -1452,9 +1468,9 @@ fn rectfill(vm: &mut Vm) -> R {
     for r in rs {
         rect_path(vm, r)?;
     }
-    paint(vm, true, false);
+    let painted = paint(vm, true, false);
     grestore(vm);
-    Ok(())
+    painted
 }
 
 fn rectstroke(vm: &mut Vm) -> R {
@@ -1468,9 +1484,9 @@ fn rectstroke(vm: &mut Vm) -> R {
     for r in rs {
         rect_path(vm, r)?;
     }
-    paint(vm, false, true);
+    let painted = paint(vm, false, true);
     grestore(vm);
-    Ok(())
+    painted
 }
 
 // ----- Painting -----
@@ -1480,8 +1496,9 @@ fn stroke_width(vm: &Vm) -> f64 {
     vm.g.line_width * (a * d - b * c).abs().sqrt()
 }
 
-/// Paints the current path and ends it.
-pub(super) fn paint(vm: &mut Vm, fill: bool, stroke: bool) {
+/// Paints the current path and ends it. The painted path counts for the
+/// memory limit; the path after `MAX_SHAPES` stops the run.
+pub(super) fn paint(vm: &mut Vm, fill: bool, stroke: bool) -> R {
     let subs: Vec<Sub> = std::mem::take(&mut vm.g.path)
         .into_iter()
         .filter(|s| s.els.len() > 1)
@@ -1490,8 +1507,12 @@ pub(super) fn paint(vm: &mut Vm, fill: bool, stroke: bool) {
     let stroked = vm.g.stroked;
     new_path(vm);
     if subs.is_empty() || clip || vm.g.hidden || vm.ai.skips() {
-        return;
+        return Ok(());
     }
+    if vm.out.drawn.len() >= MAX_SHAPES {
+        return Err(PsError::TooManyShapes);
+    }
+    vm.charge(subs.iter().map(|s| s.els.len()).sum::<usize>() * EL_BYTES + 64)?;
     let (fill, stroke) = match stroked {
         // The outline of a stroke, filled: the stroke.
         Some(w) if fill => (false, Some(w)),
@@ -1511,16 +1532,15 @@ pub(super) fn paint(vm: &mut Vm, fill: bool, stroke: bool) {
         count(p, &mut vm.out.patterns);
     }
     vm.out.add(subs, f, s);
+    Ok(())
 }
 
 fn fill(vm: &mut Vm) -> R {
-    paint(vm, true, false);
-    Ok(())
+    paint(vm, true, false)
 }
 
 fn stroke(vm: &mut Vm) -> R {
-    paint(vm, false, true);
-    Ok(())
+    paint(vm, false, true)
 }
 
 fn shfill(vm: &mut Vm) -> R {

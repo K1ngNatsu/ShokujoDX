@@ -44,7 +44,7 @@ Sizes are relative effort: S (days), M (one to two weeks), L (a month), XL (seve
 | 14. Sketch mode | Done (owner request, 2026-10-27): Milestones 1 (sketch model and constraint solver, ADR 0068), 2 (sketch mode in the app, ADR 0069), 3 (drawing help and sketch edits, ADR 0070), 4 (regions to embroidery, ADR 0075), 5 (objects that follow their sketch, ADR 0076) and 6 (parameters, splines and drawings to sketches, ADR 0078 and 0079). The owner's test in the app and the badge sew-outs on the Topaz 20 passed (owner, 2026-11-16). See `docs/design/p14-plan.md`. |
 | 16. Product view | Done in software (owner request, 2026-11-17): Milestones 1 (a realistic look, ADR 0101), 2 (other designs on the product, ADR 0102), 3 (front and back, ADR 0103), 4 (the product on the approval sheet, ADR 0104), 5 (better products, ADR 0105), 6 (two-tone products and swatches, ADR 0106), 7 (photos of the user's products, ADR 0107) and 8 (turntable view, ADR 0108); audit in "Audit of P16". Open: the exit tests of the eight milestones (owner, at the end of the phase). See `docs/design/product-plan.md`. |
 | 17. Polish and lettering | Accepted (owner, 2026-11-18); Milestones 1 (update check, ADR 0109), 2 (pictures of the windows, ADR 0110), 4 (font test sheet and letter corrections, ADR 0112), 5 (ten tuned fonts, ADR 0113), 6 (text shaping, ADR 0114) and 7 (quality score of the fonts, 55 fonts in the program and 68 in font packages, ADR 0115; then pen strokes in the stroke finder and routes for all fonts, ADR 0116, and ten fill fonts for large text, ADR 0117) and 8 (content families: 71 motifs, 48 split patterns, 39 stamps, 50 borders and 45 clipart items, ADR 0118) done in software, Milestone 3 set aside by the owner: eight milestones (update check, pictures of the windows, tests on an industrial machine, font test sheet and letter corrections, ten tuned fonts, text shaping, more fonts with a quality score, content families). See `docs/design/p17-plan.md`. |
-| 18. Designs from other programs, and the 3D stitch view | First part: accepted (owner, 2026-11-18), started 2026-11-19, Milestones 1 to 3 (the parts of a stitch file; runs and satin columns; fills) done (ADR 0131, ADR 0132, ADR 0133), Milestone 4 (Recognize Objects) done except the sew-out of the owner (ADR 0134), Milestone 5 (read Ink/Stitch files) done except the files of testers (ADR 0135), Milestone 6 (write Ink/Stitch files and read its fonts) done except the test in Ink/Stitch and the bundled fonts (ADR 0136), Milestone 7 (outlines with a stitch file) done except the test of the owner (ADR 0137), Milestone 8 (EPS files, and a message for CDR files; changed by the owner on 2026-11-20 from import helpers) done except the files of testers (ADR 0138): eight milestones (the parts of a stitch file, runs and satin columns, fills, Recognize Objects, read Ink/Stitch files, write them and read its fonts, outlines with a stitch file, EPS files). See `docs/design/p18-plan.md`. Second part (owner request, 2026-11-19): a thorough upgrade of the engine of the 3D stitch view, started first (owner, 2026-11-19); Milestone 1 (measures and a reference set) done except the sew-out (ADR 0122, `docs/design/p18-view-m1-report.md`); Milestone 2 (linear light, thread kinds and weights) done (ADR 0123); Milestone 3 (the surface with heights) done (ADR 0124); Milestone 4 (the light on the surface) done except the compare with photos (ADR 0125); Milestone 5 (the canvas on tiles) done, with a speed pass (ADR 0126); Milestone 6 (the fabric) done except the compare with photos (ADR 0127); Milestone 7 (what is not thread) done except the compare with sew-outs (ADR 0128); Milestone 8 (the viewer) done except the check of the owner (ADR 0129); Milestone 9 (all pictures, quality, audit) done except the test with users (ADR 0130): nine milestones (measures and a reference set, linear light and thread kinds, the surface with heights, the light on the surface, the canvas on tiles, the fabric, what is not thread, the viewer with tilt and light by hand, all pictures and quality settings). See `docs/design/p18-view-plan.md`. |
+| 18. Designs from other programs, and the 3D stitch view | First part: accepted (owner, 2026-11-18), started 2026-11-19, Milestones 1 to 3 (the parts of a stitch file; runs and satin columns; fills) done (ADR 0131, ADR 0132, ADR 0133), Milestone 4 (Recognize Objects) done except the sew-out of the owner (ADR 0134), Milestone 5 (read Ink/Stitch files) done except the files of testers (ADR 0135), Milestone 6 (write Ink/Stitch files and read its fonts) done except the test in Ink/Stitch and the bundled fonts (ADR 0136), Milestone 7 (outlines with a stitch file) done except the test of the owner (ADR 0137), Milestone 8 (EPS files, and a message for CDR files; changed by the owner on 2026-11-20 from import helpers) done except the files of testers (ADR 0138): eight milestones (the parts of a stitch file, runs and satin columns, fills, Recognize Objects, read Ink/Stitch files, write them and read its fonts, outlines with a stitch file, EPS files). See `docs/design/p18-plan.md`. Second part (owner request, 2026-11-19): a thorough upgrade of the engine of the 3D stitch view, started first (owner, 2026-11-19); Milestone 1 (measures and a reference set) done except the sew-out (ADR 0122, `docs/design/p18-view-m1-report.md`); Milestone 2 (linear light, thread kinds and weights) done (ADR 0123); Milestone 3 (the surface with heights) done (ADR 0124); Milestone 4 (the light on the surface) done except the compare with photos (ADR 0125); Milestone 5 (the canvas on tiles) done, with a speed pass (ADR 0126); Milestone 6 (the fabric) done except the compare with photos (ADR 0127); Milestone 7 (what is not thread) done except the compare with sew-outs (ADR 0128); Milestone 8 (the viewer) done except the check of the owner (ADR 0129); Milestone 9 (all pictures, quality, audit) done except the test with users (ADR 0130): nine milestones (measures and a reference set, linear light and thread kinds, the surface with heights, the light on the surface, the canvas on tiles, the fabric, what is not thread, the viewer with tilt and light by hand, all pictures and quality settings). See `docs/design/p18-view-plan.md`. Audit of both parts in "Audit of P18" (2026-11-20). |
 | 19. Help and tutorials | Proposed (2026-11-18): nine milestones (pictures in the help, Show Me, guided lessons, the sew-out doctor, samples, ways to start, the help on the web, moving pictures, better answers); the owner selects them. See `docs/design/p19-plan.md`. |
 | 15. Browser version | Later (owner decision, 2026-11-16): not started. Start after the first feedback of users on the desktop program (about v0.4). See "P15. Browser version" below. |
 
@@ -79,7 +79,7 @@ features that the program has better before it gets new ones.
 | A user of an old version does not learn of a new one; the packages have no signature | P17 Milestone 1 (update check); code signing continues (ADR 0062) |
 | No window is checked automatically; texts in German and Japanese are longer | P17 Milestone 2 (pictures of the windows, development only) |
 | The help is text with no pictures; seven tutorials; no videos | P19 (proposed) |
-| EPS and CDR artwork cannot be read | P18 Milestone 8 (import helpers) |
+| EPS and CDR artwork cannot be read | P18 Milestone 8 (import helpers; changed by the owner on 2026-11-20: the program reads EPS files, and a CDR file gives a message, ADR 0138) |
 
 **Decided, no work.**
 
@@ -118,6 +118,143 @@ The audit of Stages 1 to 6 and the IP review of the release (the rules of the re
 - Docs: the README has the v0.3 features, the upgrade and start notes and a repaired install table; the spec has the machine library and a roadmap row for this work.
 - Open: the start test on the PC of the owner's friends. Passed (owner, 2026-11-16): endless pan with a real mouse, the My Machines window. The installer removes the older version before it asks to close a running ShokujoDX, so a Cancel at that question leaves no version installed (install again to fix).
 
+
+## Audit of P18 (2026-11-20)
+
+After the eight milestones of the first part (designs from other
+programs) and the nine milestones of the second part (the 3D stitch
+view), a check of the code and the documents: probes with wrong and heavy
+input for each reader of the files of other programs, the rules of the
+spec, the translations, the help, the pictures of the windows and the
+documents. The second part had an audit of its own in Milestone 9 (a
+design 1 km wide, ten open designs; `docs/design/p18-view-m9-report.md`).
+
+**Fixed.**
+
+- **An EPS file could stop the computer.** A probe
+  (`emb_formats::eps::probe`) runs each of the 353 operators of the
+  reader with 45 sets of wrong operands (15,885 cases, in a debug build,
+  which finds the overflows of whole numbers), and 50 programs that ask
+  for much time or memory, each in a process of its own with a watch on
+  its memory. Before: a program that painted in a loop with no end
+  (fills, circles, strokes, or a long path that `gsave` copies) used more
+  than 4 GB in 4 s; the first run of the probe stopped the work session
+  of the audit. A program that made subpaths with no end did not stop in
+  2 minutes: each new point counted all the points of the path again.
+  Now the path keeps its length, a painted path and a copy of the path
+  count for the memory limit (256 MB), and the 100,000th painted path
+  stops the program with a warning. After: each of the 50 programs stops
+  in less than 1 s and 350 MB; the 15,885 cases have no crash and no hang,
+  and none takes more than 20 ms.
+- **Shapes far away could make a project that does not open.** A large
+  transform in an EPS file, or a number such as 1e30, gave shapes many km
+  from the design. The program refuses a project with such a shape when
+  it opens (the limit is 1 km, `project::MAX_COORD_MM`). Now all artwork
+  readers (SVG, Ink/Stitch, PDF, AI, EPS, EMF, WMF) leave out a shape with
+  a point farther than 1 km or with a wrong number (`svg::drop_far`), and
+  a warning gives their number.
+- **An Ink/Stitch file with a large repeat count took all the memory.** A
+  probe (`crates/emb-cli/tests/p18_probe.rs`) sets each of the 136
+  settings that the reader reads to 14 wrong values on each shape of the
+  test badge (1,904 cases), and sews the design. With
+  `center_walk_underlay_repeats="1e9"` the reader made 500 million
+  underlay layers (more than 3 GB in 1 s). Now the reader takes at most
+  10 repeats of a center walk, 4 of a bean stitch and 100 mm of
+  `expand_mm` (a larger expand made an object many km wide), each with a
+  warning. After: no problem; the slowest case takes 1.9 s (an expand of
+  100 mm).
+- **An outline could give its shape to an object of each color.**
+  Recognize Objects matches the outlines to the objects of each stitch
+  object (one for each color) alone. An outline round the design (a
+  background), with only one small object of a color in it, gave that
+  object its shape. In the probe, 5,000 colors and one outline round all
+  became 5,000 fills of the background (5.3 million stitches in place of
+  90,000). Now an outline takes objects only if they cover a quarter of
+  its box (`part_outlines::MIN_COVER`). The exit test of Milestone 7 gives
+  92.5 % (92.8 % before).
+- **F1 did not open the topic of two windows.** The Tilt View window (the
+  second part, Milestone 8) and the Product Photo window (P16) had an id
+  that was not their name in the list of the help (`help::WINDOW_HELP`).
+  Now their ids are these names, F1 over the Tilt View opens the topic
+  *The 3D view*, and a test checks that each name of the list is a window
+  of the program.
+- The first error of an EPS file can be a name of thousands of letters
+  from damaged data; the warning shows its first 40 letters now.
+- The heading of P18 in this roadmap said that the first part was not
+  started and named a helper program for EPS and CDR files. The README
+  did not name EPS files, Recognize Objects or Ink/Stitch files.
+
+**Left as it is.**
+
+- A stitch file that sews one fill at one place many times: each layer
+  is the underlay of the last, and the time to recognize it grows with
+  the square of the rows (200 layers: 4.5 s; 500 layers: 28 s). The
+  Recognize Objects window does this work when it opens, so the window
+  waits. The corpus designs take at most 0.26 s each (85 designs in
+  3.2 s), and many separate fills take a time that grows with their number
+  (2,000 fills in 1 s).
+- No EPS or AI file of another program is tested. The AI operators come
+  from the format as it is known (its published description could not be
+  read). A large procedure set of a commercial program can use an
+  operator that the reader does not have; the warning names the first.
+- An EPS program stops at 100,000 painted paths, 40 million steps or
+  256 MB of memory; the import keeps what it painted before.
+- A CDR file gives a message only. No font of Ink/Stitch is bundled (the
+  owner chose a test only, 2026-11-20).
+- The limits of the second part are in
+  `docs/design/p18-view-m9-report.md` (the picture on the approval sheet,
+  the sew-out animation, the short quality measure).
+
+**Checked, no change.**
+
+- Rules 3 and 9: the changes of the phase name no closed-source program
+  (the names are the header line of EPS files and the brands of thread
+  charts); no `unsafe` code; the new dependency edges (`emb-art` on
+  `emb-stitch`, `emb-letter` on `emb-formats`, `flate2` in `emb-formats`
+  and `emb-render`) are in the spec, and `flate2` is pure Rust and was
+  already in the list of licenses; the trigonometry of the new engine
+  code goes through `emb_geom::math`.
+- Other input of the probes with no problem: Ink/Stitch fonts (45 cases:
+  wrong page sizes, guides, transforms, widths, kerning and scales; 26 are
+  refused by `EmbFont::validate`, the others sew), stitch files (15
+  kinds, with and without outlines: no stitches, 10,000 stitches at one
+  point, a stitch of 1 km, a column at the edge of the range, rows
+  0.001 mm apart, 100,000 random stitches, 50,000 parts, 5,000 colors),
+  and the fits of outlines (sizes of 0, two points on each other, an
+  outline far away, 10,000 small outlines).
+- Translations: the 4,308 texts of the template are in German, Spanish
+  and Japanese, none missing and none extra.
+- Help: the topics `artwork.md`, `file-formats.md`,
+  `objects-and-stitches.md`, `troubleshooting.md`, `3d-view.md`,
+  `checking.md` and `whats-new.md` describe the phase in four languages;
+  F1 opens a topic from the Recognize Objects and Tilt View windows.
+- ADRs 0122 to 0138; the two plans, the reports of the second part, the
+  inventory, the spec and `CLAUDE.md` name each part of the phase.
+- The pictures of the windows (636): the texts that do not fit are the
+  titles of dock tabs, as in the audit of P17. The program is 83.3 MB.
+
+**Exit tests.** The automated parts passed; the tests of the owner, of
+testers and of users are open.
+
+| Part | Milestone | Exit test | State |
+| --- | --- | --- | --- |
+| 1 | 1 | 90 % of the stitches of the corpus as DST in a part of their kind | Passed (97.1 %) |
+| 1 | 2 | The width of a column within 0.2 mm and its spacing within 10 % | Passed (98.9 % of the stitches) |
+| 1 | 3 | The angle of a fill within 5° and its row spacing within 10 % | Passed (99.9 % of the stitches) |
+| 1 | 4 | A logo with lettering from a machine file sews at 150 % with the density of the first size | The automated part passed (0.89 to 1.14 of the density); the sew-out is open (owner) |
+| 1 | 5 | Three Ink/Stitch files of testers open with their objects, kinds and colors; one sews | The test badge passed; the files of testers are open |
+| 1 | 6 | A corpus design written for Ink/Stitch opens there with the same objects; a converted font sews at its sizes | The round trip passed (85 designs, 2,768 objects; Cats at three sizes); the test in Ink/Stitch and the sew-out are open (owner) |
+| 1 | 7 | A corpus design as outlines and as DST becomes objects of the kinds of the source | Passed (92.5 % of 1,819 objects; each fill within 5°); the test of the owner is open |
+| 1 | 8 | EPS files of three kinds open with their colors and shapes; a CDR file gives the message | Passed; the EPS and AI files of testers are open |
+| 2 | 1 | The view bench in CI; a report with the numbers and a picture of each fault next to its photo | The bench runs in CI; the sew-out of the reference set and the small computer are open |
+| 2 | 2 | Two thread weights show two widths; a matte thread has no highlight; linear light | Passed |
+| 2 | 3 | The heights of a border, a satin with underlay and puff; 100,000 stitches in less than 1 s | Passed (0.17 s) |
+| 2 | 4 | Eight satin columns have eight brightness values; each area within 3 % at each zoom; the compare with photos | The tests passed; the compare with photos is open (owner) |
+| 2 | 5 | The budgets of pan, zoom, the first view and a change; no missing tile | Passed on the development computer; the small computer is open |
+| 2 | 6 | Thin lettering on a towel with no topping is partly lost; each fabric at three zooms | The pictures are in the bench; the compare with photos is open (owner) |
+| 2 | 7 | A reference design for each kind that is not thread, at two zooms | The pictures are in the bench; the compare with sew-outs is open (owner) |
+| 2 | 8 | The owner checks a design with the low light, the tilt view and a check view; the tilt view at 20 frames in a second | 45 frames in a second; the check of the owner is open |
+| 2 | 9 | Five test users tell a photo of a sew-out from a picture of the view; the budgets hold; the program starts with the software renderer | Open (test users; a computer with no graphics driver) |
 
 ## Audit of P17 (2026-11-19)
 
@@ -1335,14 +1472,17 @@ larger libraries of motifs, patterns, stamps, borders and clipart.
 
 **Exit:** the exit tests of the eight milestones in the plan.
 
-### P18. Designs from other programs, and the 3D stitch view (XL) — first part accepted, not started; second part started (`docs/design/p18-plan.md`, `docs/design/p18-view-plan.md`)
+### P18. Designs from other programs, and the 3D stitch view (XL) — done in software, exit tests open (audit: "Audit of P18") (`docs/design/p18-plan.md`, `docs/design/p18-view-plan.md`)
 
 A machine file of another program becomes objects with stitch types
 (runs, satin columns, fills) that scale with their density; the program
 reads and writes Ink/Stitch files and reads its fonts; outlines with a
-stitch file become objects; artwork formats that the program cannot read
-open through a helper program of the user (Inkscape for CDR and EPS).
-The native formats of closed-source programs stay out of scope.
+stitch file become objects; the program reads EPS files with its own
+PostScript interpreter, and a CDR file gives a message (the owner changed
+Milestone 8 on 2026-11-20: no helper program). The native formats of
+closed-source programs stay out of scope. All eight milestones are done
+in software (ADR 0131 to ADR 0138); the tests of the owner and the files
+of testers are open.
 
 **Exit:** the exit tests of the eight milestones in the plan.
 

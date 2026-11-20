@@ -12,7 +12,7 @@ pub const ARTWORK_EXTENSIONS: [&str; 8] = ["svg", "pdf", "ai", "eps", "ps", "emf
 /// Imports artwork of type `ext` (a file extension, any case): as vector
 /// objects (`vectors`), else as fills and running lines.
 pub fn import_artwork(ext: &str, data: &[u8], vectors: bool) -> Result<SvgImport, SvgError> {
-    match ext.to_ascii_lowercase().as_str() {
+    let read = match ext.to_ascii_lowercase().as_str() {
         "svg" if vectors => crate::svg::import_svg_vectors(data),
         "svg" => crate::svg::import_svg(data),
         // An AI file is PDF inside, or PostScript (the old kind).
@@ -31,7 +31,9 @@ pub fn import_artwork(ext: &str, data: &[u8], vectors: bool) -> Result<SvgImport
         "emf" => crate::emf::import_emf(data, vectors),
         "wmf" => crate::wmf::import_wmf(data, vectors),
         other => Err(SvgError::Parse(text::fill("cannot import .{} artwork", &[&other]))),
-    }
+    };
+    // Shapes that a project cannot keep (farther than 1 km) are left out.
+    read.map(crate::svg::drop_far)
 }
 
 #[cfg(test)]

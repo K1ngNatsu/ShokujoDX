@@ -168,15 +168,43 @@ impl SvgImport {
 /// types ([`crate::inkstitch`]).
 pub fn import_svg(data: &[u8]) -> Result<SvgImport, SvgError> {
     if crate::inkstitch::is_inkstitch(data) {
-        return crate::inkstitch::import_inkstitch(data);
+        return crate::inkstitch::import_inkstitch(data).map(drop_far);
     }
-    import(data, false)
+    import(data, false).map(drop_far)
 }
 
 /// Imports the paths of an SVG file as vector objects (artwork with no
 /// stitches): one for each path, with its fill and stroke.
 pub fn import_svg_vectors(data: &[u8]) -> Result<SvgImport, SvgError> {
-    import(data, true)
+    import(data, true).map(drop_far)
+}
+
+/// Leaves out the objects with a point that is not a number or that is
+/// farther than a project file can have (`project::MAX_COORD_MM`, 1 km): a
+/// damaged file, or a transform of the file that is wrong. Such an object
+/// cannot be saved in a project. A warning gives their number.
+pub(crate) fn drop_far(mut out: SvgImport) -> SvgImport {
+    let m = emb_model::project::MAX_COORD_MM;
+    let near = |p: &Point| p.x.is_finite() && p.y.is_finite() && p.x.abs() <= m && p.y.abs() <= m;
+    let path_near = |path: &Path| {
+        path.cmds.iter().all(|c| match c {
+            emb_geom::PathCmd::MoveTo(p) | emb_geom::PathCmd::LineTo(p) => near(p),
+            emb_geom::PathCmd::CubicTo(a, b, p) => near(a) && near(b) && near(p),
+            emb_geom::PathCmd::Close => true,
+        })
+    };
+    let before = out.objects.len();
+    out.objects.retain(|o| {
+        o.kind.paths().all(path_near) && o.kind.control_bbox().is_none_or(|b| near(&b.min) && near(&b.max))
+    });
+    let far = before - out.objects.len();
+    if far > 0 {
+        out.warnings.push(text::fill(
+            "{} shape(s) not imported: they are farther than 1 km, or their numbers are wrong.",
+            &[&far],
+        ));
+    }
+    out
 }
 
 fn import(data: &[u8], vectors: bool) -> Result<SvgImport, SvgError> {

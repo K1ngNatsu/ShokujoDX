@@ -572,6 +572,13 @@ After Milestone 2 the user sees thread widths and kinds. After Milestone
   must give the same picture. Milestone 9 does this only if the measures
   ask for it.
 
+## Audit
+
+The audit of both parts of the phase is in the roadmap: "Audit of P18
+(2026-11-20)". For this part it found that F1 over the Tilt View window
+did not open a topic (now *The 3D view*); the audit of Milestone 9 is in
+`docs/design/p18-view-m9-report.md`.
+
 ## Not planned
 
 - The pull of the stitches on the fabric (gaps at the ends of a column,

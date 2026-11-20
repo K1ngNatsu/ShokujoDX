@@ -182,6 +182,8 @@ pub(super) enum PsError {
     VmError,
     TooManySteps,
     TooManyErrors,
+    /// The program painted `graphics::MAX_SHAPES` paths.
+    TooManyShapes,
     /// The end of the run (`quit`, or the end of the first page).
     Quit,
 }
@@ -190,7 +192,7 @@ impl PsError {
     pub(super) fn stops_the_run(&self) -> bool {
         matches!(
             self,
-            PsError::VmError | PsError::TooManySteps | PsError::TooManyErrors | PsError::Quit
+            PsError::VmError | PsError::TooManySteps | PsError::TooManyErrors | PsError::TooManyShapes | PsError::Quit
         )
     }
 
@@ -213,6 +215,7 @@ impl PsError {
             PsError::VmError => "VMerror",
             PsError::TooManySteps => "timeout",
             PsError::TooManyErrors => "toomanyerrors",
+            PsError::TooManyShapes => "toomanyshapes",
             PsError::Quit => "quit",
         }
     }
@@ -931,7 +934,14 @@ impl Vm {
         self.errors += 1;
         if self.first_error.is_none() {
             let what = match &e {
-                PsError::Undefined(n) => format!("undefined {}", self.name_text(*n)),
+                // A name from damaged data can be long: its start only.
+                PsError::Undefined(n) => {
+                    let name = self.name_text(*n);
+                    match name.char_indices().nth(40) {
+                        Some((cut, _)) => format!("undefined {}…", &name[..cut]),
+                        None => format!("undefined {name}"),
+                    }
+                }
                 other => other.name().to_string(),
             };
             self.first_error = Some(what);

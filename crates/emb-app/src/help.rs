@@ -177,7 +177,7 @@ pub const WINDOW_HELP: &[(&str, &str)] = &[
     ("Product", "checking"),
     ("Product Photo", "checking"),
     ("Turntable", "checking"),
-    ("Tilt View", "checking"),
+    ("Tilt View", "3d-view"),
     ("Check for Updates", "options"),
     ("New Versions", "options"),
     ("Repeats", "checking"),
@@ -1567,6 +1567,38 @@ mod tests {
         h.st.set_tool(Tool::Select);
         h.st.help_f1(None);
         assert_eq!(h.st.help.current, "getting-started");
+    }
+
+    /// Each name of `WINDOW_HELP` is the id of a window, or the title of a
+    /// window with no id of its own (the audit of P18 found a window whose
+    /// id was not its name in the list, so F1 did not open its topic).
+    #[test]
+    fn each_window_of_the_help_list_is_a_window() {
+        fn sources(dir: &std::path::Path, out: &mut String) {
+            for e in std::fs::read_dir(dir).unwrap().flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    sources(&p, out);
+                } else if p.extension().is_some_and(|x| x == "rs") {
+                    out.push_str(&std::fs::read_to_string(&p).unwrap());
+                }
+            }
+        }
+        let mut src = String::new();
+        sources(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src"), &mut src);
+        let missing: Vec<&str> = WINDOW_HELP
+            .iter()
+            .map(|(name, _)| *name)
+            .filter(|name| {
+                let by_id = src.contains(&format!("Id::new(\"{name}\")"));
+                let title = format!("Window::new(tr(\"{name}\"))");
+                let by_title = src
+                    .match_indices(&title)
+                    .any(|(i, m)| !src[i + m.len()..].trim_start().starts_with(".id("));
+                !(by_id || by_title)
+            })
+            .collect();
+        assert!(missing.is_empty(), "no window has these names: {missing:?}");
     }
 
     #[test]

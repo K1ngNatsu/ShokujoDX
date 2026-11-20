@@ -467,9 +467,9 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
     }
     let mut open = true;
     crate::dock::docked(
-        egui::Window::new(tr("Tilt View")).id(egui::Id::new("TiltView")),
+        egui::Window::new(tr("Tilt View")).id(egui::Id::new("Tilt View")),
         ctx,
-        egui::Id::new("TiltView"),
+        egui::Id::new("Tilt View"),
         st.canvas_rect,
     )
     .open(&mut open)

@@ -276,6 +276,14 @@ objects with their colors and sizes, and sew. The published description
 of the AI format could not be read (its copies were offline), so the
 files of testers must check the AI operators.
 
+## Audit
+
+The audit of both parts of the phase is in the roadmap: "Audit of P18
+(2026-11-20)". It limits what an EPS program can paint and copy, leaves
+out the shapes of artwork files that are farther than 1 km, limits the
+repeats and the expand of an Ink/Stitch file, and makes an outline take
+objects only if they cover a quarter of its box.
+
 ## Not in this phase
 
 - The native formats of closed-source programs.
