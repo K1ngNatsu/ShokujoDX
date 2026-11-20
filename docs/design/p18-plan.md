@@ -2,7 +2,8 @@
 
 Date: 2026-11-18 · Status: Accepted (owner, 2026-11-18). Started by the
 owner on 2026-11-19, after the second part of P18 (the 3D stitch view).
-Milestones 1 to 3 are done (ADR 0131, ADR 0132, ADR 0133).
+Milestones 1 to 3 are done (ADR 0131, ADR 0132, ADR 0133); Milestone 4 is
+done except the sew-out of the owner (ADR 0134).
 
 ## Goal
 
@@ -122,6 +123,18 @@ The user changes a stitch file into objects in one step.
 **Exit test (owner):** a machine file of a logo with lettering becomes
 objects; at 150 % of its size it sews correctly, with the density of the
 first size.
+
+**Done except the sew-out (2026-11-20, ADR 0134).** Artwork > Convert >
+Recognize Objects opens a window with the stitches of the file and the
+objects sewn again next to each other, the stitch counts, the places that
+differ (red), and a list of the objects with a box to keep each one as
+stitches. Accept is one undo step. Options > Recognize objects when a
+file opens does it at Open (off by default). The automated part of the
+exit test (the fourth test of `crates/emb-cli/tests/parts.rs`): six
+corpus designs with lettering and logos, as DST and back, changed into
+objects and scaled to 150 %, have 0.89 to 1.14 of the density of the
+first size (the stitch objects: 0.67 to 0.75). The sew-out is for the
+owner.
 
 ## Milestone 5: read Ink/Stitch files (M)
 

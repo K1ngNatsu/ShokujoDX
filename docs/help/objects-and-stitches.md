@@ -28,8 +28,9 @@ setting, the stitches change at once.
   from it. See [Vector artwork and shaping](artwork).
 - **Stitch objects**: stitches from a machine file or a photo stitch. The
   program sews them as they are. Reshape moves, adds and deletes single
-  needle points. **Recognize Outlines** (Artwork > Convert) changes them
-  into fills that you can scale.
+  needle points. **Recognize Objects** (Artwork > Convert) changes them
+  into running objects, satin columns and fills that you can scale and
+  edit; **Recognize Outlines** changes them into fills.
 - **Cross Stitch** and **rhinestones**: see [Specialty
   decoration](specialty).
 

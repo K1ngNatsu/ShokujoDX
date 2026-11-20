@@ -321,12 +321,22 @@ impl AppState {
         d.machine = self.doc.design().machine.clone();
         d.hoop.selection = self.doc.design().hoop.selection.clone();
         let n = d.objects().len();
+        let recognized = self
+            .settings
+            .recognize_on_open
+            .then(|| crate::recognize_objects::recognize_all(&mut d));
         self.start_design(d);
         self.add_recent(path);
-        self.message = crate::i18n::fill(
-            "Opened {} as {} stitch objects. Save it to keep it as a project.",
-            &[&(path.display()), &n],
-        );
+        self.message = match recognized {
+            Some((made, with_type)) => crate::i18n::fill(
+                "Opened {} as {} objects ({} with a stitch type). Save it to keep it as a project.",
+                &[&(path.display()), &made, &with_type],
+            ),
+            None => crate::i18n::fill(
+                "Opened {} as {} stitch objects. Save it to keep it as a project.",
+                &[&(path.display()), &n],
+            ),
+        };
     }
 
     /// Asks for a machine file and adds its stitch objects to the design.

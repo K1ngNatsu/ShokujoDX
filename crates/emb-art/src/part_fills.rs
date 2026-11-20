@@ -72,6 +72,9 @@ const MAX_STAGGERS: u32 = 6;
 /// The cells of the area are at most this size, mm, and at most this many.
 const CELL_MM: f64 = 0.1;
 const MAX_CELLS: f64 = 3.0e6;
+/// A needle point of a row is on the line of the row within this part of
+/// the row spacing.
+const ON_ROW: f64 = 0.35;
 /// A gap across the rows of the area of at most this many row spacings is
 /// closed (a row that went with another part).
 const SLIT: f64 = 1.2;
@@ -170,20 +173,17 @@ pub struct RowLayer {
 }
 
 /// The rows of the needle points of a part of rows, in layers (see the
-/// module text): a leg is a row if it is long enough and not a turn (a
-/// short leg between two rows that go back and forth); a new layer starts
+/// module text): a leg is a row if it is long enough and not a turn (a leg
+/// between two rows that go back and forth); a new layer starts
 /// where the direction of the rows changes and the next row keeps it (else
 /// the leg is not a row).
 pub fn row_layers(points: &[Point]) -> Vec<RowLayer> {
     let (pts, index) = clean(points);
     let legs = parts::legs(&pts);
     let n = legs.len();
-    let turn = |k: usize| {
-        k > 0
-            && k + 1 < n
-            && parts::dot(legs[k - 1].dir(), legs[k + 1].dir()) < parts::BACK
-            && legs[k].len() < legs[k - 1].len().min(legs[k + 1].len())
-    };
+    // A turn is between two rows that go back and forth (where the edge
+    // is almost along the rows, a turn is longer than the rows).
+    let turn = |k: usize| k > 0 && k + 1 < n && parts::dot(legs[k - 1].dir(), legs[k + 1].dir()) < parts::BACK;
     let rows: Vec<usize> = (0..n).filter(|&k| legs[k].len() >= MIN_ROW_MM && !turn(k)).collect();
     let angle = |k: usize| angle_of(legs[k].b.x - legs[k].a.x, legs[k].b.y - legs[k].a.y);
     let mut layers: Vec<Vec<usize>> = Vec::new();
@@ -248,7 +248,7 @@ pub fn rows_shape(rows: &[Vec<Point>]) -> Option<RowsShape> {
         (b.x - a.x, b.y - a.y, a.distance(b).powi(2))
     }))?;
     let to_rows = Transform::rotate_deg(-angle_deg);
-    let v_of = |r: &Vec<Point>| r.iter().map(|p| to_rows.apply(*p).y).sum::<f64>() / r.len() as f64;
+    let v_of = |r: &Vec<Point>| row_line(&r.iter().map(|p| to_rows.apply(*p)).collect::<Vec<_>>());
     let vs: Vec<f64> = rows.iter().map(v_of).collect();
     let steps: Vec<f64> = vs
         .windows(2)
@@ -328,9 +328,13 @@ pub fn rows_area(rows: &[Vec<Point>], angle_deg: f64, spacing: f64) -> Vec<(Path
         .filter(|r| r.len() >= 2)
         .map(|r| {
             let t: Vec<Point> = r.iter().map(|p| to_rows.apply(*p)).collect();
-            let v = t.iter().map(|p| p.y).sum::<f64>() / t.len() as f64;
-            let u0 = t.iter().map(|p| p.x).fold(f64::INFINITY, f64::min);
-            let u1 = t.iter().map(|p| p.x).fold(f64::NEG_INFINITY, f64::max);
+            let v = row_line(&t);
+            // The points on the line of the row (not a turn that the leg
+            // has at its end, where the edge is almost along the rows).
+            let on: Vec<&Point> = t.iter().filter(|p| (p.y - v).abs() <= ON_ROW * spacing).collect();
+            let on = if on.len() >= 2 { on } else { t.iter().collect() };
+            let u0 = on.iter().map(|p| p.x).fold(f64::INFINITY, f64::min);
+            let u1 = on.iter().map(|p| p.x).fold(f64::NEG_INFINITY, f64::max);
             (v, u0, u1)
         })
         .collect();
@@ -470,6 +474,12 @@ pub fn rows_area(rows: &[Vec<Point>], angle_deg: f64, spacing: f64) -> Vec<(Path
             (a.outer, a.holes)
         })
         .collect()
+}
+
+/// The line of a row in the frame of the rows: the median of its needle
+/// points (a turn at the end of the leg does not move it).
+fn row_line(t: &[Point]) -> f64 {
+    median(t.iter().map(|p| p.y).collect()).unwrap_or(0.0)
 }
 
 /// `p` is inside the polygon `q` (even-odd).

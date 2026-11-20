@@ -37,7 +37,9 @@ DST, VP3, PES, PEC, EXP, JEF, XXX, SEW, HUS, SHV, TBF, TAP, DSB, DSZ,
 MAX, MIT, NEW, PCD, PCQ, PCS, PCM, SPX, STC, ZHS and ZXY.
 
 A machine file has needle points, not shapes. To scale it and keep the
-density, use **Artwork > Convert > Recognize Outlines**.
+density, use **Artwork > Convert > Recognize Objects** (running objects,
+satin columns and fills with their settings) or **Recognize Outlines**
+(fills of the area).
 
 ## Other files
 

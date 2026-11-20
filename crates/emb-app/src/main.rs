@@ -84,6 +84,7 @@ mod product_photo;
 mod product_probe;
 mod quilting;
 mod quote;
+mod recognize_objects;
 mod repeats;
 mod reshape;
 mod resources;

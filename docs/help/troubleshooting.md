@@ -143,8 +143,9 @@ current colorway.
 
 ## A machine file gets too dense when I scale it
 
-A machine file has needle points, not shapes. Use **Artwork > Convert > Recognize Outlines** first: the stitches become fills, which keep their
-density when you scale them.
+A machine file has needle points, not shapes. Use **Artwork > Convert > Recognize Objects** first: the stitches become running objects, satin
+columns and fills, which keep their density when you scale them.
+**Recognize Outlines** makes fills of the area of the stitches.
 
 ## A button is dimmed
 

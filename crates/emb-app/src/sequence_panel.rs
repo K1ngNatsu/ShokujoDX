@@ -408,9 +408,15 @@ fn detail(obj: &DesignObject) -> String {
 }
 
 fn stitch_detail(obj: &DesignObject) -> String {
+    kind_detail(&obj.kind)
+}
+
+/// The stitch type and its main settings of an object kind, as the
+/// Sequence panel shows them.
+pub(crate) fn kind_detail(kind: &ObjectKind) -> String {
     use crate::i18n::fill;
     let mm1 = |v: f64| format!("{v:.1}");
-    match &obj.kind {
+    match kind {
         ObjectKind::Running { params, .. } => match (&params.border, &params.motif) {
             (Some(b), _) => fill(
                 "{} line · {} mm wide",

@@ -661,6 +661,14 @@ fn scenes() -> Vec<Scene> {
         st.tilt.on_canvas = true;
     }));
     // The stitches by the kind of their part (ADR 0131).
+    v.push(Scene::new("recognize objects", View::Windows, |st, _| {
+        // The stitches of the sample design as a stitch object.
+        let plan = st.plan_view().plan.clone();
+        let d = emb_model::design_from_stitches(&plan.stitches, "sample");
+        st.doc = emb_model::Document::new(d);
+        st.select_all();
+        st.open_recognize_objects();
+    }));
     v.push(Scene::new("stitch parts", View::Screen, |st, _| {
         st.stitch_tiles.sync = true;
         st.parts_view.on = true;

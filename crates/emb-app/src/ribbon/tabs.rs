@@ -365,7 +365,7 @@ pub(super) const ARTWORK: &[Panel] = &[
                 Cmd::Convert(emb_model::ConvertTo::Outline),
                 Cmd::ToVector,
             ]),
-            Small(&[Cmd::RecognizeOutlines, Cmd::VectorToSketch]),
+            Small(&[Cmd::RecognizeObjects, Cmd::RecognizeOutlines, Cmd::VectorToSketch]),
         ],
     },
     Panel {

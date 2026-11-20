@@ -39,7 +39,8 @@ MAX, MIT, NEW, PCD, PCQ, PCS, PCM, SPX, STC, ZHS y ZXY.
 
 Un archivo de máquina tiene penetraciones de aguja, no formas. Para
 escalarlo y conservar la densidad, use **Arte > Convertir > Reconocer
-contornos**.
+objetos** (objetos de puntada recta, columnas de satén y rellenos con sus
+ajustes) o **Reconocer contornos** (rellenos del área).
 
 ## Otros archivos
 

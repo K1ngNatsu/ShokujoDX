@@ -54,6 +54,16 @@ Otros comandos del panel:
 
 - **A vector**: los objetos de bordado seleccionados pasan a ser gráficos
   vectoriales (sus contornos, sin puntadas).
+- **Reconocer objetos**: los objetos de puntadas de un archivo de máquina
+  pasan a ser objetos de puntada recta, columnas de satén y rellenos, con
+  los ajustes que muestran sus puntadas (espaciado, ángulo, largo de
+  puntada, base). Una ventana muestra las puntadas del archivo y los
+  objetos uno al lado del otro, con el número de puntadas. El rojo marca
+  los lugares donde los dos son diferentes. En la lista, desmarque la
+  casilla de un objeto para mantener sus puntadas como están.
+  **Aceptar** hace el cambio; un deshacer lo quita. Para hacerlo cada vez
+  que abre un archivo de máquina, active **Reconocer objetos al abrir un
+  archivo** en las opciones.
 - **Reconocer contornos**: los objetos de puntadas (de un archivo de
   máquina o de una puntada fotográfica) pasan a ser rellenos del área que
   cubren sus puntadas, para que pueda escalarlos y conserven su densidad.

@@ -53,6 +53,16 @@ Andere Befehle des Bereichs:
 
 - **Zu Vektor**: Die ausgewählten Stickobjekte werden zu Vektorgrafik
   (ihre Umrisse, keine Stiche).
+- **Objekte erkennen**: Stichobjekte aus einer Maschinendatei werden zu
+  Steppstichobjekten, Satinsäulen und Füllungen mit den Einstellungen,
+  die ihre Stiche zeigen (Abstand, Winkel, Stichlänge, Unterlage). Ein
+  Fenster zeigt die Stiche der Datei und die Objekte nebeneinander, mit
+  der Zahl der Stiche. Rot zeigt die Stellen, an denen die beiden
+  verschieden sind. Entfernen Sie in der Liste den Haken eines Objekts,
+  damit seine Stiche bleiben, wie sie sind. **Übernehmen** macht die
+  Änderung; ein Rückgängig nimmt sie zurück. Um es bei jeder
+  Maschinendatei zu tun, die Sie öffnen, wählen Sie in den Optionen
+  **Objekte beim Öffnen einer Datei erkennen**.
 - **Umrisse erkennen**: Stichobjekte (aus einer Maschinendatei oder einem
   Fotostich) werden zu Füllungen der Fläche, die ihre Stiche bedecken,
   damit Sie sie skalieren können und sie ihre Dichte behalten.

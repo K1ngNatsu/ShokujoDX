@@ -159,8 +159,10 @@ Exportieren schreibt die aktuelle Farbvariante.
 ## Eine Maschinendatei wird zu dicht, wenn ich sie skaliere
 
 Eine Maschinendatei hat Einstichpunkte, keine Formen. Benutzen Sie zuerst
-**Grafik > Umwandeln > Umrisse erkennen**: Die Stiche werden zu
-Füllungen, die ihre Dichte behalten, wenn Sie sie skalieren.
+**Grafik > Umwandeln > Objekte erkennen**: Die Stiche werden zu
+Steppstichobjekten, Satinsäulen und Füllungen, die ihre Dichte behalten,
+wenn Sie sie skalieren. **Umrisse erkennen** macht Füllungen der Fläche
+der Stiche.
 
 ## Eine Schaltfläche ist grau
 

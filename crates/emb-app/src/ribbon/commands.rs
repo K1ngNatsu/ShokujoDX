@@ -366,6 +366,7 @@ pub enum Cmd {
     /// Vector to Sketch (P14 Milestone 6, ADR 0079).
     VectorToSketch,
     /// Stitch objects become fills of the area that their stitches cover.
+    RecognizeObjects,
     RecognizeOutlines,
     /// A shaping command on the selection.
     Shape(emb_model::ShapeOp),
@@ -1050,6 +1051,15 @@ impl Cmd {
                 tr(
                     "Turn a picture into embroidery step by step: choose it, remove the background, \
                  choose the detail and the colors, the stitch of each color, then see the stitches.",
+                ),
+            ),
+            Cmd::RecognizeObjects => (
+                g(ph::CUBE_FOCUS),
+                tr("Recognize Objects"),
+                tr(
+                    "Selected stitch objects (from a machine file) become running objects, satin columns and fills \
+                 with the settings that their stitches show. A window shows the file and the objects next to \
+                 each other.",
                 ),
             ),
             Cmd::RecognizeOutlines => (

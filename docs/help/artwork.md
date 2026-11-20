@@ -50,6 +50,15 @@ Other commands of the panel:
 
 - **To Vector**: the selected embroidery objects become vector artwork
   (their outlines, no stitches).
+- **Recognize Objects**: stitch objects from a machine file become
+  running objects, satin columns and fills, with the settings that their
+  stitches show (spacing, angle, stitch length, underlay). A window shows
+  the stitches of the file and the objects next to each other, with the
+  stitch counts. Red marks the places where the two are different. In
+  the list, clear the box of an object to keep its stitches as they are.
+  **Accept** makes the change; one undo takes it back. To do it each time
+  that you open a machine file, set **Recognize objects when a file
+  opens** in Options.
 - **Recognize Outlines**: stitch objects (from a machine file or a photo
   stitch) become fills of the area that their stitches cover, so you can
   scale them and they keep their density.

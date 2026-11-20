@@ -101,7 +101,7 @@ impl AppState {
             }
             Cmd::ToVector => s.n > s.vectors,
             Cmd::VectorToSketch => s.vectors > 0,
-            Cmd::RecognizeOutlines => s.stitches > 0,
+            Cmd::RecognizeOutlines | Cmd::RecognizeObjects => s.stitches > 0,
             Cmd::ExportOutlines => !d.objects().is_empty(),
             Cmd::FlorentineGuide => s.n == 2 && s.fills == 1 && s.lines == 1,
             Cmd::Laydown => !d.objects().is_empty(),
@@ -409,6 +409,7 @@ impl AppState {
             Cmd::ToVector => self.convert_to_vectors(),
             Cmd::VectorToSketch => self.vectors_to_sketch(),
             Cmd::RecognizeOutlines => self.recognize_outlines(),
+            Cmd::RecognizeObjects => self.open_recognize_objects(),
             Cmd::ExportOutlines => self.export_outlines_dialog(),
             Cmd::LoadPicture => self.import_bitmap_dialog(),
             Cmd::Cut => self.cut_selection(ctx),

@@ -128,6 +128,14 @@ pequeños destellos con mucho zoom, y **Ver > Aspecto de hilo > Luces
 apagadas** solo muestra el hilo fosforescente. Consulte [Comprobar un
 diseño](checking).
 
+**Objetos de archivos de máquina.** **Arte > Convertir > Reconocer
+objetos** convierte las puntadas de un archivo de máquina en objetos de
+puntada recta, columnas de satén y rellenos, con los ajustes que
+muestran las puntadas. Una ventana muestra el archivo y los objetos uno
+al lado del otro, con los lugares que difieren; puede mantener objetos
+sueltos como puntadas. Las opciones pueden hacerlo cada vez que se abre
+un archivo de máquina. Consulte [Gráficos vectoriales y formas](artwork).
+
 **Partes de puntadas.** **Ver > Partes de puntadas** colorea las
 puntadas de un diseño según el tipo de su parte: rectas, columnas y las
 filas de los rellenos, con la base de cada parte. El programa las

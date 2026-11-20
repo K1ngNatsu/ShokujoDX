@@ -29,8 +29,10 @@ ajuste, las puntadas cambian al momento.
   de ellos. Vea [Gráficos vectoriales y formas](artwork).
 - **Objetos de puntadas**: puntadas de un archivo de máquina o de una
   puntada fotográfica. El programa las borda tal cual. Remodelar mueve,
-  añade y borra puntos de aguja sueltos. **Reconocer contornos** (Arte >
-  Convertir) los convierte en rellenos que puede escalar.
+  añade y borra puntos de aguja sueltos. **Reconocer objetos** (Arte >
+  Convertir) los convierte en objetos de puntada recta, columnas de satén
+  y rellenos que puede escalar y editar; **Reconocer contornos** los
+  convierte en rellenos.
 - **Punto de cruz** y **strass**: vea [Decoración especial](specialty).
 
 ## Propiedades del objeto

@@ -351,6 +351,8 @@ pub struct AppState {
     pub gap_settings: emb_geom::gaps::Gaps,
     /// The Clean Up window, and its last settings.
     pub cleanup_dialog: Option<crate::cleanup::CleanupDialog>,
+    /// The Recognize Objects window (P18 Milestone 4).
+    pub recognize_dialog: Option<crate::recognize_objects::RecognizeDialog>,
     /// The Envelope window (ADR 0092).
     pub envelope_dialog: Option<crate::drawing_aids::EnvelopeDialog>,
     pub cleanup_settings: emb_geom::cleanup::Cleanup,
@@ -832,6 +834,7 @@ impl AppState {
             gaps_dialog: None,
             gap_settings: emb_geom::gaps::Gaps::STANDARD,
             cleanup_dialog: None,
+            recognize_dialog: None,
             envelope_dialog: None,
             cleanup_settings: emb_geom::cleanup::Cleanup::STANDARD,
             paste_special: None,
@@ -1842,6 +1845,7 @@ impl EmbApp {
         crate::simplify::window(&ctx, st);
         crate::gaps::window(&ctx, st);
         crate::cleanup::window(&ctx, st);
+        crate::recognize_objects::window(&ctx, st);
         crate::drawing_aids::envelope_window(&ctx, st);
         crate::editing::paste_special_window(&ctx, st);
         crate::help::window(&ctx, st);

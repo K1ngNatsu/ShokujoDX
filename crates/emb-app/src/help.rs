@@ -144,6 +144,7 @@ pub const WINDOW_HELP: &[(&str, &str)] = &[
     ("Font Test Sheet", "lettering"),
     ("Offsets", "artwork"),
     ("Border Trace", "artwork"),
+    ("Recognize Objects", "artwork"),
     ("Arrangements", "arranging"),
     ("Paste Special", "editing"),
     ("Simplify", "editing"),

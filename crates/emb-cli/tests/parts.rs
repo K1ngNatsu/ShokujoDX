@@ -1,4 +1,4 @@
-//! The exit tests of P18 Milestones 1 to 3 (ADR 0131 to ADR 0133): each
+//! The exit tests of P18 Milestones 1 to 4 (ADR 0131 to ADR 0134): each
 //! design of the corpus, written as DST and read again, is cut into parts
 //! (`emb_art::parts`) and made into objects (`emb_art::part_objects`).
 //! Lettering is cut into its letter parts first (as Break Apart), so each
@@ -11,6 +11,8 @@
 //!   spacing within 10 % of its source object.
 //! - Milestone 3: the angle of a recognized fill is within 5° and its row
 //!   spacing within 10 % of its source object.
+//! - Milestone 4 (the part that a test can do): a design of objects made
+//!   from a file has the density of the first size at 150 %.
 //!
 //! `cargo test --release -p emb-cli --test parts -- --nocapture` prints the
 //! numbers of each design.
@@ -22,7 +24,7 @@ use emb_geom::Point;
 use emb_model::{
     ColumnPattern, Design, FillPattern, ObjectId, ObjectKind, SatinGeometry, SatinParams, StitchDesign, StitchKind,
 };
-use emb_stitch::StitchPlan;
+use emb_stitch::{PlanOptions, StitchPlan};
 
 /// The kind of part that the stitches of an object of `kind` are, if the
 /// parts know it.
@@ -818,4 +820,76 @@ fn write_whole_picture() {
     std::fs::write(&file, pic.png()).unwrap();
     let recognized = made.iter().filter(|m| m.recognized()).count();
     println!("{}: {} objects, {recognized} recognized", file.display(), made.len());
+}
+
+/// The design of the stitches of a file with its stitch objects made into
+/// objects (P18 Milestone 4, as Recognize Objects with all objects made).
+fn recognized_design(read: &StitchDesign) -> Design {
+    let mut d = emb_model::design_from_stitches(read, "file");
+    let ids: Vec<ObjectId> = d.objects().iter().map(|o| o.id).collect();
+    for id in ids {
+        let Some(o) = d.object(id).cloned() else { continue };
+        let Some((_, made)) = emb_art::part_objects::recognize(&o.kind) else {
+            continue;
+        };
+        let Some(at) = d.index_of(id) else { continue };
+        d.remove_object(id);
+        for (k, m) in made.into_iter().enumerate() {
+            d.insert_object(at + k, o.thread, m.kind);
+        }
+    }
+    d
+}
+
+/// The thread for each mm² that has thread (cells of 1 mm), mm.
+fn density(s: &StitchDesign) -> f64 {
+    let mut cells: std::collections::HashSet<(i64, i64)> = std::collections::HashSet::new();
+    let mut length = 0.0;
+    for w in s.records.windows(2) {
+        if w[1].kind != StitchKind::Stitch {
+            continue;
+        }
+        let (a, b) = (w[0].pos, w[1].pos);
+        length += a.distance(b);
+        let n = (a.distance(b) / 0.5).ceil().max(1.0) as usize;
+        for k in 0..=n {
+            let p = a.lerp(b, k as f64 / n as f64);
+            cells.insert((p.x.floor() as i64, p.y.floor() as i64));
+        }
+    }
+    length / cells.len().max(1) as f64
+}
+
+/// The automated part of the exit test of P18 Milestone 4 (the owner sews
+/// it): designs with lettering and a logo, written as DST and read again,
+/// become objects; at 150 % of their size they have the density of the
+/// first size (thread for each mm² that has thread, within 15 %), while
+/// the stitch objects scaled to 150 % lose a third of it.
+#[test]
+fn recognized_designs_keep_their_density_at_150_percent() {
+    for name in [
+        "two-color-patch",
+        "smart-logo",
+        "lettering-names",
+        "view-lettering",
+        "monogram",
+        "sewout-cap",
+    ] {
+        let design = corpus::build(name).expect("the design");
+        let opts = emb_cli::plan_options(&design, None).expect("options");
+        let plan = emb_cli::plan(&design, &opts);
+        let bytes = emb_formats::write_machine("dst", &plan.stitches, name, "2026-11-20").expect("DST");
+        let read = emb_formats::read_machine("dst", &bytes).expect("read");
+        let first = density(&read);
+        let scaled = |mut d: Design| {
+            let ids: Vec<ObjectId> = d.objects().iter().map(|o| o.id).collect();
+            d.transform_objects(&ids, &emb_geom::Transform::scale(1.5, 1.5));
+            density(&emb_cli::plan(&d, &PlanOptions::default()).stitches)
+        };
+        let objects = scaled(recognized_design(&read)) / first;
+        let stitches = scaled(emb_model::design_from_stitches(&read, "file")) / first;
+        println!("{name:<20} objects at 150 %: {objects:.2} of the density, stitch objects: {stitches:.2}");
+        assert!((objects - 1.0).abs() <= 0.15, "{name}: {objects}");
+        assert!(stitches < 0.8, "{name}: {stitches}");
+    }
 }

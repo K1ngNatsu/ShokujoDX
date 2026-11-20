@@ -128,6 +128,14 @@ ihrem Schaumstoff rund. Metallgarn hat bei großem Zoom kleine
 Glanzpunkte, und **Ansicht > Garnansicht > Licht aus** zeigt nur
 nachtleuchtendes Garn. Siehe [Ein Design prüfen](checking).
 
+**Objekte aus Maschinendateien.** **Grafik > Umwandeln > Objekte
+erkennen** macht aus den Stichen einer Maschinendatei
+Steppstichobjekte, Satinsäulen und Füllungen mit den Einstellungen, die
+die Stiche zeigen. Ein Fenster zeigt die Datei und die Objekte
+nebeneinander, mit den Stellen, die verschieden sind; einzelne Objekte
+können Stiche bleiben. Die Optionen können es bei jeder Maschinendatei
+tun, die Sie öffnen. Siehe [Vektorgrafik und Formen](artwork).
+
 **Stichteile.** **Ansicht > Stichteile** färbt die Stiche eines Designs
 nach der Art ihres Teils: Steppstiche, Säulen und die Reihen von
 Füllungen, mit der Unterlage jedes Teils. Das Programm findet sie in den

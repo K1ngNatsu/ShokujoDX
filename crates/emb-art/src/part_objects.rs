@@ -38,8 +38,8 @@ use std::ops::Range;
 
 use emb_geom::{Path, Point};
 use emb_model::{
-    ColumnPattern, ObjectKind, RunningParams, SatinGeometry, SatinParams, StitchDesign, StitchKind, Underlay,
-    UnderlayLayer,
+    ColumnPattern, ObjectKind, RunningParams, SatinGeometry, SatinParams, StitchDesign, StitchKind, StitchRecord,
+    Underlay, UnderlayLayer,
 };
 
 use crate::part_fills::{FillGroup, can_be_travel, fill_items, part_members};
@@ -121,6 +121,55 @@ impl Made {
     pub fn recognized(&self) -> bool {
         !matches!(self.kind, ObjectKind::Stitches { .. })
     }
+
+    /// The number of stitches of the file that the object sews.
+    pub fn stitch_count(&self) -> usize {
+        self.records.iter().map(|r| r.len()).sum()
+    }
+}
+
+/// The stitches of a stitch object (`ObjectKind::Stitches`) as a stitch
+/// list of one thread: a jump to the start of each part, a trim before the
+/// parts that start after a trim. `None` for another kind.
+pub fn stitch_design_of(kind: &ObjectKind) -> Option<StitchDesign> {
+    let ObjectKind::Stitches { path, trims } = kind else {
+        return None;
+    };
+    let mut records = Vec::new();
+    let mut last: Option<Point> = None;
+    for (k, sub) in path.subpaths().iter().enumerate() {
+        let pts: Vec<Point> = sub.points().collect();
+        let Some((&first, rest)) = pts.split_first() else {
+            continue;
+        };
+        if trims.contains(&k)
+            && let Some(at) = last
+        {
+            records.push(StitchRecord::new(at, StitchKind::Trim));
+        }
+        records.push(StitchRecord::new(first, StitchKind::Jump));
+        records.extend(rest.iter().map(|p| StitchRecord::stitch(p.x, p.y)));
+        last = rest.last().copied().or(Some(first));
+    }
+    Some(StitchDesign {
+        threads: vec![Default::default()],
+        records,
+    })
+}
+
+/// The objects of a stitch object (P18 Milestone 4): its stitches as a
+/// stitch list, and the objects that its parts become (see `objects`).
+/// `None` for another kind.
+pub fn recognize(kind: &ObjectKind) -> Option<(StitchDesign, Vec<Made>)> {
+    let s = stitch_design_of(kind)?;
+    let made = objects(&s, &crate::parts::parts(&s));
+    Some((s, made))
+}
+
+/// A stitch object of the stitch records `records` of `s` (the parts that
+/// stay stitches).
+pub fn stitches_of(s: &StitchDesign, records: &[Range<usize>]) -> ObjectKind {
+    stitches_kind(s, records)
 }
 
 /// An item while the objects are made.
@@ -1245,6 +1294,40 @@ mod tests {
         };
         assert_eq!(params.pattern, ColumnPattern::Zigzag);
         assert!((params.spacing_mm - 1.5).abs() < 0.15, "{}", params.spacing_mm);
+    }
+
+    #[test]
+    fn a_stitch_object_becomes_its_objects_and_back() {
+        let (_, pts) = engine_satin(4.0, &SatinParams::default());
+        let mut path = Path::new().move_to(pts[0]);
+        for p in &pts[1..] {
+            path = path.line_to(*p);
+        }
+        // A second part after a trim: a run.
+        path = path.move_to(Point::new(0.0, 20.0));
+        for k in 1..=10 {
+            path = path.line_to(Point::new(2.5 * k as f64, 20.0));
+        }
+        let kind = ObjectKind::Stitches { path, trims: vec![1] };
+        let (s, made) = recognize(&kind).expect("a stitch object");
+        assert_eq!(s.records.iter().filter(|r| r.kind == StitchKind::Trim).count(), 1);
+        let kinds: Vec<&str> = made.iter().map(|m| m.kind.type_name()).collect();
+        assert_eq!(kinds, vec!["Satin", "Running"], "{made:?}");
+        let all: usize = made.iter().map(Made::stitch_count).sum();
+        assert_eq!(all, s.records.iter().filter(|r| r.kind == StitchKind::Stitch).count());
+        // Kept as stitches: the same needle points.
+        let back = stitches_of(&s, &made[1].records);
+        let ObjectKind::Stitches { path, .. } = back else {
+            panic!()
+        };
+        assert_eq!(path.points().count(), 11);
+        assert!(
+            recognize(&ObjectKind::Running {
+                path: Path::new(),
+                params: Default::default()
+            })
+            .is_none()
+        );
     }
 
     /// The time of the objects of many satins and runs. Run with `cargo test

@@ -38,8 +38,9 @@ DST, VP3, PES, PEC, EXP, JEF, XXX, SEW, HUS, SHV, TBF, TAP, DSB, DSZ,
 MAX, MIT, NEW, PCD, PCQ, PCS, PCM, SPX, STC, ZHS und ZXY.
 
 Eine Maschinendatei hat Einstichpunkte, keine Formen. Um sie zu skalieren
-und die Dichte zu behalten, benutzen Sie **Grafik > Umwandeln > Umrisse
-erkennen**.
+und die Dichte zu behalten, benutzen Sie **Grafik > Umwandeln > Objekte
+erkennen** (Steppstichobjekte, Satinsäulen und Füllungen mit ihren
+Einstellungen) oder **Umrisse erkennen** (Füllungen der Fläche).
 
 ## Andere Dateien
 

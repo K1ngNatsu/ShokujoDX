@@ -121,6 +121,14 @@ cloth**. Puff columns are round over their foam. Metallic thread has
 small glints at a large zoom, and **View > Thread Look > Lights off**
 shows only glow-in-the-dark thread. See [Checking a design](checking).
 
+**Objects from machine files.** **Artwork > Convert > Recognize
+Objects** changes the stitches of a machine file into running objects,
+satin columns and fills, with the settings that the stitches show. A
+window shows the file and the objects next to each other, with the
+places that differ; you can keep single objects as stitches. Options can
+do it each time that a machine file opens. See [Vector artwork and
+shaping](artwork).
+
 **Stitch parts.** **View > Stitch Parts** colors the stitches of a
 design by the kind of their part: runs, columns and the rows of fills,
 with the underlay of each part. The program finds them in the stitches

@@ -29,8 +29,10 @@ oder eine Einstellung ändern, ändern sich die Stiche sofort.
   Siehe [Vektorgrafik und Formen](artwork).
 - **Stichobjekte**: Stiche aus einer Maschinendatei oder einem Fotostich.
   Das Programm stickt sie, wie sie sind. Umformen verschiebt einzelne
-  Einstichpunkte, fügt sie hinzu und löscht sie. **Umrisse erkennen**
-  (Grafik > Umwandeln) macht daraus Füllungen, die Sie skalieren können.
+  Einstichpunkte, fügt sie hinzu und löscht sie. **Objekte erkennen**
+  (Grafik > Umwandeln) macht daraus Steppstichobjekte, Satinsäulen und
+  Füllungen, die Sie skalieren und bearbeiten können; **Umrisse
+  erkennen** macht daraus Füllungen.
 - **Kreuzstich** und **Strasssteine**: siehe [Spezielle
   Verzierungen](specialty).
 

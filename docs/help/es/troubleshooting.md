@@ -157,8 +157,10 @@ es la actual (pestaña Color): Exportar escribe la combinación actual.
 ## Un archivo de máquina queda demasiado denso al escalarlo
 
 Un archivo de máquina tiene puntos de aguja, no formas. Use primero **Arte
-> Convertir > Reconocer contornos**: las puntadas pasan a ser rellenos,
-que conservan su densidad al escalarlos.
+> Convertir > Reconocer objetos**: las puntadas pasan a ser objetos de
+puntada recta, columnas de satén y rellenos, que conservan su densidad al
+escalarlos. **Reconocer contornos** hace rellenos del área de las
+puntadas.
 
 ## Un botón está atenuado
 

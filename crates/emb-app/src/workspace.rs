@@ -436,6 +436,9 @@ pub struct Settings {
     /// Endless pan: during a pan drag, the pointer goes to the other side
     /// of the canvas at an edge (v0.3 plan, Stage 3).
     pub endless_pan: bool,
+    /// Open makes objects with stitch types of the stitches of a machine
+    /// file at once (Recognize Objects; P18 Milestone 4). Off by default.
+    pub recognize_on_open: bool,
     /// The check for a new version (ADR 0109).
     pub updates: crate::update::UpdateSettings,
     /// The start page shows when the program starts.
@@ -510,6 +513,7 @@ impl Default for Settings {
             machine: None,
             hoop: None,
             endless_pan: true,
+            recognize_on_open: false,
             updates: Default::default(),
             start_page: true,
             simple_mode: false,
@@ -1386,6 +1390,12 @@ pub fn options_window(ctx: &egui::Context, st: &mut AppState) {
                         ui.checkbox(&mut s.show_rulers, tr("Show rulers"));
                         ui.checkbox(&mut s.snap_guides, tr("Snap to Guides"));
                     });
+                    ui.end_row();
+                    ui.label(tr("Machine files"));
+                    ui.checkbox(&mut s.recognize_on_open, tr("Recognize objects when a file opens"))
+                        .on_hover_text(tr(
+                            "Open makes running objects, satin columns and fills of the stitches of a machine file at once, as Artwork > Convert > Recognize Objects does. Off: the file opens as stitch objects.",
+                        ));
                     ui.end_row();
                     ui.label(tr("Pan"));
                     ui.checkbox(&mut s.endless_pan, tr("Endless pan"))
