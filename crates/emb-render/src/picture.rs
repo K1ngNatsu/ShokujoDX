@@ -144,7 +144,7 @@ impl Embroidery {
             .max(1);
         let ground = self.ground.as_ref();
         // Each block, row by row; a block of a worker goes in its place.
-        let blocks: Vec<(usize, Picture)> = std::thread::scope(|scope| {
+        let blocks: Vec<(usize, Picture)> = emb_geom::threads::scope(|scope| {
             let handles: Vec<_> = (0..workers)
                 .map(|_| {
                     scope.spawn(|| {

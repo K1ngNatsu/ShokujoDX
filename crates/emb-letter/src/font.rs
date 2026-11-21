@@ -131,6 +131,9 @@ impl Shared {
     fn mode(&self) -> RouteMode {
         match self.mode.load(Ordering::Relaxed) {
             0 => RouteMode::Wait,
+            // A browser cannot start the route thread (the browser trial of
+            // P15): the route is made when the letter is laid out.
+            1 if cfg!(target_arch = "wasm32") => RouteMode::Wait,
             1 => RouteMode::Background,
             _ => RouteMode::Off,
         }

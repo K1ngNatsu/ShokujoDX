@@ -33,7 +33,7 @@ const MAX_PX_PER_MM: f64 = 2.5;
 const PLAY_MS: u64 = 150;
 /// After a change, the views are made again when the design stays the
 /// same for this long (a drag makes many changes).
-const SETTLE: std::time::Duration = std::time::Duration::from_millis(300);
+const SETTLE: crate::clock::Duration = crate::clock::Duration::from_millis(300);
 /// The views of the strip: front, a quarter turn, the back quarter, back.
 const STRIP: [usize; 4] = [0, 3, 9, 12];
 
@@ -65,12 +65,12 @@ pub struct TurntableUi {
     state: Option<u64>,
     /// A newer design state and when it came (the views wait for it to
     /// settle).
-    changed: Option<(u64, std::time::Instant)>,
+    changed: Option<(u64, crate::clock::Instant)>,
     views: Vec<Option<Arc<Picture>>>,
     job: Option<Job>,
     texture: Option<(usize, TextureHandle)>,
     /// A GIF that a thread writes now: its file and the thread.
-    saving: Option<(PathBuf, std::thread::JoinHandle<Result<(), String>>)>,
+    saving: Option<(PathBuf, crate::background::Handle<Result<(), String>>)>,
 }
 
 impl TurntableUi {
@@ -219,7 +219,7 @@ impl AppState {
         if self.turntable.state != Some(state) && !first && !settled {
             // The old views show until the design stays the same.
             if self.turntable.changed.is_none_or(|(s, _)| s != state) {
-                self.turntable.changed = Some((state, std::time::Instant::now()));
+                self.turntable.changed = Some((state, crate::clock::Instant::now()));
             }
         } else if self.turntable.state != Some(state) {
             self.turntable.changed = None;
@@ -235,7 +235,7 @@ impl AppState {
                 let stop = Arc::new(AtomicBool::new(false));
                 let (tx, rx) = channel();
                 let flag = stop.clone();
-                std::thread::spawn(move || {
+                crate::background::spawn(move || {
                     make_views(&design, &plan, &machines, &look, &mut |m| tx.send(m).is_ok(), &flag);
                 });
                 self.turntable.job = Some(Job { rx, stop });
@@ -276,7 +276,7 @@ impl AppState {
 
     fn save_turntable_gif(&mut self) {
         let Some(views) = self.turntable.all() else { return };
-        let Some(path) = rfd::FileDialog::new()
+        let Some(path) = crate::dialog::FileDialog::new()
             .set_title(tr("Save the turn (GIF)"))
             .add_filter("GIF", &["gif"])
             .set_directory(self.dialog_dir())
@@ -286,7 +286,7 @@ impl AppState {
             return;
         };
         let p = path.clone();
-        let handle = std::thread::spawn(move || {
+        let handle = crate::background::spawn(move || {
             let bytes = gif_bytes(&views)?;
             std::fs::write(&p, bytes).map_err(|e| format!("{}: {e}", p.display()))
         });
@@ -298,7 +298,7 @@ impl AppState {
         let Some(pic) = self.turntable.all().and_then(|v| strip(&v)) else {
             return;
         };
-        let Some(path) = rfd::FileDialog::new()
+        let Some(path) = crate::dialog::FileDialog::new()
             .set_title(tr("Save four views (PNG)"))
             .add_filter("PNG", &["png"])
             .set_directory(self.dialog_dir())
@@ -348,7 +348,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         || st.turntable.playing
         || st.turntable.saving.is_some()
     {
-        ctx.request_repaint_after(std::time::Duration::from_millis(50));
+        ctx.request_repaint_after(crate::clock::Duration::from_millis(50));
     }
     let mut open = true;
     crate::dock::docked(
@@ -573,11 +573,11 @@ mod tests {
         h.st.turntable.open = true;
         let ctx = egui::Context::default();
         let state = h.st.doc.state_id();
-        let start = std::time::Instant::now();
+        let start = crate::clock::Instant::now();
         while h.st.turntable.ready() < STEPS && start.elapsed().as_secs() < 120 {
             let mut out = ctx.run_ui(Default::default(), |ui| window(ui.ctx(), &mut h.st));
             out.textures_delta.clear();
-            std::thread::sleep(std::time::Duration::from_millis(20));
+            std::thread::sleep(crate::clock::Duration::from_millis(20));
         }
         assert_eq!(h.st.turntable.ready(), STEPS);
         assert_eq!(h.st.doc.state_id(), state);
@@ -588,11 +588,11 @@ mod tests {
         let mut out = ctx.run_ui(Default::default(), |ui| window(ui.ctx(), &mut h.st));
         out.textures_delta.clear();
         assert_eq!(h.st.turntable.ready(), STEPS);
-        let start = std::time::Instant::now();
+        let start = crate::clock::Instant::now();
         while h.st.turntable.state != Some(new) && start.elapsed().as_secs() < 5 {
             let mut out = ctx.run_ui(Default::default(), |ui| window(ui.ctx(), &mut h.st));
             out.textures_delta.clear();
-            std::thread::sleep(std::time::Duration::from_millis(20));
+            std::thread::sleep(crate::clock::Duration::from_millis(20));
         }
         assert_eq!(h.st.turntable.state, Some(new));
         assert!(h.st.turntable.ready() < STEPS);

@@ -415,7 +415,7 @@ impl AppState {
             return;
         };
         let name = format!("{} template.svg", self.doc.design().name);
-        let Some(p) = rfd::FileDialog::new()
+        let Some(p) = crate::dialog::FileDialog::new()
             .set_title(tr("Rhinestone template"))
             .add_filter(tr("SVG (cutting machines)"), &["svg"])
             .add_filter(tr("DXF (cutter and laser programs)"), &["dxf"])

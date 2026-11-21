@@ -136,7 +136,7 @@ pub fn draw(painter: &egui::Painter, ctx: &egui::Context, rect: Rect, st: &mut A
     let high = st.show_high_thread.then_some(st.settings.thread_height_limit_mm);
     let Some(map) = st.check_map(ctx) else {
         status(painter, ctx, rect, st, &[tr("Checking the surface…").to_string()]);
-        ctx.request_repaint_after(std::time::Duration::from_millis(60));
+        ctx.request_repaint_after(crate::clock::Duration::from_millis(60));
         return;
     };
     let tkey = {

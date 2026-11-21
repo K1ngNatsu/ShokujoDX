@@ -172,7 +172,7 @@ pub fn draw_magnifier(painter: &egui::Painter, ctx: &egui::Context, rect: Rect, 
         return;
     }
     let Some((lay, laid)) = crate::stitch_tiles::laid_of(ctx, st) else {
-        ctx.request_repaint_after(std::time::Duration::from_millis(50));
+        ctx.request_repaint_after(crate::clock::Duration::from_millis(50));
         return;
     };
     let ppp = f64::from(ctx.pixels_per_point());

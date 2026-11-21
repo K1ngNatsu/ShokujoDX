@@ -215,7 +215,7 @@ impl AppState {
             return;
         };
         let name = format!("{} chart.pdf", self.doc.design().name);
-        let Some(p) = rfd::FileDialog::new()
+        let Some(p) = crate::dialog::FileDialog::new()
             .set_title(tr("Cross-stitch chart"))
             .add_filter("PDF", &["pdf"])
             .set_directory(self.dialog_dir())

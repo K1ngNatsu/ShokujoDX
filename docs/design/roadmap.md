@@ -1725,7 +1725,11 @@ Code signing (ADR 0062) does not wait for this phase.
    off (`cfg(target_arch = "wasm32")`): open is an upload, save is a
    download, the data is in the page. A test page; the owner tries it in
    a browser and on a tablet. Decide on step 2 from the result (speed,
-   memory, how it feels).
+   memory, how it feels). *Made on the branch `trial/browser`
+   (2026-11-21, owner request): `tools/build-web.py`, `tools/web-bench.mjs`
+   and the report `docs/design/p15-trial-report.md` (it runs with the same
+   stitches; 200,000 stitches at 10 to 20 frames a second; the first 3D
+   view stops the page for 3.5 s to 6.2 s; step 2 is L to XL).*
 2. **Web version for computers (M).**
    - One storage layer for all file access: files of the user in and out
      through upload and download; settings, backups, My Hoops and My

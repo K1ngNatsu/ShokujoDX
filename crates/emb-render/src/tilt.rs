@@ -129,7 +129,7 @@ pub fn project(relief: &Relief, camera: &Camera, w: u32, h: u32, background: [u8
         .max(1);
     let per = (w as usize).div_ceil(workers);
     // Each thread makes a band of columns, column by column.
-    let bands: Vec<Vec<[u8; 4]>> = std::thread::scope(|scope| {
+    let bands: Vec<Vec<[u8; 4]>> = emb_geom::threads::scope(|scope| {
         let handles: Vec<_> = (0..workers)
             .map(|k| {
                 let cols = (k * per) as u32..(((k + 1) * per) as u32).min(w);

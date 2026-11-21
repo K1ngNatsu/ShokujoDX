@@ -96,11 +96,17 @@ impl AppState {
             Pending::NewFrom(path) => self.new_from_template(path.as_deref()),
             Pending::NewLace(i) => self.new_from_lace(i),
             Pending::Open(path) => {
+                // The browser trial: File > Open is an upload.
+                #[cfg(target_arch = "wasm32")]
+                if path.is_none() {
+                    crate::web::upload();
+                    return;
+                }
                 let path = path.or_else(|| {
                     let mut all = vec![project::FILE_EXTENSION];
                     all.extend(emb_formats::READ_EXTENSIONS);
                     all.push("svg");
-                    rfd::FileDialog::new()
+                    crate::dialog::FileDialog::new()
                         .set_title(tr("Open design"))
                         .add_filter(tr("Designs and machine files"), &all)
                         .add_filter(tr("Embroidery project"), &[project::FILE_EXTENSION])
@@ -411,7 +417,7 @@ impl AppState {
 
     /// Asks for a machine file and adds its stitch objects to the design.
     pub fn insert_machine_file_dialog(&mut self) {
-        let Some(p) = rfd::FileDialog::new()
+        let Some(p) = crate::dialog::FileDialog::new()
             .set_title(tr("Insert machine file"))
             .add_filter(tr("Machine files"), &emb_formats::READ_EXTENSIONS)
             .set_directory(self.dialog_dir())
@@ -461,8 +467,14 @@ impl AppState {
 
     /// Asks for a file name and saves. Returns `true` if saved.
     pub fn save_as(&mut self) -> bool {
+        // The browser trial: Save is a download.
+        #[cfg(target_arch = "wasm32")]
+        {
+            return self.download_project();
+        }
+        #[cfg_attr(target_arch = "wasm32", allow(unreachable_code))]
         let name = format!("{}.{}", self.doc.design().name, project::FILE_EXTENSION);
-        let Some(mut p) = rfd::FileDialog::new()
+        let Some(mut p) = crate::dialog::FileDialog::new()
             .set_title(tr("Save design as"))
             .add_filter(tr("Embroidery project"), &[project::FILE_EXTENSION])
             .set_directory(self.dialog_dir())
@@ -519,7 +531,7 @@ impl AppState {
     /// Asks for an SVG file and imports it: as fills and lines, or (`lines`)
     /// every shape as a running-stitch line.
     pub fn import_artwork_dialog(&mut self, mode: ArtworkImport) {
-        let Some(p) = rfd::FileDialog::new()
+        let Some(p) = crate::dialog::FileDialog::new()
             .set_title(match mode {
                 ArtworkImport::Objects => tr("Import Artwork"),
                 ArtworkImport::Lines => tr("Import artwork as lines"),

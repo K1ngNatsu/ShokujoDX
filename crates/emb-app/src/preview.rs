@@ -10,8 +10,8 @@
 //!   the last plan (`plan_waits`), so a large design (a design from a photo
 //!   has hundreds of thousands of stitches) does not stop the program.
 
+use crate::clock::Duration;
 use std::sync::{Arc, mpsc};
-use std::time::Duration;
 
 use eframe::egui::{self, Color32};
 use emb_geom::Point;
@@ -70,7 +70,7 @@ pub const FRAME_WAIT: Duration = if cfg!(test) {
 
 /// Makes the plan of `design` and its segments in canvas coordinates.
 fn make(state: u64, design: &emb_model::Design, opts: &PlanOptions, cache: &mut StitchCache) -> Made {
-    let t0 = std::time::Instant::now();
+    let t0 = crate::clock::Instant::now();
     let plan = build_plan(design, opts, cache);
     cache.trim(design.objects().len());
     let back = design.from_hoop_transform();
@@ -135,7 +135,7 @@ impl AppState {
         self.plan_waits = false;
         // When the design state changed last.
         if self.plan_change.0 != state {
-            self.plan_change = (state, std::time::Instant::now());
+            self.plan_change = (state, crate::clock::Instant::now());
         }
         self.poll_plan(Duration::ZERO);
         let Some(p) = &self.plan_view else {

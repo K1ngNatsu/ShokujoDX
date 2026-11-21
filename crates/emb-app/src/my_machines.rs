@@ -441,7 +441,7 @@ fn machine_form(ui: &mut egui::Ui, st: &mut AppState) {
 fn export_dialog(st: &mut AppState, id: &str) {
     let Some(text) = st.export_machine_text(id) else { return };
     let name = st.user_machines.get(id).map_or("machine".into(), |m| m.name.clone());
-    let Some(p) = rfd::FileDialog::new()
+    let Some(p) = crate::dialog::FileDialog::new()
         .set_title(tr("Export Machine"))
         .add_filter(tr("ShokujoDX machine"), &["toml"])
         .set_file_name(format!("{name}.toml"))
@@ -456,7 +456,7 @@ fn export_dialog(st: &mut AppState, id: &str) {
 }
 
 fn import_dialog(st: &mut AppState) {
-    let Some(p) = rfd::FileDialog::new()
+    let Some(p) = crate::dialog::FileDialog::new()
         .set_title(tr("Import Machine"))
         .add_filter(tr("ShokujoDX machine"), &["toml"])
         .pick_file()

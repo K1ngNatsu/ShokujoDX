@@ -305,7 +305,7 @@ impl Updates {
         let (tx, rx) = channel();
         self.rx = Some(rx);
         let ctx = ctx.clone();
-        std::thread::spawn(move || {
+        crate::background::spawn(move || {
             let _ = tx.send(fetch());
             ctx.request_repaint();
         });
@@ -595,7 +595,7 @@ mod tests {
             if !st.updates.checking() {
                 return;
             }
-            std::thread::sleep(std::time::Duration::from_millis(2));
+            std::thread::sleep(crate::clock::Duration::from_millis(2));
         }
         panic!("the check did not end");
     }
@@ -739,7 +739,7 @@ mod tests {
             });
             assert!(!st.updates.checking(), "{auto:?}");
             assert_eq!(st.updates.status, Status::Idle);
-            std::thread::sleep(std::time::Duration::from_millis(20));
+            std::thread::sleep(crate::clock::Duration::from_millis(20));
             assert_eq!(calls.load(Ordering::SeqCst), 0, "{auto:?}");
         }
         // The installer said no: no request, and no question.

@@ -9,9 +9,9 @@
 //! cut), the folder stays: at the next start, a session whose heartbeat is
 //! old is a crashed session, and the app offers its designs for recovery.
 
+use crate::clock::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use eframe::egui;
 use emb_model::project;
@@ -79,7 +79,7 @@ impl Backups {
             .map_or(0, |d| d.as_millis());
         Backups {
             root,
-            session: format!("{}-{millis}", std::process::id()),
+            session: format!("{}-{millis}", process_id()),
             written: BTreeMap::new(),
             last_write: None,
             last_heartbeat: None,
@@ -357,6 +357,15 @@ pub fn recovery_window(ctx: &egui::Context, st: &mut AppState) {
         None if later => st.recovery.clear(),
         None => {}
     }
+}
+
+/// The id of the process; 0 in a browser, which has no process ids (the
+/// browser trial of P15).
+fn process_id() -> u32 {
+    #[cfg(not(target_arch = "wasm32"))]
+    return std::process::id();
+    #[cfg(target_arch = "wasm32")]
+    return 0;
 }
 
 #[cfg(test)]

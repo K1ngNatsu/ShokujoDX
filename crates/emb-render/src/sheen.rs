@@ -299,7 +299,7 @@ fn light_values_on(s: &Surface, lighting: &Lighting, fabric: Option<(Rgb, Fabric
         threads
     };
     let rows_per = h.div_ceil(threads).max(1);
-    std::thread::scope(|scope| {
+    emb_geom::threads::scope(|scope| {
         for (band, chunk) in rgba.chunks_mut(rows_per * w).enumerate() {
             let lit = &lit;
             scope.spawn(move || {

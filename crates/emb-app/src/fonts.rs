@@ -364,7 +364,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         }
     }
     if st.fonts_window.job.is_some() {
-        ctx.request_repaint_after(std::time::Duration::from_millis(200));
+        ctx.request_repaint_after(crate::clock::Duration::from_millis(200));
     }
     if !st.fonts_window.open {
         return;
@@ -425,7 +425,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                      font.json). Check that the license of the font lets you use it.",
                 ))
                 .clicked()
-                && let Some(folder) = rfd::FileDialog::new()
+                && let Some(folder) = crate::dialog::FileDialog::new()
                     .set_title(tr("Folder of an Ink/Stitch font"))
                     .set_directory(st.dialog_dir())
                     .pick_folder()
@@ -821,7 +821,7 @@ pub fn start_inkstitch_convert(st: &mut AppState, folder: PathBuf) {
     st.fonts_window.progress = std::sync::Arc::new(ConvertProgress::default());
     let (ntx, nrx) = channel();
     st.fonts_window.notes = Some(nrx);
-    std::thread::spawn(move || {
+    crate::background::spawn(move || {
         let run = || -> Result<PathBuf, String> {
             let c = emb_letter::inkstitch::convert_inkstitch_font(&folder)?;
             std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
@@ -850,7 +850,7 @@ fn start_convert(st: &mut AppState, form: ConvertForm, dir: PathBuf) {
     st.fonts_window.form = None;
     let progress = std::sync::Arc::new(ConvertProgress::default());
     st.fonts_window.progress = progress.clone();
-    std::thread::spawn(move || {
+    crate::background::spawn(move || {
         let run = || -> Result<PathBuf, String> {
             std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
             let name = form.name.trim();

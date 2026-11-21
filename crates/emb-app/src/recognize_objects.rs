@@ -458,7 +458,7 @@ impl AppState {
     /// Asks for a vector file with the outlines of the design and puts them
     /// in the Recognize Objects window.
     fn open_outlines_dialog(&mut self, d: &mut RecognizeDialog) {
-        let Some(p) = rfd::FileDialog::new()
+        let Some(p) = crate::dialog::FileDialog::new()
             .set_title(tr("Outlines of the design"))
             .add_filter(
                 tr("Vector artwork (SVG, PDF, AI, EPS, EMF, WMF)"),

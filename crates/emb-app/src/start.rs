@@ -90,7 +90,7 @@ impl AppState {
         }
         self.start.asked.extend(new.iter().cloned());
         let (tx, rx) = channel();
-        std::thread::spawn(move || {
+        crate::background::spawn(move || {
             for p in new {
                 let img = thumbnail(&p);
                 if tx.send((p, img)).is_err() {
@@ -202,7 +202,7 @@ pub fn page(ui: &mut egui::Ui, st: &mut AppState) {
     let recent = st.start.recent_files(&st.settings.recent, now);
     st.ask_thumbnails(&recent);
     if st.take_thumbnails(&ctx) {
-        ctx.request_repaint_after(std::time::Duration::from_millis(100));
+        ctx.request_repaint_after(crate::clock::Duration::from_millis(100));
     }
     let mut run: Option<Cmd> = None;
     let mut open: Option<PathBuf> = None;
@@ -378,8 +378,8 @@ mod tests {
         h.st.settings.recent = vec![p.clone()];
         let ctx = egui::Context::default();
         // A time limit, not a number of frames, for slow computers.
-        let end = std::time::Instant::now() + std::time::Duration::from_secs(60);
-        while std::time::Instant::now() < end {
+        let end = crate::clock::Instant::now() + crate::clock::Duration::from_secs(60);
+        while crate::clock::Instant::now() < end {
             let mut out = ctx.run_ui(Default::default(), |ui| {
                 egui::CentralPanel::default().show(ui, |ui| page(ui, &mut h.st));
             });
@@ -387,7 +387,7 @@ mod tests {
             if h.st.start.thumbs.contains_key(&p) {
                 break;
             }
-            std::thread::sleep(std::time::Duration::from_millis(10));
+            std::thread::sleep(crate::clock::Duration::from_millis(10));
         }
         assert!(
             matches!(h.st.start.thumbs.get(&p), Some(Some(_))),

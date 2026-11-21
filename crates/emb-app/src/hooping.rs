@@ -355,7 +355,7 @@ impl AppState {
 
     /// Asks for a folder, then writes the hoopings there.
     pub fn output_hoopings_dialog(&mut self) {
-        let Some(folder) = rfd::FileDialog::new()
+        let Some(folder) = crate::dialog::FileDialog::new()
             .set_title(tr("Output hoopings: choose a folder"))
             .set_directory(self.dialog_dir())
             .pick_folder()

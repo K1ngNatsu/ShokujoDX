@@ -139,7 +139,7 @@ impl AppState {
         let stop = Arc::new(AtomicBool::new(false));
         let (tx, rx) = mpsc::channel();
         let (d, t, s) = (done.clone(), total.clone(), stop.clone());
-        std::thread::spawn(move || {
+        crate::background::spawn(move || {
             let result = emb_library::scan(&roots, &old, thumbs.as_deref(), |k, n| {
                 d.store(k, Ordering::Relaxed);
                 t.store(n, Ordering::Relaxed);
@@ -296,7 +296,7 @@ impl AppState {
         if paths.is_empty() {
             return;
         }
-        let Some(folder) = rfd::FileDialog::new()
+        let Some(folder) = crate::dialog::FileDialog::new()
             .set_title(tr("Output selected: folder for the files"))
             .set_directory(self.dialog_dir())
             .pick_folder()
@@ -321,7 +321,7 @@ impl AppState {
 
     /// Asks for a file and queues the catalog of the found designs.
     pub fn library_catalog_dialog(&mut self) {
-        let Some(path) = rfd::FileDialog::new()
+        let Some(path) = crate::dialog::FileDialog::new()
             .set_title(tr("Design catalog"))
             .add_filter("PDF", &["pdf"])
             .set_file_name("Design catalog.pdf")
@@ -352,7 +352,7 @@ impl AppState {
 
     /// Asks for a file and writes the list of the found designs (CSV).
     pub fn library_csv_dialog(&mut self) {
-        let Some(path) = rfd::FileDialog::new()
+        let Some(path) = crate::dialog::FileDialog::new()
             .set_title(tr("Design list"))
             .add_filter("CSV", &["csv"])
             .set_file_name("Design list.csv")
@@ -538,7 +538,7 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
         st.start_library(library_dir());
     }
     if st.poll_library() {
-        ui.ctx().request_repaint_after(std::time::Duration::from_millis(150));
+        ui.ctx().request_repaint_after(crate::clock::Duration::from_millis(150));
     }
     st.refresh_library();
     toolbar(ui, st);
@@ -551,7 +551,9 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
             ));
             ui.add_space(6.0);
             if ui.button(tr("Add a library folder…")).clicked()
-                && let Some(p) = rfd::FileDialog::new().set_title(tr("Library folder")).pick_folder()
+                && let Some(p) = crate::dialog::FileDialog::new()
+                    .set_title(tr("Library folder"))
+                    .pick_folder()
             {
                 st.add_library_folder(p);
             }
@@ -586,7 +588,10 @@ fn toolbar(ui: &mut egui::Ui, st: &mut AppState) {
             }
             if ui.button(tr("Add folder…")).clicked() {
                 ui.close();
-                if let Some(p) = rfd::FileDialog::new().set_title(tr("Library folder")).pick_folder() {
+                if let Some(p) = crate::dialog::FileDialog::new()
+                    .set_title(tr("Library folder"))
+                    .pick_folder()
+                {
                     st.add_library_folder(p);
                 }
             }
@@ -1034,7 +1039,7 @@ mod tests {
         h.st.settings = s;
         h.st.scan_library();
         while h.st.poll_library() {
-            std::thread::sleep(std::time::Duration::from_millis(10));
+            std::thread::sleep(crate::clock::Duration::from_millis(10));
         }
         h.st.refresh_library();
         (h, root)

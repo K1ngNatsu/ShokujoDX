@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShokujoDX (browser trial)</title>
+<link rel="icon" type="image/png" href="icon.png">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1e1f22; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; outline: none; }
+  #loading { position: absolute; inset: 0; display: flex; align-items: center;
+    justify-content: center; color: #ccc; font: 16px sans-serif; text-align: center;
+    pointer-events: none; padding: 16px; }
+</style>
+</head>
+<body>
+<canvas id="shokujodx"></canvas>
+<div id="loading">ShokujoDX loads (a trial of the browser version)…</div>
+<script type="module">
+  import init from "./emb-app.js";
+  const loading = document.getElementById("loading");
+  const t0 = performance.now();
+  try {
+    const wasm = await init({ module_or_path: "./emb-app_bg.wasm" });
+    window.shokujodxMemoryMb = () => wasm.memory.buffer.byteLength / 1e6;
+    window.shokujodxLoadMs = performance.now() - t0;
+    loading.textContent = "";
+  } catch (e) {
+    loading.textContent = "ShokujoDX did not start in this browser: " + e;
+  }
+</script>
+</body>
+</html>

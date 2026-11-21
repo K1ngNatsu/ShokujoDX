@@ -479,7 +479,7 @@ fn rows_in_parallel<T: Send>(rows: usize, f: impl Fn(usize) -> T + Sync) -> Vec<
         .min(rows)
         .max(1);
     let per = rows.div_ceil(workers);
-    std::thread::scope(|scope| {
+    emb_geom::threads::scope(|scope| {
         let handles: Vec<_> = (0..workers)
             .map(|k| {
                 let f = &f;

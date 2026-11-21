@@ -455,9 +455,23 @@ pub fn dialog(ctx: &egui::Context, st: &mut AppState) {
         st.export = None;
         return;
     }
+    // The browser trial: the machine file is a download.
+    #[cfg(target_arch = "wasm32")]
+    if export {
+        match st.download_machine_file(dlg.format) {
+            Ok(()) => st.export = None,
+            Err(e) => {
+                st.notice = Some(Notice {
+                    title: "Export failed".into(),
+                    lines: vec![e],
+                })
+            }
+        }
+        return;
+    }
     if export {
         let name = format!("{}.{}", st.doc.design().name, dlg.format.ext());
-        let picked = rfd::FileDialog::new()
+        let picked = crate::dialog::FileDialog::new()
             .set_title(tr("Export machine file"))
             .add_filter(dlg.format.label(), &[dlg.format.ext()])
             .set_directory(st.export_dialog_dir())

@@ -382,7 +382,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         st.team_add_column(id);
     }
     if import_file
-        && let Some(p) = rfd::FileDialog::new()
+        && let Some(p) = crate::dialog::FileDialog::new()
             .set_title(tr("Import names"))
             .add_filter(tr("Name lists"), &["csv", "txt", "tsv"])
             .set_directory(st.dialog_dir())
@@ -404,7 +404,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         st.message = e;
     }
     if save_each
-        && let Some(folder) = rfd::FileDialog::new()
+        && let Some(folder) = crate::dialog::FileDialog::new()
             .set_title(tr("Save each name: folder"))
             .set_directory(st.dialog_dir())
             .pick_folder()

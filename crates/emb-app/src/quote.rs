@@ -84,7 +84,7 @@ impl AppState {
             return;
         };
         let name = format!("{} quote.pdf", self.doc.design().name);
-        let Some(p) = rfd::FileDialog::new()
+        let Some(p) = crate::dialog::FileDialog::new()
             .set_title(tr("Quote sheet"))
             .add_filter("PDF", &["pdf"])
             .set_directory(self.dialog_dir())

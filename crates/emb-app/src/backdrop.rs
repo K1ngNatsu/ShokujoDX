@@ -114,7 +114,7 @@ impl AppState {
 
     /// Asks for a picture file and loads it as the backdrop.
     pub fn import_bitmap_dialog(&mut self) {
-        let Some(p) = rfd::FileDialog::new()
+        let Some(p) = crate::dialog::FileDialog::new()
             .set_title(tr("Load backdrop picture"))
             .add_filter(tr("Pictures (PNG, JPEG, BMP, TIFF, GIF)"), &FILE_TYPES)
             .set_directory(self.dialog_dir())

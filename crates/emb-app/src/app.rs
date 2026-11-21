@@ -137,7 +137,7 @@ pub struct AppState {
     /// canvas asks for another frame soon.
     pub plan_waits: bool,
     /// The last design state that the plan saw, and when it changed.
-    pub plan_change: (u64, std::time::Instant),
+    pub plan_change: (u64, crate::clock::Instant),
     /// Show the stitches of the design (the Stitches view).
     pub show_plan: bool,
     pub export: Option<crate::export::ExportDialog>,
@@ -520,6 +520,11 @@ impl EmbApp {
         let dock = default_dock();
 
         let mut state = AppState::new(hoops, machines, message);
+        // The browser trial: no threads, so the 3D tiles are made in the
+        // frame.
+        if cfg!(target_arch = "wasm32") {
+            state.stitch_tiles.sync = true;
+        }
         state.settings = crate::workspace::Settings::load();
         // The View options of the last session, and the user's machine and
         // hoop (v0.3 plan, Stage 2). The first start asks for the machine.
@@ -712,7 +717,7 @@ impl AppState {
             plan_view: None,
             stitch_tiles: Default::default(),
             plan_waits: false,
-            plan_change: (0, std::time::Instant::now()),
+            plan_change: (0, crate::clock::Instant::now()),
             show_plan: true,
             export: None,
             backdrop_tex: None,
@@ -1797,7 +1802,7 @@ impl EmbApp {
         for f in ctx.input(|i| i.raw.dropped_files.clone()) {
             self.state.open_any(f.path());
         }
-        self.state.backups_tick(std::time::Instant::now());
+        self.state.backups_tick(crate::clock::Instant::now());
         ctx.request_repaint_after(crate::backup::HEARTBEAT);
         crate::backup::recovery_window(&ctx, &mut self.state);
         crate::file::dialogs(&ctx, &mut self.state);
@@ -1873,8 +1878,10 @@ impl EmbApp {
         crate::send::window(&ctx, st);
         crate::clipart::window(&ctx, st);
         // Jobs and the library scan go on while their tabs are hidden.
+        #[cfg(target_arch = "wasm32")]
+        crate::web::poll(st, &ctx);
         if st.poll_jobs() | st.poll_library() | st.poll_outside_edit() | st.poll_routes() {
-            ctx.request_repaint_after(std::time::Duration::from_millis(150));
+            ctx.request_repaint_after(crate::clock::Duration::from_millis(150));
         }
         // The split view is a dock tab right of the canvas while it is on.
         match (st.show_split, self.dock.find_tab(&Tab::Split)) {

@@ -5,3 +5,8 @@
 # C++ runtime, and the installer does not install it (v0.3 plan, Stage 1).
 [target.x86_64-pc-windows-msvc]
 rustflags = ["-C", "target-feature=+crt-static"]
+
+# The browser trial (P15 step 1): getrandom 0.3 takes its random numbers
+# from the browser (with its feature wasm_js, set in emb-app).
+[target.wasm32-unknown-unknown]
+rustflags = ["--cfg", 'getrandom_backend="wasm_js"']

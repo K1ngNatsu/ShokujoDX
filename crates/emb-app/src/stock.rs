@@ -142,7 +142,7 @@ impl AppState {
     }
 
     fn import_stock_dialog(&mut self) {
-        let Some(p) = rfd::FileDialog::new()
+        let Some(p) = crate::dialog::FileDialog::new()
             .set_title(tr("Import thread stock"))
             .add_filter("CSV", &["csv"])
             .set_directory(self.dialog_dir())
@@ -173,7 +173,7 @@ impl AppState {
     }
 
     fn save_csv_dialog(&mut self, title: &str, name: &str, text: String) {
-        let Some(p) = rfd::FileDialog::new()
+        let Some(p) = crate::dialog::FileDialog::new()
             .set_title(title)
             .add_filter("CSV", &["csv"])
             .set_directory(self.dialog_dir())

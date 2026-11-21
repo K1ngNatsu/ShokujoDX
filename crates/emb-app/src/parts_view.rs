@@ -192,7 +192,7 @@ pub fn draw(painter: &egui::Painter, ctx: &egui::Context, rect: Rect, st: &mut A
     }
     let visuals = ctx.global_style().visuals.clone();
     let Some(shown) = st.part_segments(ctx) else {
-        ctx.request_repaint_after(std::time::Duration::from_millis(60));
+        ctx.request_repaint_after(crate::clock::Duration::from_millis(60));
         return;
     };
     // The canvas a little darker or lighter, so the colors show.

@@ -504,7 +504,7 @@ impl AppState {
     /// Asks for a file and writes the cutter file of the appliqué pieces.
     pub fn cutter_file_dialog(&mut self) {
         let name = format!("{} cut.svg", self.doc.design().name);
-        let Some(p) = rfd::FileDialog::new()
+        let Some(p) = crate::dialog::FileDialog::new()
             .set_title(tr("Appliqué cutter file"))
             .add_filter(tr("SVG (cutting machines)"), &["svg"])
             .add_filter(tr("DXF (cutter and laser programs)"), &["dxf"])

@@ -9,9 +9,10 @@
 //!   the folder shows the zip file to attach (a mail link cannot attach it).
 //! - Zip files (stored or deflated) for the email and the asset packages.
 
+use crate::clock::{Duration, Instant};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant, SystemTime};
+use std::time::SystemTime;
 
 use crate::app::AppState;
 use crate::file::Notice;

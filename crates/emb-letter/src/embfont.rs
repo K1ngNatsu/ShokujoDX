@@ -659,7 +659,7 @@ impl EmbFont {
         // group of them.
         let threads = std::thread::available_parallelism().map_or(1, |n| n.get()).min(16);
         let size = todo.len().div_ceil(threads).max(1);
-        let found: Vec<crate::route::Routed> = std::thread::scope(|scope| {
+        let found: Vec<crate::route::Routed> = emb_geom::threads::scope(|scope| {
             let jobs: Vec<_> = todo
                 .chunks_mut(size)
                 .map(|group| {

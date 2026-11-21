@@ -14,8 +14,8 @@
 //! drag moves the view, the wheel zooms, a double-click fits the design,
 //! and L with a drag moves the light.
 
+use crate::clock::{Duration, Instant};
 use std::sync::{Arc, mpsc};
-use std::time::{Duration, Instant};
 
 use eframe::egui::{self, Color32, Pos2, Rect, TextureHandle, TextureOptions};
 use emb_geom::{BBox, Point, math};

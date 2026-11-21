@@ -42,11 +42,11 @@
 //! The canvas draws the other marks (the selection, needle points, jumps,
 //! functions, the density map) over the tiles, as before.
 
+use crate::clock::{Duration, Instant};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::hash::{Hash, Hasher};
 use std::ops::Range;
 use std::sync::{Arc, Condvar, Mutex, mpsc};
-use std::time::{Duration, Instant};
 
 use eframe::egui::{self, Color32, ColorImage, Pos2, Rect, Shape, TextureHandle, TextureOptions};
 use emb_geom::{BBox, Point, Transform};

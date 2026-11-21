@@ -189,7 +189,7 @@ impl AppState {
             return;
         };
         let stem = p.name.rsplit_once('.').map_or(p.name.as_str(), |(s, _)| s).to_string();
-        let Some(path) = rfd::FileDialog::new()
+        let Some(path) = crate::dialog::FileDialog::new()
             .set_title(tr("Export the product"))
             .add_filter(tr("Product templates"), &[TEMPLATE_EXT])
             .set_directory(self.dialog_dir())
@@ -207,7 +207,7 @@ impl AppState {
     /// Reads a template file that the user chooses, adds it to My Products
     /// and puts it under the design.
     pub fn import_product_template(&mut self) {
-        let Some(path) = rfd::FileDialog::new()
+        let Some(path) = crate::dialog::FileDialog::new()
             .set_title(tr("Import a product"))
             .add_filter(tr("Product templates"), &[TEMPLATE_EXT])
             .set_directory(self.dialog_dir())

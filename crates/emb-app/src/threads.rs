@@ -73,7 +73,7 @@ impl AppState {
     /// Asks for a chart file (GIMP palette or CSV), copies it to the user
     /// chart folder and shows it.
     pub fn import_chart_dialog(&mut self) {
-        let Some(p) = rfd::FileDialog::new()
+        let Some(p) = crate::dialog::FileDialog::new()
             .set_title(tr("Import thread chart"))
             .add_filter(tr("Thread charts (GIMP palette, CSV)"), &["gpl", "csv"])
             .set_directory(self.dialog_dir())

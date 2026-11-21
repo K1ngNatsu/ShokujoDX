@@ -17,6 +17,7 @@ pub mod region;
 pub mod simplify;
 pub mod spine;
 pub mod text;
+pub mod threads;
 pub mod transform;
 
 pub use bbox::BBox;

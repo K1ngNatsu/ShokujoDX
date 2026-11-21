@@ -832,7 +832,7 @@ impl Wizard {
         self.poll_edit();
         self.poll_job(ctx);
         if self.editing() {
-            ctx.request_repaint_after(std::time::Duration::from_millis(30));
+            ctx.request_repaint_after(crate::clock::Duration::from_millis(30));
         }
         // A job whose result is old (a setting of its step changed) stops:
         // when it ends, a job for the newest settings starts.
@@ -874,7 +874,7 @@ impl Wizard {
             self.start_job(ctx, key, current);
         }
         if self.job.is_some() {
-            ctx.request_repaint_after(std::time::Duration::from_millis(30));
+            ctx.request_repaint_after(crate::clock::Duration::from_millis(30));
         }
         match &self.texture {
             Some((_, t)) => t.clone(),
@@ -1828,7 +1828,7 @@ fn show_window(ctx: &egui::Context, st: &mut AppState) {
     // Finish waits for the job in the background: the window stays usable.
     if w.finish && w.step == Step::Finish {
         if w.working() {
-            ctx.request_repaint_after(std::time::Duration::from_millis(30));
+            ctx.request_repaint_after(crate::clock::Duration::from_millis(30));
         } else {
             w.finish = false;
             done = Done::Finish;
@@ -2758,13 +2758,13 @@ mod tests {
     /// not a number of frames: a slow computer (a CI runner with two cores
     /// and all the other tests) needs more frames.
     fn draw_until_done(ctx: &egui::Context, st: &mut AppState) {
-        let end = std::time::Instant::now() + std::time::Duration::from_secs(120);
-        while std::time::Instant::now() < end {
+        let end = crate::clock::Instant::now() + crate::clock::Duration::from_secs(120);
+        while crate::clock::Instant::now() < end {
             draw(ctx, st);
             if !st.wizard.as_ref().unwrap().working() {
                 return;
             }
-            std::thread::sleep(std::time::Duration::from_millis(5));
+            std::thread::sleep(crate::clock::Duration::from_millis(5));
         }
         panic!("the job did not end");
     }

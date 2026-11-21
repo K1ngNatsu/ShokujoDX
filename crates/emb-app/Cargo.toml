@@ -32,6 +32,33 @@ flate2.workspace = true
 crc32fast.workspace = true
 toml.workspace = true
 
+# The browser trial (P15 step 1, branch trial/browser): the random numbers,
+# the clock, the page and the files of the browser.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+getrandom_04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-time = "1.1"
+# Local time for the worksheets and the file headers from the clock of the
+# browser.
+chrono = { version = "0.4", default-features = false, features = ["clock", "wasmbind"] }
+web-sys = { version = "0.3", features = [
+    "Window",
+    "Document",
+    "Element",
+    "HtmlElement",
+    "HtmlCanvasElement",
+    "HtmlAnchorElement",
+    "Blob",
+    "BlobPropertyBag",
+    "Url",
+    "Performance",
+    "Response",
+    "console",
+] }
+
 [build-dependencies]
 winresource.workspace = true
 

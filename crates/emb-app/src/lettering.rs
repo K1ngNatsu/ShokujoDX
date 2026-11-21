@@ -7,12 +7,12 @@
 //! The fonts of the computer are found in a background thread, so the app
 //! starts with the bundled fonts and adds the others when the scan is done.
 
+use crate::clock::{Duration, Instant};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, channel};
-use std::time::{Duration, Instant};
 
 use eframe::egui;
 use emb_geom::{BBox, Point, Transform};
@@ -296,7 +296,7 @@ impl FontLibrary {
         }
         let (tx, rx) = channel();
         self.scan = Some(rx);
-        std::thread::spawn(move || {
+        crate::background::spawn(move || {
             tx.send(scan(&font_dirs())).ok();
         });
     }
@@ -1031,7 +1031,7 @@ pub enum EditTarget {
 pub fn windows(ctx: &egui::Context, st: &mut AppState) {
     st.fonts.poll();
     if st.fonts.scan.is_some() {
-        ctx.request_repaint_after(std::time::Duration::from_millis(200));
+        ctx.request_repaint_after(crate::clock::Duration::from_millis(200));
     }
     let Some(mut d) = st.lettering_dialog.take() else {
         return;
@@ -2515,10 +2515,10 @@ mod tests {
             20.0,
         ));
         let steps = st.doc.undo_len();
-        let start = std::time::Instant::now();
+        let start = crate::clock::Instant::now();
         while st.poll_routes() {
             assert!(start.elapsed().as_secs() < 60, "the routes are not made");
-            std::thread::sleep(std::time::Duration::from_millis(10));
+            std::thread::sleep(crate::clock::Duration::from_millis(10));
         }
         // The last routes that the thread made.
         st.poll_routes();
@@ -2551,10 +2551,10 @@ mod tests {
             FontRef::embroidery(emb_letter::bundled::DEFAULT_EMBROIDERY, ""),
             20.0,
         ));
-        let start = std::time::Instant::now();
+        let start = crate::clock::Instant::now();
         while st.poll_routes() {
             assert!(start.elapsed().as_secs() < 60, "the routes are not made");
-            std::thread::sleep(std::time::Duration::from_millis(10));
+            std::thread::sleep(crate::clock::Duration::from_millis(10));
         }
         st.poll_routes();
         st.undo();

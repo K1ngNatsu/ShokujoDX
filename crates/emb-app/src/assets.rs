@@ -274,7 +274,7 @@ impl AppState {
 
     fn import_assets_dialog(&mut self, kind: AssetKind) {
         let Some(dir) = kind.dir() else { return };
-        let Some(paths) = rfd::FileDialog::new()
+        let Some(paths) = crate::dialog::FileDialog::new()
             .set_title(crate::i18n::fill(
                 "Import {}",
                 &[&crate::i18n::in_sentence(kind.label())],
@@ -308,7 +308,7 @@ impl AppState {
         if kinds.len() == 1 {
             files.retain(|(n, _)| n != FAVORITES_FILE);
         }
-        let Some(p) = rfd::FileDialog::new()
+        let Some(p) = crate::dialog::FileDialog::new()
             .set_title(tr("Export (zip file)"))
             .add_filter(tr("Zip file"), &["zip"])
             .set_file_name(format!("{name}.zip"))
@@ -328,7 +328,7 @@ impl AppState {
     }
 
     fn import_package_dialog(&mut self) {
-        let Some(p) = rfd::FileDialog::new()
+        let Some(p) = crate::dialog::FileDialog::new()
             .set_title(tr("Import a package of assets"))
             .add_filter(tr("Zip file"), &["zip"])
             .pick_file()

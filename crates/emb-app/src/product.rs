@@ -376,7 +376,7 @@ impl AppState {
     }
 
     pub fn product_picture_dialog(&mut self) {
-        let Some(p) = rfd::FileDialog::new()
+        let Some(p) = crate::dialog::FileDialog::new()
             .set_title(tr("Picture of your product"))
             .add_filter(tr("Pictures (PNG, JPEG, BMP, TIFF, GIF)"), &crate::backdrop::FILE_TYPES)
             .set_directory(self.dialog_dir())
@@ -427,7 +427,7 @@ impl AppState {
             self.message = tr("Choose a product first (Design > Product).").into();
             return;
         }
-        let Some(p) = rfd::FileDialog::new()
+        let Some(p) = crate::dialog::FileDialog::new()
             .set_title(tr("Save picture on product (PNG)"))
             .add_filter("PNG", &["png"])
             .set_directory(self.dialog_dir())
@@ -495,7 +495,7 @@ impl AppState {
     pub fn add_product_design_dialog(&mut self) {
         let mut exts: Vec<&str> = vec![emb_model::project::FILE_EXTENSION];
         exts.extend(emb_formats::READ_EXTENSIONS);
-        let Some(p) = rfd::FileDialog::new()
+        let Some(p) = crate::dialog::FileDialog::new()
             .set_title(tr("Design to show on the product"))
             .add_filter(tr("Designs (projects and machine files)"), &exts)
             .set_directory(self.dialog_dir())

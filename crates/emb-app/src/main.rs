@@ -2,6 +2,9 @@
 //! the stitches and the files; this crate has the ribbon, the canvas, the
 //! panels and the windows.
 #![forbid(unsafe_code)]
+// The browser trial (P15 step 1) leaves out the desktop start, the crash
+// report and the renderer fallbacks.
+#![cfg_attr(target_arch = "wasm32", allow(dead_code, unused_imports))]
 // Hide the console window on Windows release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -14,6 +17,7 @@ mod applique;
 mod artwork;
 mod assets;
 mod backdrop;
+mod background;
 mod backup;
 mod bling;
 mod buttonholes;
@@ -21,6 +25,7 @@ mod canvas;
 mod checks;
 mod cleanup;
 mod clipart;
+mod clock;
 mod color_fills;
 mod commands;
 mod corners;
@@ -29,6 +34,7 @@ mod cross;
 mod cutwork;
 mod decor;
 mod density;
+mod dialog;
 mod dock;
 mod draw;
 mod drawing_aids;
@@ -116,11 +122,14 @@ mod tilt;
 mod turntable;
 mod update;
 mod vectors;
+#[cfg(not(target_arch = "wasm32"))]
 mod view_bench;
 mod viewer;
 mod viewing;
 mod views;
 mod viewtools;
+#[cfg(target_arch = "wasm32")]
+mod web;
 mod wizard;
 mod words;
 mod workspace;
@@ -165,6 +174,7 @@ fn thumbnail(args: &[String]) -> Result<(), String> {
     std::fs::write(output, picture.png()).map_err(|e| format!("{output}: {e}"))
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result {
     // The packages run `--version` to see that the program starts.
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -224,4 +234,10 @@ fn main() -> eframe::Result {
         Err(e) if startup::failed(&e.to_string()) => Ok(()),
         other => other,
     }
+}
+
+/// The browser trial (P15 step 1): the page starts the program.
+#[cfg(target_arch = "wasm32")]
+fn main() {
+    web::start();
 }

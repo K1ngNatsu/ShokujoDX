@@ -348,7 +348,7 @@ impl AppState {
             return;
         };
         let name = crate::i18n::fill("{} outlines.svg", &[&self.doc.design().name]);
-        let Some(p) = rfd::FileDialog::new()
+        let Some(p) = crate::dialog::FileDialog::new()
             .set_title(tr("Export outlines (SVG or EMF)"))
             .add_filter(tr("SVG vector file"), &["svg"])
             .add_filter(tr("EMF Windows metafile"), &["emf"])
@@ -585,24 +585,24 @@ mod timing {
             modifiers: Modifiers::NONE,
         }]);
         for i in 1..=5 {
-            let t0 = std::time::Instant::now();
+            let t0 = crate::clock::Instant::now();
             h.frame(vec![Event::PointerMoved(
                 from + eframe::egui::vec2(2.0 * i as f32, 0.0),
             )]);
             let frame = t0.elapsed();
             // The parts of the frame: the cut again, and the stitch plan.
             let d = h.st.doc.design().clone();
-            let t1 = std::time::Instant::now();
+            let t1 = crate::clock::Instant::now();
             let mut d2 = d.clone();
             d2.linked_objects_moved(&[top], &emb_geom::Transform::translate(0.1, 0.0));
             let cut = t1.elapsed();
-            let t2 = std::time::Instant::now();
+            let t2 = crate::clock::Instant::now();
             let _ = emb_stitch::build_plan(&d2, &Default::default(), &mut Default::default());
             let plan = t2.elapsed();
             println!("frame {i}: {frame:?} (cut {cut:?}, plan from scratch {plan:?})");
             if i == 5 {
                 for o in d2.objects() {
-                    let t3 = std::time::Instant::now();
+                    let t3 = crate::clock::Instant::now();
                     let st = emb_stitch::stitch_object(o, Point::ZERO);
                     println!(
                         "  object {:?} {}: {:?}, {} runs",

@@ -394,7 +394,7 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
         // The last plan shows while a thread makes the new one (ADR 0077).
         let waits = st.plan_waits;
         if waits {
-            ui.ctx().request_repaint_after(std::time::Duration::from_millis(40));
+            ui.ctx().request_repaint_after(crate::clock::Duration::from_millis(40));
         }
         let look = if !st.show_thread_look {
             MeshLook::Stitches
@@ -1173,7 +1173,7 @@ mod tests {
                 emb_render::bounds(&segments.iter().map(|s| s.0).collect::<Vec<_>>()).unwrap(),
             );
             let runs = 10;
-            let t0 = std::time::Instant::now();
+            let t0 = crate::clock::Instant::now();
             let mut drawn = 0;
             for _ in 0..runs {
                 drawn = stitch_mesh(r, &v, &segments, false).1;
@@ -1202,7 +1202,7 @@ mod tests {
                     zoom,
                 };
                 let time = |f: &dyn Fn() -> Mesh| {
-                    let t0 = std::time::Instant::now();
+                    let t0 = crate::clock::Instant::now();
                     let mut tris = 0;
                     for _ in 0..10 {
                         tris = f().indices.len() / 3;

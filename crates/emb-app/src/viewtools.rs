@@ -155,7 +155,7 @@ pub fn quality_for(ms: f64) -> Quality {
 pub fn measure_ms() -> f64 {
     let stitches = emb_render::stress::make(20_000);
     let strands = emb_render::strand::strands(&stitches, &Default::default());
-    let t0 = std::time::Instant::now();
+    let t0 = crate::clock::Instant::now();
     let laid = emb_render::surface::lay(&strands, &[]);
     let c = laid.bounds().center();
     let ppm = 8.0;
@@ -164,7 +164,7 @@ pub fn measure_ms() -> f64 {
     // The tiles in a square round the middle of the design.
     let side = (count as f64).sqrt().ceil() as i64;
     let next = std::sync::atomic::AtomicUsize::new(0);
-    std::thread::scope(|scope| {
+    emb_geom::threads::scope(|scope| {
         for _ in 0..workers {
             scope.spawn(|| {
                 loop {

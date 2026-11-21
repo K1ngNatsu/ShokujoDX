@@ -230,7 +230,7 @@ impl AppState {
             }
             let (tx, rx) = mpsc::channel();
             let lang = crate::i18n::active();
-            std::thread::spawn(move || {
+            crate::background::spawn(move || {
                 crate::i18n::set_active(lang);
                 let _ = tx.send(work());
             });
@@ -290,7 +290,7 @@ impl AppState {
     #[cfg(test)]
     pub fn wait_jobs(&mut self) {
         while self.poll_jobs() {
-            std::thread::sleep(std::time::Duration::from_millis(5));
+            std::thread::sleep(crate::clock::Duration::from_millis(5));
         }
     }
 
@@ -400,7 +400,7 @@ impl AppState {
 /// The Exports tab.
 pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
     if st.poll_jobs() {
-        ui.ctx().request_repaint_after(std::time::Duration::from_millis(100));
+        ui.ctx().request_repaint_after(crate::clock::Duration::from_millis(100));
     }
     ui.horizontal(|ui| {
         let active = st.jobs.active();

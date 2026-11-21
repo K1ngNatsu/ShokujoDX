@@ -288,7 +288,7 @@ impl AppState {
             return;
         };
         let title = crate::i18n::fill("{} hoop template", &[&self.doc.design().name]);
-        let Some(p) = rfd::FileDialog::new()
+        let Some(p) = crate::dialog::FileDialog::new()
             .set_title(tr("Print hoop template (PDF)"))
             .add_filter("PDF", &["pdf"])
             .set_directory(self.dialog_dir())

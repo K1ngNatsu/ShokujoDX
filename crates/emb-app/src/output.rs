@@ -575,7 +575,7 @@ impl AppState {
             .and_then(Path::file_stem)
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_else(|| self.doc.design().name.clone());
-        let Some(path) = rfd::FileDialog::new()
+        let Some(path) = crate::dialog::FileDialog::new()
             .set_title(tr("Export design picture (SVG)"))
             .add_filter(tr("SVG picture"), &["svg"])
             .set_directory(self.dialog_dir())
@@ -600,7 +600,7 @@ impl AppState {
             .and_then(Path::file_stem)
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_else(|| self.doc.design().name.clone());
-        let Some(path) = rfd::FileDialog::new()
+        let Some(path) = crate::dialog::FileDialog::new()
             .set_title(tr("Export for Ink/Stitch"))
             .add_filter(tr("Ink/Stitch design (SVG)"), &["svg"])
             .set_directory(self.dialog_dir())
@@ -707,7 +707,7 @@ impl AppState {
     pub fn batch_output_dialog(&mut self) {
         let mut types = vec![project::FILE_EXTENSION];
         types.extend(emb_formats::READ_EXTENSIONS);
-        let Some(paths) = rfd::FileDialog::new()
+        let Some(paths) = crate::dialog::FileDialog::new()
             .set_title(tr("Batch output: designs"))
             .add_filter(tr("Designs and machine files"), &types)
             .set_directory(self.dialog_dir())
@@ -715,7 +715,7 @@ impl AppState {
         else {
             return;
         };
-        let Some(folder) = rfd::FileDialog::new()
+        let Some(folder) = crate::dialog::FileDialog::new()
             .set_title(tr("Batch output: folder for the files"))
             .set_directory(self.dialog_dir())
             .pick_folder()
@@ -1029,7 +1029,9 @@ fn output_window(ctx: &egui::Context, st: &mut AppState) {
                 ui.horizontal(|ui| {
                     ui.label(dlg.folder.display().to_string());
                     if ui.button(tr("Change…")).clicked()
-                        && let Some(f) = rfd::FileDialog::new().set_directory(&dlg.folder).pick_folder()
+                        && let Some(f) = crate::dialog::FileDialog::new()
+                            .set_directory(&dlg.folder)
+                            .pick_folder()
                     {
                         dlg.folder = f;
                     }
@@ -1108,7 +1110,7 @@ fn preview_window(ctx: &egui::Context, st: &mut AppState) {
                 if ui.button(tr("Save PDF…")).clicked() {
                     let kind = if pv.approval { "approval" } else { "worksheet" };
                     let name = format!("{} {kind}.pdf", st.doc.design().name);
-                    if let Some(path) = rfd::FileDialog::new()
+                    if let Some(path) = crate::dialog::FileDialog::new()
                         .set_file_name(name)
                         .add_filter("PDF", &["pdf"])
                         .set_directory(st.dialog_dir())

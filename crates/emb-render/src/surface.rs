@@ -1254,7 +1254,7 @@ pub fn relay(old: &Laid, strands: &[Strand], pieces: &[Piece]) -> (Laid, Changes
     }));
     // The index of the new lay and the cells of the grid that no change
     // reaches, on a second thread while the stitches are laid.
-    let (new_index, mut grid) = std::thread::scope(|scope| {
+    let (new_index, mut grid) = emb_geom::threads::scope(|scope| {
         let helper = scope.spawn(|| {
             (
                 Index::new(boxes.iter().copied(), b, INDEX_MM),
@@ -2271,7 +2271,7 @@ fn in_parallel_with<T: Send>(threads: usize, count: usize, f: impl Fn(usize) -> 
         return (0..count).map(f).collect();
     }
     let next = AtomicUsize::new(0);
-    let mut made: Vec<(usize, T)> = std::thread::scope(|scope| {
+    let mut made: Vec<(usize, T)> = emb_geom::threads::scope(|scope| {
         let handles: Vec<_> = (0..workers)
             .map(|_| {
                 scope.spawn(|| {
@@ -2732,7 +2732,7 @@ impl Surface {
             return;
         }
         let per = self.tiles.len().div_ceil(workers).max(1);
-        std::thread::scope(|scope| {
+        emb_geom::threads::scope(|scope| {
             for chunk in self.tiles.chunks_mut(per) {
                 scope.spawn(move || work(chunk));
             }

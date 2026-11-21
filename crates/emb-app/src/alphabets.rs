@@ -763,7 +763,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
             }
             None => Ok(String::new()),
         },
-        Act::Import => match rfd::FileDialog::new()
+        Act::Import => match crate::dialog::FileDialog::new()
             .set_title(tr("Import an alphabet"))
             .add_filter(tr("Embroidery and bitmap fonts"), &[FILE_EXTENSION, "bdf", "fon"])
             .set_directory(st.dialog_dir())
@@ -776,7 +776,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
             None => Ok(String::new()),
         },
         Act::Export => match (&sel, sel.as_ref().and_then(|p| p.file_name()).map(|n| n.to_owned())) {
-            (Some(p), Some(name)) => match rfd::FileDialog::new()
+            (Some(p), Some(name)) => match crate::dialog::FileDialog::new()
                 .set_title(tr("Export the alphabet"))
                 .set_file_name(name.to_string_lossy())
                 .set_directory(st.dialog_dir())
