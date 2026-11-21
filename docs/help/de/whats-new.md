@@ -10,7 +10,7 @@ Dieses Thema listet die Änderungen jeder Version, die neueste zuerst.
 **Hilfe > Was ist neu** öffnet es. Nach einem Update hat die Startseite
 einen Link dazu.
 
-## Nach Version 0.3.0
+## Version 0.4.0
 
 **Die Produktansicht.** **Design > Produkt** zeigt das Design auf einem
 Produkt, das wie Stoff aussieht.
@@ -229,6 +229,14 @@ Siehe [Sticharten](stitch-types).
 
 **Neue Versionen.** Das Programm kann Ihnen sagen, wenn eine neue Version
 verfügbar ist. Siehe [Optionen](options).
+
+**Der Stich-Player in der 3D-Ansicht.** Mit der 3D-Garnansicht zeigt der
+Stich-Player die neuen Stiche in der 3D-Ansicht kurz hinter der Nadel,
+ohne ein Aufblitzen der flachen Ansicht, und die Ansicht bleibt schnell,
+nachdem Sie den Schieberegler des Players gezogen haben.
+
+**Ein neues Symbol.** Das Symbol des Programms ist ein violetter Stern in
+einem Stickrahmen, mit einer Nadel und einem Faden.
 
 ## Version 0.3.0
 

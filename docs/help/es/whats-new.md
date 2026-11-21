@@ -10,7 +10,7 @@ Este tema enumera los cambios de cada versión, la más reciente primero.
 **Ayuda > Novedades** lo abre. Después de una actualización, la página
 de inicio tiene un enlace a él.
 
-## Después de la versión 0.3.0
+## Versión 0.4.0
 
 **La vista de producto.** **Diseño > Producto** muestra el diseño sobre
 un producto que parece tela.
@@ -227,6 +227,14 @@ puntadas. Consulte [Tipos de puntada](stitch-types).
 
 **Versiones nuevas.** El programa puede avisarle cuando hay una versión
 nueva disponible. Consulte [Opciones](options).
+
+**El reproductor de puntadas en el aspecto 3D.** Con el aspecto de hilo
+3D, el reproductor de puntadas muestra las puntadas nuevas en el aspecto
+3D justo detrás de la aguja, sin un destello del aspecto plano, y la vista
+sigue rápida después de arrastrar el control deslizante del reproductor.
+
+**Un icono nuevo.** El icono del programa es una estrella morada en un
+bastidor, con una aguja y un hilo.
 
 ## Versión 0.3.0
 

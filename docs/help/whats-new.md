@@ -10,7 +10,7 @@ This topic lists the changes of each version, the newest first.
 **Help > What Is New** opens it. After an update, the start page has a
 link to it.
 
-## After version 0.3.0
+## Version 0.4.0
 
 **The product view.** **Design > Product** shows the design on a product
 that looks like cloth.
@@ -215,6 +215,14 @@ hexagon and an octagon) and another size of its stitches. See
 
 **New versions.** The program can tell you when a new version is
 available. See [Options](options).
+
+**The stitch player in the 3D look.** With the 3D thread look, the stitch
+player shows the new stitches in the 3D look close behind the needle,
+with no flash of the flat look, and the view stays quick after a drag of
+the slider of the player.
+
+**A new icon.** The icon of the program is a purple star in a hoop, with
+a needle and a thread.
 
 ## Version 0.3.0
 

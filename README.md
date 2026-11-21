@@ -183,15 +183,17 @@ first.
 ## Project status
 
 Phases 1 to 14 of the roadmap are done, and their sew-out tests passed on
-the reference machine, a Husqvarna Viking Topaz 20. Phases 16 to 18 (the
-product view, better lettering, designs of other programs and the 3D
-stitch view) are done in software; their tests on fabric and with users
-are open. Also open: tests with new users, and tests on cap frames,
+the reference machine, a Husqvarna Viking Topaz 20. Phases 16 to 18 and
+20 (the product view, better lettering, designs of other programs, the 3D
+stitch view and Japanese lettering) are done in software; their tests on
+fabric and with users are open. Also open: tests with new users, and tests on cap frames,
 cutwork machines and other machines that the owner does not have. Sew-out
 results from **your** machine help a lot:
 see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-The phases and the open tests are in the [roadmap](docs/design/roadmap.md).
+The phases and the open tests are in the [roadmap](docs/design/roadmap.md),
+and all the open work is in one list:
+[open work](docs/design/open-work.md).
 
 ## For developers
 
