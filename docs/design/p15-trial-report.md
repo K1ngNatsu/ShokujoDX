@@ -65,7 +65,11 @@ desktop, each new part is the part of before.
   trial is, the program says it once in its status line (four languages),
   and the settings stay in the storage of the browser (the machine, the
   hoop, the language, the quality of the 3D look), so the first start
-  question comes one time.
+  question comes one time. The page is https://k1ngnatsu.github.io/ShokujoDX/
+  (published 2026-11-21): GitHub Pages sends the program with gzip
+  (38.2 MB), and a new headless browser on the development computer starts
+  it in 3.4 s with the download (`BASE=<address> node tools/web-bench.mjs`
+  measures a published page).
 
 ## Measures
 

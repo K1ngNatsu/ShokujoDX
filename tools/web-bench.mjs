@@ -19,7 +19,8 @@ const BROWSER =
     ? "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
     : "google-chrome");
 const OUT = process.argv[3] ?? "target/web-bench";
-const BASE = "http://localhost:8765/";
+// BASE=<address>: another copy of the page (the test page on GitHub Pages).
+const BASE = process.env.BASE ?? "http://localhost:8765/";
 const PORT = 9333;
 // [name, query, seconds]
 const CASES = [
