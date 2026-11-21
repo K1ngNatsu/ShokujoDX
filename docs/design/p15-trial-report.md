@@ -1,8 +1,9 @@
 # P15, step 1: the browser trial
 
-Date: 2026-11-21 · Branch: `trial/browser` · Status: Report. The owner
-decides on step 2 of P15 (the web version for computers) from it. See
-"P15. Browser version" in `docs/design/roadmap.md`.
+Date: 2026-11-21 · Branch: `trial/browser` · Status: Report, with the
+first changes of step 2 (owner, 2026-11-21: a test page on GitHub Pages
+for tests with friends, and the recommendations below). See "P15.
+Browser version" in `docs/design/roadmap.md`.
 
 ## What the trial is
 
@@ -23,8 +24,9 @@ desktop, each new part is the part of before.
   `export=<format>`, `letter=<text>` and `gl=1` (WebGL2 only).
 - **Files:** File > Open is an upload (a project, a machine file, artwork
   or a picture). Save gives the project as a download, and Export Machine
-  File gives the machine file as a download. The other file dialogs (about
-  37) show a notice that the command needs the desktop program.
+  File gives the machine file as a download. The other file dialogs (about 45
+  places in the code) show a notice that the command needs the desktop
+  program.
 - **Code** (all in the branch):
   - `emb_geom::threads::scope`: `std::thread::scope` on the desktop; in the
     browser each job runs when it is spawned (six places in the engine,
@@ -57,6 +59,13 @@ desktop, each new part is the part of before.
   browser is the same, byte for byte, as the file of `emb-cli convert` on
   the desktop (ADR 0003).
 - WebGPU and WebGL2 (`?gl=1`, as in a browser with no WebGPU) both draw.
+- **The test page** (owner, 2026-11-21): the workflow
+  `.github/workflows/web-trial.yml` builds the page from the branch
+  `trial/browser` and publishes it on GitHub Pages. The page says what the
+  trial is, the program says it once in its status line (four languages),
+  and the settings stay in the storage of the browser (the machine, the
+  hoop, the language, the quality of the 3D look), so the first start
+  question comes one time.
 
 ## Measures
 
@@ -103,6 +112,34 @@ the numbers below are the work of the program.
   WebGL2 uses about 40 % more. Safari on an iPad stops a page at about
   1 to 1.5 GB (not measured here).
 
+## After the first measures (2026-11-21)
+
+- **The tiles of the 3D look are made a little in each frame.** With no
+  threads, the tile cache made all tiles of a view in one frame. Now a
+  frame uses at most 30 ms for tiles (`TileCache::frame_budget`; always
+  one tile, so the tiles come), and the next frames make the others. The
+  desktop and the tests have no budget, as before. The longest frame of
+  the first 3D view of 200,000 stitches: 6.2 s to 1.0 s (Best) and 3.5 s
+  to 0.54 s (Good). The rest is the lay of the surface, which runs in one
+  piece (about 0.5 s for 200,000 stitches, much less for a design of
+  20,000).
+- **The quality of the 3D look** comes from the short measure of the
+  first start (ADR 0130), as on the desktop: on the development computer
+  it chooses Good. With the budget above, Good and Best do not stop the
+  page for seconds, so the browser does not start on Fast.
+- **`wasm-opt`** (`tools/build-web.py --opt`, binaryen 0.133 from
+  crates.io): the program 70.1 MB to 59.8 MB, but the download with gzip
+  stays 37 MB (the optimized code compresses less), and the frames are not
+  quicker. The page is built with no `--opt`.
+- **A profile of a still frame** with 200,000 stitches (49 ms in the flat
+  look): about 25 % strokes the outline of each stitch object (its outline
+  is all its stitches, 53,000 points), about 20 % uploads the vertex
+  buffers to the graphics card, about 14 % grows memory, and 3 % makes the
+  mesh of the stitches. The next optimizations for large designs: no
+  outline of a stitch object while its stitches show (a change of the
+  desktop view too, so the owner decides), and a mesh of the stitches
+  that is kept between frames when the view does not change.
+
 ## Faults that the trial found (fixed in the branch)
 
 In a browser, these calls stop the program: `std::time::Instant::now`
@@ -118,8 +155,8 @@ wizard).
 - Not in the trial: the file dialogs other than Open, Save and Export
   (artwork import, backdrop, fonts and alphabets, assets and packages,
   thread charts, Output Design, the pictures and the PDF sheets, Send to
-  USB), the settings, My Hoops and My Machines (not kept: no storage
-  layer), the backups, the design library, the fonts of the computer
+  USB), My Hoops and My Machines (not kept: the storage layer has only the
+  settings), the backups, the design library, the fonts of the computer
   (so no Japanese lettering: the Japanese font package is added with a
   dialog), the update check and the thumbnails.
 - Not tested: Firefox, Safari, Chrome on another computer, a slow
@@ -129,19 +166,21 @@ wizard).
 
 The plan calls step 2 M. After the trial it is L to XL:
 
-1. **Work off the screen thread.** Without it, the 3D look stops the page
-   for seconds, and kanji stop typing. Threads of WebAssembly need a
+1. **Work off the screen thread.** The tiles are made in steps now (see
+   above); the lay of the surface and the routes of new kanji still stop
+   the page for up to about a second. Threads of WebAssembly need a
    shared memory, which needs the page to be cross-origin isolated
    (GitHub Pages cannot set it; a service worker can), and a standard
    library built with atomics, which today needs a nightly compiler.
    The other way is to make the heavy jobs (the lay, the tiles, the
    routes) in steps across frames, or in a second copy of the program in
    a web worker that gets its inputs as messages.
-2. **A storage layer** for about 300 file calls: the settings, My Hoops,
-   My Machines, the backups, the fonts and the asset packages in the
-   storage of the browser.
-3. **The 37 file dialogs** as uploads and downloads (or the File System
-   Access API, which only Chrome and Edge have).
+2. **A storage layer** for about 300 file calls: My Hoops, My Machines,
+   the backups, the fonts and the asset packages in the storage of the
+   browser (the settings are there already).
+3. **The other file dialogs** (about 45 places in the code) as uploads
+   and downloads (or the File System Access API, which only Chrome and
+   Edge have).
 4. **A smaller first visit:** the fonts load when a design needs them, and
    `wasm-opt` makes the code smaller.
 5. **Memory:** a limit for large designs, so a tablet does not stop the

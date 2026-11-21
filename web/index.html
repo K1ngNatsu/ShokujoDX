@@ -9,13 +9,16 @@
   html, body { margin: 0; height: 100%; overflow: hidden; background: #1e1f22; }
   canvas { position: absolute; inset: 0; width: 100%; height: 100%; outline: none; }
   #loading { position: absolute; inset: 0; display: flex; align-items: center;
-    justify-content: center; color: #ccc; font: 16px sans-serif; text-align: center;
+    justify-content: center; color: #ccc; font: 16px/1.6 sans-serif; text-align: center;
     pointer-events: none; padding: 16px; }
 </style>
 </head>
 <body>
 <canvas id="shokujodx"></canvas>
-<div id="loading">ShokujoDX loads (a trial of the browser version)…</div>
+<div id="loading">ShokujoDX is loading: a trial of the program in a browser.<br>
+The first visit downloads about 35 MB; then the browser keeps it.<br>
+A computer with Chrome, Edge, Firefox or Safari works best.</div>
+<noscript>ShokujoDX needs JavaScript and WebAssembly.</noscript>
 <script type="module">
   import init from "./emb-app.js";
   const loading = document.getElementById("loading");

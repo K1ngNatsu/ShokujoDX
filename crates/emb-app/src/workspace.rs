@@ -684,13 +684,21 @@ pub fn settings_path() -> Option<std::path::PathBuf> {
 impl Settings {
     /// Reads the settings file. A missing or bad file gives the defaults.
     pub fn load() -> Settings {
-        settings_path()
-            .and_then(|p| std::fs::read_to_string(p).ok())
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default()
+        // The browser keeps the settings in the storage of the page.
+        #[cfg(target_arch = "wasm32")]
+        let text = crate::web::stored(crate::web::SETTINGS_KEY);
+        #[cfg(not(target_arch = "wasm32"))]
+        let text = settings_path().and_then(|p| std::fs::read_to_string(p).ok());
+        text.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
     }
 
     pub fn save(&self) -> Result<(), String> {
+        #[cfg(target_arch = "wasm32")]
+        {
+            let s = serde_json::to_string(self).map_err(|e| e.to_string())?;
+            return crate::web::store(crate::web::SETTINGS_KEY, &s);
+        }
+        #[cfg_attr(target_arch = "wasm32", allow(unreachable_code))]
         let p = settings_path().ok_or("no configuration folder")?;
         if let Some(dir) = p.parent() {
             std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;

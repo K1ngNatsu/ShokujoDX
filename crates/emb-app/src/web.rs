@@ -53,6 +53,27 @@ pub fn start() {
     });
 }
 
+/// The key of the settings in the storage of the page.
+pub const SETTINGS_KEY: &str = "shokujodx-settings";
+
+/// The storage of the page (it stays on this computer, in this browser).
+fn storage() -> Option<web_sys::Storage> {
+    web_sys::window()?.local_storage().ok()?
+}
+
+/// The text under `key` in the storage of the page.
+pub fn stored(key: &str) -> Option<String> {
+    storage()?.get_item(key).ok()?
+}
+
+/// Keeps `text` under `key` in the storage of the page.
+pub fn store(key: &str, text: &str) -> Result<(), String> {
+    storage()
+        .ok_or("the browser keeps no data for this page")?
+        .set_item(key, text)
+        .map_err(|e| format!("{e:?}"))
+}
+
 /// A command that needs the desktop: the next frame shows a notice.
 pub fn not_in_the_browser() {
     if let Ok(mut n) = NOTICES.lock() {
@@ -161,8 +182,13 @@ fn fetch_as_upload(url: String) {
 /// asks for (a download).
 static EXPORT_AFTER_OPEN: Mutex<Option<String>> = Mutex::new(None);
 
-/// The first frame: the measures that the address asks for.
+/// The first frame: what the trial is, and the measures that the address
+/// asks for.
 fn first_frame(st: &mut AppState) {
+    st.message = crate::i18n::tr(
+        "This is a trial of ShokujoDX in a browser. File > Open uploads a design or a machine file, and Save and Export download a file. Your designs stay on your computer.",
+    )
+    .to_string();
     let mut load_ms = 0.0;
     if let Some(url) = param("open") {
         st.ask_machine = None;

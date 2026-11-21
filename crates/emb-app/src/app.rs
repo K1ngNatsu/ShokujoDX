@@ -524,6 +524,7 @@ impl EmbApp {
         // frame.
         if cfg!(target_arch = "wasm32") {
             state.stitch_tiles.sync = true;
+            state.stitch_tiles.frame_budget = Some(crate::clock::Duration::from_millis(30));
         }
         state.settings = crate::workspace::Settings::load();
         // The View options of the last session, and the user's machine and

@@ -561,8 +561,16 @@ pub struct TileCache {
     queued_parts: HashSet<(Key, [u32; 4])>,
     queued_relights: HashSet<Key>,
     /// Make the lays and the tiles in the frame that asks for them, with no
-    /// threads (the tests).
+    /// threads (the tests, the browser).
     pub sync: bool,
+    /// With `sync`: the time that a frame can use to make tiles. The next
+    /// frame makes the others, so the page does not stop (the browser trial
+    /// of P15). `None`: all tiles in the frame that asks for them (the
+    /// tests).
+    pub frame_budget: Option<Duration>,
+    /// The frame and the start of the budget of that frame.
+    budget_frame: u64,
+    budget_start: Option<Instant>,
     pub stats: Stats,
 }
 
@@ -584,6 +592,9 @@ impl Default for TileCache {
             queued_parts: HashSet::new(),
             queued_relights: HashSet::new(),
             sync: false,
+            frame_budget: None,
+            budget_frame: u64::MAX,
+            budget_start: None,
             stats: Stats::default(),
         }
     }
@@ -597,6 +608,21 @@ impl Drop for TileCache {
 }
 
 impl TileCache {
+    /// With no threads and a budget for each frame: `true` while frame
+    /// `frame` can make one more tile. The first tile of a frame is always
+    /// made, so the tiles come.
+    fn may_make(&mut self, frame: u64) -> bool {
+        let Some(budget) = self.frame_budget else {
+            return true;
+        };
+        if self.budget_frame != frame {
+            self.budget_frame = frame;
+            self.budget_start = Some(Instant::now());
+            return true;
+        }
+        self.budget_start.is_some_and(|t| t.elapsed() < budget)
+    }
+
     /// The memory of the tiles now, bytes.
     pub fn bytes(&self) -> usize {
         self.bytes
@@ -1092,6 +1118,10 @@ impl TileCache {
         }
         self.shared.wake.notify_all();
         for job in jobs {
+            if !self.may_make(frame) {
+                ctx.request_repaint();
+                break;
+            }
             let t0 = Instant::now();
             let made = make(&job);
             let done = Done {
@@ -1199,8 +1229,13 @@ impl TileCache {
             }
         }
         self.shared.wake.notify_all();
-        // With no threads: here, now.
+        // With no threads: here, now (in the browser, as many as the budget
+        // of the frame lets; the next frame makes the others).
         for job in jobs {
+            if !self.may_make(frame) {
+                ctx.request_repaint();
+                break;
+            }
             let t0 = Instant::now();
             let made = make(&job);
             let done = Done {
