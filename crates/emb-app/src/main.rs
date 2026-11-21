@@ -69,6 +69,8 @@ mod overview;
 #[cfg(test)]
 mod p17_probe;
 #[cfg(test)]
+mod p20_probe;
+#[cfg(test)]
 mod packaging;
 mod palette;
 mod panels;

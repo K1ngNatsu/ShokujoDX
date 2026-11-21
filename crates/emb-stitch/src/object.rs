@@ -189,8 +189,27 @@ pub fn too_large(obj: &DesignObject) -> bool {
         ObjectKind::Satin { params, .. } => serde_json::to_value(params),
         ObjectKind::Fill { params, .. } => serde_json::to_value(params),
         ObjectKind::Applique { params, .. } => serde_json::to_value(params),
-        // The settings of the lettering and of each letter.
-        ObjectKind::Lettering(l) => serde_json::to_value(l),
+        // The settings of the lettering and of each letter, but not the
+        // sizes that the letters have already: the height, the spacing, the
+        // kerning and the underline are in the outline of the letters, and
+        // the trim length is not a size. With them, lettering 1 m high was
+        // refused when it was wider than 1 m (the audit of P20).
+        ObjectKind::Lettering(l) => serde_json::to_value(l).map(|mut v| {
+            if let Some(m) = v.as_object_mut() {
+                for key in ["height_mm", "letter_spacing_mm", "trim_over_mm", "underline"] {
+                    m.remove(key);
+                }
+                for edit in m.get_mut("edits").and_then(|e| e.as_array_mut()).into_iter().flatten() {
+                    if let Some(e) = edit.as_object_mut() {
+                        e.remove("kern_mm");
+                        if let Some(shape) = e.get_mut("shape").and_then(|s| s.as_object_mut()) {
+                            shape.remove("height_mm");
+                        }
+                    }
+                }
+            }
+            v
+        }),
         _ => Ok(serde_json::Value::Null),
     };
     let mut l = Largest::default();
@@ -1569,6 +1588,34 @@ mod tests {
         assert_eq!(fill(1e9, 0.2), Err(StitchError::TooLarge), "a wrong coordinate");
         assert_eq!(fill(20.0, 1e9), Err(StitchError::TooLarge), "a wrong pull compensation");
         assert_eq!(fill(f64::NAN, 0.2), Err(StitchError::TooLarge));
+    }
+
+    #[test]
+    fn lettering_is_measured_by_its_letters() {
+        // The audit of P20: two letters 1 m high (2.2 m wide) were refused,
+        // because the height counted as a margin round the letters.
+        let lettering = |height: f64, width: f64, pull: f64| {
+            let mut l = emb_model::Lettering::new("AB", emb_model::FontRef::new("Lato", "Bold"), height, Point::ZERO);
+            let params = FillParams {
+                pull_compensation_mm: pull,
+                ..FillParams::default()
+            };
+            l.letters.push(emb_model::Letter {
+                text: "AB".into(),
+                parts: vec![ObjectKind::Fill {
+                    outer: Path::rect(emb_geom::BBox::new(Point::ZERO, Point::new(width, height))),
+                    holes: vec![],
+                    params,
+                }],
+                ..Default::default()
+            });
+            let mut d = Design::new("t");
+            let id = d.add_object(ThreadId(0), ObjectKind::Lettering(Box::new(l)));
+            too_large(d.object(id).unwrap())
+        };
+        assert!(!lettering(1000.0, 2200.0, 0.2));
+        assert!(lettering(1000.0, 3100.0, 0.2), "larger than 3 m");
+        assert!(lettering(20.0, 50.0, 1e9), "a wrong pull compensation of a letter");
     }
 
     #[test]

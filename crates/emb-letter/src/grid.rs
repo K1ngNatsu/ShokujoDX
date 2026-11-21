@@ -20,11 +20,41 @@ pub struct Grid {
     pub inside: Vec<bool>,
 }
 
+/// The most cells on each side of a grid. A glyph has about 350 cells on
+/// its longer side (200 cells for the capital height); a glyph more than
+/// ten times its capital height gets larger cells. A grid with no limit
+/// over a glyph of a damaged font (14,000 times its capital height) asked
+/// for 1.6 TB of memory (the audit of P20).
+pub const MAX_SIDE: usize = 2048;
+
 impl Grid {
+    /// The size of the cells of a grid over `bounds`: `cell`, or larger
+    /// cells if the grid has more than [`MAX_SIDE`] cells on a side. A
+    /// grid takes this size: use it, not `cell`.
+    pub fn cell_for(bounds: BBox, cell: f64) -> f64 {
+        let side = bounds.width().max(bounds.height());
+        if side.is_finite() {
+            cell.max(side / MAX_SIDE as f64)
+        } else {
+            cell
+        }
+    }
+
     /// An empty grid over `bounds` with `margin` empty cells on each side.
+    /// The cells have the size [`Grid::cell_for`]; bounds that are not
+    /// real numbers give a grid of one cell.
     pub fn new(bounds: BBox, cell: f64, margin: usize) -> Grid {
-        let w = (bounds.width() / cell).ceil() as usize + 2 * margin + 1;
-        let h = (bounds.height() / cell).ceil() as usize + 2 * margin + 1;
+        let cell = Grid::cell_for(bounds, cell);
+        let cells = |size: f64| {
+            let n = (size / cell).ceil();
+            if n.is_finite() && n > 0.0 {
+                (n as usize).min(MAX_SIDE)
+            } else {
+                0
+            }
+        };
+        let w = cells(bounds.width()) + 2 * margin + 1;
+        let h = cells(bounds.height()) + 2 * margin + 1;
         let m = margin as f64 * cell;
         Grid {
             w,
@@ -282,6 +312,22 @@ pub fn parts(g: &Grid) -> (Vec<usize>, usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_grid_has_at_most_max_side_cells_on_a_side() {
+        // The audit of P20: a glyph 14,000 times its capital height.
+        let huge = BBox::new(Point::new(0.0, 0.0), Point::new(1e7, 2e6));
+        let g = Grid::new(huge, 3.5, 3);
+        assert!(g.w <= MAX_SIDE + 7 && g.h <= MAX_SIDE + 7, "{} x {}", g.w, g.h);
+        assert_eq!(g.cell, Grid::cell_for(huge, 3.5));
+        // A glyph of normal size keeps its cells.
+        let glyph = BBox::new(Point::new(0.0, 0.0), Point::new(900.0, 1000.0));
+        assert_eq!(Grid::cell_for(glyph, 3.5), 3.5);
+        // Bounds that are not real numbers.
+        let bad = BBox::new(Point::new(0.0, 0.0), Point::new(f64::INFINITY, f64::NAN));
+        let g = Grid::new(bad, 3.5, 2);
+        assert_eq!((g.w, g.h), (5, 5));
+    }
 
     fn rect(x0: f64, y0: f64, x1: f64, y1: f64) -> Vec<Point> {
         vec![

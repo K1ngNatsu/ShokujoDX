@@ -101,3 +101,7 @@ letters each time, with routes and a quality score (ADR 0113, 0115).
 - The test `tests/japanese_font.rs` converts the reference set of the test
   font: no fill letters, the range to 300 mm, a score of 65 or more with
   the Japanese characters, the header of the file.
+- The audit of P20 (2026-11-20) found that the route left out parts of
+  letters with 32 to 64 parts (ADR 0144). The two fonts were made again:
+  in Noto Sans JP, 醸 had no stitches and 鬱 had 36 of its 56 columns;
+  Zen Maru Gothic had no such letter. The scores stay 89 and 88.

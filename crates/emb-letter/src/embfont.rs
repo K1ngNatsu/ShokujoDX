@@ -290,9 +290,8 @@ impl EmbFont {
         if h.version > VERSION {
             return Err(format!("{}: {}", path.display(), EmbFontError::Version(h.version)));
         }
-        if h.family.trim().is_empty() {
-            return Err(format!("{}: {}", path.display(), EmbFontError::Format));
-        }
+        // The same rules as `load` for these fields (the audit of P20: a
+        // header with a family of spaces was refused, and the font read).
         Ok(h)
     }
 

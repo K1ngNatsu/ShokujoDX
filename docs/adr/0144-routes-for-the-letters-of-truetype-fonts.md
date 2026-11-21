@@ -66,3 +66,10 @@ has many columns, more so since the crossings are cut (ADR 0143).
 - The bundled embroidery fonts get the beam search when they are made again
   (letters with more than 8 parts, for example in a font with many
   accented capitals).
+- The audit of P20 (2026-11-20): the route kept the sets of parts as the
+  bits of a `u32`, and the beam search of this ADR takes letters of up to
+  64 parts. The route of a letter of 33 to 64 parts left parts out (in a
+  release build; a debug build stops with an overflow). The sets are the
+  bits of a `u64` now (`route::MOST_PARTS` is at most 64). The route
+  thread of a font goes on after a fault in the route of one letter: that
+  letter keeps no route.

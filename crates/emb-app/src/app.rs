@@ -868,6 +868,7 @@ impl AppState {
         if let Some(label) = self.doc.undo() {
             self.message = crate::i18n::fill("Undo: {}", &[&label]);
             self.fix_selection();
+            self.fonts.recheck_routes();
         }
     }
 
@@ -875,6 +876,7 @@ impl AppState {
         if let Some(label) = self.doc.redo() {
             self.message = crate::i18n::fill("Redo: {}", &[&label]);
             self.fix_selection();
+            self.fonts.recheck_routes();
         }
     }
 

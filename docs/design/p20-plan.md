@@ -3,7 +3,7 @@
 Date: 2026-11-20 · Status: Accepted (owner, 2026-11-20: before v0.4.0).
 Milestones 1, 2, 4 and 5 are done (ADR 0141, 0142, 0144, 0145).
 Milestones 3 and 6 are made (ADR 0143, 0146) and wait for the sew-out of
-the owner.
+the owner. Audit: "Audit of P20" in `docs/design/roadmap.md`.
 
 ## Goal
 
@@ -293,7 +293,9 @@ of its satin columns. The score measures the reference set too. The package
 jōyō kanji. The app reads a large embroidery font only when it is used.
 The sew-out kit has a sheet of each font at 20 mm. Open: the あ of Zen
 Maru Gothic has a gap in its inner stroke (92.6 % covered; the stroke
-finder does not find it).
+finder does not find it). The audit of P20 made both fonts again: the
+route had left out parts of letters with 32 to 64 parts (醸 had no
+stitches, 鬱 had 36 of its 56 columns).
 
 ## Order
 

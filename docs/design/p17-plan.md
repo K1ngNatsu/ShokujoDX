@@ -1,6 +1,6 @@
 # Plan: polish and lettering (phase P17)
 
-Date: 2026-11-18 · Status: Accepted (owner, 2026-11-18). Milestones 1 (ADR 0109), 2 (ADR 0110), 4 (ADR 0112), 5 (ADR 0113), 6 (ADR 0114) and 7 (ADR 0115) done in software; Milestone 3 is set aside by the owner (2026-11-18). The owner checks the exit test of Milestone 1 with the next release, sews the test sheets of Milestones 4 and 5, and sews the three words of Milestone 6.
+Date: 2026-11-18 · Status: Accepted (owner, 2026-11-18). Milestones 1 (ADR 0109), 2 (ADR 0110), 4 (ADR 0112), 5 (ADR 0113), 6 (ADR 0114), 7 (ADR 0115) and 8 (ADR 0118) done in software; Milestone 3 is set aside by the owner (2026-11-18). The owner checks the exit test of Milestone 1 with the next release, sews the test sheets of Milestones 4 and 5, and sews the three words of Milestone 6.
 
 ## Goal
 

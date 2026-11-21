@@ -1,6 +1,6 @@
 # Plan: roadmap phase P10 (polish and assistance)
 
-Date: 2026-10-24 · Status: Accepted. Milestones 1 to 6 done in software; Milestone 7 done in software (German, Spanish and Japanese); Milestone 8 done in software (the first CI run and the exit test are open). Milestone 9 (assistant) is benched (owner decision).
+Date: 2026-10-24 · Status: Accepted. Milestones 1 to 6 done in software; Milestone 7 done in software (German, Spanish and Japanese); Milestone 8 done (CI builds the packages, and three releases are made); its exit test (the 15-minute patch test with users of each system) is open. Milestone 9 (assistant) is benched (owner decision).
 
 ## Goal
 

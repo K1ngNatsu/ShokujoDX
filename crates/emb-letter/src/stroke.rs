@@ -1128,7 +1128,7 @@ pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
     let Some(bb) = BBox::from_points(rings.iter().flatten().copied()) else {
         return Strokes::default();
     };
-    let cell = (cap_height / GRID_CELLS).max(1e-6);
+    let cell = Grid::cell_for(bb, (cap_height / GRID_CELLS).max(1e-6));
     let mut g = Grid::new(bb, cell, 3);
     g.fill(rings);
     let inside_count = g.inside.iter().filter(|&&v| v).count();

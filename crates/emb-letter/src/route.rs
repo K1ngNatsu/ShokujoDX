@@ -37,11 +37,13 @@ const EDGE: f64 = 0.012;
 const SNAP: f64 = 0.12;
 /// The stitch length of a travel run, in mm (at each size).
 pub const RUN_STITCH_MM: f64 = 1.5;
-/// Letters with more parts than this get no search of all orders: each
-/// time the nearest part that needs no trim sews next.
+/// Letters with more parts than this get no search of all orders, but a
+/// beam search ([`BEAM`]).
 const MAX_PARTS: usize = 8;
-/// Letters with more parts than this keep their order.
+/// Letters with more parts than this keep their order. The sets of parts
+/// are the bits of a `u64`.
 const MOST_PARTS: usize = 64;
+const _: () = assert!(MOST_PARTS <= 64);
 /// The number of routes that the search for letters with more than
 /// [`MAX_PARTS`] parts keeps at each step.
 const BEAM: usize = 12;
@@ -226,17 +228,17 @@ struct Router {
     pieces: Vec<Piece>,
     cap: f64,
     /// The parts near each edge (see [`Router::near`]).
-    near: RefCell<HashMap<EdgeKey, u32>>,
+    near: RefCell<HashMap<EdgeKey, u64>>,
     /// The joins of each edge for each set of the parts near it that are
     /// not sewn.
-    joins: RefCell<HashMap<(EdgeKey, u32), Rc<Joins>>>,
-    links: HashMap<(usize, usize, usize, u32), Link>,
+    joins: RefCell<HashMap<(EdgeKey, u64), Rc<Joins>>>,
+    links: HashMap<(usize, usize, usize, u64), Link>,
 }
 
 impl Router {
     fn new(parts: &[ObjectKind], cap: f64) -> Option<Router> {
         let bounds = parts.iter().filter_map(|p| p.control_bbox()).reduce(BBox::union)?;
-        let cell = cap / CELLS;
+        let cell = Grid::cell_for(bounds, cap / CELLS);
         let grid = Grid::new(bounds, cell, 2);
         let pieces = parts
             .iter()
@@ -362,7 +364,7 @@ impl Router {
     }
 
     /// The cell is in a part of `unsewn`.
-    fn covered(&self, idx: usize, unsewn: u32) -> bool {
+    fn covered(&self, idx: usize, unsewn: u64) -> bool {
         self.pieces
             .iter()
             .enumerate()
@@ -371,7 +373,7 @@ impl Router {
 
     /// The middle of the cell in a part of `unsewn` that is nearest `p`,
     /// within [`SNAP`].
-    fn nearest_covered(&self, p: Point, unsewn: u32) -> Option<Point> {
+    fn nearest_covered(&self, p: Point, unsewn: u64) -> Option<Point> {
         let r = SNAP * self.cap;
         let n = (r / self.grid.cell).ceil() as isize;
         let (ci, cj) = self.grid.cell_of(p)?;
@@ -396,7 +398,7 @@ impl Router {
     /// A run can go through the cell: it is far enough from the edge of a
     /// part of `unsewn`. Returns how near the middle of that part it is
     /// (0: at the limit, 1: in the middle).
-    fn passable(&self, idx: usize, unsewn: u32) -> Option<f64> {
+    fn passable(&self, idx: usize, unsewn: u64) -> Option<f64> {
         self.pieces
             .iter()
             .enumerate()
@@ -407,7 +409,7 @@ impl Router {
 
     /// The straight line from `a` to `b` is under the parts of `unsewn`
     /// (but for its first and last bit).
-    fn hidden(&self, a: Point, b: Point, unsewn: u32) -> bool {
+    fn hidden(&self, a: Point, b: Point, unsewn: u64) -> bool {
         let free = NO_RUN * self.cap;
         let steps = (a.distance(b) / (0.5 * self.grid.cell)).ceil().max(1.0) as usize;
         (0..=steps).map(|i| a.lerp(b, i as f64 / steps as f64)).all(|p| {
@@ -423,7 +425,7 @@ impl Router {
     /// The passable cells that a point of the edge `e` can join, each with
     /// the length of the join and the point of the edge: the cells within
     /// [`SNAP`] with a hidden line to the point.
-    fn joins(&self, e: Edge, unsewn: u32) -> Rc<Joins> {
+    fn joins(&self, e: Edge, unsewn: u64) -> Rc<Joins> {
         // Only the parts near the edge change its joins.
         let key = (edge_key(e), unsewn & self.near(e));
         if let Some(j) = self.joins.borrow().get(&key) {
@@ -444,14 +446,14 @@ impl Router {
 
     /// The parts with a cell within [`SNAP`] of a point of the edge `e`:
     /// only these can hide a join of the edge.
-    fn near(&self, e: Edge) -> u32 {
+    fn near(&self, e: Edge) -> u64 {
         let key = edge_key(e);
         if let Some(n) = self.near.borrow().get(&key) {
             return *n;
         }
         let r = SNAP * self.cap;
         let n = (r / self.grid.cell).ceil() as isize + 1;
-        let mut near = 0u32;
+        let mut near = 0u64;
         for p in along(e) {
             let Some((ci, cj)) = self.grid.cell_of(p) else { continue };
             for dj in -n..=n {
@@ -473,7 +475,7 @@ impl Router {
         near
     }
 
-    fn joins_of(&self, p: Point, unsewn: u32) -> Vec<(usize, f64)> {
+    fn joins_of(&self, p: Point, unsewn: u64) -> Vec<(usize, f64)> {
         let r = SNAP * self.cap;
         let n = (r / self.grid.cell).ceil() as isize;
         let Some((ci, cj)) = self.grid.cell_of(p) else {
@@ -500,7 +502,7 @@ impl Router {
     /// The connection from the edge `from` to the edge `to` while the
     /// parts of `unsewn` (the part that starts at `to` with them) are not
     /// sewn.
-    fn link(&self, from: Edge, to: Edge, unsewn: u32) -> Link {
+    fn link(&self, from: Edge, to: Edge, unsewn: u64) -> Link {
         let (ps, qs) = (along(from), along(to));
         let pairs = || ps.iter().flat_map(|p| qs.iter().map(move |q| (*p, *q)));
         let gap = pairs().map(|(p, q)| p.distance(q)).fold(f64::MAX, f64::min);
@@ -599,7 +601,7 @@ impl Router {
 
     /// Fewer points for the run `pts`: a point goes if the line between
     /// its neighbors stays in the passable cells.
-    fn simplify(&self, pts: &[Point], unsewn: u32) -> Vec<Point> {
+    fn simplify(&self, pts: &[Point], unsewn: u64) -> Vec<Point> {
         let clear = |a: Point, b: Point| {
             let steps = (a.distance(b) / (0.5 * self.grid.cell)).ceil().max(1.0) as usize;
             (0..=steps).map(|i| a.lerp(b, i as f64 / steps as f64)).all(|p| {
@@ -639,11 +641,11 @@ impl Router {
     /// time the nearest part with no trim sews next (the route before) used
     /// up the parts that would hide the runs later, so kanji had many
     /// trims.
-    fn beam(&self, modes: &[Mode], all: u32, entry: Point) -> (Vec<usize>, usize) {
+    fn beam(&self, modes: &[Mode], all: u64, entry: Point) -> (Vec<usize>, usize) {
         #[derive(Clone)]
         struct State {
             order: Vec<usize>,
-            sewn: u32,
+            sewn: u64,
             trims: usize,
             travel: f64,
             at: Option<(Point, Edge)>,
@@ -694,7 +696,7 @@ impl Router {
         beam.into_iter().next().map_or((Vec::new(), 0), |s| (s.order, s.trims))
     }
 
-    fn link_of(&mut self, from_key: usize, from: Edge, to: Mode, unsewn: u32) -> Link {
+    fn link_of(&mut self, from_key: usize, from: Edge, to: Mode, unsewn: u64) -> Link {
         let key = (from_key, to.0, usize::from(to.1), unsewn);
         if let Some(l) = self.links.get(&key) {
             return l.clone();
@@ -740,7 +742,11 @@ pub fn route(letter: &EmbLetter, cap_mm: f64) -> (EmbLetter, Routed) {
         return keep(n - 1);
     }
     let modes = r.modes();
-    let all: u32 = (1 << n) - 1;
+    // The sets of parts are bits of a u64 (MOST_PARTS is 64 at most). With
+    // a u32, the parts after the 32nd were the same bits as the first ones,
+    // and the route of a letter of 33 to 64 parts left parts out (the audit
+    // of P20).
+    let all: u64 = if n >= 64 { u64::MAX } else { (1 << n) - 1 };
     // The left end of the baseline: where the first part starts if it has
     // no ends.
     let entry = Point::new(r.grid.origin.x, 0.0);
@@ -783,7 +789,7 @@ pub fn route(letter: &EmbLetter, cap_mm: f64) -> (EmbLetter, Routed) {
                 }
                 let from = r.end(modes[i], s0);
                 let from_edge = r.end_edge(modes[i], s0);
-                let unsewn = all & !(mask as u32);
+                let unsewn = all & !(mask as u64);
                 for (j, m) in modes.iter().enumerate() {
                     if mask & (1 << m.0) != 0 {
                         continue;
@@ -846,7 +852,7 @@ pub fn route(letter: &EmbLetter, cap_mm: f64) -> (EmbLetter, Routed) {
     let mut parts = Vec::new();
     let mut tuning = Vec::new();
     let mut runs = 0;
-    let mut sewn: u32 = 0;
+    let mut sewn: u64 = 0;
     let mut needle: Option<(Point, Edge)> = lead.map(|p| (p, (p, p)));
     for &j in &order {
         let m = modes[j];
@@ -1105,6 +1111,28 @@ mod tests {
             column((3.0, -12.5), (13.0, -12.5), 4.0),
             column((3.0, -2.0), (15.0, -2.0), 4.0),
         ])
+    }
+
+    #[test]
+    fn a_letter_of_many_parts_keeps_all_its_parts() {
+        // The audit of P20: the route of a letter of 33 to 64 parts left
+        // parts out (the sets of parts were the bits of a u32). A comb of
+        // 40 teeth on a bar: 41 columns.
+        let mut parts: Vec<ObjectKind> = (0..40)
+            .map(|i| {
+                let x = 1.0 + i as f64 * 1.5;
+                column((x, -1.0), (x, -20.0), 0.8)
+            })
+            .collect();
+        parts.push(column((0.0, -20.5), (61.0, -20.5), 1.5));
+        let before = letter(parts);
+        let (after, _) = route(&before, 25.0);
+        let columns = after
+            .parts
+            .iter()
+            .filter(|p| matches!(p, ObjectKind::Satin { .. }))
+            .count();
+        assert_eq!(columns, 41);
     }
 
     #[test]

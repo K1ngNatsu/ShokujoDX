@@ -46,7 +46,7 @@ Sizes are relative effort: S (days), M (one to two weeks), L (a month), XL (seve
 | 17. Polish and lettering | Accepted (owner, 2026-11-18); Milestones 1 (update check, ADR 0109), 2 (pictures of the windows, ADR 0110), 4 (font test sheet and letter corrections, ADR 0112), 5 (ten tuned fonts, ADR 0113), 6 (text shaping, ADR 0114) and 7 (quality score of the fonts, 55 fonts in the program and 68 in font packages, ADR 0115; then pen strokes in the stroke finder and routes for all fonts, ADR 0116, and ten fill fonts for large text, ADR 0117) and 8 (content families: 71 motifs, 48 split patterns, 39 stamps, 50 borders and 45 clipart items, ADR 0118) done in software, Milestone 3 set aside by the owner: eight milestones (update check, pictures of the windows, tests on an industrial machine, font test sheet and letter corrections, ten tuned fonts, text shaping, more fonts with a quality score, content families). See `docs/design/p17-plan.md`. |
 | 18. Designs from other programs, and the 3D stitch view | First part: accepted (owner, 2026-11-18), started 2026-11-19, Milestones 1 to 3 (the parts of a stitch file; runs and satin columns; fills) done (ADR 0131, ADR 0132, ADR 0133), Milestone 4 (Recognize Objects) done except the sew-out of the owner (ADR 0134), Milestone 5 (read Ink/Stitch files) done except the files of testers (ADR 0135), Milestone 6 (write Ink/Stitch files and read its fonts) done except the test in Ink/Stitch and the bundled fonts (ADR 0136), Milestone 7 (outlines with a stitch file) done except the test of the owner (ADR 0137), Milestone 8 (EPS files, and a message for CDR files; changed by the owner on 2026-11-20 from import helpers) done except the files of testers (ADR 0138): eight milestones (the parts of a stitch file, runs and satin columns, fills, Recognize Objects, read Ink/Stitch files, write them and read its fonts, outlines with a stitch file, EPS files). See `docs/design/p18-plan.md`. Second part (owner request, 2026-11-19): a thorough upgrade of the engine of the 3D stitch view, started first (owner, 2026-11-19); Milestone 1 (measures and a reference set) done except the sew-out (ADR 0122, `docs/design/p18-view-m1-report.md`); Milestone 2 (linear light, thread kinds and weights) done (ADR 0123); Milestone 3 (the surface with heights) done (ADR 0124); Milestone 4 (the light on the surface) done except the compare with photos (ADR 0125); Milestone 5 (the canvas on tiles) done, with a speed pass (ADR 0126); Milestone 6 (the fabric) done except the compare with photos (ADR 0127); Milestone 7 (what is not thread) done except the compare with sew-outs (ADR 0128); Milestone 8 (the viewer) done except the check of the owner (ADR 0129); Milestone 9 (all pictures, quality, audit) done except the test with users (ADR 0130): nine milestones (measures and a reference set, linear light and thread kinds, the surface with heights, the light on the surface, the canvas on tiles, the fabric, what is not thread, the viewer with tilt and light by hand, all pictures and quality settings). See `docs/design/p18-view-plan.md`. Audit of both parts in "Audit of P18" (2026-11-20). |
 | 19. Help and tutorials | Proposed (2026-11-18): nine milestones (pictures in the help, Show Me, guided lessons, the sew-out doctor, samples, ways to start, the help on the web, moving pictures, better answers); the owner selects them. See `docs/design/p19-plan.md`. |
-| 20. Japanese lettering | Accepted (owner, 2026-11-20, before v0.4.0); Milestone 1 (the Japanese reference set and the lettering bench, a test font from Noto Sans JP, and font outlines with the nonzero rule) done (ADR 0141); Milestone 2 (the stitch of each column in Auto: satin to 12 mm with split stitches, tatami columns above, the width of a column between its sides) done (ADR 0142). Milestone 3 (one stitch for the text, crossings cut, no bulges, ends cut back in other columns, stroke ends to their corners; two layers 6.3 % to 1.4 %, each character covered 95 % or more) made, the sew-out of the owner is open (ADR 0143, `tools/make-sewout-kit-p20.py`). Milestone 4 (routes for the letters of TrueType fonts, made in the background in the app; 刺繍東京 at 20 mm 48 to 23 trims) done (ADR 0144). Milestone 5 (the height of Japanese text is the height of its characters, thin strokes sew as runs, the smallest size of a text in the Lettering window) done (ADR 0145). Milestone 6 (two Japanese embroidery fonts with the 2,136 jōyō kanji in a font package, scores 89 and 88) made, its sew-out is open (ADR 0146). Six milestones (a Japanese reference set and its measure, the stitch of each column, crossings and junctions, routes for the fonts of the computer, sizes and thin strokes, a Japanese embroidery font); the owner accepts them. The measures of 2026-11-20 (the fonts of the owner's computer): a character becomes all tatami when one column is wider than 8 mm (128 of 149 characters in Yu Gothic Bold at 50 mm), crossings have two layers on 10 % to 16 % of a kanji, and the letters of a font of the computer have no route (twice the trims). See `docs/design/p20-plan.md`. |
+| 20. Japanese lettering | Accepted (owner, 2026-11-20, before v0.4.0); Milestone 1 (the Japanese reference set and the lettering bench, a test font from Noto Sans JP, and font outlines with the nonzero rule) done (ADR 0141); Milestone 2 (the stitch of each column in Auto: satin to 12 mm with split stitches, tatami columns above, the width of a column between its sides) done (ADR 0142). Milestone 3 (one stitch for the text, crossings cut, no bulges, ends cut back in other columns, stroke ends to their corners; two layers 6.3 % to 1.4 %, each character covered 95 % or more) made, the sew-out of the owner is open (ADR 0143, `tools/make-sewout-kit-p20.py`). Milestone 4 (routes for the letters of TrueType fonts, made in the background in the app; 刺繍東京 at 20 mm 48 to 23 trims) done (ADR 0144). Milestone 5 (the height of Japanese text is the height of its characters, thin strokes sew as runs, the smallest size of a text in the Lettering window) done (ADR 0145). Milestone 6 (two Japanese embroidery fonts with the 2,136 jōyō kanji in a font package, scores 89 and 88) made, its sew-out is open (ADR 0146). Audit in "Audit of P20" (2026-11-20): the route of letters with 32 to 64 parts, a size limit for the grids of the stroke finder, layouts while routes come; the fonts and the sew-out kit made again. The open work of the whole project is `docs/design/open-work.md`. Six milestones (a Japanese reference set and its measure, the stitch of each column, crossings and junctions, routes for the fonts of the computer, sizes and thin strokes, a Japanese embroidery font); the owner accepts them. The measures of 2026-11-20 (the fonts of the owner's computer): a character becomes all tatami when one column is wider than 8 mm (128 of 149 characters in Yu Gothic Bold at 50 mm), crossings have two layers on 10 % to 16 % of a kanji, and the letters of a font of the computer have no route (twice the trims). See `docs/design/p20-plan.md`. |
 | 15. Browser version | Later (owner decision, 2026-11-16): not started. Start after the first feedback of users on the desktop program (about v0.4). See "P15. Browser version" below. |
 
 ## Review of 2026-11-18 and the next phases
@@ -144,6 +144,141 @@ The audit of Stages 1 to 6 and the IP review of the release (the rules of the re
 - Docs: the README has the v0.3 features, the upgrade and start notes and a repaired install table; the spec has the machine library and a roadmap row for this work.
 - Open: the start test on the PC of the owner's friends. Passed (owner, 2026-11-16): endless pan with a real mouse, the My Machines window. The installer removes the older version before it asks to close a running ShokujoDX, so a Cancel at that question leaves no version installed (install again to fix).
 
+
+## Audit of P20 (2026-11-20)
+
+After the six milestones of Japanese lettering, a check of the code and
+the documents: probes with heavy and wrong input for the stroke finder,
+the route, the layout, the font files and the font axes
+(`crates/emb-cli/tests/p20_probe.rs`, `crates/emb-app/src/p20_probe.rs`;
+`cargo test --release -p emb-cli --test p20_probe -- --ignored` and
+`cargo test --release -p emb-app -- --ignored probe_p20`), the rules of
+the spec, the translations, the help, the pictures of the windows and the
+documents. A project-wide list of the open work is in
+`docs/design/open-work.md`.
+
+**Fixed.**
+
+- **The route left out parts of letters with many parts.** The route keeps
+  the sets of sewn parts as bits. They were the bits of a `u32`, and
+  Milestone 4 let the beam search take letters of up to 64 parts (24
+  before). In a release build, the parts after the 32nd were the same
+  bits as the first ones, so the search stopped early: in the probe, a
+  comb of 60 teeth was covered 91 % before the route and 49 % after it.
+  Kanji with many strokes have more than 32 columns after the crossings
+  are cut. The sets are the bits of a `u64` now (ADR 0144). The two
+  Japanese fonts were made again: in Noto Sans JP, 醸 had no stitches (its
+  route kept no part) and 鬱 had 36 of its 56 columns; Zen Maru Gothic had
+  no such letter, and the scores stay 89 and 88. Lettering in a TrueType
+  font had the same fault for letters of 32 to 64 parts since Milestone 4.
+  The bundled embroidery fonts and the other font packages were made
+  before Milestone 4 (at most 24 parts), so they do not change.
+- **A glyph far larger than its capital height ended the program.** The
+  stroke finder puts a grid of cells over a glyph (200 cells for the
+  capital height) with no limit on its size. A glyph 14,000 times its
+  capital height asked for 1.6 TB of memory, and the process stopped. A
+  TrueType font on the computer with a small em and a wide glyph can do
+  this. A grid now has at most 2,048 cells on a side
+  (`grid::MAX_SIDE`; a glyph has about 350); a glyph more than ten times
+  its capital height gets larger cells. The route, the tuning and the
+  quality measures use the same grid.
+- **Lettering 1 m high was not sewn.** The check of the size of an object
+  (at most 3 m, `emb_stitch::MAX_OBJECT_MM`) added each distance setting
+  of the lettering round its letters, the height too. Two letters 1 m
+  high and 2.2 m wide were refused. The height, the spacing, the kerning,
+  the underline and the trim length are not counted now: the letters
+  have them already. (This was so before P20.)
+- **A long Japanese text made the program slow while its routes came.**
+  The app laid the lettering out again each time the route thread made
+  new routes. A text of 496 characters was laid out 146 times in the
+  173 s of its routes, each time up to 0.1 s on the thread of the screen.
+  Now the lettering is laid out again at most one time a second while the
+  thread works (78 times in 159 s for the same text), and at once when it
+  ends. One layout of such a long text still takes 0.1 s.
+- **An undo took the routes away.** The routes of a new text go into the
+  last edit (`Document::amend`). If another edit came before the routes,
+  an undo of that edit took the letters back to no routes, until the next
+  change of the lettering. Now an undo, a redo and a change of the design
+  tab lay the lettering out again with the routes that its font has
+  (`FontLibrary::recheck_routes`).
+- **A fault in the route of one letter stopped all routes of its font.**
+  The route thread of a font ended, and the app drew a frame every
+  150 ms with no end. Now the thread goes on, and that letter keeps no
+  route.
+- The header of a font file (the font lists of a large font) refused a
+  family name of spaces, but the font file was read with it. The two
+  readers have the same rules now.
+- The documents: the inventory did not name the work of P20 (the rows
+  Lettering, TrueType conversion and Embroidery fonts have it now), and
+  eleven rows were marked partly done with all their jobs done (split
+  window, zoom, dockers, styles, viewing modes, options, machine formats,
+  productivity, appliqué, asset management, sketch mode). The plan of P10
+  said that CI had not run, the plan of P17 did not name Milestone 8 as
+  done, and the plan of the 3D view said "Started".
+
+**Left as it is.**
+
+- The font lists read a large embroidery font in full to draw its name in
+  its font: 0.3 s for each Japanese font, one time in a session. The
+  header gives the other values.
+- The route of a kanji is made one time in a session for each font of the
+  computer (0.004 s to 0.56 s in a thread); the routes are not kept on
+  the disk. Lettering in a saved design keeps its routed letters.
+- A letter with more than 64 parts keeps the order of the stroke finder
+  (no route). No character of the reference set has so many.
+- Stitch objects larger than 3 m are not sewn (a long line of text at a
+  large size); the probe texts have lines.
+- The あ of Zen Maru Gothic (a gap in its inner stroke) and the 17
+  characters with two layers on more than 3 % (see the plan).
+
+**Checked, no change.**
+
+- The probes: 26 texts and the size ranges of 5 texts (a line of the reference set, 992 characters in
+  lines, 120 lines, sizes from 0.5 mm to 1 m, characters that the font
+  does not have, marks and variation selectors, stacked text, bold and
+  italic, spacing of −50 mm and 500 mm), 11 outlines (a ring of 20,000
+  points, a sliver, all points the same, an empty ring, a star that
+  crosses itself, 50 rings in each other, 400 dots, a lattice of 24
+  strokes, a comb of 60 teeth), 317 wrong values in a Japanese font file
+  (93 refused, no problem), 7 damaged headers and 9 wrong axis values of
+  the variable Noto Sans JP (no problem; a weight out of the range of the
+  font takes the nearest weight). No crash, no hang, no stitch out of
+  range; the slowest outline is 2 s (400 dots). In the app: a text of
+  496 characters gets the routes of all its letters, a font file of more
+  than 4 MB that is damaged after its header is refused when it is used
+  (2 ms for each try), and each Japanese font takes 0.3 s to read.
+- Rules 3 and 9: the changes of the phase name no closed-source program
+  (the names of fonts are names of fonts, and the names of their makers
+  are in their license texts); no `unsafe` code; the new dependency `i_overlay` (the
+  back end of `geo`, pure Rust) is in the spec and in the list of
+  licenses, and `ttf-parser` has one more feature (`variable-fonts`, no
+  new crate); the new engine code has no trigonometry of its own.
+- Translations: the 4,315 texts of the template are in German, Spanish
+  and Japanese. The help topics *Lettering* and *What is new* describe the
+  phase in four languages.
+- ADRs 0141 to 0146, the plan, the spec, the README and `CLAUDE.md` name
+  each part of the phase. The program is 83.8 MB (83.3 MB after P18): the
+  Japanese fonts are in a font package.
+- The pictures of the windows (113 s): 48 changed since the run before
+  (the Lettering window with Arabic and Devanagari text, the Fonts window,
+  the help). The texts that do not fit are the titles of dock tabs and the
+  last number of the ruler at the edge of the canvas, as before. The line
+  of the smallest size in the Lettering window shows only for Japanese,
+  Chinese or Korean text in a font of the computer, so no picture has it
+  (the fonts of the program have no Japanese letters); it is a label that
+  wraps.
+
+**Exit tests.** The automated parts passed; the sew-outs are open. The
+kit `out/p20-sewout` was made again after the fix of the route.
+
+| Milestone | Exit test | State |
+| --- | --- | --- |
+| 1 | The measure runs in CI and gives the numbers of today | Passed |
+| 2 | No character all tatami from 15 to 80 mm; each column wider than 8 mm with split stitches or as a tatami column | Passed |
+| 3 | Two layers on at most 3 % of each character, 95 % of each shape covered; a sew-out with no lumps and no gaps | Covered 95 % or more passed; two layers on more than 3 % for 17 characters; the sew-out and the choice of the crossing rule are open (owner) |
+| 4 | 刺繍東京 at 20 mm with at most half the trims; a new kanji shows at once | Passed (23 trims of 48) |
+| 5 | 刺繍 at 20 mm is 20 mm high (± 5 %); no satin column under 0.8 mm at 10 mm | Passed (20.1 mm; 0.81 mm) |
+| 6 | A font package with the kana and the 2,136 jōyō kanji and a score of 65 or more; a test sheet sews well | The package passed (scores 89 and 88); the sew-out is open (owner) |
 
 ## Audit of the whole project (2026-11-20)
 

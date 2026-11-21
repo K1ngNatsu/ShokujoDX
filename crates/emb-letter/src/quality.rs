@@ -377,6 +377,7 @@ pub fn fill_widths(parts: &[ObjectKind]) -> FillWidths {
         return FillWidths::default();
     };
     let mut g = Grid::new(bounds, FILL_CELL_MM, 2);
+    let cell = g.cell;
     for part in &fills {
         let mask = tune::part_mask(&g, part);
         for (cell, m) in g.inside.iter_mut().zip(mask) {
@@ -387,7 +388,7 @@ pub fn fill_widths(parts: &[ObjectKind]) -> FillWidths {
     let strokes = local_width(&g)
         .into_iter()
         .filter(|w| *w > 0.0)
-        .map(|w| (w * FILL_CELL_MM, FILL_CELL_MM * FILL_CELL_MM))
+        .map(|w| (w * cell, cell * cell))
         .collect();
     let mut holes = Vec::new();
     for part in &fills {
@@ -406,9 +407,9 @@ pub fn fill_widths(parts: &[ObjectKind]) -> FillWidths {
             let far = grid::distance(&g).into_iter().fold(0.0, f64::max);
             // A hole with no cell center in it is narrower than a cell.
             holes.push(if far > 0.0 {
-                (2.0 * far - 1.0).max(1.0) * FILL_CELL_MM
+                (2.0 * far - 1.0).max(1.0) * cell
             } else {
-                0.5 * FILL_CELL_MM
+                0.5 * cell
             });
         }
     }

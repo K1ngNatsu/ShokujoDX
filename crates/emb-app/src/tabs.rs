@@ -107,6 +107,8 @@ impl AppState {
         self.info_cache = s.info_cache;
         self.doc_id = s.doc_id;
         self.reset_transient();
+        // Lettering of this design can be laid out before its routes came.
+        self.fonts.recheck_routes();
     }
 
     /// Clears the state of a tool, drag or dialog that belongs to the design

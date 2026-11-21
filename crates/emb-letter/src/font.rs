@@ -147,7 +147,11 @@ impl Shared {
                 let next = me.todo.lock().ok().and_then(|mut t| t.pop());
                 match next {
                     Some(g) => {
-                        let route = me.make_route(g);
+                        // A fault in the route of one letter does not stop
+                        // the thread: that letter keeps no route, and the
+                        // other letters get theirs (the audit of P20).
+                        let route =
+                            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| me.make_route(g))).unwrap_or(None);
                         if let Ok(mut r) = me.routes.lock() {
                             r.insert(g, route);
                         }

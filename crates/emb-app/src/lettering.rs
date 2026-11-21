@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, channel};
+use std::time::{Duration, Instant};
 
 use eframe::egui;
 use emb_geom::{BBox, Point, Transform};
@@ -79,7 +80,15 @@ pub struct FontLibrary {
     /// The number of routes of each font that the design has (see
     /// [`AppState::poll_routes`]).
     routes_seen: HashMap<FontRef, u64>,
+    /// When `routes_changed` last reported fonts with new routes.
+    routes_reported: Option<Instant>,
 }
+
+/// While a route thread works, the lettering is laid out again at most one
+/// time in this period: the layout of a long text takes up to 0.1 s on the
+/// thread of the screen (the audit of P20: a text of 496 characters was
+/// laid out 146 times while its routes were made).
+const ROUTE_LAYOUT_EVERY: Duration = Duration::from_secs(1);
 
 /// A font name in its own font: the outlines of the letters, each letter
 /// (or part) filled alone, even-odd.
@@ -261,6 +270,7 @@ impl Default for FontLibrary {
                 .map(|d| d.join(CORRECTIONS_DIR)),
             background_routes: !cfg!(test),
             routes_seen: HashMap::new(),
+            routes_reported: None,
         };
         if let Some(dir) = user_fonts_dir() {
             lib.add_user_fonts(&dir);
@@ -415,11 +425,16 @@ impl FontLibrary {
     /// The fonts that made new routes of letters since the last call, and
     /// `true` while a font makes routes.
     pub fn routes_changed(&mut self) -> (Vec<FontRef>, bool) {
+        let busy = self
+            .loaded
+            .values()
+            .any(|f| matches!(f, AnyFont::TrueType(t) if t.routing()));
+        if busy && self.routes_reported.is_some_and(|t| t.elapsed() < ROUTE_LAYOUT_EVERY) {
+            return (Vec::new(), true);
+        }
         let mut changed = Vec::new();
-        let mut busy = false;
         for (r, f) in &self.loaded {
             let AnyFont::TrueType(f) = f else { continue };
-            busy |= f.routing();
             let made = f.routes_made();
             if self.routes_seen.get(r).is_none_or(|&seen| seen != made) {
                 self.routes_seen.insert(r.clone(), made);
@@ -428,7 +443,20 @@ impl FontLibrary {
                 }
             }
         }
+        if !changed.is_empty() {
+            self.routes_reported = Some(Instant::now());
+        }
         (changed, busy)
+    }
+
+    /// The next [`FontLibrary::routes_changed`] reports each font with
+    /// routes. After an undo, a redo or a change of the active design, the
+    /// design can have letters that were laid out before their routes were
+    /// made (the audit of P20: the routes went into the edit after the
+    /// typing, and an undo of that edit took them back).
+    pub fn recheck_routes(&mut self) {
+        self.routes_seen.clear();
+        self.routes_reported = None;
     }
 
     /// The name of a family in its own font. `None` while it is not made
@@ -2502,6 +2530,41 @@ mod tests {
         assert_eq!(st.doc.undo_len(), steps, "no new undo step");
         st.doc.undo();
         assert!(st.doc.design().objects().is_empty());
+    }
+
+    #[test]
+    fn an_undo_keeps_the_routes_of_the_letters() {
+        // The audit of P20: the routes went into the edit after the typing,
+        // and an undo of that edit took the letters back to no routes.
+        let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        st.fonts.background_routes = true;
+        st.add_lettering(LetteringDialog::new(
+            Point::new(-30.0, 10.0),
+            "Hex",
+            FontRef::new("Lato", "Bold"),
+            20.0,
+        ));
+        // Another edit before the routes come.
+        st.add_lettering(LetteringDialog::new(
+            Point::new(-30.0, 40.0),
+            "Anna",
+            FontRef::embroidery(emb_letter::bundled::DEFAULT_EMBROIDERY, ""),
+            20.0,
+        ));
+        let start = std::time::Instant::now();
+        while st.poll_routes() {
+            assert!(start.elapsed().as_secs() < 60, "the routes are not made");
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        st.poll_routes();
+        st.undo();
+        st.poll_routes();
+        let d = st.doc.design();
+        assert_eq!(d.objects().len(), 1);
+        let ObjectKind::Lettering(l) = &d.objects()[0].kind else {
+            panic!()
+        };
+        assert!(l.letters.iter().all(|x| x.fixed), "each letter has its route");
     }
 
     #[test]

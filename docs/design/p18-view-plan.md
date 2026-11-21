@@ -1,6 +1,6 @@
 # Plan: the 3D stitch view (phase P18, second part)
 
-Date: 2026-11-19 · Status: Started. The owner asked for a thorough
+Date: 2026-11-19 · Status: Done in software (2026-11-20). The owner asked for a thorough
 upgrade of the engine of the 3D stitch view, and for this plan in phase
 P18 (2026-11-19). The first part of P18 (designs from other programs,
 `docs/design/p18-plan.md`) does not change. The owner started this part
