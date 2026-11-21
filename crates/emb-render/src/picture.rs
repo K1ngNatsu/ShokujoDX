@@ -477,7 +477,9 @@ mod tests {
         let near = BBox::new(Point::new(-1.0, -1.0), Point::new(6.0, 4.0));
         let p = e.picture(near, 32.0, &Look::three_d(None), None, FULL_DETAIL, &|_| true);
         assert!(p.rgba.chunks(4).any(|c| c[3] > 0), "the threads show");
-        assert!(t0.elapsed().as_secs_f64() < 20.0, "{:?}", t0.elapsed());
+        // A debug build on a CI runner takes about 21 s (2026-11-20); a
+        // picture with no limit takes many minutes or all the memory.
+        assert!(t0.elapsed().as_secs_f64() < 60.0, "{:?}", t0.elapsed());
     }
 
     #[test]
