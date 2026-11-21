@@ -3,7 +3,8 @@
 Date: 2026-11-20 · Status: Accepted (owner, 2026-11-20: before v0.4.0).
 Milestones 1, 2, 4 and 5 are done (ADR 0141, 0142, 0144, 0145).
 Milestones 3 and 6 are made (ADR 0143, 0146) and wait for the sew-out of
-the owner. Audit: "Audit of P20" in `docs/design/roadmap.md`.
+the owner. Audit: "Audit of P20" in `docs/design/roadmap.md`. Released
+in v0.4.0 (2026-11-20).
 
 ## Goal
 

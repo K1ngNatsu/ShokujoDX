@@ -1,13 +1,15 @@
 # Open work
 
-Date: 2026-11-20 (after the audit of P20) · Status: Reference. One list
+Date: 2026-11-20 (after the audit of P20 and the release of v0.4.0) ·
+Status: Reference. One list
 of all the work that is not finished: from the roadmap, the plans of the
 phases, the audits and the inventory (`docs/design/feature-inventory.md`).
 The owner selects the work. Each audit makes this list current.
 
 The program is done in software for phases P1 to P14, P16, P17 (not
-Milestone 3), P18 and P20. What is open is mostly proof: sew-outs, tests
-with users and tests on other machines and systems.
+Milestone 3), P18 and P20, and all of it is in the release v0.4.0. What
+is open is mostly proof: sew-outs, tests with users and tests on other
+machines and systems.
 
 ## 1. Sew-outs and checks of the owner
 

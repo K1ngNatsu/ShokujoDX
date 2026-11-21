@@ -49,6 +49,19 @@ Sizes are relative effort: S (days), M (one to two weeks), L (a month), XL (seve
 | 20. Japanese lettering | Accepted (owner, 2026-11-20, before v0.4.0); Milestone 1 (the Japanese reference set and the lettering bench, a test font from Noto Sans JP, and font outlines with the nonzero rule) done (ADR 0141); Milestone 2 (the stitch of each column in Auto: satin to 12 mm with split stitches, tatami columns above, the width of a column between its sides) done (ADR 0142). Milestone 3 (one stitch for the text, crossings cut, no bulges, ends cut back in other columns, stroke ends to their corners; two layers 6.3 % to 1.4 %, each character covered 95 % or more) made, the sew-out of the owner is open (ADR 0143, `tools/make-sewout-kit-p20.py`). Milestone 4 (routes for the letters of TrueType fonts, made in the background in the app; 刺繍東京 at 20 mm 48 to 23 trims) done (ADR 0144). Milestone 5 (the height of Japanese text is the height of its characters, thin strokes sew as runs, the smallest size of a text in the Lettering window) done (ADR 0145). Milestone 6 (two Japanese embroidery fonts with the 2,136 jōyō kanji in a font package, scores 89 and 88) made, its sew-out is open (ADR 0146). Audit in "Audit of P20" (2026-11-20): the route of letters with 32 to 64 parts, a size limit for the grids of the stroke finder, layouts while routes come; the fonts and the sew-out kit made again. The open work of the whole project is `docs/design/open-work.md`. Six milestones (a Japanese reference set and its measure, the stitch of each column, crossings and junctions, routes for the fonts of the computer, sizes and thin strokes, a Japanese embroidery font); the owner accepts them. The measures of 2026-11-20 (the fonts of the owner's computer): a character becomes all tatami when one column is wider than 8 mm (128 of 149 characters in Yu Gothic Bold at 50 mm), crossings have two layers on 10 % to 16 % of a kanji, and the letters of a font of the computer have no route (twice the trims). See `docs/design/p20-plan.md`. |
 | 15. Browser version | Later (owner decision, 2026-11-16): not started. Start after the first feedback of users on the desktop program (about v0.4). See "P15. Browser version" below. |
 
+## Releases
+
+Each release is on the release page of the repository, with the packages
+for Windows, macOS and Linux, the font packages and their checksums. A
+tag `v<version>` makes a draft release in CI; the owner publishes it.
+
+| Version | Published | What is in it |
+| --- | --- | --- |
+| v0.1.0 | 2026-10-27 | The first public release: phases P1 to P14 in software |
+| v0.2.0 | 2026-11-13 | The work of 2026-10-28 to 2026-11-13: buttonholes, mitre corners, drawing aids, lettering knockout, translated messages and help, faster panels |
+| v0.3.0 | 2026-11-16 | The owner's list of 2026-11-16 (start fixes, the first start, endless pan, sketch changes, lettering styles, the machine library); the sew-outs of P1 to P14 passed |
+| v0.4.0 | 2026-11-20 | P16 (the product view), P17 (polish and lettering, not Milestone 3), P18 (designs from other programs and the 3D stitch view) and P20 (Japanese lettering), with their audits; the font packages with the two Japanese fonts. The sew-outs of these phases are open |
+
 ## Review of 2026-11-18 and the next phases
 
 After the audit of P16, a review of the project against the reference
