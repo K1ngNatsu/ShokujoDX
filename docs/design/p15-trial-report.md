@@ -192,6 +192,56 @@ screens (step 3 of the roadmap; "only if users ask").
   Screen" and offline use (iPad and Android). Hover tooltips and F1 do not
   exist on a touch screen; keyboard shortcuts need a keyboard.
 
+## Phones (the owner's report, 2026-11-22)
+
+The owner used the test page on a phone and found seven problems. The
+changes:
+
+1. **Words on top of words (upright phone).** The Start page has one
+   column when it is narrower than 560 points (`start.rs`). The status
+   bar scrolls to the side. The update check is not in the browser (no
+   question at the first start, no check at the start; Help > Check for
+   Updates says that it is not in the browser), so its window does not
+   open wider than the phone.
+2. **The ribbon tabs did not scroll.** The File button, the quick buttons
+   and the tabs are in a row that scrolls to the side; the arrow that folds
+   the ribbon stays at the right. The panels of a tab also scroll. These
+   rows and the status bar scroll with a drag of the finger also before
+   egui knows that the screen is a touch screen (in egui, a drag scrolls
+   only after the first touch).
+3. **Side panels and ribbon: size, and open and close.** A button at the
+   right edge of the canvas hides the side panels and shows them again
+   (`canvas::side_handle`, `AppState::side_hidden`; larger on a touch
+   screen). The dock is kept while they are hidden (`EmbApp::saved_dock`),
+   so they come back with their tabs and sizes. On a touch screen the line
+   between two panels is wider for a finger (3 points, 14 points to each
+   side to drag). The arrow at the right of the tabs folds the ribbon (as
+   before).
+4. **Back to Select after a command.** When new lettering is added, the
+   tool is Select again (on each computer; the message says what was
+   added). On a touch screen the draw tools also go back to Select when a
+   shape is finished; with a mouse they stay on, so the next shape can be
+   drawn, and Esc stops them (as before).
+5. **The rotate handle was too small for a finger.** On a touch screen the
+   handles are drawn 1.6 times larger, the rotate handle is 44 points above
+   the box (24 with a mouse), so it is farther from the top handles, and a
+   handle takes a touch from 22 points away (the nearest handle wins).
+6. **Only the Start page at the start.** While the Start page is the tab
+   that shows, the side panels are hidden; when a design shows, they come
+   back. A command that shows a side panel shows them also.
+7. **The ribbon on a phone held across.** A screen lower than 520 points
+   shows only the tab row of the ribbon. A tap on a tab shows its panels
+   over the canvas; a command, a second tap on the tab or a tap outside
+   closes them (`AppState::ribbon_peek`).
+
+Tests: `ribbon::tests::a_swipe_scrolls_the_tabs_of_a_phone` (a swipe of one
+finger scrolls the tabs and is not a tap on a tab) and
+`a_short_screen_shows_the_panels_of_a_tab_over_the_canvas`.
+`tools/web-shots.mjs` makes pictures of a phone (upright and across, the
+Start page and a design, a swipe on the tabs, the side panels hidden, the
+panels of a tab over the canvas) and of a tablet in the headless browser.
+Not tested on a real phone yet.
+
 ## Faults that the trial found (fixed in the branch)
 
 In a browser, these calls stop the program: `std::time::Instant::now`

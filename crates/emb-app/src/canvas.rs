@@ -193,6 +193,9 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
     // the middle between them. From the second finger until all fingers are
     // up, the tools take no input, so a pinch does not move or select.
     let (multi, touching) = ui.input(|i| (i.multi_touch(), i.any_touches()));
+    if ui.input(|i| i.has_touch_screen()) {
+        st.touch_seen = true;
+    }
     match multi.filter(|t| rect.contains(t.center_pos)) {
         Some(t) => {
             if !st.touch_gesture {
@@ -518,6 +521,32 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
     }
     crate::viewer::draw_light(&painter, ui.ctx(), rect, st, response.hovered());
     touch_bar(ui, rect, st, drawing);
+    side_handle(ui, rect, st);
+}
+
+/// The button at the right edge of the canvas that hides and shows the side
+/// panels (P15 step 3): the canvas gets the width, and one tap brings them
+/// back. Larger on a touch screen.
+fn side_handle(ui: &mut egui::Ui, rect: Rect, st: &mut AppState) {
+    let size = if st.touch_seen {
+        Vec2::new(26.0, 64.0)
+    } else {
+        Vec2::new(16.0, 44.0)
+    };
+    let at = Rect::from_min_size(
+        Pos2::new(rect.right() - size.x - 2.0, rect.center().y - size.y / 2.0),
+        size,
+    );
+    let (glyph, tip) = if st.side_hidden {
+        (egui_phosphor::regular::CARET_LEFT, tr("Show the side panels"))
+    } else {
+        (egui_phosphor::regular::CARET_RIGHT, tr("Hide the side panels"))
+    };
+    let resp = ui.put(at, egui::Button::new(egui::RichText::new(glyph).size(14.0)));
+    let resp = crate::a11y::named(resp, tip).on_hover_text(tip);
+    if resp.clicked() {
+        st.side_hidden = !st.side_hidden;
+    }
 }
 
 /// On a touch screen with no keyboard, the buttons for the keys of the

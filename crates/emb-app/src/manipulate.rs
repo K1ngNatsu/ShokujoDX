@@ -214,8 +214,15 @@ fn selection_box(st: &AppState) -> Option<BBox> {
     st.doc.design().bbox_of(st.selection.ids())
 }
 
-/// Screen positions of the handles for box `b`.
-fn handles(map: &ViewMap, b: BBox) -> Vec<(Handle, Pos2)> {
+/// On a touch screen (P15 step 3): the distance of the rotate handle over
+/// the box, the reach of a handle and the size of its drawing are for a
+/// finger.
+const TOUCH_ROTATE_OFFSET: f32 = 44.0;
+const TOUCH_REACH: f32 = 22.0;
+const TOUCH_DRAW: f32 = 1.6;
+
+/// Screen positions of the handles for box `b` (`touch`: for a finger).
+fn handles(map: &ViewMap, b: BBox, touch: bool) -> Vec<(Handle, Pos2)> {
     let c = b.center();
     let (hw, hh) = (b.width() / 2.0, b.height() / 2.0);
     let mut v = Vec::with_capacity(9);
@@ -233,16 +240,21 @@ fn handles(map: &ViewMap, b: BBox) -> Vec<(Handle, Pos2)> {
         }
     }
     let sb = map.screen_box(b);
-    v.push((Handle::Rotate, Pos2::new(sb.center().x, sb.top() - ROTATE_OFFSET)));
+    let offset = if touch { TOUCH_ROTATE_OFFSET } else { ROTATE_OFFSET };
+    v.push((Handle::Rotate, Pos2::new(sb.center().x, sb.top() - offset)));
     v
 }
 
 /// Returns the handle under `pos`, if a selection exists.
 pub fn hit_handle(st: &AppState, map: &ViewMap, pos: Pos2) -> Option<Handle> {
     let b = selection_box(st)?;
-    handles(map, b)
+    let reach = if st.touch_seen { TOUCH_REACH } else { HANDLE + 4.0 };
+    // The nearest handle in reach: on a small box the reach of a finger
+    // takes in more than one.
+    handles(map, b, st.touch_seen)
         .into_iter()
-        .find(|(_, p)| p.distance(pos) <= HANDLE + 4.0)
+        .filter(|(_, p)| p.distance(pos) <= reach)
+        .min_by(|x, y| x.1.distance(pos).total_cmp(&y.1.distance(pos)))
         .map(|(h, _)| h)
 }
 
@@ -574,7 +586,7 @@ pub fn hover_cursor(st: &AppState, map: &ViewMap, pos: Pos2) -> Option<CursorIco
             Handle::Scale { .. } => {
                 // Use the screen direction from the box center, so the cursor is right for a rotated design.
                 let c = map.to_screen(b.center());
-                let d = handles(map, b).into_iter().find(|(hh, _)| *hh == h)?.1 - c;
+                let d = handles(map, b, st.touch_seen).into_iter().find(|(hh, _)| *hh == h)?.1 - c;
                 if d.x.abs() < 1.0 {
                     CursorIcon::ResizeVertical
                 } else if d.y.abs() < 1.0 {
@@ -626,15 +638,16 @@ pub fn draw_overlay(painter: &egui::Painter, map: &ViewMap, st: &AppState, accen
     ];
     painter.extend(egui::Shape::dashed_line(&pts, Stroke::new(1.0, accent), 5.0, 3.0));
 
-    let hs = handles(map, b);
+    let hs = handles(map, b, st.touch_seen);
+    let size = if st.touch_seen { HANDLE * TOUCH_DRAW } else { HANDLE };
     if let Some((_, rot)) = hs.iter().find(|(h, _)| *h == Handle::Rotate) {
         painter.line_segment([Pos2::new(rot.x, sb.top()), *rot], Stroke::new(1.0, accent));
-        painter.circle_filled(*rot, HANDLE + 1.0, Color32::WHITE);
-        painter.circle_stroke(*rot, HANDLE + 1.0, Stroke::new(1.5, accent));
+        painter.circle_filled(*rot, size + 1.0, Color32::WHITE);
+        painter.circle_stroke(*rot, size + 1.0, Stroke::new(1.5, accent));
     }
     for (h, p) in &hs {
         if let Handle::Scale { .. } = h {
-            let r = Rect::from_center_size(*p, Vec2::splat(HANDLE * 2.0));
+            let r = Rect::from_center_size(*p, Vec2::splat(size * 2.0));
             painter.rect_filled(r, 1.0, Color32::WHITE);
             painter.rect_stroke(r, 1.0, Stroke::new(1.5, accent), egui::StrokeKind::Inside);
         }
@@ -871,7 +884,7 @@ mod tests {
         h.frame(vec![]);
         let map = h.map();
         let b = h.st.doc.design().bbox_of(&[fill]).unwrap();
-        let (_, handle) = handles(&map, b)
+        let (_, handle) = handles(&map, b, false)
             .into_iter()
             .find(|(k, _)| *k == Handle::Rotate)
             .unwrap();
@@ -895,7 +908,7 @@ mod tests {
         h.frame(vec![]);
         let map = h.map();
         let b = h.st.doc.design().bbox_of(&[star]).unwrap();
-        let (_, right) = handles(&map, b)
+        let (_, right) = handles(&map, b, false)
             .into_iter()
             .find(|(k, _)| *k == Handle::Scale { fx: 1, fy: 0 })
             .unwrap();
@@ -946,7 +959,7 @@ mod tests {
         h.frame(vec![]);
         let map = h.map();
         let b = h.st.doc.design().bbox_of(&[id]).unwrap();
-        let (_, corner) = handles(&map, b)
+        let (_, corner) = handles(&map, b, false)
             .into_iter()
             .find(|(k, _)| *k == Handle::Scale { fx: 1, fy: 1 })
             .unwrap();

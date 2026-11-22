@@ -23,7 +23,8 @@ arc](tutorial-lettering) shows the first steps.
    smallest height at which its strokes sew well; with **Automatic**, a
    stroke thinner than 0.8 mm sews as a run.
 4. Click **OK** (or **Ctrl+Enter**). **Esc** or **Cancel** closes the
-   window and takes back what it shows.
+   window and takes back what it shows. After **OK**, the tool is
+   **Select** again.
 
 To change the text later, double-click the lettering, or right-click it
 and select **Edit text**.

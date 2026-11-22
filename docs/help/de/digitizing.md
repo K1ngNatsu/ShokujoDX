@@ -8,7 +8,8 @@ keywords: zeichnen, digitalisieren, linie, manuell, freihand, form, füllung, ko
 
 Die Werkzeuge des Tabs **Digitalisieren** zeichnen neue Objekte. Jedes
 Werkzeug bleibt nach einem Objekt aktiv, damit Sie weiter zeichnen können.
-Drücken Sie **Esc**, um aufzuhören.
+Drücken Sie **Esc**, um aufzuhören. Auf einem Touchscreen wechselt das
+Werkzeug nach jedem Objekt zurück zu **Auswählen**.
 
 ## Klicks und Tasten
 

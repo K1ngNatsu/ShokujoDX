@@ -232,6 +232,41 @@ fn file_menu(ui: &mut egui::Ui, st: &mut AppState) {
     }
 }
 
+/// A screen lower than this (points) shows the tabs of the ribbon only (a
+/// phone held across; P15 step 3).
+const SHORT_SCREEN: f32 = 520.0;
+/// The width of the arrow that folds the ribbon.
+const ARROW_W: f32 = 30.0;
+
+/// The panels of `tab` in a row that scrolls; the panels that do not fit
+/// `width` fold into one button each.
+fn panels_row(ui: &mut egui::Ui, st: &mut AppState, s: &SelInfo, tab: RibbonTab, simple: bool, width: f32) {
+    egui::ScrollArea::horizontal()
+        .id_salt("ribbon_panels")
+        .scroll_source(egui::scroll_area::ScrollSource::ALL)
+        .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::VisibleWhenNeeded)
+        .show(ui, |ui| {
+            let folded = folded_panels(st, tab, width);
+            let _row = ui.horizontal_top(|ui| {
+                ui.spacing_mut().item_spacing.x = 2.0;
+                for (i, p) in tab.panels_in(simple).iter().enumerate() {
+                    let x0 = ui.cursor().min.x;
+                    if folded[i] {
+                        folded_panel(ui, st, s, p);
+                    } else {
+                        panel(ui, st, s, p);
+                    }
+                    let w = ui.cursor().min.x - x0;
+                    if st.ribbon_widths.insert((tab, i, folded[i]), w) != Some(w) {
+                        ui.ctx().request_repaint();
+                    }
+                }
+            });
+            #[cfg(test)]
+            PANELS_W.with(|w| w.set(_row.response.rect.width()));
+        });
+}
+
 /// Shows the ribbon: the tab row and the panels of the current tab.
 pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
     #[cfg(test)]
@@ -242,96 +277,127 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
     st.hover_cmd = None;
     let mut settings = st.settings.clone();
     let (tab_before, collapsed_before) = (settings.ribbon_tab, settings.ribbon_collapsed);
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing.x = 2.0;
-        let accent = ui.visuals().selection.bg_fill;
-        let file = egui::Button::new(RichText::new(tr("File")).strong().color(Color32::WHITE))
-            .fill(accent)
-            .min_size(vec2(52.0, SMALL_H));
-        let resp = ui.add(file);
-        note_rect("File", resp.rect);
-        egui::Popup::menu(&resp).show(|ui| file_menu(ui, st));
-        ui.add_space(6.0);
-        for cmd in QUICK {
-            let (icon, label, _) = cmd.meta();
-            let r = icon_button(ui, icon, label, st.can(cmd, &s));
-            if tooltip(r, &ctx, cmd).clicked() {
-                st.run(cmd, &ctx);
+    // A short screen (a phone held across): the ribbon shows its tabs
+    // only, and a tap on a tab shows its panels over the canvas until a
+    // command runs (P15 step 3).
+    let short = ctx.content_rect().height() < SHORT_SCREEN;
+    let folded = settings.ribbon_collapsed || short;
+    if !short {
+        st.ribbon_peek = None;
+    }
+    let row = ui
+        .horizontal(|ui| {
+            // The arrow that folds the ribbon stays at the right; the File
+            // button, the quick buttons and the tabs scroll on a narrow
+            // screen (a phone).
+            let width = (ui.available_width() - ARROW_W).max(80.0);
+            egui::ScrollArea::horizontal()
+                .id_salt("ribbon_tabs")
+                .max_width(width)
+                // A finger drags the tabs also before egui knows that the
+                // screen is a touch screen (its first touch).
+                .scroll_source(egui::scroll_area::ScrollSource::ALL)
+                .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.spacing_mut().item_spacing.x = 2.0;
+                        let accent = ui.visuals().selection.bg_fill;
+                        let file = egui::Button::new(RichText::new(tr("File")).strong().color(Color32::WHITE))
+                            .fill(accent)
+                            .min_size(vec2(52.0, SMALL_H));
+                        let resp = ui.add(file);
+                        note_rect("File", resp.rect);
+                        egui::Popup::menu(&resp).show(|ui| file_menu(ui, st));
+                        ui.add_space(6.0);
+                        for cmd in QUICK {
+                            let (icon, label, _) = cmd.meta();
+                            let r = icon_button(ui, icon, label, st.can(cmd, &s));
+                            if tooltip(r, &ctx, cmd).clicked() {
+                                st.run(cmd, &ctx);
+                            }
+                        }
+                        ui.add_space(8.0);
+                        ui.separator();
+                        ui.add_space(4.0);
+                        let sketching = st.sketch.is_some();
+                        if !sketching && settings.ribbon_tab == RibbonTab::Sketch {
+                            settings.ribbon_tab = RibbonTab::Digitize;
+                        }
+                        let mut tabs = RibbonTab::visible(settings.simple_mode).to_vec();
+                        if sketching {
+                            tabs.push(RibbonTab::Sketch);
+                        }
+                        for tab in tabs {
+                            let shown = if short {
+                                st.ribbon_peek == Some(tab)
+                            } else {
+                                !settings.ribbon_collapsed
+                            };
+                            let active = settings.ribbon_tab == tab && shown;
+                            let text = RichText::new(tab.label()).size(13.5);
+                            let text = if active { text.strong() } else { text };
+                            let r = ui.add(egui::Button::selectable(active, text).min_size(vec2(64.0, SMALL_H)));
+                            note_rect(tab.label(), r.rect);
+                            if active {
+                                let y = r.rect.bottom() - 1.0;
+                                let stroke = Stroke::new(2.0, ui.visuals().selection.stroke.color);
+                                ui.painter().hline(r.rect.x_range().shrink(6.0), y, stroke);
+                            }
+                            if short && r.clicked() {
+                                // A second tap on the tab closes its panels.
+                                st.ribbon_peek = if st.ribbon_peek == Some(tab) { None } else { Some(tab) };
+                                settings.ribbon_tab = tab;
+                            } else if r.double_clicked() {
+                                settings.ribbon_tab = tab;
+                                settings.ribbon_collapsed = !settings.ribbon_collapsed;
+                            } else if r.clicked() {
+                                settings.ribbon_tab = tab;
+                                settings.ribbon_collapsed = false;
+                            }
+                        }
+                    });
+                });
+            if !short {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let (glyph, tip) = if settings.ribbon_collapsed {
+                        (ph::CARET_DOWN, tr("Show the ribbon"))
+                    } else {
+                        (ph::CARET_UP, tr("Hide the ribbon (or double-click a tab)"))
+                    };
+                    if icon_button(ui, Icon::Glyph(glyph), tr("Collapse"), true)
+                        .on_hover_text(tip)
+                        .clicked()
+                    {
+                        settings.ribbon_collapsed = !settings.ribbon_collapsed;
+                    }
+                });
             }
-        }
-        ui.add_space(8.0);
-        ui.separator();
-        ui.add_space(4.0);
-        let sketching = st.sketch.is_some();
-        if !sketching && settings.ribbon_tab == RibbonTab::Sketch {
-            settings.ribbon_tab = RibbonTab::Digitize;
-        }
-        let mut tabs = RibbonTab::visible(settings.simple_mode).to_vec();
-        if sketching {
-            tabs.push(RibbonTab::Sketch);
-        }
-        for tab in tabs {
-            let active = settings.ribbon_tab == tab && !settings.ribbon_collapsed;
-            let text = RichText::new(tab.label()).size(13.5);
-            let text = if active { text.strong() } else { text };
-            let r = ui.add(egui::Button::selectable(active, text).min_size(vec2(64.0, SMALL_H)));
-            note_rect(tab.label(), r.rect);
-            if active {
-                let y = r.rect.bottom() - 1.0;
-                let stroke = Stroke::new(2.0, ui.visuals().selection.stroke.color);
-                ui.painter().hline(r.rect.x_range().shrink(6.0), y, stroke);
-            }
-            if r.double_clicked() {
-                settings.ribbon_tab = tab;
-                settings.ribbon_collapsed = !settings.ribbon_collapsed;
-            } else if r.clicked() {
-                settings.ribbon_tab = tab;
-                settings.ribbon_collapsed = false;
-            }
-        }
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let (glyph, tip) = if settings.ribbon_collapsed {
-                (ph::CARET_DOWN, tr("Show the ribbon"))
-            } else {
-                (ph::CARET_UP, tr("Hide the ribbon (or double-click a tab)"))
-            };
-            if icon_button(ui, Icon::Glyph(glyph), tr("Collapse"), true)
-                .on_hover_text(tip)
-                .clicked()
-            {
-                settings.ribbon_collapsed = !settings.ribbon_collapsed;
-            }
-        });
-    });
-    if !settings.ribbon_collapsed {
+        })
+        .response
+        .rect;
+    if !folded {
         ui.add_space(2.0);
         // The width of the window, outside the scroll area (inside it the
         // width has no end).
         let width = ui.available_width();
-        egui::ScrollArea::horizontal()
-            .id_salt("ribbon_panels")
-            .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::VisibleWhenNeeded)
-            .show(ui, |ui| {
-                let tab = settings.ribbon_tab;
-                let folded = folded_panels(st, tab, width);
-                let _row = ui.horizontal_top(|ui| {
-                    ui.spacing_mut().item_spacing.x = 2.0;
-                    for (i, p) in tab.panels_in(settings.simple_mode).iter().enumerate() {
-                        let x0 = ui.cursor().min.x;
-                        if folded[i] {
-                            folded_panel(ui, st, &s, p);
-                        } else {
-                            panel(ui, st, &s, p);
-                        }
-                        let w = ui.cursor().min.x - x0;
-                        if st.ribbon_widths.insert((tab, i, folded[i]), w) != Some(w) {
-                            ui.ctx().request_repaint();
-                        }
-                    }
+        panels_row(ui, st, &s, settings.ribbon_tab, settings.simple_mode, width);
+    } else if let Some(tab) = st.ribbon_peek {
+        let screen = ctx.content_rect();
+        let shown = egui::Area::new(egui::Id::new("ribbon_peek"))
+            .order(egui::Order::Foreground)
+            .fixed_pos(row.left_bottom() + vec2(0.0, 2.0))
+            .show(&ctx, |ui| {
+                egui::Frame::popup(ui.style()).show(ui, |ui| {
+                    let width = (screen.width() - row.left() - 24.0).max(120.0);
+                    ui.set_max_width(width);
+                    panels_row(ui, st, &s, tab, settings.simple_mode, width);
                 });
-                #[cfg(test)]
-                PANELS_W.with(|w| w.set(_row.response.rect.width()));
             });
+        // A tap outside the panels and the tabs closes the panels.
+        let on_tabs = ctx.input(|i| i.pointer.interact_pos().is_some_and(|p| row.contains(p)));
+        if shown.response.clicked_elsewhere() && !on_tabs {
+            st.ribbon_peek = None;
+        }
     }
     // The ribbon state is a user setting; the folded ribbon stays after a
     // restart, the tab does not (the program starts on Digitize).

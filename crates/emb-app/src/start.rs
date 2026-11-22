@@ -222,7 +222,10 @@ pub fn page(ui: &mut egui::Ui, st: &mut AppState) {
                     st.open_help("whats-new", None);
                 }
                 ui.add_space(12.0);
-                ui.columns(2, |cols| {
+                // One column on a narrow screen (a phone): two columns
+                // there put the words over each other.
+                let n = if ui.available_width() < 560.0 { 1 } else { 2 };
+                ui.columns(n, |cols| {
                     let ui = &mut cols[0];
                     ui.label(RichText::new(tr("Start")).size(16.0).strong());
                     for cmd in [
@@ -294,7 +297,11 @@ pub fn page(ui: &mut egui::Ui, st: &mut AppState) {
                             st.ask_help(&q);
                         }
                     });
-                    let ui = &mut cols[1];
+                    let last = cols.len() - 1;
+                    if last == 0 {
+                        cols[0].add_space(16.0);
+                    }
+                    let ui = &mut cols[last];
                     ui.label(RichText::new(tr("Recent designs")).size(16.0).strong());
                     if recent.is_empty() {
                         ui.weak(tr("The designs that you open and save show here."));

@@ -27,6 +27,7 @@ struct Rib {
     /// A very wide screen (no panel folds), else `width`.
     wide: bool,
     width: f32,
+    height: f32,
 }
 
 impl Rib {
@@ -40,6 +41,7 @@ impl Rib {
             st,
             wide: true,
             width: 1600.0,
+            height: 900.0,
         }
     }
 
@@ -47,7 +49,7 @@ impl Rib {
         let input = RawInput {
             screen_rect: Some(Rect::from_min_size(
                 Pos2::ZERO,
-                vec2(if self.wide { 4000.0 } else { self.width }, 900.0),
+                vec2(if self.wide { 4000.0 } else { self.width }, self.height),
             )),
             events,
             ..Default::default()
@@ -463,4 +465,74 @@ fn undo_from_the_quick_access_buttons() {
     assert_eq!(r.st.doc.design().objects().len(), 0, "sample objects are one undo step");
     r.click("Redo");
     assert_eq!(r.st.doc.design().objects().len(), n);
+}
+
+/// One finger on a touch screen from `from` to `to` in steps, then up (as
+/// eframe on the web: the finger also moves and presses the pointer).
+fn swipe(r: &mut Rib, from: Pos2, to: Pos2) {
+    use egui::{TouchDeviceId, TouchId, TouchPhase};
+    let touch = |phase, pos| Event::Touch {
+        device_id: TouchDeviceId(1),
+        id: TouchId(0),
+        phase,
+        pos,
+        force: None,
+    };
+    let button = |pos, pressed| Event::PointerButton {
+        pos,
+        button: PointerButton::Primary,
+        pressed,
+        modifiers: Modifiers::NONE,
+    };
+    r.frame(vec![
+        Event::PointerMoved(from),
+        button(from, true),
+        touch(TouchPhase::Start, from),
+    ]);
+    for i in 1..=10 {
+        let p = from + (to - from) * (i as f32 / 10.0);
+        r.frame(vec![Event::PointerMoved(p), touch(TouchPhase::Move, p)]);
+    }
+    r.frame(vec![button(to, false), touch(TouchPhase::End, to), Event::PointerGone]);
+    r.frame(vec![]);
+}
+
+#[test]
+fn a_swipe_scrolls_the_tabs_of_a_phone() {
+    let mut r = Rib::new();
+    r.wide = false;
+    r.width = 390.0;
+    r.frame(vec![]);
+    r.frame(vec![]);
+    let before = r.rect("Design");
+    assert!(before.left() > 390.0, "the last tab does not show on a phone");
+    let y = r.rect("Digitize").center().y;
+    swipe(&mut r, Pos2::new(330.0, y), Pos2::new(40.0, y));
+    let after = r.rect("Design");
+    assert!(after.left() < before.left() - 200.0, "{before:?} {after:?}");
+    // A swipe is not a tap on the tab under the finger.
+    assert_eq!(r.st.settings.ribbon_tab, RibbonTab::Digitize);
+}
+
+#[test]
+fn a_short_screen_shows_the_panels_of_a_tab_over_the_canvas() {
+    let mut r = Rib::new();
+    r.wide = false;
+    r.width = 844.0;
+    r.height = 390.0;
+    r.frame(vec![]);
+    // Only the tabs show.
+    assert!(RECTS.with(|x| x.borrow().iter().all(|(l, _)| l != "Fonts")));
+    r.click("Lettering");
+    assert_eq!(r.st.ribbon_peek, Some(RibbonTab::Lettering));
+    r.frame(vec![]);
+    // A command closes the panels.
+    r.click("Fonts");
+    assert_eq!(r.st.ribbon_peek, None);
+    r.frame(vec![]);
+    assert!(RECTS.with(|x| x.borrow().iter().all(|(l, _)| l != "Fonts")));
+    // A second tap on a tab closes its panels.
+    r.click("Edit");
+    r.click("Edit");
+    assert_eq!(r.st.ribbon_peek, None);
 }

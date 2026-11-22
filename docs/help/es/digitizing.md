@@ -8,7 +8,8 @@ keywords: dibujar, digitalizar, línea, manual, a mano alzada, forma, relleno, r
 
 Las herramientas de la pestaña **Digitalizar** dibujan objetos nuevos.
 Cada herramienta sigue activa después de un objeto, para que pueda dibujar
-más. Pulse **Esc** para parar.
+más. Pulse **Esc** para parar. En una pantalla táctil, la herramienta
+vuelve a **Seleccionar** después de cada objeto.
 
 ## Clics y teclas
 

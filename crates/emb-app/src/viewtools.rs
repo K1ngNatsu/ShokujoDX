@@ -577,11 +577,18 @@ pub fn sync_panels(dock: &mut egui_dock::DockState<Tab>, st: &mut AppState) {
         if flag && !st.panel_shown(tab) {
             st.set_panel_shown(tab, true);
         }
+        // A command that shows a side panel shows the side panels.
+        if flag && tab != Tab::Library {
+            st.side_hidden = false;
+        }
     }
     for (tab, _) in PANELS {
         // Simple mode shows the panels of the simple tasks only.
         let simple_hides = st.settings.simple_mode && !SIMPLE_PANELS.contains(&tab);
-        match (st.panel_shown(tab) && !simple_hides, dock.find_tab(&tab)) {
+        // The side panels are hidden (P15 step 3); the Library is a tab
+        // next to the design.
+        let side_hides = st.side_panels_hidden && tab != Tab::Library;
+        match (st.panel_shown(tab) && !simple_hides && !side_hides, dock.find_tab(&tab)) {
             (false, Some(p)) => {
                 dock.remove_tab(p);
             }

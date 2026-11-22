@@ -211,6 +211,18 @@ pub struct AppState {
     /// Two fingers touch the canvas: they pan and zoom, and the tools take
     /// no input until all fingers are up (P15 step 3).
     pub touch_gesture: bool,
+    /// A touch screen was used (egui saw a touch): larger handles, the
+    /// touch bar of the draw tools, and tools that go back to Select.
+    pub touch_seen: bool,
+    /// The user hid the side panels with the button at the edge of the
+    /// canvas (P15 step 3).
+    pub side_hidden: bool,
+    /// The side panels are hidden now: by the user, or while the Start page
+    /// shows. `viewtools::sync_panels` reads it.
+    pub side_panels_hidden: bool,
+    /// On a short screen the ribbon shows only its tabs; a tap on a tab
+    /// shows its panels over the canvas until a command runs.
+    pub ribbon_peek: Option<crate::ribbon::RibbonTab>,
     pub focus_library: bool,
     pub focus_clipart: bool,
     /// A panel to show in front (View > Panels).
@@ -408,6 +420,9 @@ pub struct EmbApp {
     frames: u8,
     /// The window size of the last frame.
     last_size: egui::Vec2,
+    /// The dock with the side panels, kept while they are hidden (the
+    /// Start page shows, or the user hid them; P15 step 3).
+    saved_dock: Option<DockState<Tab>>,
 }
 
 /// Loads a data file from `data/` next to the executable or in the working
@@ -508,6 +523,7 @@ impl EmbApp {
             started: true,
             frames: 2,
             last_size: egui::Vec2::ZERO,
+            saved_dock: None,
         }
     }
 
@@ -643,6 +659,7 @@ impl EmbApp {
             started: false,
             frames: 0,
             last_size: egui::Vec2::ZERO,
+            saved_dock: None,
         }
     }
 }
@@ -764,6 +781,10 @@ impl AppState {
             focus_styles: false,
             focus_canvas: false,
             touch_gesture: false,
+            touch_seen: false,
+            side_hidden: false,
+            side_panels_hidden: false,
+            ribbon_peek: None,
             focus_library: false,
             focus_clipart: false,
             focus_tab: None,
@@ -1554,82 +1575,89 @@ impl AppState {
                 ui.weak(tr(crate::viewing::KEYS_HELP));
             });
         }
-        ui.horizontal(|ui| {
-            let d = self.doc.design();
-            let size = d
-                .extents()
-                .map(|b| {
-                    format!(
-                        "{} × {}",
-                        self.settings.units.fmt(b.width()),
-                        self.settings.units.fmt(b.height())
-                    )
-                })
-                .unwrap_or_else(|| tr("empty").into());
-            ui.label(crate::i18n::fill("Objects: {}", &[&(d.objects().len())]));
-            ui.separator();
-            ui.label(crate::i18n::fill("Colors: {}", &[&(d.sewn_color_blocks().len())]));
-            if let Some(pv) = &self.plan_view {
-                let s = &pv.plan.stitches;
-                ui.separator();
-                ui.label(crate::i18n::fill(
-                    "Stitches: {}  Trims: {}",
-                    &[&(s.stitch_count()), &(s.trim_count())],
-                ))
-                .on_hover_text(crate::i18n::fill(
-                    "Stitch plan built in {} ms",
-                    &[&format!("{:.1}", pv.build_ms)],
-                ));
-            }
-            if let Some(m) = info.minutes {
-                ui.separator();
-                ui.label(crate::i18n::fill("Sew time: about {}", &[&(crate::info::time_text(m))]))
-                    .on_hover_text(tr(
-                        "Stitches at the speed of the machine; trims and color changes add time.",
+        // On a narrow screen (a phone) the row scrolls (P15 step 3).
+        egui::ScrollArea::horizontal()
+            .id_salt("status_bar")
+            .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
+            .scroll_source(egui::scroll_area::ScrollSource::ALL)
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    let d = self.doc.design();
+                    let size = d
+                        .extents()
+                        .map(|b| {
+                            format!(
+                                "{} × {}",
+                                self.settings.units.fmt(b.width()),
+                                self.settings.units.fmt(b.height())
+                            )
+                        })
+                        .unwrap_or_else(|| tr("empty").into());
+                    ui.label(crate::i18n::fill("Objects: {}", &[&(d.objects().len())]));
+                    ui.separator();
+                    ui.label(crate::i18n::fill("Colors: {}", &[&(d.sewn_color_blocks().len())]));
+                    if let Some(pv) = &self.plan_view {
+                        let s = &pv.plan.stitches;
+                        ui.separator();
+                        ui.label(crate::i18n::fill(
+                            "Stitches: {}  Trims: {}",
+                            &[&(s.stitch_count()), &(s.trim_count())],
+                        ))
+                        .on_hover_text(crate::i18n::fill(
+                            "Stitch plan built in {} ms",
+                            &[&format!("{:.1}", pv.build_ms)],
+                        ));
+                    }
+                    if let Some(m) = info.minutes {
+                        ui.separator();
+                        ui.label(crate::i18n::fill("Sew time: about {}", &[&(crate::info::time_text(m))]))
+                            .on_hover_text(tr(
+                                "Stitches at the speed of the machine; trims and color changes add time.",
+                            ));
+                    }
+                    if !info.issues.is_empty() {
+                        ui.separator();
+                        let (text, color) = if info.errors() > 0 {
+                            (
+                                crate::i18n::fill("⛔ {} problems", &[&info.issues.len()]),
+                                egui::Color32::from_rgb(220, 60, 50),
+                            )
+                        } else {
+                            (
+                                crate::i18n::fill("⚠ {} warnings", &[&info.issues.len()]),
+                                egui::Color32::from_rgb(230, 150, 20),
+                            )
+                        };
+                        let r = ui
+                            .add(egui::Button::new(egui::RichText::new(text).color(color)).frame(false))
+                            .on_hover_text(tr("Show the warnings in the Design info panel"));
+                        if r.clicked() {
+                            open_info = true;
+                        }
+                    }
+                    ui.separator();
+                    ui.label(crate::i18n::fill("Size: {}", &[&size]));
+                    ui.separator();
+                    ui.label(crate::i18n::fill(
+                        "Zoom: {} %",
+                        &[&format!("{:.0}", self.view.zoom * 100.0)],
                     ));
-            }
-            if !info.issues.is_empty() {
-                ui.separator();
-                let (text, color) = if info.errors() > 0 {
-                    (
-                        crate::i18n::fill("⛔ {} problems", &[&info.issues.len()]),
-                        egui::Color32::from_rgb(220, 60, 50),
-                    )
-                } else {
-                    (
-                        crate::i18n::fill("⚠ {} warnings", &[&info.issues.len()]),
-                        egui::Color32::from_rgb(230, 150, 20),
-                    )
-                };
-                let r = ui
-                    .add(egui::Button::new(egui::RichText::new(text).color(color)).frame(false))
-                    .on_hover_text(tr("Show the warnings in the Design info panel"));
-                if r.clicked() {
-                    open_info = true;
-                }
-            }
-            ui.separator();
-            ui.label(crate::i18n::fill("Size: {}", &[&size]));
-            ui.separator();
-            ui.label(crate::i18n::fill(
-                "Zoom: {} %",
-                &[&format!("{:.0}", self.view.zoom * 100.0)],
-            ));
-            if let Some(p) = self.cursor_mm {
-                ui.separator();
-                let u = self.settings.units;
-                let c = p - d.hoop.center;
-                ui.label(format!("X {}  Y {}", u.fmt(c.x), u.fmt(c.y)));
-            }
-            if self.doc.is_modified() {
-                ui.separator();
-                ui.label("●").on_hover_text(tr("Changed since last save"));
-            }
-            if !self.message.is_empty() {
-                ui.separator();
-                ui.label(&self.message);
-            }
-        });
+                    if let Some(p) = self.cursor_mm {
+                        ui.separator();
+                        let u = self.settings.units;
+                        let c = p - d.hoop.center;
+                        ui.label(format!("X {}  Y {}", u.fmt(c.x), u.fmt(c.y)));
+                    }
+                    if self.doc.is_modified() {
+                        ui.separator();
+                        ui.label("●").on_hover_text(tr("Changed since last save"));
+                    }
+                    if !self.message.is_empty() {
+                        ui.separator();
+                        ui.label(&self.message);
+                    }
+                });
+            });
         if open_info {
             self.focus_info = true;
         }
@@ -1900,6 +1928,36 @@ impl EmbApp {
             }
             _ => {}
         }
+        // The side panels (P15 step 3): hidden while the Start page shows
+        // (a design shows them again) and while the user hid them with the
+        // button at the edge of the canvas. The dock with them is kept and
+        // comes back with the tab that shows then.
+        let start_showing = self.dock.find_tab(&Tab::Start).is_some_and(|p| {
+            self.dock[p.surface][p.node]
+                .get_leaf()
+                .is_some_and(|l| l.active == p.tab)
+        });
+        let hide = st.side_hidden || start_showing;
+        match (hide, self.saved_dock.is_some()) {
+            (true, false) => self.saved_dock = Some(self.dock.clone()),
+            (false, true) => {
+                let front = self.dock.find_tab(&Tab::Canvas).and_then(|p| {
+                    self.dock[p.surface][p.node]
+                        .get_leaf()
+                        .and_then(|l| l.tabs.get(l.active.0).cloned())
+                });
+                if let Some(full) = self.saved_dock.take() {
+                    self.dock = full;
+                }
+                if let Some(tab) = front
+                    && let Some(p) = self.dock.find_tab(&tab)
+                {
+                    let _ = self.dock.set_active_tab(p);
+                }
+            }
+            _ => {}
+        }
+        st.side_panels_hidden = hide;
         crate::viewtools::sync_panels(&mut self.dock, st);
         crate::views::sync_views(&mut self.dock, st);
         // The start page is a tab before the design.
@@ -1916,8 +1974,15 @@ impl EmbApp {
         }
         if !kiosk {
             egui::CentralPanel::no_frame().show(ui, |ui| {
+                // A finger needs a wider place to drag the line between
+                // two panels (P15 step 3).
+                let mut style = Style::from_egui(ui.style().as_ref());
+                if st.touch_seen {
+                    style.separator.width = 3.0;
+                    style.separator.extra_interact_width = 14.0;
+                }
                 DockArea::new(&mut self.dock)
-                    .style(Style::from_egui(ui.style().as_ref()))
+                    .style(style)
                     .show_leaf_close_all_buttons(false)
                     .show_leaf_collapse_buttons(false)
                     .show_inside(ui, st);

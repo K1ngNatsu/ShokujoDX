@@ -24,7 +24,8 @@ arco](tutorial-lettering) muestra los primeros pasos.
    bien; con **Automático**, un trazo de menos de 0,8 mm se borda como
    puntada recta.
 4. Haga clic en **Aceptar** (o **Ctrl+Intro**). **Esc** o **Cancelar**
-   cierra la ventana y quita lo que muestra.
+   cierra la ventana y quita lo que muestra. Después de **Aceptar**, la
+   herramienta es **Seleccionar** de nuevo.
 
 Para cambiar el texto después, haga doble clic en las letras, o haga clic
 derecho en ellas y seleccione **Editar texto…**.

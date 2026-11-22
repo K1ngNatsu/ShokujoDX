@@ -124,7 +124,8 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
             {
                 add_own = true;
             }
-            if st.settings.updates.auto.is_none() {
+            // The browser version does not look for new versions.
+            if st.settings.updates.auto.is_none() && !cfg!(target_arch = "wasm32") {
                 ui.separator();
                 ui.checkbox(&mut step.updates, tr("Look for new versions at the start"));
                 ui.weak(crate::update::what_it_does());

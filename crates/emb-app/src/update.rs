@@ -322,6 +322,11 @@ impl AppState {
     /// of a new version, the question for a user who did not answer yet,
     /// and the automatic check if it is on and a day went by.
     pub fn start_updates(&mut self, ctx: &egui::Context) {
+        // The browser version is always the newest (the page loads it), and
+        // it cannot start `curl`: no check and no question.
+        if cfg!(target_arch = "wasm32") {
+            return;
+        }
         self.start_updates_with(ctx, installer_choice(), crate::backup::unix_now(), fetch);
     }
 
@@ -353,6 +358,12 @@ impl AppState {
 
     /// Help > Check for Updates: opens the window and checks now.
     pub fn check_updates_now(&mut self, ctx: &egui::Context) {
+        // The browser version cannot start `curl` (see `start_updates`).
+        if cfg!(target_arch = "wasm32") {
+            #[cfg(target_arch = "wasm32")]
+            crate::web::not_in_the_browser();
+            return;
+        }
         self.updates.window = true;
         self.updates.check(true, ctx, fetch);
     }

@@ -1039,7 +1039,15 @@ impl AppState {
         self.current_thread = self.doc.design().object(id).map(|o| o.thread);
         self.selection.set(id);
         self.draw = DrawState::default();
-        self.message = crate::i18n::fill("{} added. Draw the next one, or press Esc.", &[&(self.tool.label())]);
+        if self.touch_seen {
+            // A touch screen has no Esc key: the tool goes back to Select
+            // (P15 step 3). With a mouse the tool stays for the next shape.
+            let label = self.tool.label();
+            self.set_tool(Tool::Select);
+            self.message = crate::i18n::fill("{} added.", &[&label]);
+        } else {
+            self.message = crate::i18n::fill("{} added. Draw the next one, or press Esc.", &[&(self.tool.label())]);
+        }
     }
 
     /// Enter, Backspace and Esc while a tool other than Select is active.

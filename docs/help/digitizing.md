@@ -7,7 +7,8 @@ keywords: draw, digitize, line, manual, freehand, shape, fill, complex fill, fre
 # Drawing objects
 
 The tools of the **Digitize** tab draw new objects. Each tool stays on
-after an object, so you can draw more. Push **Esc** to stop.
+after an object, so you can draw more. Push **Esc** to stop. On a touch
+screen, the tool changes back to **Select** after each object.
 
 ## Clicks and keys
 

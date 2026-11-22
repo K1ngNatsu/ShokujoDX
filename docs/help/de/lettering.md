@@ -24,7 +24,8 @@ Bogen](tutorial-lettering) zeigt die ersten Schritte.
    kleinste Höhe, bei der seine Striche gut sticken; mit **Automatisch**
    stickt ein Strich, der dünner als 0,8 mm ist, als Steppstich.
 4. Klicken Sie auf **OK** (oder **Strg+Eingabe**). **Esc** oder
-   **Abbrechen** schließt das Fenster und nimmt zurück, was es zeigt.
+   **Abbrechen** schließt das Fenster und nimmt zurück, was es zeigt. Nach
+   **OK** ist das Werkzeug wieder **Auswählen**.
 
 Um den Text später zu ändern, doppelklicken Sie auf die Schrift, oder
 klicken Sie mit der rechten Maustaste darauf und wählen Sie **Text

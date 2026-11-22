@@ -350,6 +350,8 @@ impl AppState {
 
     /// Runs a ribbon command.
     pub fn run(&mut self, cmd: Cmd, ctx: &egui::Context) {
+        // The panels over the canvas of a short screen close (P15 step 3).
+        self.ribbon_peek = None;
         let label = cmd.meta().1;
         // Space repeats it (not undo, redo and the view switches).
         if !matches!(cmd, Cmd::Undo | Cmd::Redo | Cmd::Toggle(_) | Cmd::RepeatLast) {
