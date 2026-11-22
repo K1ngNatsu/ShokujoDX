@@ -48,12 +48,17 @@ pub fn start() {
                 Box::new(|cc| Ok(Box::new(crate::app::EmbApp::new(cc)))),
             )
             .await;
-        let text = match started {
-            Ok(()) => String::new(),
-            Err(e) => format!("The program did not start: {e:?}"),
-        };
+        // The loader of the page (the logo that fills with the download)
+        // fades out when the program runs, or shows why it did not start.
         if let Some(loading) = document.get_element_by_id("loading") {
-            loading.set_text_content(Some(&text));
+            match started {
+                Ok(()) => loading.set_class_name("done"),
+                Err(e) => {
+                    if let Some(status) = document.get_element_by_id("status") {
+                        status.set_text_content(Some(&format!("The program did not start: {e:?}")));
+                    }
+                }
+            }
         }
     });
 }

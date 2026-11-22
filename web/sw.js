@@ -12,6 +12,7 @@ const FILES = [
   "./emb-app.js",
   "./emb-app_bg.wasm",
   "./manifest.webmanifest",
+  "./logo.svg",
   "./icon-180.png",
   "./icon-192.png",
   "./icon-512.png",

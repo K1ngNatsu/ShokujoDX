@@ -296,6 +296,22 @@ fails with the old popup), `guides::tests::a_right_click_on_a_ruler_adds_a_guide
 they find the buttons in the tree of the screen reader
 (`Harness::reader_nodes`, `Harness::widget`).
 
+## The loader (the owner, 2026-11-22)
+
+While the program downloads, the page shows the logo (`logo.svg`: the
+logo of `data/icon/icon.svg` with no tile, made by `tools/build-web.py`)
+in the middle: a dim logo, and the bright logo over it in a sweep from
+12 o'clock round the middle of the hoop, as far as the download has come
+(`?loader=up`: a line from the bottom to the top). The page reads the
+program through a stream that counts its bytes against the size of the
+unpacked program (the build writes it into the page; the Content-Length
+of a packed file is smaller), and gives the stream to the browser as a
+response, so the browser still compiles during the download. A browser
+that does not compile such a response gets the file again from its
+cache. Then "Starting…" (the logo breathes), and the loader fades out
+when the program runs (`web::start`). Checked in a headless browser with
+a download of 6 MB a second; not on a phone yet.
+
 ## Faults that the trial found (fixed in the branch)
 
 In a browser, these calls stop the program: `std::time::Instant::now`

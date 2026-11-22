@@ -21,16 +21,43 @@
     -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
   canvas { position: absolute; inset: 0; width: 100%; height: 100%; outline: none;
     touch-action: none; }
-  #loading { position: absolute; inset: 0; display: flex; align-items: center;
-    justify-content: center; color: #ccc; font: 16px/1.6 sans-serif; text-align: center;
-    pointer-events: none; padding: 16px; }
+  #loading { position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 14px; color: #ccc;
+    font: 16px/1.6 sans-serif; text-align: center; pointer-events: none; padding: 16px;
+    background: #1e1f22; transition: opacity 0.5s ease; }
+  #loading.done { opacity: 0; visibility: hidden; transition: opacity 0.5s ease, visibility 0s 0.5s; }
+  /* The logo fills with the download: a dim logo, and over it the bright
+     logo in a sweep from 12 o'clock round the middle of the hoop (?loader=up:
+     from the bottom to the top). --p is the part of the program that came. */
+  @property --p { syntax: "<percentage>"; inherits: true; initial-value: 0%; }
+  #logo { --p: 0%; position: relative; width: min(56vw, 36vh, 260px); aspect-ratio: 1;
+    transition: --p 0.35s linear; }
+  #logo img { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #logo .dim { opacity: 0.22; filter: saturate(0.5); }
+  #logo .lit { filter: drop-shadow(0 0 10px rgba(156, 98, 220, 0.55));
+    -webkit-mask-image: conic-gradient(from 0deg at 50% 54%, #000 calc(var(--p) - 1.5%), transparent var(--p));
+    mask-image: conic-gradient(from 0deg at 50% 54%, #000 calc(var(--p) - 1.5%), transparent var(--p)); }
+  /* The logo is from 15 % to 90 % of the height of its picture. */
+  #logo.up { --line: calc(15% + var(--p) * 0.75); }
+  #logo.up .lit {
+    -webkit-mask-image: linear-gradient(to top, #000 calc(var(--line) - 1.5%), transparent calc(var(--line) + 1.5%));
+    mask-image: linear-gradient(to top, #000 calc(var(--line) - 1.5%), transparent calc(var(--line) + 1.5%)); }
+  /* The program starts (after the download): the logo breathes. */
+  #logo.starting .lit { animation: breathe 1.4s ease-in-out infinite; }
+  @keyframes breathe { 50% { opacity: 0.7; } }
+  #status { color: #e6e6e6; font-size: 17px; min-height: 1.6em; }
+  #note { color: #999; font-size: 14px; max-width: 34em; }
 </style>
 </head>
 <body>
 <canvas id="shokujodx"></canvas>
-<div id="loading">ShokujoDX is loading: a trial of the program in a browser.<br>
-The first visit downloads about 35 MB; then the browser keeps it.<br>
-On a phone or a tablet, "Add to Home Screen" makes it an app that also works offline.</div>
+<div id="loading">
+<div id="logo"><img class="dim" src="logo.svg" alt=""><img class="lit" src="logo.svg" alt=""></div>
+<div id="status">Loading ShokujoDX…</div>
+<div id="note">A trial of the program in a browser. The first visit downloads about 35 MB;
+then the browser keeps it.<br>On a phone or a tablet, "Add to Home Screen" makes it an app
+that also works offline.</div>
+</div>
 <noscript>ShokujoDX needs JavaScript and WebAssembly.</noscript>
 <script type="module">
   import init from "./emb-app.js";
@@ -62,15 +89,58 @@ On a phone or a tablet, "Add to Home Screen" makes it an app that also works off
       location.reload();
     }
   };
-  const loading = document.getElementById("loading");
+  const logo = document.getElementById("logo");
+  const status = document.getElementById("status");
+  if (new URLSearchParams(location.search).get("loader") === "up") logo.classList.add("up");
+  // The part of the program that came (0 to 1): the logo and the status.
+  const show = (part) => {
+    logo.style.setProperty("--p", (part >= 1 ? 102 : part * 100).toFixed(1) + "%");
+    status.textContent = "Downloading ShokujoDX… " + Math.floor(part * 100) + " %";
+  };
+  // The program as a response that counts its bytes as they come, so the
+  // browser still compiles it during the download. The size is the size of
+  // the program after the browser unpacks it (tools/build-web.py writes it;
+  // the Content-Length of a packed file is smaller).
+  const counted = async (url) => {
+    const r = await fetch(url);
+    const total = Number("@WASM_BYTES@") || Number(r.headers.get("content-length")) || 0;
+    if (!r.ok || !r.body || !total) return r;
+    let got = 0;
+    const reader = r.body.getReader();
+    const body = new ReadableStream({
+      async pull(controller) {
+        const { done, value } = await reader.read();
+        if (done) {
+          controller.close();
+          return;
+        }
+        got += value.byteLength;
+        show(Math.min(got / total, 1));
+        controller.enqueue(value);
+      },
+    });
+    return new Response(body, { headers: { "Content-Type": "application/wasm" } });
+  };
   const t0 = performance.now();
-  try {
-    const wasm = await init({ module_or_path: "./emb-app_bg.wasm" });
+  const ready = (wasm) => {
     window.shokujodxLoadMs = performance.now() - t0;
     window.shokujodxMemoryMb = () => wasm.memory.buffer.byteLength / 1e6;
-    loading.textContent = "";
-  } catch (e) {
-    loading.textContent = "ShokujoDX did not start in this browser: " + e;
+    // The program hides the loader when it draws (crates/emb-app/src/web.rs).
+    show(1);
+    status.textContent = "Starting…";
+    logo.classList.add("starting");
+  };
+  try {
+    ready(await init({ module_or_path: await counted("./emb-app_bg.wasm") }));
+  } catch (first) {
+    // A browser that does not compile a counted response: the file again
+    // (from its cache).
+    try {
+      ready(await init({ module_or_path: "./emb-app_bg.wasm" }));
+    } catch (e) {
+      logo.classList.remove("starting");
+      status.textContent = "ShokujoDX did not start in this browser: " + e;
+    }
   }
   // Offline use and "Add to Home Screen": a service worker keeps the files
   // of this version (only on https, so a local test build is not kept).

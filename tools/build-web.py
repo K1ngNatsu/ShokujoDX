@@ -83,7 +83,10 @@ def main():
         ).stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         commit = "unknown"
-    stamps = {"@VERSION@": version, "@BUILT@": built, "@COMMIT@": commit}
+    # The size of the program after the browser unpacks it: the loader of
+    # the page counts the download against it.
+    wasm_bytes = os.path.getsize(os.path.join(OUT, "emb-app_bg.wasm"))
+    stamps = {"@VERSION@": version, "@BUILT@": built, "@COMMIT@": commit, "@WASM_BYTES@": str(wasm_bytes)}
     for name in os.listdir(os.path.join(ROOT, "web")):
         src = os.path.join(ROOT, "web", name)
         if name in ("sw.js", "index.html"):
@@ -93,6 +96,12 @@ def main():
             open(os.path.join(OUT, name), "w", encoding="utf-8", newline="\n").write(text)
         else:
             shutil.copyfile(src, os.path.join(OUT, name))
+    # The logo of the loader: the logo of the program with no tile behind it.
+    icon = open(os.path.join(ROOT, "data", "icon", "icon.svg"), encoding="utf-8").read()
+    tile = '<rect width="1200" height="1200" fill="rgb(43,42,51)"/>'
+    if tile not in icon:
+        sys.exit("data/icon/icon.svg has no tile to take out for logo.svg")
+    open(os.path.join(OUT, "logo.svg"), "w", encoding="utf-8", newline="\n").write(icon.replace(tile, ""))
     with open(os.path.join(OUT, "version.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump({"version": version, "built": built, "commit": commit}, f)
     stale = os.path.join(OUT, "icon.png")
