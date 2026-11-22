@@ -153,10 +153,9 @@ pub struct AppState {
     /// The Measure tool line, in design coordinates.
     pub measure: Option<(Point, Point)>,
     /// The guide or construction mark whose menu is open (ADR 0089).
-    pub guide_menu: Option<crate::guides::MarkRef>,
-    /// The menu of a place on a ruler (a right click or a long press on a
-    /// ruler, not on a marker).
-    pub ruler_menu: Option<crate::guides::RulerPick>,
+    /// The menu of a guide, a construction mark (ADR 0089) or a place on a
+    /// ruler that a right click (a long press on a touch screen) opened.
+    pub guide_menu: Option<crate::guides::CanvasMenu>,
     /// The edit window of a guide or a construction mark.
     pub guide_edit: Option<crate::guides::GuideEdit>,
     /// Keyboard modifiers of the current frame on the canvas.
@@ -736,7 +735,6 @@ impl AppState {
             show_options: false,
             measure: None,
             guide_menu: None,
-            ruler_menu: None,
             guide_edit: None,
             mods: Modifiers::NONE,
             arrange_values: (15.0, 0.0, 45.0),
@@ -1983,14 +1981,6 @@ mod dock_tests {
         out.textures_delta.clear();
     }
 
-    fn one_group(dock: &DockState<Tab>) -> bool {
-        let side: Vec<_> = SIDE_PANELS.iter().filter_map(|t| dock.find_tab(t)).collect();
-        side.len() == SIDE_PANELS.len()
-            && side
-                .iter()
-                .all(|p| (p.surface, p.node) == (side[0].surface, side[0].node))
-    }
-
     #[test]
     fn reset_the_panels_puts_all_side_panels_back_in_one_group() {
         let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
@@ -2000,7 +1990,7 @@ mod dock_tests {
         let mut app = EmbApp::for_test(st);
         let ctx = crate::test_util::ready_context();
         frame(&ctx, &mut app);
-        assert!(one_group(&app.dock), "one group at the start");
+        assert!(crate::test_util::one_side_group(&app.dock), "one group at the start");
         // The user closes a panel and moves another one under the group.
         app.state().set_panel_shown(Tab::Styles, false);
         let p = app.dock.find_tab(&Tab::Threads).unwrap();
@@ -2008,10 +1998,13 @@ mod dock_tests {
         let q = app.dock.find_tab(&Tab::Properties).unwrap();
         app.dock[q.surface].split_below(q.node, 0.5, vec![Tab::Threads]);
         frame(&ctx, &mut app);
-        assert!(!one_group(&app.dock));
+        assert!(!crate::test_util::one_side_group(&app.dock));
         app.state().reset_panels = true;
         frame(&ctx, &mut app);
-        assert!(one_group(&app.dock), "all side panels back in one group");
+        assert!(
+            crate::test_util::one_side_group(&app.dock),
+            "all side panels back in one group"
+        );
         assert!(app.state().panel_shown(Tab::Styles), "the closed panel opens");
     }
 }

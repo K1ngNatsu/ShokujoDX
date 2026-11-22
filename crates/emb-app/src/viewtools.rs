@@ -969,15 +969,12 @@ mod tests {
         let mut h = Harness::empty();
         h.st.save_settings = false;
         let mut dock = crate::app::default_dock();
-        // The side panels are one group at the start.
-        let side: Vec<_> = crate::app::SIDE_PANELS
-            .iter()
-            .map(|t| dock.find_tab(t).unwrap())
-            .collect();
-        assert!(
-            side.iter()
-                .all(|p| (p.surface, p.node) == (side[0].surface, side[0].node))
-        );
+        // The side panels are one group at the start, and they are the
+        // panels of View > Panels with no Library (it is next to the design).
+        assert!(crate::test_util::one_side_group(&dock));
+        let mut side = crate::app::SIDE_PANELS.to_vec();
+        side.push(Tab::Library);
+        assert!(PANELS.iter().all(|(t, _)| side.contains(t)) && side.len() == PANELS.len());
         h.st.set_panel_shown(Tab::Threads, false);
         assert!(!h.st.panel_shown(Tab::Threads));
         sync_panels(&mut dock, &mut h.st);

@@ -279,21 +279,19 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
             && let Some(pos) = response.interact_pointer_pos()
         {
             st.guide_menu = None;
-            st.ruler_menu = None;
             match pick(st, st.view.to_mm(rect, pos)) {
                 Some(id) if !st.selection.contains(id) => st.selection.set(id),
                 Some(_) => {}
                 None => {
                     st.selection.clear();
                     // A guide or a construction mark there: its menu.
-                    st.guide_menu = crate::guides::mark_at(st, rect, pos, false);
+                    st.guide_menu = crate::guides::mark_at(st, rect, pos, false).map(crate::guides::CanvasMenu::Mark);
                 }
             }
         }
-        response.context_menu(|ui| match (st.ruler_menu, st.guide_menu) {
-            (Some(at), _) => crate::guides::ruler_menu(ui, st, at),
-            (None, Some(target)) => crate::guides::menu(ui, st, target),
-            (None, None) => commands::canvas_menu(ui, st),
+        response.context_menu(|ui| match st.guide_menu {
+            Some(m) => crate::guides::canvas_menu(ui, st, m),
+            None => commands::canvas_menu(ui, st),
         });
         // Double-click on a guide or a mark (no object there): type its place.
         if response.double_clicked()
@@ -359,30 +357,19 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
             }
         }
     }
-    // The menu of a guide (from its ruler marker) with Reshape or a draw
-    // tool; the Select tool shows it in place of its own menu.
+    // The menu of a guide (from its ruler marker) or of a ruler with
+    // Reshape or a draw tool; the Select tool shows it in place of its own
+    // menu.
     if st.sketch.is_none()
         && !st.hoopings_ui.mode
         && (by_guides || st.tool != Tool::Select)
-        && let Some(target) = st.guide_menu
+        && let Some(m) = st.guide_menu
         && response
-            .context_menu(|ui| crate::guides::menu(ui, st, target))
+            .context_menu(|ui| crate::guides::canvas_menu(ui, st, m))
             .is_none()
         && !by_guides
     {
         st.guide_menu = None;
-    }
-    // The menu of a place on a ruler, in the same way.
-    if st.sketch.is_none()
-        && !st.hoopings_ui.mode
-        && (by_guides || st.tool != Tool::Select)
-        && let Some(at) = st.ruler_menu
-        && response
-            .context_menu(|ui| crate::guides::ruler_menu(ui, st, at))
-            .is_none()
-        && !by_guides
-    {
-        st.ruler_menu = None;
     }
 
     // Groups are selected together; locked objects cannot be selected.
@@ -513,26 +500,39 @@ fn touch_bar(ui: &mut egui::Ui, rect: Rect, st: &mut AppState, drawing: bool) {
     if !drawing || !has_points || !ui.input(|i| i.has_touch_screen()) {
         return;
     }
-    egui::Area::new(egui::Id::new("touch_draw_bar"))
+    let next = st.tool.enter_goes_on(st.draw.points.len(), st.draw.stages.len());
+    let labels = [
+        if next { tr("Next") } else { tr("Finish") },
+        tr("Remove Point"),
+        tr("Cancel"),
+    ];
+    let keys = [egui::Key::Enter, egui::Key::Backspace, egui::Key::Escape];
+    if let Some(i) = touch_buttons(ui, "touch_draw_bar", rect, &labels) {
+        st.draw_key(keys[i]);
+    }
+}
+
+/// A row of large buttons in the middle of the bottom of the canvas `rect`,
+/// over the canvas (the touch bars); the button that was tapped.
+pub(crate) fn touch_buttons(ui: &egui::Ui, id: &str, rect: Rect, labels: &[&str]) -> Option<usize> {
+    let mut tapped = None;
+    egui::Area::new(egui::Id::new(id))
         .order(egui::Order::Foreground)
-        .fixed_pos(rect.center_bottom() - Vec2::new(150.0, 64.0))
+        .pivot(egui::Align2::CENTER_BOTTOM)
+        .fixed_pos(rect.center_bottom() - Vec2::new(0.0, 16.0))
         .show(ui.ctx(), |ui| {
             egui::Frame::popup(ui.style()).show(ui, |ui| {
                 ui.spacing_mut().button_padding = Vec2::new(14.0, 10.0);
                 ui.horizontal(|ui| {
-                    let next = st.tool.enter_goes_on(st.draw.points.len(), st.draw.stages.len());
-                    if ui.button(if next { tr("Next") } else { tr("Finish") }).clicked() {
-                        st.draw_key(egui::Key::Enter);
-                    }
-                    if ui.button(tr("Remove Point")).clicked() {
-                        st.draw_key(egui::Key::Backspace);
-                    }
-                    if ui.button(tr("Cancel")).clicked() {
-                        st.draw_key(egui::Key::Escape);
+                    for (i, label) in labels.iter().enumerate() {
+                        if ui.button(*label).clicked() {
+                            tapped = Some(i);
+                        }
                     }
                 });
             });
         });
+    tapped
 }
 
 /// Returns the topmost object at the point (view mm), by its real shape.

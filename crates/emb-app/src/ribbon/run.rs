@@ -546,6 +546,7 @@ impl AppState {
                 self.guide_edit = None;
             }
             Cmd::Options => self.show_options = true,
+            Cmd::ResetPanels => self.reset_panels = true,
             Cmd::RotateDesign => {
                 self.doc
                     .edit(tr("Rotate Design"), |d| d.rotation = d.rotation.turned_cw());

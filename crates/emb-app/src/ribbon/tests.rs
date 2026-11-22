@@ -44,6 +44,11 @@ impl Rib {
     }
 
     fn frame(&mut self, events: Vec<Event>) {
+        self.run(events);
+    }
+
+    /// One frame with `events`, and what it gives out.
+    fn run(&mut self, events: Vec<Event>) -> egui::FullOutput {
         let input = RawInput {
             screen_rect: Some(Rect::from_min_size(
                 Pos2::ZERO,
@@ -57,6 +62,7 @@ impl Rib {
             egui::Panel::top("ribbon").show(ui, |ui| show(ui, st));
         });
         out.textures_delta.clear();
+        out
     }
 
     fn rect(&self, label: &str) -> Rect {
@@ -70,7 +76,10 @@ impl Rib {
     }
 
     fn click(&mut self, label: &str) {
-        let p = self.rect(label).center();
+        self.click_at(self.rect(label).center());
+    }
+
+    fn click_at(&mut self, p: Pos2) {
         let ev = |pressed| Event::PointerButton {
             pos: p,
             button: PointerButton::Primary,
@@ -468,39 +477,7 @@ fn undo_from_the_quick_access_buttons() {
 /// The names and places of the widgets for a screen reader, in one frame.
 fn reader_nodes(r: &mut Rib) -> Vec<(String, Rect)> {
     r.ctx.enable_accesskit();
-    let input = RawInput {
-        screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(r.width, 900.0))),
-        ..Default::default()
-    };
-    let st = &mut r.st;
-    let mut out = r.ctx.run_ui(input, |ui| {
-        egui::Panel::top("ribbon").show(ui, |ui| show(ui, st));
-    });
-    out.textures_delta.clear();
-    let update = out.platform_output.accesskit_update.expect("the screen reader tree");
-    update
-        .nodes
-        .iter()
-        .filter_map(|(_, n)| {
-            let b = n.bounds()?;
-            let rect = Rect::from_min_max(Pos2::new(b.x0 as f32, b.y0 as f32), Pos2::new(b.x1 as f32, b.y1 as f32));
-            let text = n.label().or(n.value())?;
-            Some((text.to_string(), rect))
-        })
-        .collect()
-}
-
-fn click_at(r: &mut Rib, p: Pos2) {
-    let ev = |pressed| Event::PointerButton {
-        pos: p,
-        button: PointerButton::Primary,
-        pressed,
-        modifiers: Modifiers::NONE,
-    };
-    r.frame(vec![Event::PointerMoved(p)]);
-    r.frame(vec![ev(true)]);
-    r.frame(vec![ev(false)]);
-    r.frame(vec![]);
+    crate::test_util::reader_nodes(&r.run(vec![]))
 }
 
 #[test]
@@ -520,7 +497,7 @@ fn a_list_in_a_folded_panel_opens_and_picks() {
             .map(|(_, r)| *r)
             .expect("the panel is folded on a phone")
     });
-    click_at(&mut r, folded.center());
+    r.click_at(folded.center());
     let current =
         r.st.machines
             .get(r.st.doc.design().machine.as_deref().unwrap_or(""))
@@ -532,7 +509,7 @@ fn a_list_in_a_folded_panel_opens_and_picks() {
         .find(|(l, _)| *l == current)
         .map(|(_, r)| *r)
         .unwrap_or_else(|| panic!("the Machine list shows in the popup: {nodes:?}"));
-    click_at(&mut r, combo.center());
+    r.click_at(combo.center());
     let other =
         r.st.machines
             .machines
@@ -546,15 +523,9 @@ fn a_list_in_a_folded_panel_opens_and_picks() {
         .find(|(l, _)| *l == other.1)
         .map(|(_, r)| *r)
         .unwrap_or_else(|| panic!("the list of machines opens: {nodes:?}"));
-    click_at(&mut r, item.center());
+    r.click_at(item.center());
     assert_eq!(r.st.doc.design().machine.as_deref(), Some(other.0.as_str()));
     // A click on the ribbon outside the popups closes the panel.
-    let tab = r.rect("Digitize").center();
-    click_at(&mut r, tab);
-    r.frame(vec![]);
-    assert!(nodes_without(&mut r, &other.1));
-}
-
-fn nodes_without(r: &mut Rib, label: &str) -> bool {
-    reader_nodes(r).iter().all(|(l, _)| l != label)
+    r.click("Digitize");
+    assert!(reader_nodes(&mut r).iter().all(|(l, _)| *l != other.1));
 }

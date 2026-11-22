@@ -621,7 +621,10 @@ pub(super) const VIEW: &[Panel] = &[
             Small(&[f(Flag::Grid), f(Flag::Rulers), t(Tool::Measure)]),
             Small(&[t(Tool::ConstructionLine), t(Tool::ConstructionPoint)]),
             Small(&[f(Flag::SnapGrid), f(Flag::SnapGuides), f(Flag::SnapObjects)]),
-            Custom(workspace_more, &[Cmd::RemoveGuides, f(Flag::DarkMode)]),
+            Custom(
+                workspace_more,
+                &[Cmd::RemoveGuides, f(Flag::DarkMode), Cmd::ResetPanels],
+            ),
             Large(Cmd::Options),
         ],
     },

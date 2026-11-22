@@ -270,7 +270,7 @@ pub(super) fn dropdown(
     content: impl FnOnce(&mut egui::Ui),
 ) {
     let resp = small(ui, Icon::Glyph(icon), label, false, enabled, true).on_hover_text(tip);
-    holding_popup(&resp, egui::Layout::top_down_justified(egui::Align::Min), content);
+    egui::Popup::menu(&resp).show(content);
 }
 
 /// A column of controls with the height of three small buttons.
@@ -367,57 +367,47 @@ pub(super) fn panel_icon(p: &Panel) -> Icon {
         .unwrap_or(Icon::Glyph(ph::DOTS_THREE))
 }
 
-/// A click whose place is not in a popup (a click on the ribbon or the
-/// canvas): the place of the click is under the layers of the popups.
-pub(crate) fn click_below_popups(ctx: &egui::Context) -> bool {
-    ctx.input(|i| i.pointer.any_click() && i.pointer.interact_pos().is_some())
-        && ctx
-            .input(|i| i.pointer.interact_pos())
-            .and_then(|p| ctx.layer_id_at(p))
-            .is_none_or(|l| l.order < egui::Order::Foreground)
-}
-
-/// A popup under `resp` that a click on `resp` opens and closes. Unlike
-/// `egui::Popup::menu`, it keeps its own open state: egui keeps one open
-/// popup in its memory, so a list (a combo box, a dropdown) in a menu
-/// closed the menu, and the list did not show (Design > Machine on a
-/// narrow screen). A click in a popup (the popup itself or a list in it)
-/// keeps it open; a click outside the popups, Esc, or a frame that does
-/// not show it closes it.
-pub(crate) fn holding_popup<R>(
-    resp: &egui::Response,
-    layout: egui::Layout,
-    content: impl FnOnce(&mut egui::Ui) -> R,
-) -> Option<R> {
+/// The popup of a folded panel under `resp`; a click on `resp` opens and
+/// closes it. Unlike `egui::Popup::menu`, it keeps its own open state:
+/// egui keeps one open popup in its memory, so a list (a combo box) in a
+/// menu closed the menu, and the list did not show (the Machine list of a
+/// folded Machine and Hoop panel). A click outside it closes it, but not a
+/// click in a list that was open in it; Esc and a frame that does not show
+/// it close it too. A command in it does not close it.
+fn holding_popup(resp: &egui::Response, layout: egui::Layout, content: impl FnOnce(&mut egui::Ui)) {
     let ctx = resp.ctx.clone();
     let key = resp.id.with("holding_popup");
     let pass = ctx.cumulative_pass_nr();
-    let (mut open, last) = ctx.data(|d| d.get_temp::<(bool, u64)>(key)).unwrap_or((false, 0));
-    // Not shown in the frame before (its panel closed): it is closed.
-    if last + 1 < pass {
-        open = false;
-    }
+    // The pass of the last frame that showed it open.
+    let last = ctx.data(|d| d.get_temp::<u64>(key));
+    let mut open = last.is_some_and(|l| l + 1 >= pass);
+    // A list in it (a popup in the memory of egui) is open.
+    let list_open = egui::Popup::is_any_open(&ctx);
     if resp.clicked() {
         open = !open;
         if open {
             // The other popups close, as when a menu opens.
             egui::Popup::close_all(&ctx);
         }
-    } else if open && (click_below_popups(&ctx) || ctx.input(|i| i.key_pressed(egui::Key::Escape))) {
-        open = false;
     }
     let mut shown = open;
-    let inner = egui::Popup::from_response(resp)
+    let area = egui::Popup::from_response(resp)
         .kind(egui::PopupKind::Menu)
         .layout(layout)
         .style(egui::containers::menu::menu_style)
         .gap(0.0)
         .close_behavior(egui::PopupCloseBehavior::IgnoreClicks)
         .open_bool(&mut shown)
-        .show(content)
-        .map(|r| r.inner);
-    ctx.data_mut(|d| d.insert_temp(key, (open && shown, pass)));
-    inner
+        .show(content);
+    if area.is_some_and(|a| a.response.clicked_elsewhere()) && !resp.clicked() && !list_open {
+        shown = false;
+    }
+    // Only an open popup keeps a value (Esc closes it in `show`).
+    if open && shown {
+        ctx.data_mut(|d| d.insert_temp(key, pass));
+    } else if last.is_some() {
+        ctx.data_mut(|d| d.remove::<u64>(key));
+    }
 }
 
 /// The label of a folded panel: its title and a caret.
