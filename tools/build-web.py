@@ -50,6 +50,36 @@ def lock_version():
     return m.group(1) if m else "?"
 
 
+# The white shapes of the mask of data/icon/icon.svg (tools/make-icon.py
+# writes them in this order) that make each part of the logo.
+LOGO_PARTS = {
+    "logo-hoop.svg": [0, 2, 3, 4],  # the ring, the clasp, the screw
+    "logo-needle.svg": [6, 7, 9],  # the thread, its end, the needle
+    "logo-star.svg": [12],
+}
+
+
+def logo_parts():
+    """The logo with no tile (logo.svg) and one file for each part. A part
+    keeps all the black shapes of the mask (the gaps), so the parts
+    together are the logo."""
+    icon = open(os.path.join(ROOT, "data", "icon", "icon.svg"), encoding="utf-8").read()
+    tile = '<rect width="1200" height="1200" fill="rgb(43,42,51)"/>'
+    shapes = re.findall(r'      <path fill="(white|black)" d="[^"]+"/>\n', icon)
+    lines = re.findall(r'      <path fill="(?:white|black)" d="[^"]+"/>\n', icon)
+    if tile not in icon or len(lines) != 13:
+        sys.exit("data/icon/icon.svg is not the logo that tools/build-web.py splits (LOGO_PARTS)")
+    logo = icon.replace(tile, "")
+    files = {"logo.svg": logo}
+    for name, whites in LOGO_PARTS.items():
+        part = logo
+        for i, (fill, line) in enumerate(zip(shapes, lines)):
+            if fill == "white" and i not in whites:
+                part = part.replace(line, "", 1)
+        files[name] = part
+    return files
+
+
 def main():
     args = sys.argv[1:]
     subprocess.run(
@@ -96,12 +126,10 @@ def main():
             open(os.path.join(OUT, name), "w", encoding="utf-8", newline="\n").write(text)
         else:
             shutil.copyfile(src, os.path.join(OUT, name))
-    # The logo of the loader: the logo of the program with no tile behind it.
-    icon = open(os.path.join(ROOT, "data", "icon", "icon.svg"), encoding="utf-8").read()
-    tile = '<rect width="1200" height="1200" fill="rgb(43,42,51)"/>'
-    if tile not in icon:
-        sys.exit("data/icon/icon.svg has no tile to take out for logo.svg")
-    open(os.path.join(OUT, "logo.svg"), "w", encoding="utf-8", newline="\n").write(icon.replace(tile, ""))
+    # The logo of the loader: the logo of the program with no tile behind
+    # it, and its parts (the hoop, the needle with its thread, the star).
+    for name, text in logo_parts().items():
+        open(os.path.join(OUT, name), "w", encoding="utf-8", newline="\n").write(text)
     with open(os.path.join(OUT, "version.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump({"version": version, "built": built, "commit": commit}, f)
     stale = os.path.join(OUT, "icon.png")

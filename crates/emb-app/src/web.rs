@@ -49,10 +49,23 @@ pub fn start() {
             )
             .await;
         // The loader of the page (the logo that fills with the download)
-        // fades out when the program runs, or shows why it did not start.
+        // goes when the program runs (`window.shokujodxStarted` lets the
+        // needle and the star light up first), or shows why it did not
+        // start.
         if let Some(loading) = document.get_element_by_id("loading") {
             match started {
-                Ok(()) => loading.set_class_name("done"),
+                Ok(()) => {
+                    let page = web_sys::window().and_then(|w| {
+                        let f = js_sys::Reflect::get(&w, &"shokujodxStarted".into()).ok()?;
+                        f.dyn_into::<js_sys::Function>().ok().map(|f| (w, f))
+                    });
+                    match page {
+                        Some((w, f)) => {
+                            let _ = f.call0(&w);
+                        }
+                        None => loading.set_class_name("done"),
+                    }
+                }
                 Err(e) => {
                     if let Some(status) = document.get_element_by_id("status") {
                         status.set_text_content(Some(&format!("The program did not start: {e:?}")));

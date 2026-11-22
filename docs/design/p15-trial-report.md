@@ -300,16 +300,22 @@ they find the buttons in the tree of the screen reader
 
 While the program downloads, the page shows the logo (`logo.svg`: the
 logo of `data/icon/icon.svg` with no tile, made by `tools/build-web.py`)
-in the middle: a dim logo, and the bright logo over it in a sweep from
-12 o'clock round the middle of the hoop, as far as the download has come
-(`?loader=up`: a line from the bottom to the top). The page reads the
+in the middle: a dim logo, and the bright hoop over it in a sweep from
+12 o'clock round its middle, as far as the download has come
+(`?loader=up`: a line from the bottom to the top). When the program
+starts, the needle and then the star light up. The build splits the logo
+into `logo-hoop.svg`, `logo-needle.svg` and `logo-star.svg`
+(`LOGO_PARTS`: the white shapes of the mask of each part; each part keeps
+all the black gaps, so the parts together are the logo). The page reads the
 program through a stream that counts its bytes against the size of the
 unpacked program (the build writes it into the page; the Content-Length
 of a packed file is smaller), and gives the stream to the browser as a
 response, so the browser still compiles during the download. A browser
 that does not compile such a response gets the file again from its
-cache. Then "Starting…" (the logo breathes), and the loader fades out
-when the program runs (`web::start`). Checked in a headless browser with
+cache. Then "Starting…" (the needle and the star light up, and the logo
+breathes), and the loader fades out when the program runs
+(`web::start` calls `window.shokujodxStarted`, which waits until the star
+is lit, 1 s after Starting). Checked in a headless browser with
 a download of 6 MB a second; not on a phone yet.
 
 ## Faults that the trial found (fixed in the branch)

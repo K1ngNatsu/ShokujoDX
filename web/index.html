@@ -27,24 +27,30 @@
     background: #1e1f22; transition: opacity 0.5s ease; }
   #loading.done { opacity: 0; visibility: hidden; transition: opacity 0.5s ease, visibility 0s 0.5s; }
   /* The logo fills with the download: a dim logo, and over it the bright
-     logo in a sweep from 12 o'clock round the middle of the hoop (?loader=up:
-     from the bottom to the top). --p is the part of the program that came. */
+     hoop in a sweep from 12 o'clock round its middle (?loader=up: from the
+     bottom to the top). --p is the part of the program that came. When the
+     program starts, the needle and then the star light up. */
   @property --p { syntax: "<percentage>"; inherits: true; initial-value: 0%; }
   #logo { --p: 0%; position: relative; width: min(56vw, 36vh, 260px); aspect-ratio: 1;
     transition: --p 0.35s linear; }
   #logo img { position: absolute; inset: 0; width: 100%; height: 100%; }
   #logo .dim { opacity: 0.22; filter: saturate(0.5); }
-  #logo .lit { filter: drop-shadow(0 0 10px rgba(156, 98, 220, 0.55));
+  #logo .lit { filter: drop-shadow(0 0 10px rgba(156, 98, 220, 0.55)); }
+  #logo .hoop {
     -webkit-mask-image: conic-gradient(from 0deg at 50% 54%, #000 calc(var(--p) - 1.5%), transparent var(--p));
     mask-image: conic-gradient(from 0deg at 50% 54%, #000 calc(var(--p) - 1.5%), transparent var(--p)); }
-  /* The logo is from 15 % to 90 % of the height of its picture. */
-  #logo.up { --line: calc(15% + var(--p) * 0.75); }
-  #logo.up .lit {
+  /* The hoop is from 11 % to 92 % of the height of its picture (from the bottom). */
+  #logo.up { --line: calc(11% + var(--p) * 0.81); }
+  #logo.up .hoop {
     -webkit-mask-image: linear-gradient(to top, #000 calc(var(--line) - 1.5%), transparent calc(var(--line) + 1.5%));
     mask-image: linear-gradient(to top, #000 calc(var(--line) - 1.5%), transparent calc(var(--line) + 1.5%)); }
-  /* The program starts (after the download): the logo breathes. */
-  #logo.starting .lit { animation: breathe 1.4s ease-in-out infinite; }
-  @keyframes breathe { 50% { opacity: 0.7; } }
+  #logo .needle, #logo .star { opacity: 0; transform: scale(0.92);
+    transition: opacity 0.6s ease, transform 0.6s ease; }
+  #logo .star { transition-delay: 0.35s; }
+  #logo.starting .needle, #logo.starting .star { opacity: 1; transform: none; }
+  /* Then, while the program starts, the logo breathes. */
+  #logo.starting { animation: breathe 1.4s ease-in-out 1s infinite; }
+  @keyframes breathe { 50% { opacity: 0.75; } }
   #status { color: #e6e6e6; font-size: 17px; min-height: 1.6em; }
   #note { color: #999; font-size: 14px; max-width: 34em; }
 </style>
@@ -52,7 +58,8 @@
 <body>
 <canvas id="shokujodx"></canvas>
 <div id="loading">
-<div id="logo"><img class="dim" src="logo.svg" alt=""><img class="lit" src="logo.svg" alt=""></div>
+<div id="logo"><img class="dim" src="logo.svg" alt=""><img class="lit hoop" src="logo-hoop.svg" alt=""><img
+class="lit needle" src="logo-needle.svg" alt=""><img class="lit star" src="logo-star.svg" alt=""></div>
 <div id="status">Loading ShokujoDX…</div>
 <div id="note">A trial of the program in a browser. The first visit downloads about 35 MB;
 then the browser keeps it.<br>On a phone or a tablet, "Add to Home Screen" makes it an app
@@ -122,13 +129,20 @@ that also works offline.</div>
     return new Response(body, { headers: { "Content-Type": "application/wasm" } });
   };
   const t0 = performance.now();
+  let startingAt = null;
   const ready = (wasm) => {
     window.shokujodxLoadMs = performance.now() - t0;
     window.shokujodxMemoryMb = () => wasm.memory.buffer.byteLength / 1e6;
-    // The program hides the loader when it draws (crates/emb-app/src/web.rs).
     show(1);
     status.textContent = "Starting…";
     logo.classList.add("starting");
+    startingAt = performance.now();
+  };
+  // The program runs (crates/emb-app/src/web.rs calls it): the loader
+  // fades out, after the needle and the star are lit (1 s after Starting).
+  window.shokujodxStarted = () => {
+    const wait = startingAt === null ? 0 : Math.max(0, startingAt + 1000 - performance.now());
+    setTimeout(() => document.getElementById("loading").classList.add("done"), wait);
   };
   try {
     ready(await init({ module_or_path: await counted("./emb-app_bg.wasm") }));
