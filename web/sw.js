@@ -1,9 +1,10 @@
 // The service worker of the browser version (P15 step 3): it keeps the
 // files of one version, so the page works offline and as an app from the
 // home screen. tools/build-web.py puts the version in place of @VERSION@
-// (a hash of the program); a new version gets a new cache, and the old one
-// goes when the new worker starts (when all pages of the old one are
-// closed).
+// (a hash of the program); a new version gets a new cache. The new worker
+// starts at once and removes the old cache, so the next load of the page
+// (a reload) is the new version; a page that is open keeps the program that
+// it loaded.
 const CACHE = "shokujodx-@VERSION@";
 const FILES = [
   "./",
@@ -17,14 +18,22 @@ const FILES = [
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(FILES)));
+  // From the network, not from the cache of the browser (it can keep the
+  // files of the version before for some minutes).
+  event.waitUntil(
+    caches
+      .open(CACHE)
+      .then((cache) => cache.addAll(FILES.map((f) => new Request(f, { cache: "reload" }))))
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith("shokujodx-") && k !== CACHE).map((k) => caches.delete(k)))),
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith("shokujodx-") && k !== CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim()),
   );
 });
 

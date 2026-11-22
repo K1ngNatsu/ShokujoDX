@@ -176,7 +176,11 @@ screens (step 3 of the roadmap; "only if users ask").
   service worker (`web/sw.js`; a cache for each version of the program, so
   an update is a new cache), so "Add to Home Screen" makes an app that
   also works offline. The service worker runs only on https, so a local
-  test build is not kept.
+  test build is not kept. A new version takes the place of the old one
+  when the page opens, and the next reload shows it (before 2026-11-22,
+  only after all pages of the old version were closed, which a reload in
+  Safari does not do). It gets its files from the network, not from the
+  cache of the browser.
 - **Tests:** `canvas::tests::two_fingers_zoom_about_their_middle_pan_and_move_nothing`
   (the harness sends the touch events of eframe on the web,
   `Harness::pinch`), and `tools/web-touch.mjs` in a headless browser with
