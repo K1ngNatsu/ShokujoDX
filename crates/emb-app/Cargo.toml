@@ -57,6 +57,7 @@ web-sys = { version = "0.3", features = [
     "Performance",
     "Response",
     "Storage",
+    "MediaQueryList",
     "console",
 ] }
 

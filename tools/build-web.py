@@ -7,11 +7,13 @@
 #       the version of wasm-bindgen in Cargo.lock; the tool looks for it in
 #       target/tools/bin first:
 #       cargo install wasm-bindgen-cli --version <v> --locked --root target/tools)
-#       --opt makes the program smaller and quicker with wasm-opt (binaryen;
+#       --opt makes the program 15 % smaller with wasm-opt (but not the gzip
+#       download and not quicker: docs/design/p15-trial-report.md; binaryen;
 #       target/tools/bin first: cargo install wasm-opt --locked --root
 #       target/tools). --serve starts a local web server on the folder (port
 #       8765 if not given) for a test in a browser.
 
+import hashlib
 import os
 import re
 import shutil
@@ -66,10 +68,21 @@ def main():
         except FileNotFoundError:
             sys.exit("wasm-opt is not found (see the head of this file)")
         print("wasm-opt: %.1f MB to %.1f MB" % (before / 1e6, os.path.getsize(wasm) / 1e6))
-    shutil.copyfile(os.path.join(ROOT, "web", "index.html"), os.path.join(OUT, "index.html"))
-    icon = os.path.join(ROOT, "data", "icon", "icon-256.png")
-    if os.path.isfile(icon):
-        shutil.copyfile(icon, os.path.join(OUT, "icon.png"))
+    # The page, the manifest, the icons; the service worker gets the version
+    # (a hash of the program), so a new build is a new cache.
+    with open(os.path.join(OUT, "emb-app_bg.wasm"), "rb") as f:
+        version = hashlib.sha256(f.read()).hexdigest()[:12]
+    for name in os.listdir(os.path.join(ROOT, "web")):
+        src = os.path.join(ROOT, "web", name)
+        if name == "sw.js":
+            text = open(src, encoding="utf-8").read().replace("@VERSION@", version)
+            open(os.path.join(OUT, name), "w", encoding="utf-8", newline="\n").write(text)
+        else:
+            shutil.copyfile(src, os.path.join(OUT, name))
+    stale = os.path.join(OUT, "icon.png")
+    if os.path.isfile(stale):
+        os.remove(stale)
+    print("version", version)
     for name in sorted(os.listdir(OUT)):
         size = os.path.getsize(os.path.join(OUT, name))
         print("%-24s %8.1f MB" % (name, size / 1e6))

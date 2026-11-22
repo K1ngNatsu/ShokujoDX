@@ -208,6 +208,9 @@ pub struct AppState {
     pub focus_styles: bool,
     /// Set by commands; the dock shows the Design (canvas) tab or the Library tab.
     pub focus_canvas: bool,
+    /// Two fingers touch the canvas: they pan and zoom, and the tools take
+    /// no input until all fingers are up (P15 step 3).
+    pub touch_gesture: bool,
     pub focus_library: bool,
     pub focus_clipart: bool,
     /// A panel to show in front (View > Panels).
@@ -760,6 +763,7 @@ impl AppState {
             template_ask: None,
             focus_styles: false,
             focus_canvas: false,
+            touch_gesture: false,
             focus_library: false,
             focus_clipart: false,
             focus_tab: None,

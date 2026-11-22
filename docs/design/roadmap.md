@@ -1729,7 +1729,12 @@ Code signing (ADR 0062) does not wait for this phase.
    (2026-11-21, owner request): `tools/build-web.py`, `tools/web-bench.mjs`
    and the report `docs/design/p15-trial-report.md` (it runs with the same
    stitches; 200,000 stitches at 10 to 20 frames a second; the first 3D
-   view stops the page for 3.5 s to 6.2 s; step 2 is L to XL).*
+   view stops the page for 3.5 s to 6.2 s; step 2 is L to XL). Published
+   on GitHub Pages for tests with friends, with the tiles of the 3D look
+   made in steps and the settings in the browser; then the first part of
+   step 3 for tablets (two-finger pan and pinch, a touch bar for the draw
+   tools, larger controls, "Add to Home Screen" and offline use; owner,
+   2026-11-21). See the report.*
 2. **Web version for computers (M).**
    - One storage layer for all file access: files of the user in and out
      through upload and download; settings, backups, My Hoops and My

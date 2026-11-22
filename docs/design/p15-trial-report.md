@@ -144,6 +144,54 @@ the numbers below are the work of the program.
   desktop view too, so the owner decides), and a mesh of the stitches
   that is kept between frames when the view does not change.
 
+## Tablets and touch screens (step 3, owner, 2026-11-21)
+
+The owner opened the test page in Safari on a phone: it works, a little
+slower than on the computer. Then the owner asked for tablets and touch
+screens (step 3 of the roadmap; "only if users ask").
+
+- **Two fingers on the canvas** pan, and a pinch zooms about the middle
+  between them (`canvas::show`, egui `multi_touch`). From the second
+  finger until all fingers are up, the tools take no input
+  (`AppState::touch_gesture`), so a pinch does not move an object, make a
+  selection box or add a point. A drag that one finger started before
+  the second one ends normally. Before, a pinch zoomed about the first
+  finger, nothing panned (a pan needed a middle or right drag), and the
+  first finger of a pinch moved objects.
+- **A long press is a right click** in egui (`Response::secondary_clicked`),
+  so the menu of an object on the canvas, of the Sequence panel and of the
+  other lists opens with a long press. No change was needed.
+- **The draw tools on a touch screen** finish a line with Enter, remove a
+  point with Backspace and stop with Esc, and a tablet often has no
+  keyboard. After the first touch, a bar at the bottom of the canvas has
+  **Finish**, **Remove Point** and **Cancel** while a shape has points
+  (`canvas::touch_bar`; it calls `AppState::draw_key`). A computer with a
+  mouse does not show it.
+- **The first visit on a touch screen** (no saved settings, a coarse
+  pointer): a tablet gets the text size 125 % (larger controls); a phone
+  (narrower than 700 CSS pixels) gets simple mode (six tabs with large
+  buttons). The settings of a visit before stay as they are.
+- **The page** takes all fingers on its canvas (no scroll, zoom, bounce,
+  text selection or callout of the page), has a manifest with icons and a
+  service worker (`web/sw.js`; a cache for each version of the program, so
+  an update is a new cache), so "Add to Home Screen" makes an app that
+  also works offline. The service worker runs only on https, so a local
+  test build is not kept.
+- **Tests:** `canvas::tests::two_fingers_zoom_about_their_middle_pan_and_move_nothing`
+  (the harness sends the touch events of eframe on the web,
+  `Harness::pinch`), and `tools/web-touch.mjs` in a headless browser with
+  touch emulation: a tablet (1180 × 820) and a phone (390 × 844) on a
+  first visit, and a pinch of two fingers (zoom 2.000 times, the view
+  follows the fingers, no undo step, the gesture ends). With an emulated
+  device scale of 2, the headless browser gave the program the canvas at
+  half its size and the touches missed it; the test uses the scale 1. A
+  real phone does not do this (the taps of the owner's phone hit their
+  buttons).
+- **Not tested on a real tablet:** the pinch and the pan, the long press,
+  the touch bar, the keyboard of the screen in a text field, "Add to Home
+  Screen" and offline use (iPad and Android). Hover tooltips and F1 do not
+  exist on a touch screen; keyboard shortcuts need a keyboard.
+
 ## Faults that the trial found (fixed in the branch)
 
 In a browser, these calls stop the program: `std::time::Instant::now`

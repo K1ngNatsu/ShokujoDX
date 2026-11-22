@@ -11,7 +11,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 const BROWSER =
   process.argv[2] ??
@@ -50,6 +50,38 @@ const ONLY = process.env.ONLY;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const profile = mkdtempSync(join(tmpdir(), "emb-web-bench-"));
 mkdirSync(OUT, { recursive: true });
+
+// Closes the browser through its own connection (the connection of a page
+// does not close all its processes), then stops each process that still has
+// the profile of this run (by its id), and removes the profile.
+async function closeBrowser(port, profile) {
+  try {
+    const v = await (await fetch(`http://127.0.0.1:${port}/json/version`)).json();
+    const b = new WebSocket(v.webSocketDebuggerUrl);
+    await new Promise((r) => b.addEventListener("open", r, { once: true }));
+    b.send(JSON.stringify({ id: 1, method: "Browser.close" }));
+    await sleep(1500);
+    b.close();
+  } catch {
+    // The browser is closed already.
+  }
+  if (process.platform === "win32") {
+    const name = basename(profile);
+    spawnSync("powershell", [
+      "-NoProfile",
+      "-Command",
+      `Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" | Where-Object { $_.CommandLine -like '*${name}*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`,
+    ]);
+  }
+  for (let i = 0; i < 20; i++) {
+    try {
+      rmSync(profile, { recursive: true, force: true });
+      return;
+    } catch {
+      await sleep(500);
+    }
+  }
+}
 const browser = spawn(
   BROWSER,
   [
@@ -133,23 +165,5 @@ for (const [name, query, seconds] of CASES.filter(([n]) => !ONLY || n.includes(O
 }
 writeFileSync(join(OUT, "results.json"), JSON.stringify(results, null, 2));
 console.log("downloads:", readdirSync(OUT).filter((f) => !f.endsWith(".png") && f !== "results.json").join(", "));
-// Close the browser with all its processes (the first process of Edge
-// can end before the others).
-await send("Browser.close");
 ws.close();
-await sleep(1000);
-// The browser and its child processes (by the id of the browser).
-if (process.platform === "win32") {
-  spawnSync("taskkill", ["/PID", String(browser.pid), "/T", "/F"], { stdio: "ignore" });
-} else {
-  browser.kill();
-}
-for (let i = 0; i < 20; i++) {
-  await sleep(500);
-  try {
-    rmSync(profile, { recursive: true, force: true });
-    break;
-  } catch {
-    // The browser still has its files open.
-  }
-}
+await closeBrowser(PORT, profile);

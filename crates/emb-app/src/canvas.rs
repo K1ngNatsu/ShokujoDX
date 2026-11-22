@@ -189,8 +189,35 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
         }
     }
 
+    // Touch screens (P15 step 3): two fingers pan, and pinch zooms about
+    // the middle between them. From the second finger until all fingers are
+    // up, the tools take no input, so a pinch does not move or select.
+    let (multi, touching) = ui.input(|i| (i.multi_touch(), i.any_touches()));
+    match multi.filter(|t| rect.contains(t.center_pos)) {
+        Some(t) => {
+            if !st.touch_gesture {
+                st.touch_gesture = true;
+                // A drag of one finger before the second one: it ends here.
+                if st.drag.is_some() {
+                    let map = ViewMap::new(rect, st.view, st.doc.design());
+                    manipulate::end_drag(st, &map);
+                }
+            }
+            let s = st.view.scale();
+            let d = t.translation_delta;
+            st.view.center -= Point::new(f64::from(d.x) / s, f64::from(d.y) / s);
+            if t.zoom_delta != 1.0 {
+                st.view.zoom_at(rect, t.center_pos, f64::from(t.zoom_delta));
+            }
+        }
+        None if !touching => st.touch_gesture = false,
+        None => {}
+    }
+
     if let Some(pos) = response.hover_pos() {
         let (scroll, pinch) = ui.input(|i| (i.smooth_scroll_delta.y, i.zoom_delta()));
+        // A pinch on a touch screen zooms above.
+        let pinch = if multi.is_some() { 1.0 } else { pinch };
         let mut factor = f64::from(pinch);
         if scroll != 0.0 {
             factor *= (f64::from(scroll) * 0.0015).exp();
@@ -236,12 +263,17 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
     st.mods = mods;
     // A draw tool takes the left and right clicks (see `draw`).
     let drawing = !matches!(st.tool, Tool::Select | Tool::Reshape);
+    // Two fingers on a touch screen pan and zoom (above): no tool input.
+    let gesture = st.touch_gesture;
     // L held: a drag moves the light (ADR 0129), not a tool.
-    let lighting = crate::viewer::light_drag(ui, &response, rect, st);
+    let lighting = !gesture && crate::viewer::light_drag(ui, &response, rect, st);
     // Rulers and guides first: a drag from a ruler or on a guide is not for the tool.
-    let by_guides =
-        !lighting && st.sketch.is_none() && !st.hoopings_ui.mode && crate::workspace::guide_input(ui, &response, st);
-    if lighting {
+    let by_guides = !gesture
+        && !lighting
+        && st.sketch.is_none()
+        && !st.hoopings_ui.mode
+        && crate::workspace::guide_input(ui, &response, st);
+    if gesture || lighting {
     } else if st.sketch.is_some() {
         crate::sketch::handle_input(ui, &response, st, &map);
     } else if st.hoopings_ui.mode {
@@ -485,6 +517,37 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
         crate::viewer::draw_magnifier(&painter, ui.ctx(), rect, pos, st);
     }
     crate::viewer::draw_light(&painter, ui.ctx(), rect, st, response.hovered());
+    touch_bar(ui, rect, st, drawing);
+}
+
+/// On a touch screen with no keyboard, the buttons for the keys of the
+/// draw tools (Enter, Backspace, Esc) at the bottom of the canvas while a
+/// shape has points (P15 step 3). It shows only after a touch, so a computer
+/// with a mouse does not get it.
+fn touch_bar(ui: &mut egui::Ui, rect: Rect, st: &mut AppState, drawing: bool) {
+    let has_points = !st.draw.points.is_empty() || !st.draw.stages.is_empty();
+    if !drawing || !has_points || !ui.input(|i| i.has_touch_screen()) {
+        return;
+    }
+    egui::Area::new(egui::Id::new("touch_draw_bar"))
+        .order(egui::Order::Foreground)
+        .fixed_pos(rect.center_bottom() - Vec2::new(150.0, 64.0))
+        .show(ui.ctx(), |ui| {
+            egui::Frame::popup(ui.style()).show(ui, |ui| {
+                ui.spacing_mut().button_padding = Vec2::new(14.0, 10.0);
+                ui.horizontal(|ui| {
+                    if ui.button(tr("Finish")).clicked() {
+                        st.draw_key(egui::Key::Enter);
+                    }
+                    if ui.button(tr("Remove Point")).clicked() {
+                        st.draw_key(egui::Key::Backspace);
+                    }
+                    if ui.button(tr("Cancel")).clicked() {
+                        st.draw_key(egui::Key::Escape);
+                    }
+                });
+            });
+        });
 }
 
 /// Returns the topmost object at the point (view mm), by its real shape.
@@ -1058,6 +1121,38 @@ pub fn thread_mesh_3d(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn two_fingers_zoom_about_their_middle_pan_and_move_nothing() {
+        // P15 step 3: a pinch that starts on an object does not move it.
+        let mut h = crate::test_util::Harness::new();
+        let id = h.id(0);
+        let object = h.center_of(id);
+        let steps = h.st.doc.undo_len();
+        let zoom = h.st.view.zoom;
+        let a = h.screen(object);
+        let b = a + Vec2::new(120.0, 0.0);
+        let middle = h.st.view.to_mm(crate::test_util::screen_rect(), a + (b - a) * 0.5);
+        // Spread from 120 to 240 points, and move the middle 50 points down.
+        let shift = Vec2::new(0.0, 50.0);
+        h.pinch(
+            (a, a - Vec2::new(60.0, 0.0) + shift),
+            (b, b + Vec2::new(60.0, 0.0) + shift),
+        );
+        assert!(
+            (h.st.view.zoom / zoom - 2.0).abs() < 0.05,
+            "{} {}",
+            zoom,
+            h.st.view.zoom
+        );
+        // The point that was between the fingers is between them again.
+        let now = h.st.view.to_screen(crate::test_util::screen_rect(), middle);
+        let want = a + (b - a) * 0.5 + shift;
+        assert!(now.distance(want) < 3.0, "{now:?} {want:?}");
+        assert_eq!(h.center_of(id), object, "the object did not move");
+        assert_eq!(h.st.doc.undo_len(), steps, "no undo step");
+        assert!(h.st.drag.is_none() && !h.st.touch_gesture);
+    }
 
     fn rect() -> Rect {
         Rect::from_min_size(Pos2::ZERO, Vec2::new(800.0, 600.0))

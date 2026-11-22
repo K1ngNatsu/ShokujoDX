@@ -17,8 +17,13 @@ static NOTICES: Mutex<Vec<String>> = Mutex::new(Vec::new());
 /// The files that the user uploaded: their names and bytes.
 static UPLOADS: Mutex<Vec<(String, Vec<u8>)>> = Mutex::new(Vec::new());
 
+/// No settings were in the storage of the page when the program started: a
+/// first visit (the program saves its settings while it starts).
+static FRESH: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 /// Starts the program on the canvas `shokujodx` of the page.
 pub fn start() {
+    FRESH.store(stored(SETTINGS_KEY).is_none(), std::sync::atomic::Ordering::Relaxed);
     let mut options = eframe::WebOptions::default();
     // `?gl=1`: WebGL2 only, as in a browser with no WebGPU (a measure).
     if param("gl").is_some()
@@ -182,9 +187,42 @@ fn fetch_as_upload(url: String) {
 /// asks for (a download).
 static EXPORT_AFTER_OPEN: Mutex<Option<String>> = Mutex::new(None);
 
-/// The first frame: what the trial is, and the measures that the address
-/// asks for.
+/// `true` if the main pointer of the device is a finger (a phone or a
+/// tablet), not a mouse.
+fn touch_device() -> bool {
+    web_sys::window()
+        .and_then(|w| w.match_media("(pointer: coarse)").ok().flatten())
+        .is_some_and(|m| m.matches())
+}
+
+/// The width of the page in CSS pixels.
+fn page_width() -> f64 {
+    web_sys::window()
+        .and_then(|w| w.inner_width().ok())
+        .and_then(|v| v.as_f64())
+        .unwrap_or(1024.0)
+}
+
+/// The first visit on a touch screen (P15 step 3): larger controls on a
+/// tablet (text size 125 %), simple mode on a phone (large buttons, fewer
+/// tools). Only with no saved settings, so a choice of the user stays.
+fn touch_defaults(st: &mut AppState) {
+    if !FRESH.load(std::sync::atomic::Ordering::Relaxed) || !touch_device() {
+        return;
+    }
+    let mut s = st.settings.clone();
+    if page_width() < 700.0 {
+        s.simple_mode = true;
+    } else {
+        s.text_scale = 1.25;
+    }
+    st.set_settings(s);
+}
+
+/// The first frame: what the trial is, the defaults of a touch screen, and
+/// the measures that the address asks for.
 fn first_frame(st: &mut AppState) {
+    touch_defaults(st);
     st.message = crate::i18n::tr(
         "This is a trial of ShokujoDX in a browser. File > Open uploads a design or a machine file, and Save and Export download a file. Your designs stay on your computer.",
     )
@@ -303,12 +341,45 @@ fn bench_frame(st: &mut AppState, ctx: &eframe::egui::Context) {
     ctx.request_repaint();
 }
 
+/// `?probe=1`: the state of the view for a test of the page
+/// (`window.shokujodxView`, JSON), each frame.
+static PROBE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
+fn probe(st: &AppState, ctx: &eframe::egui::Context) {
+    if !*PROBE.get_or_init(|| param("probe").is_some()) {
+        return;
+    }
+    let (touching, middle) = ctx.input(|i| (i.any_touches(), i.multi_touch().map(|t| t.center_pos)));
+    let middle = middle.map_or("null".to_string(), |p| format!("[{:.0},{:.0}]", p.x, p.y));
+    let canvas = st.canvas_rect.map_or("null".to_string(), |r| {
+        format!("[{:.0},{:.0},{:.0},{:.0}]", r.min.x, r.min.y, r.max.x, r.max.y)
+    });
+    let state = format!(
+        "{{\"zoom\":{:.4},\"cx\":{:.3},\"cy\":{:.3},\"gesture\":{},\"simple\":{},\"text_scale\":{},\"undo\":{},\"touching\":{touching},\"middle\":{middle},\"canvas\":{canvas},\"egui\":[{:.2},{:.2},{:.0},{:.0}]}}",
+        st.view.zoom,
+        st.view.center.x,
+        st.view.center.y,
+        st.touch_gesture,
+        st.settings.simple_mode,
+        st.settings.text_scale,
+        st.doc.undo_len(),
+        ctx.zoom_factor(),
+        ctx.pixels_per_point(),
+        ctx.content_rect().width(),
+        ctx.content_rect().height()
+    );
+    if let Some(w) = web_sys::window() {
+        let _ = js_sys::Reflect::set(&w, &"shokujodxView".into(), &state.into());
+    }
+}
+
 /// Each frame: the measures, the uploaded files and the notices.
 pub fn poll(st: &mut AppState, ctx: &eframe::egui::Context) {
     if !STARTED.swap(true, std::sync::atomic::Ordering::Relaxed) {
         first_frame(st);
     }
     bench_frame(st, ctx);
+    probe(st, ctx);
     let uploads = UPLOADS.lock().map(|mut u| std::mem::take(&mut *u)).unwrap_or_default();
     for (name, bytes) in uploads {
         st.open_upload(&name, bytes);

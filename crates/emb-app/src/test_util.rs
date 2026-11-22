@@ -10,6 +10,11 @@ use crate::manipulate::ViewMap;
 
 pub const SCREEN: Vec2 = Vec2::new(1000.0, 700.0);
 
+/// The canvas of the harness: all of the screen.
+pub fn screen_rect() -> Rect {
+    Rect::from_min_size(Pos2::ZERO, SCREEN)
+}
+
 /// A context after one empty frame, so it has its fonts. On macOS,
 /// `Context::format_shortcut` reads the fonts (to show ⌘ and ⌥), and a new
 /// context has none until its first frame.
@@ -84,6 +89,51 @@ impl Harness {
         }
         self.frame(vec![ev(to, false)]);
         self.frame(vec![Event::ModifiersChanged(Modifiers::NONE)]);
+    }
+
+    /// Two fingers on a touch screen: from `a.0` and `b.0` to `a.1` and
+    /// `b.1` in steps, then up. As in eframe on the web, the first finger
+    /// also moves and presses the pointer.
+    pub fn pinch(&mut self, a: (Pos2, Pos2), b: (Pos2, Pos2)) {
+        use egui::{TouchDeviceId, TouchId, TouchPhase};
+        let touch = |id: u64, phase, pos| Event::Touch {
+            device_id: TouchDeviceId(1),
+            id: TouchId(id),
+            phase,
+            pos,
+            force: None,
+        };
+        let button = |pos, pressed| Event::PointerButton {
+            pos,
+            button: PointerButton::Primary,
+            pressed,
+            modifiers: Modifiers::NONE,
+        };
+        self.frame(vec![
+            Event::PointerMoved(a.0),
+            button(a.0, true),
+            touch(0, TouchPhase::Start, a.0),
+            touch(1, TouchPhase::Start, b.0),
+        ]);
+        // egui starts a gesture of two fingers in the frame after they are
+        // down; real fingers move in small steps from there.
+        self.frame(vec![touch(0, TouchPhase::Move, a.0), touch(1, TouchPhase::Move, b.0)]);
+        for i in 1..=10 {
+            let t = i as f32 / 10.0;
+            let (pa, pb) = (a.0 + (a.1 - a.0) * t, b.0 + (b.1 - b.0) * t);
+            self.frame(vec![
+                Event::PointerMoved(pa),
+                touch(0, TouchPhase::Move, pa),
+                touch(1, TouchPhase::Move, pb),
+            ]);
+        }
+        self.frame(vec![touch(1, TouchPhase::End, b.1)]);
+        self.frame(vec![
+            button(a.1, false),
+            touch(0, TouchPhase::End, a.1),
+            Event::PointerGone,
+        ]);
+        self.frame(vec![]);
     }
 
     pub fn click(&mut self, button: PointerButton, at: Pos2) {
