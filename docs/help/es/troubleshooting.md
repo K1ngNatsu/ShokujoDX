@@ -178,6 +178,8 @@ simple (Ver > Modo simple).
 ## Un panel ha desaparecido
 
 La × de un panel lo cierra. **Ver > Paneles** lo abre de nuevo.
+**Restablecer los paneles** (en Ver > Paneles y en las Opciones) pone
+todos los paneles de nuevo en su sitio.
 
 ## ¿Por qué el programa empieza con una página?
 

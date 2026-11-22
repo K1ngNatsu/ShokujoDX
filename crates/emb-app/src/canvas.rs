@@ -279,6 +279,7 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
             && let Some(pos) = response.interact_pointer_pos()
         {
             st.guide_menu = None;
+            st.ruler_menu = None;
             match pick(st, st.view.to_mm(rect, pos)) {
                 Some(id) if !st.selection.contains(id) => st.selection.set(id),
                 Some(_) => {}
@@ -289,9 +290,10 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
                 }
             }
         }
-        response.context_menu(|ui| match st.guide_menu {
-            Some(target) => crate::guides::menu(ui, st, target),
-            None => commands::canvas_menu(ui, st),
+        response.context_menu(|ui| match (st.ruler_menu, st.guide_menu) {
+            (Some(at), _) => crate::guides::ruler_menu(ui, st, at),
+            (None, Some(target)) => crate::guides::menu(ui, st, target),
+            (None, None) => commands::canvas_menu(ui, st),
         });
         // Double-click on a guide or a mark (no object there): type its place.
         if response.double_clicked()
@@ -369,6 +371,18 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
         && !by_guides
     {
         st.guide_menu = None;
+    }
+    // The menu of a place on a ruler, in the same way.
+    if st.sketch.is_none()
+        && !st.hoopings_ui.mode
+        && (by_guides || st.tool != Tool::Select)
+        && let Some(at) = st.ruler_menu
+        && response
+            .context_menu(|ui| crate::guides::ruler_menu(ui, st, at))
+            .is_none()
+        && !by_guides
+    {
+        st.ruler_menu = None;
     }
 
     // Groups are selected together; locked objects cannot be selected.
@@ -485,6 +499,40 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
         crate::viewer::draw_magnifier(&painter, ui.ctx(), rect, pos, st);
     }
     crate::viewer::draw_light(&painter, ui.ctx(), rect, st, response.hovered());
+    touch_bar(ui, rect, st, drawing);
+}
+
+/// On a touch screen with no keyboard, the buttons for the keys of the
+/// draw tools (Enter, Backspace, Esc) at the bottom of the canvas while a
+/// shape has points (from the browser trial, P15 step 3). It shows only
+/// after a touch, so a computer with a mouse does not get it. Next: the
+/// tool goes on to its next part (side B of a column, the holes of a
+/// complex fill); Finish on the last part.
+fn touch_bar(ui: &mut egui::Ui, rect: Rect, st: &mut AppState, drawing: bool) {
+    let has_points = !st.draw.points.is_empty() || !st.draw.stages.is_empty();
+    if !drawing || !has_points || !ui.input(|i| i.has_touch_screen()) {
+        return;
+    }
+    egui::Area::new(egui::Id::new("touch_draw_bar"))
+        .order(egui::Order::Foreground)
+        .fixed_pos(rect.center_bottom() - Vec2::new(150.0, 64.0))
+        .show(ui.ctx(), |ui| {
+            egui::Frame::popup(ui.style()).show(ui, |ui| {
+                ui.spacing_mut().button_padding = Vec2::new(14.0, 10.0);
+                ui.horizontal(|ui| {
+                    let next = st.tool.enter_goes_on(st.draw.points.len(), st.draw.stages.len());
+                    if ui.button(if next { tr("Next") } else { tr("Finish") }).clicked() {
+                        st.draw_key(egui::Key::Enter);
+                    }
+                    if ui.button(tr("Remove Point")).clicked() {
+                        st.draw_key(egui::Key::Backspace);
+                    }
+                    if ui.button(tr("Cancel")).clicked() {
+                        st.draw_key(egui::Key::Escape);
+                    }
+                });
+            });
+        });
 }
 
 /// Returns the topmost object at the point (view mm), by its real shape.

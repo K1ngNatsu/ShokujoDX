@@ -28,6 +28,8 @@ Los cambios se aplican enseguida y se conservan para el siguiente inicio.
   **Separación de la cuadrícula** y la **Línea principal cada**.
 - **Reglas y guías**: **Mostrar reglas** y **Ajustar a las guías**; la
   **Distancia de ajuste**.
+- **Paneles**: **Restablecer los paneles** pone todos los paneles de
+  nuevo en un grupo a la derecha y abre los cerrados.
 - **Desplazamiento con flechas** y **Desplazamiento con Mayús + flecha**:
   cuánto mueven la selección las teclas de flecha.
 
@@ -78,8 +80,8 @@ El programa puede buscar una versión nueva al iniciar.
 - **Comprobar al iniciar**: al iniciar, y como máximo una vez al día,
   el programa pregunta a GitHub por la versión más reciente. Si hay una
   versión más nueva, una ventana muestra su versión y sus cambios.
-- **Comprobar ahora** (también **Ayuda > Buscar actualizaciones**) busca
-  de inmediato.
+- **Comprobar ahora** (también **Archivo > Buscar actualizaciones…** y
+  **Ayuda > Buscar actualizaciones**) busca de inmediato.
 - La comprobación no envía datos sobre usted ni sobre sus diseños. El
   programa no descarga ni instala una versión nueva: **Abrir la página
   de descarga** abre la página de la versión en su navegador, y usted

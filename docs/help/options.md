@@ -28,6 +28,8 @@ sets all options back.
   **Major line every**.
 - **Rulers and guides**: **Show rulers** and **Snap to Guides**; the
   **Snap distance**.
+- **Panels**: **Reset the Panels** puts all the panels back in one group
+  at the right and opens the closed ones.
 - **Arrow key nudge** and **Shift + arrow nudge**: how far the arrow keys
   move the selection.
 
@@ -76,7 +78,8 @@ The program can look for a new version when it starts.
 - **Check at the start**: at the start, and not more than one time each
   day, the program asks GitHub for the newest version. If a newer
   version exists, a window shows its version and its changes.
-- **Check Now** (also **Help > Check for Updates**) looks at once.
+- **Check Now** (also **File > Check for Updates…** and **Help > Check
+  for Updates**) looks at once.
 - The check sends no data about you or your designs. The program does
   not download and does not install a new version: **Open Download
   Page** opens the page of the version in your browser, and you install

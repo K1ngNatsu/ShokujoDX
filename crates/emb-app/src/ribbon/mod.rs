@@ -225,6 +225,7 @@ fn file_menu(ui: &mut egui::Ui, st: &mut AppState) {
     ui.separator();
     item(ui, st, Cmd::Assets, tr("My Assets…"));
     item(ui, st, Cmd::Options, tr("Options…"));
+    item(ui, st, Cmd::CheckUpdates, tr("Check for Updates…"));
     item(ui, st, Cmd::About, tr("About…"));
     ui.separator();
     if ui.button(crate::i18n::fill("{}  Exit", &[&(ph::SIGN_OUT)])).clicked() {

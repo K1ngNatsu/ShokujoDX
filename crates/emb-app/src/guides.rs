@@ -42,6 +42,56 @@ pub enum MarkRef {
     Mark(usize),
 }
 
+/// A place on a ruler (its menu): a guide there is `vertical` (the top
+/// ruler) at `pos` (view coordinates in mm).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RulerPick {
+    pub vertical: bool,
+    pub pos: f64,
+}
+
+/// The menu of a place on a ruler (a right click or a long press on the
+/// ruler): a guide at that place, the tools of the construction marks, and
+/// Remove Guides.
+pub fn ruler_menu(ui: &mut egui::Ui, st: &mut AppState, at: RulerPick) {
+    let shown = position_text(st, &Guide::new(at.vertical, at.pos));
+    ui.weak(tr("Ruler"));
+    if ui
+        .button(crate::i18n::fill("Add Guide at {}", &[&shown]))
+        .on_hover_text(tr(
+            "A guide across the canvas at this place of the ruler. Drag its marker to move it.",
+        ))
+        .clicked()
+    {
+        st.doc
+            .edit(tr("Add guide"), |d| d.guides.push(Guide::new(at.vertical, at.pos)));
+        st.ruler_menu = None;
+        ui.close();
+    }
+    for tool in [
+        crate::draw::Tool::ConstructionLine,
+        crate::draw::Tool::ConstructionPoint,
+    ] {
+        if ui.button(tool.label()).on_hover_text(tool.tooltip()).clicked() {
+            st.set_tool(tool);
+            st.ruler_menu = None;
+            ui.close();
+        }
+    }
+    let any = !st.doc.design().guides.is_empty() || !st.doc.design().marks.is_empty();
+    ui.separator();
+    let (_, label, tip) = crate::ribbon::Cmd::RemoveGuides.meta();
+    if ui
+        .add_enabled(any, egui::Button::new(label))
+        .on_hover_text(tip)
+        .clicked()
+    {
+        st.run(crate::ribbon::Cmd::RemoveGuides, &ui.ctx().clone());
+        st.ruler_menu = None;
+        ui.close();
+    }
+}
+
 /// The values of the edit window, as the user types them.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GuideEdit {
@@ -781,5 +831,37 @@ mod tests {
         h.frame(vec![ev(false)]);
         assert_eq!(h.st.guide_menu, Some(MarkRef::Guide(0)));
         assert!(h.st.draw.points.is_empty(), "the clicks on the ruler place no point");
+    }
+
+    #[test]
+    fn a_right_click_on_a_ruler_adds_a_guide_there_and_starts_the_mark_tools() {
+        for tool in [Tool::Select, Tool::Line] {
+            let mut h = Harness::empty();
+            h.st.set_tool(tool);
+            let c = h.st.doc.design().hoop.center;
+            let rect = h.map().rect;
+            // 30 mm right of the hoop center, on the top ruler (no marker).
+            let x = h.screen(c + Point::new(30.0, 0.0)).x;
+            let at = Pos2::new(x, rect.min.y + RULER / 2.0);
+            h.click(PointerButton::Secondary, at);
+            let pick = h.st.ruler_menu.expect("the menu of the ruler");
+            assert!(pick.vertical, "the top ruler measures X");
+            assert!((pick.pos - (c.x + 30.0)).abs() < 0.5, "{}", pick.pos);
+            assert!(h.st.draw.points.is_empty(), "no point on the ruler");
+            let add = h.widget("Add Guide at X").expect("the menu shows");
+            h.click(PointerButton::Primary, add.center());
+            let d = h.st.doc.design();
+            assert_eq!(d.guides.len(), 1, "{tool:?}");
+            assert!(d.guides[0].vertical && (d.guides[0].pos - pick.pos).abs() < 1e-9);
+            // On the left ruler: a horizontal guide; the menu also starts
+            // the tool of the construction points.
+            let y = h.screen(c + Point::new(0.0, 20.0)).y;
+            h.click(PointerButton::Secondary, Pos2::new(rect.min.x + RULER / 2.0, y));
+            let pick = h.st.ruler_menu.expect("the menu of the left ruler");
+            assert!(!pick.vertical);
+            let point = h.widget(Tool::ConstructionPoint.label()).expect("the tool in the menu");
+            h.click(PointerButton::Primary, point.center());
+            assert_eq!(h.st.tool, Tool::ConstructionPoint);
+        }
     }
 }

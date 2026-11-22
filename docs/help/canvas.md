@@ -89,7 +89,9 @@ back of the machine.
   ruler to make a guide. Each guide has a marker on its ruler: drag the
   marker to move the guide, and drag it off the canvas to delete the
   guide. With the Select tool, you can also drag a guide line, and drop
-  it on a ruler to delete it.
+  it on a ruler to delete it. Right-click a ruler (on a touch screen,
+  push and hold it) for its menu: **Add Guide at** that place,
+  **Construction Line**, **Construction Point** and **Remove Guides**.
 - Double-click a marker (or a guide line with the Select tool) to type the
   place of the guide, from the hoop center.
 - Right-click a marker (or a guide line or a construction mark with the
@@ -126,7 +128,8 @@ Monogram and Fabric) dock at a corner of the canvas, as in CAD programs:
 
 - **View > Panels** opens and closes each panel: Object Properties,
   Styles, Design info, Clipart, Sequence, Threads, Stitch list, Exports
-  and Library.
+  and Library. **Reset the Panels** (there and in the Options) puts all
+  the panels back in one group at the right and opens the closed ones.
 - Drag the tab of a panel to put it in another place, or next to another
   panel.
 - **View > Dark Mode** changes between light and dark panels.

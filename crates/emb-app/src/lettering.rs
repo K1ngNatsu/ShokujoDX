@@ -999,8 +999,12 @@ impl AppState {
             self.letter_font = l.font.clone();
             self.letter_height = l.height_mm;
             if d.edit.is_none() {
-                self.draw = crate::draw::DrawState::default();
-                self.message = crate::i18n::fill("{} added. Draw the next one, or press Esc.", &[&(self.tool.label())]);
+                // Lettering is placed one at a time: the tool goes back to
+                // Select, so the new lettering can be moved at once (owner,
+                // 2026-11-22).
+                let label = self.tool.label();
+                self.set_tool(crate::draw::Tool::Select);
+                self.message = crate::i18n::fill("{} added.", &[&label]);
             }
         }
     }

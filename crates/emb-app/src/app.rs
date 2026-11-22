@@ -154,6 +154,9 @@ pub struct AppState {
     pub measure: Option<(Point, Point)>,
     /// The guide or construction mark whose menu is open (ADR 0089).
     pub guide_menu: Option<crate::guides::MarkRef>,
+    /// The menu of a place on a ruler (a right click or a long press on a
+    /// ruler, not on a marker).
+    pub ruler_menu: Option<crate::guides::RulerPick>,
     /// The edit window of a guide or a construction mark.
     pub guide_edit: Option<crate::guides::GuideEdit>,
     /// Keyboard modifiers of the current frame on the canvas.
@@ -210,6 +213,9 @@ pub struct AppState {
     pub focus_canvas: bool,
     pub focus_library: bool,
     pub focus_clipart: bool,
+    /// Options > Reset the Panels: the next frame puts the dock back to
+    /// `default_dock` and opens the closed panels.
+    pub reset_panels: bool,
     /// A panel to show in front (View > Panels).
     pub focus_tab: Option<Tab>,
     /// The kind of function that Shift+Page Up and Page Down go to.
@@ -471,21 +477,25 @@ fn load_catalogs() -> (HoopCatalog, MachineCatalog, emb_model::FabricCatalog, St
     (hoops, machines, fabrics, notes.join(" | "))
 }
 
+/// The side panels in the order of their tabs in the side group.
+pub const SIDE_PANELS: [Tab; 8] = [
+    Tab::Properties,
+    Tab::Sequence,
+    Tab::Threads,
+    Tab::Styles,
+    Tab::StitchList,
+    Tab::DesignInfo,
+    Tab::Clipart,
+    Tab::Exports,
+];
+
 /// The dock layout at the start: the canvas and the Library on the left,
-/// two groups of panels on the right.
+/// one group with all the side panels on the right (the owner's choice of
+/// 2026-11-22; before, two groups one over the other).
 pub fn default_dock() -> DockState<Tab> {
     let mut dock = DockState::new(vec![Tab::Canvas, Tab::Library]);
     let surface = dock.main_surface_mut();
-    let [_, right] = surface.split_right(
-        NodeIndex::root(),
-        0.74,
-        vec![Tab::Properties, Tab::Styles, Tab::DesignInfo, Tab::Clipart],
-    );
-    surface.split_below(
-        right,
-        0.5,
-        vec![Tab::Sequence, Tab::Threads, Tab::StitchList, Tab::Exports],
-    );
+    surface.split_right(NodeIndex::root(), 0.74, SIDE_PANELS.to_vec());
     // The Library tab is next to the canvas; the canvas shows first.
     if let Some(p) = dock.find_tab(&Tab::Canvas) {
         let _ = dock.set_active_tab(p);
@@ -726,6 +736,7 @@ impl AppState {
             show_options: false,
             measure: None,
             guide_menu: None,
+            ruler_menu: None,
             guide_edit: None,
             mods: Modifiers::NONE,
             arrange_values: (15.0, 0.0, 45.0),
@@ -755,6 +766,7 @@ impl AppState {
             focus_styles: false,
             focus_canvas: false,
             focus_library: false,
+            reset_panels: false,
             focus_clipart: false,
             focus_tab: None,
             function_travel: Default::default(),
@@ -1888,6 +1900,14 @@ impl EmbApp {
             }
             _ => {}
         }
+        // Options > Reset the Panels.
+        if std::mem::take(&mut st.reset_panels) {
+            self.dock = default_dock();
+            let mut s = st.settings.clone();
+            s.hidden_panels.clear();
+            st.set_settings(s);
+            st.message = tr("The panels are back in their places.").into();
+        }
         crate::viewtools::sync_panels(&mut self.dock, st);
         crate::views::sync_views(&mut self.dock, st);
         // The start page is a tab before the design.
@@ -1947,5 +1967,51 @@ impl EmbApp {
         {
             let _ = self.dock.set_active_tab(path);
         }
+    }
+}
+
+#[cfg(test)]
+mod dock_tests {
+    use super::*;
+
+    fn frame(ctx: &egui::Context, app: &mut EmbApp) {
+        let input = egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1400.0, 900.0))),
+            ..Default::default()
+        };
+        let mut out = ctx.run_ui(input, |ui| app.draw(ui));
+        out.textures_delta.clear();
+    }
+
+    fn one_group(dock: &DockState<Tab>) -> bool {
+        let side: Vec<_> = SIDE_PANELS.iter().filter_map(|t| dock.find_tab(t)).collect();
+        side.len() == SIDE_PANELS.len()
+            && side
+                .iter()
+                .all(|p| (p.surface, p.node) == (side[0].surface, side[0].node))
+    }
+
+    #[test]
+    fn reset_the_panels_puts_all_side_panels_back_in_one_group() {
+        let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        st.save_settings = false;
+        st.show_start = false;
+        st.add_sample_objects();
+        let mut app = EmbApp::for_test(st);
+        let ctx = crate::test_util::ready_context();
+        frame(&ctx, &mut app);
+        assert!(one_group(&app.dock), "one group at the start");
+        // The user closes a panel and moves another one under the group.
+        app.state().set_panel_shown(Tab::Styles, false);
+        let p = app.dock.find_tab(&Tab::Threads).unwrap();
+        app.dock.remove_tab(p);
+        let q = app.dock.find_tab(&Tab::Properties).unwrap();
+        app.dock[q.surface].split_below(q.node, 0.5, vec![Tab::Threads]);
+        frame(&ctx, &mut app);
+        assert!(!one_group(&app.dock));
+        app.state().reset_panels = true;
+        frame(&ctx, &mut app);
+        assert!(one_group(&app.dock), "all side panels back in one group");
+        assert!(app.state().panel_shown(Tab::Styles), "the closed panel opens");
     }
 }

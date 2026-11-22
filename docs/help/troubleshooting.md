@@ -162,6 +162,8 @@ on the full ribbon: turn simple mode off (View > Simple Mode).
 ## A panel is gone
 
 The × of a panel closes it. **View > Panels** opens it again.
+**Reset the Panels** (in View > Panels and in the Options) puts all the
+panels back in their places.
 
 ## Why does the program start with a page?
 

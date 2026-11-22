@@ -181,7 +181,8 @@ Sie den einfachen Modus aus (Ansicht > Einfacher Modus).
 ## Ein Bereich ist weg
 
 Das × eines Bereichs schließt ihn. **Ansicht > Bereiche** öffnet ihn
-wieder.
+wieder. **Bereiche zurücksetzen** (in Ansicht > Bereiche und in den
+Optionen) setzt alle Bereiche wieder an ihren Platz.
 
 ## Warum startet das Programm mit einer Seite?
 

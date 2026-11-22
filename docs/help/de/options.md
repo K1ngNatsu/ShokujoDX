@@ -29,6 +29,8 @@ Optionen. Änderungen gelten sofort und bleiben für den nächsten Start.
   **Rasterabstand** und **Hauptlinie alle**.
 - **Lineale und Hilfslinien**: **Lineale zeigen** und **An Hilfslinien
   einrasten**; der **Fangabstand**.
+- **Bereiche**: **Bereiche zurücksetzen** setzt alle Bereiche wieder in
+  eine Gruppe rechts und öffnet die geschlossenen.
 - **Verschieben mit Pfeiltasten** und **Verschieben mit Umschalt +
   Pfeil**: wie weit die Pfeiltasten die Auswahl verschieben.
 
@@ -80,7 +82,8 @@ Das Programm kann beim Start nach einer neuen Version suchen.
 - **Beim Start prüfen**: Beim Start, und höchstens einmal am Tag, fragt
   das Programm GitHub nach der neuesten Version. Wenn es eine neuere
   Version gibt, zeigt ein Fenster ihre Version und ihre Änderungen.
-- **Jetzt prüfen** (auch **Hilfe > Nach Updates suchen**) sucht sofort.
+- **Jetzt prüfen** (auch **Datei > Nach Updates suchen…** und **Hilfe >
+  Nach Updates suchen**) sucht sofort.
 - Die Prüfung sendet keine Daten über Sie oder Ihre Designs. Das
   Programm lädt keine neue Version herunter und installiert keine:
   **Download-Seite öffnen** öffnet die Seite der Version in Ihrem

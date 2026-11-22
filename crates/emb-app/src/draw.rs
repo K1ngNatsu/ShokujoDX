@@ -441,6 +441,18 @@ impl Tool {
         matches!(self, Tool::Freehand | Tool::FreeShape | Tool::Lasso | Tool::SmartDraw)
     }
 
+    /// Enter (Finish) ends a part, and the tool goes on to the next part
+    /// (see `finish_drawing`): side A of a column, the outline of a turning
+    /// fill, an outline or a hole of a complex fill. The touch bar then
+    /// shows Next, not Finish.
+    pub fn enter_goes_on(self, points: usize, stages: usize) -> bool {
+        match self {
+            Tool::ComplexFill | Tool::Applique => points > 0,
+            Tool::Column | Tool::Turning => stages == 0,
+            _ => false,
+        }
+    }
+
     /// The outline of the current part is closed (clicking the first point closes it).
     fn closes(self, stages: usize) -> bool {
         matches!(
@@ -1953,6 +1965,41 @@ mod tests {
             panic!()
         };
         assert_eq!(holes.len(), 1);
+    }
+
+    #[test]
+    fn the_touch_bar_says_next_until_the_last_part() {
+        let mut h = Harness::empty();
+        // A touch screen: the touch bar shows while a shape has points.
+        let touch = |phase| egui::Event::Touch {
+            device_id: egui::TouchDeviceId(1),
+            id: egui::TouchId(0),
+            phase,
+            pos: Pos2::new(5.0, 5.0),
+            force: None,
+        };
+        h.frame(vec![touch(egui::TouchPhase::Start), touch(egui::TouchPhase::End)]);
+        h.st.set_tool(Tool::Column);
+        for (x, y) in [(-20.0, -10.0), (20.0, -10.0)] {
+            h.click(PointerButton::Primary, at(&h, x, y));
+        }
+        assert!(h.widget("Next").is_some(), "side A: Next");
+        assert!(h.widget("Finish").is_none());
+        h.key(Key::Enter);
+        for (x, y) in [(-20.0, 10.0), (20.0, 10.0)] {
+            h.click(PointerButton::Primary, at(&h, x, y));
+        }
+        assert!(h.widget("Finish").is_some(), "side B: Finish");
+        let next = h.widget("Finish").unwrap();
+        h.click(PointerButton::Primary, next.center());
+        assert_eq!(h.st.doc.design().objects().len(), 1, "the column is made");
+        // A complex fill: Next after the outline and each hole, Finish
+        // when no hole is started.
+        h.st.set_tool(Tool::ComplexFill);
+        assert!(Tool::ComplexFill.enter_goes_on(4, 0));
+        assert!(Tool::ComplexFill.enter_goes_on(3, 1));
+        assert!(!Tool::ComplexFill.enter_goes_on(0, 1));
+        assert!(!Tool::Line.enter_goes_on(5, 0));
     }
 
     #[test]

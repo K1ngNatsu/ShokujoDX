@@ -98,7 +98,10 @@ la parte trasera de la máquina.
   una regla para crear una guía. Cada guía tiene un marcador en su regla:
   arrastre el marcador para mover la guía, y arrástrelo fuera del lienzo
   para eliminar la guía. Con la herramienta Seleccionar también puede
-  arrastrar una línea guía y soltarla en una regla para eliminarla.
+  arrastrar una línea guía y soltarla en una regla para eliminarla. Haga
+  clic derecho en una regla (en una pantalla táctil, manténgala pulsada)
+  para su menú: **Añadir guía en** ese lugar, **Línea de construcción**,
+  **Punto de construcción** y **Quitar guías**.
 - Haga doble clic en un marcador (o en una línea guía con la herramienta
   Seleccionar) para escribir el lugar de la guía, desde el centro del
   bastidor.
@@ -141,7 +144,9 @@ lienzo, como en los programas de CAD:
 
 - **Ver > Paneles** abre y cierra cada panel: Propiedades del objeto,
   Estilos, Información del diseño, Cliparts, Secuencia, Hilos, Lista de
-  puntadas, Exportaciones y Biblioteca.
+  puntadas, Exportaciones y Biblioteca. **Restablecer los paneles** (allí
+  y en las Opciones) pone todos los paneles de nuevo en un grupo a la
+  derecha y abre los cerrados.
 - Arrastre la pestaña de un panel para ponerlo en otro lugar, o junto a
   otro panel.
 - **Ver > Modo oscuro** cambia entre paneles claros y oscuros.

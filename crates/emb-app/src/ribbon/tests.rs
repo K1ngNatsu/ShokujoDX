@@ -464,3 +464,97 @@ fn undo_from_the_quick_access_buttons() {
     r.click("Redo");
     assert_eq!(r.st.doc.design().objects().len(), n);
 }
+
+/// The names and places of the widgets for a screen reader, in one frame.
+fn reader_nodes(r: &mut Rib) -> Vec<(String, Rect)> {
+    r.ctx.enable_accesskit();
+    let input = RawInput {
+        screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(r.width, 900.0))),
+        ..Default::default()
+    };
+    let st = &mut r.st;
+    let mut out = r.ctx.run_ui(input, |ui| {
+        egui::Panel::top("ribbon").show(ui, |ui| show(ui, st));
+    });
+    out.textures_delta.clear();
+    let update = out.platform_output.accesskit_update.expect("the screen reader tree");
+    update
+        .nodes
+        .iter()
+        .filter_map(|(_, n)| {
+            let b = n.bounds()?;
+            let rect = Rect::from_min_max(Pos2::new(b.x0 as f32, b.y0 as f32), Pos2::new(b.x1 as f32, b.y1 as f32));
+            let text = n.label().or(n.value())?;
+            Some((text.to_string(), rect))
+        })
+        .collect()
+}
+
+fn click_at(r: &mut Rib, p: Pos2) {
+    let ev = |pressed| Event::PointerButton {
+        pos: p,
+        button: PointerButton::Primary,
+        pressed,
+        modifiers: Modifiers::NONE,
+    };
+    r.frame(vec![Event::PointerMoved(p)]);
+    r.frame(vec![ev(true)]);
+    r.frame(vec![ev(false)]);
+    r.frame(vec![]);
+}
+
+#[test]
+fn a_list_in_a_folded_panel_opens_and_picks() {
+    // A phone: the panel Machine and Hoop of the Design tab folds into a
+    // button, and its Machine list is a list in a popup (it did not open).
+    let mut r = Rib::new();
+    r.wide = false;
+    r.width = 390.0;
+    r.st.settings.ribbon_tab = RibbonTab::Design;
+    r.frame(vec![]);
+    r.frame(vec![]);
+    let folded = RECTS.with(|x| {
+        x.borrow()
+            .iter()
+            .find(|(l, _)| l.starts_with("Machine and Hoop"))
+            .map(|(_, r)| *r)
+            .expect("the panel is folded on a phone")
+    });
+    click_at(&mut r, folded.center());
+    let current =
+        r.st.machines
+            .get(r.st.doc.design().machine.as_deref().unwrap_or(""))
+            .map(|m| m.name.clone());
+    let current = current.unwrap_or_else(|| tr("None").to_string());
+    let nodes = reader_nodes(&mut r);
+    let combo = nodes
+        .iter()
+        .find(|(l, _)| *l == current)
+        .map(|(_, r)| *r)
+        .unwrap_or_else(|| panic!("the Machine list shows in the popup: {nodes:?}"));
+    click_at(&mut r, combo.center());
+    let other =
+        r.st.machines
+            .machines
+            .iter()
+            .find(|m| Some(m.id.as_str()) != r.st.doc.design().machine.as_deref())
+            .map(|m| (m.id.clone(), m.name.clone()))
+            .expect("a second machine");
+    let nodes = reader_nodes(&mut r);
+    let item = nodes
+        .iter()
+        .find(|(l, _)| *l == other.1)
+        .map(|(_, r)| *r)
+        .unwrap_or_else(|| panic!("the list of machines opens: {nodes:?}"));
+    click_at(&mut r, item.center());
+    assert_eq!(r.st.doc.design().machine.as_deref(), Some(other.0.as_str()));
+    // A click on the ribbon outside the popups closes the panel.
+    let tab = r.rect("Digitize").center();
+    click_at(&mut r, tab);
+    r.frame(vec![]);
+    assert!(nodes_without(&mut r, &other.1));
+}
+
+fn nodes_without(r: &mut Rib, label: &str) -> bool {
+    reader_nodes(r).iter().all(|(l, _)| l != label)
+}

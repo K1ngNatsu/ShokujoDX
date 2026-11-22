@@ -101,6 +101,10 @@ Arbeitsfläche ist die Rückseite der Maschine.
   verschieben, und ziehen Sie sie aus der Arbeitsfläche, um die
   Hilfslinie zu löschen. Mit dem Auswahlwerkzeug können Sie auch eine
   Hilfslinie ziehen und sie auf einem Lineal ablegen, um sie zu löschen.
+  Klicken Sie mit der rechten Maustaste auf ein Lineal (auf einem
+  Touchscreen: halten Sie es gedrückt) für sein Menü: **Hilfslinie bei …
+  hinzufügen** an dieser Stelle, **Konstruktionslinie**,
+  **Konstruktionspunkt** und **Hilfslinien entfernen**.
 - Doppelklicken Sie eine Marke (oder mit dem Auswahlwerkzeug eine
   Hilfslinie), um die Stelle der Hilfslinie von der Rahmenmitte aus
   einzugeben.
@@ -144,7 +148,9 @@ CAD-Programmen:
 
 - **Ansicht > Bereiche** öffnet und schließt jeden Bereich:
   Objekteigenschaften, Stile, Designinfo, Clipart, Reihenfolge, Garne,
-  Stichliste, Exporte und Bibliothek.
+  Stichliste, Exporte und Bibliothek. **Bereiche zurücksetzen** (dort und
+  in den Optionen) setzt alle Bereiche wieder in eine Gruppe rechts und
+  öffnet die geschlossenen.
 - Ziehen Sie den Tab eines Bereichs, um ihn an eine andere Stelle oder
   neben einen anderen Bereich zu setzen.
 - **Ansicht > Dunkler Modus** wechselt zwischen hellen und dunklen

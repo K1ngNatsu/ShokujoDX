@@ -109,6 +109,42 @@ impl Harness {
 
 impl Harness {
     /// A harness with an empty design (no sample objects).
+    /// One frame with no input; the names (or values) and places of the
+    /// widgets for a screen reader (menus included).
+    pub fn reader_nodes(&mut self) -> Vec<(String, Rect)> {
+        self.ctx.enable_accesskit();
+        let input = RawInput {
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, SCREEN)),
+            ..Default::default()
+        };
+        let st = &mut self.st;
+        let mut out = self.ctx.run_ui(input, |ui| {
+            st.handle_shortcuts(&ui.ctx().clone());
+            egui::CentralPanel::no_frame().show(ui, |ui| canvas::show(ui, st));
+        });
+        out.textures_delta.clear();
+        let Some(update) = out.platform_output.accesskit_update else {
+            return Vec::new();
+        };
+        update
+            .nodes
+            .iter()
+            .filter_map(|(_, n)| {
+                let b = n.bounds()?;
+                let rect = Rect::from_min_max(Pos2::new(b.x0 as f32, b.y0 as f32), Pos2::new(b.x1 as f32, b.y1 as f32));
+                Some((n.label().or(n.value())?.to_string(), rect))
+            })
+            .collect()
+    }
+
+    /// The place of the widget with the name `start…` (see `reader_nodes`).
+    pub fn widget(&mut self, start: &str) -> Option<Rect> {
+        self.reader_nodes()
+            .into_iter()
+            .find(|(l, _)| l.starts_with(start))
+            .map(|(_, r)| r)
+    }
+
     pub fn empty() -> Self {
         let mut h = Self::new();
         h.st.new_design();
