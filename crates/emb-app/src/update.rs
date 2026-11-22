@@ -359,9 +359,11 @@ impl AppState {
     /// Help > Check for Updates: opens the window and checks now.
     pub fn check_updates_now(&mut self, ctx: &egui::Context) {
         // The browser version cannot start `curl` (see `start_updates`).
+        // In the browser, the check compares the build of the page with the
+        // newest build on the server.
         if cfg!(target_arch = "wasm32") {
             #[cfg(target_arch = "wasm32")]
-            crate::web::not_in_the_browser();
+            crate::web::check_for_update();
             return;
         }
         self.updates.window = true;

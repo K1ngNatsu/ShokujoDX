@@ -18,12 +18,12 @@ pub(super) fn pick_at(st: &AppState, map: &ViewMap, pos: Pos2) -> Option<Pick> {
         .points
         .iter()
         .map(|p| (p.id, to(p.pos).distance(pos)))
-        .filter(|(_, d)| *d <= PICK_PX)
+        .filter(|(_, d)| *d <= pick_px(st))
         .min_by(|a, b| a.1.total_cmp(&b.1));
     if let Some((id, _)) = point {
         return Some(Pick::Point(id));
     }
-    let tol = f64::from(PICK_PX) / map.view.scale();
+    let tol = pick_mm(st, map);
     let at = map.to_design(pos);
     obj.curve_paths()
         .iter()
@@ -92,8 +92,14 @@ pub(super) fn restore_dims(sk: &mut Sketch, dims: &[ConstraintId]) {
 }
 
 /// The tolerance of a click in sketch mm.
-pub(super) fn pick_mm(map: &ViewMap) -> f64 {
-    f64::from(PICK_PX) / map.view.scale()
+pub(super) fn pick_mm(st: &AppState, map: &ViewMap) -> f64 {
+    f64::from(pick_px(st)) / map.view.scale()
+}
+
+/// How near a click must be to a point or a curve, in screen points: a
+/// finger needs more (P15).
+pub(super) fn pick_px(st: &AppState) -> f32 {
+    if st.touch_seen { TOUCH_PICK_PX } else { PICK_PX }
 }
 
 /// The snap of a click at screen position `pos`: a point or a curve of the
@@ -104,7 +110,7 @@ pub(super) fn snap_at(st: &AppState, map: &ViewMap, pos: Pos2, alt: bool) -> Opt
     if alt {
         return Some(Snap::free(at));
     }
-    Some(infer::snap(obj.sketch(), at, pick_mm(map), &[]))
+    Some(infer::snap(obj.sketch(), at, pick_mm(st, map), &[]))
 }
 
 /// The keys of sketch mode (before the keys of the program): Esc ends the
@@ -177,7 +183,7 @@ pub fn handle_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState,
     // parallel and perpendicular hints use it.
     if tool == SketchTool::Line
         && let Some(pos) = response.hover_pos()
-        && let Some((c, _)) = obj.sketch().nearest_curve(to_sketch(pos), pick_mm(map), &[])
+        && let Some((c, _)) = obj.sketch().nearest_curve(to_sketch(pos), pick_mm(st, map), &[])
         && is_line(obj.sketch(), c)
         && let Some(e) = st.sketch.as_mut()
     {
@@ -455,7 +461,7 @@ pub fn handle_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState,
             if response.clicked()
                 && let Some(pos) = response.interact_pointer_pos()
             {
-                let at = infer::snap(obj.sketch(), to_sketch(pos), pick_mm(map), &[]).at;
+                let at = infer::snap(obj.sketch(), to_sketch(pos), pick_mm(st, map), &[]).at;
                 let e = st.sketch.as_mut().expect("in sketch mode");
                 if e.source_points.is_empty() {
                     st.message = tr("Drag a box round the points to stretch first.").into();
@@ -472,7 +478,7 @@ pub fn handle_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState,
             if response.clicked()
                 && let Some(pos) = response.interact_pointer_pos()
             {
-                st.edit_click(t, to_sketch(pos), pick_mm(map));
+                st.edit_click(t, to_sketch(pos), pick_mm(st, map));
             }
         }
         _ => {
@@ -538,7 +544,7 @@ pub fn handle_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState,
                 let snap = if tool == SketchTool::TangentCircle {
                     match obj
                         .sketch()
-                        .nearest_curve(snap.at, pick_mm(map), &[])
+                        .nearest_curve(snap.at, pick_mm(st, map), &[])
                         .filter(|(c, _)| is_line(obj.sketch(), *c))
                     {
                         Some((c, q)) => Snap::on_curve(q, c),
@@ -560,7 +566,7 @@ pub fn handle_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState,
                     return;
                 }
                 if tool == SketchTool::Spline {
-                    spline_click(st, snap, pick_mm(map));
+                    spline_click(st, snap, pick_mm(st, map));
                     return;
                 }
                 e.clicks.push(snap);
@@ -687,5 +693,102 @@ pub(super) fn line_click(st: &mut AppState, to: Snap, no_help: bool) {
         let at = st.sketch_obj().and_then(|o| o.sketch().point(pb)).unwrap_or(to.at);
         let e = st.sketch.as_mut().expect("in sketch mode");
         e.clicks = vec![Snap::on_point(at, pb)];
+    }
+}
+
+/// The buttons at the bottom of the canvas in sketch mode on a touch
+/// screen (P15): a finger has no hover and no keyboard. With the Dimension
+/// tool: Length (a dimension of the picked line, its label beside the
+/// line), Add (the picked dimension, its label in its own place) and
+/// Cancel. While a chain of lines or a spline has points: Done (Enter) and
+/// Cancel (Esc).
+pub fn touch_bar(ui: &egui::Ui, rect: Rect, st: &mut AppState) {
+    if !st.touch_seen || st.sketch_obj().is_none() {
+        return;
+    }
+    let Some(e) = st.sketch.as_ref() else { return };
+    if e.value_edit.is_some() {
+        return;
+    }
+    #[derive(Clone, Copy, PartialEq)]
+    enum Do {
+        Length,
+        Add,
+        Done,
+        Cancel,
+    }
+    let mut buttons: Vec<(Do, &str)> = Vec::new();
+    if e.tool == SketchTool::Dimension {
+        let line = st
+            .sketch_obj()
+            .is_some_and(|o| matches!(dimension_of(o.sketch(), &e.picks, false), Build::More))
+            && matches!(e.picks.as_slice(), [Pick::Curve(_)]);
+        if e.pending_dim.is_some() {
+            buttons.push((Do::Add, tr("Add Dimension")));
+        } else if line {
+            buttons.push((Do::Length, tr("Length")));
+        }
+        if e.pending_dim.is_some() || !e.picks.is_empty() {
+            buttons.push((Do::Cancel, tr("Cancel")));
+        }
+    } else if !e.clicks.is_empty() || e.chain_start.is_some() {
+        buttons.push((Do::Done, tr("Done")));
+        buttons.push((Do::Cancel, tr("Cancel")));
+    }
+    if buttons.is_empty() {
+        return;
+    }
+    let mut chosen = None;
+    egui::Area::new(egui::Id::new("sketch_touch_bar"))
+        .order(egui::Order::Foreground)
+        .fixed_pos(rect.center_bottom() - Vec2::new(110.0, 64.0))
+        .show(ui.ctx(), |ui| {
+            egui::Frame::popup(ui.style()).show(ui, |ui| {
+                ui.spacing_mut().button_padding = Vec2::new(14.0, 10.0);
+                ui.horizontal(|ui| {
+                    for (what, label) in &buttons {
+                        if ui.button(*label).clicked() {
+                            chosen = Some(*what);
+                        }
+                    }
+                });
+            });
+        });
+    match chosen {
+        Some(Do::Length) => {
+            let c = st.sketch_obj().and_then(|o| {
+                let picks = st.sketch.as_ref()?.picks.clone();
+                dimension_of(o.sketch(), &picks, true).done()
+            });
+            if let Some(c) = c {
+                st.add_sketch_dimension(c, None);
+            }
+        }
+        Some(Do::Add) => {
+            if let Some(c) = st.sketch.as_mut().and_then(|e| {
+                e.pending_locked = false;
+                e.pending_dim.take()
+            }) {
+                st.add_sketch_dimension(c, None);
+            }
+        }
+        Some(Do::Done) => {
+            if st.sketch.as_ref().is_some_and(|e| e.tool == SketchTool::Spline) {
+                finish_spline(st, false);
+            } else if let Some(e) = &mut st.sketch {
+                e.clicks.clear();
+                e.chain_start = None;
+            }
+        }
+        Some(Do::Cancel) => {
+            if let Some(e) = &mut st.sketch {
+                e.picks.clear();
+                e.pending_dim = None;
+                e.pending_locked = false;
+                e.clicks.clear();
+                e.chain_start = None;
+            }
+        }
+        None => {}
     }
 }

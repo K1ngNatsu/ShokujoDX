@@ -118,7 +118,7 @@ pub fn draw_overlay(painter: &egui::Painter, ui: &egui::Ui, map: &ViewMap, st: &
         .and_then(|p| {
             if e.tool.is_edit() && !matches!(e.tool, SketchTool::Fillet | SketchTool::Chamfer) {
                 let at = obj.to_sketch(map.to_design(p));
-                s.nearest_curve(at, pick_mm(map), &[]).map(|(c, _)| Pick::Curve(c))
+                s.nearest_curve(at, pick_mm(st, map), &[]).map(|(c, _)| Pick::Curve(c))
             } else {
                 pick_at(st, map, p)
             }
@@ -386,7 +386,7 @@ pub fn draw_overlay(painter: &egui::Painter, ui: &egui::Ui, map: &ViewMap, st: &
         let mut snap = snap_at(st, map, hover, no_help || !draws).unwrap_or(Snap::free(Point::new(0.0, 0.0)));
         if e.tool == SketchTool::TangentCircle
             && let Some((c, q)) = s
-                .nearest_curve(obj.to_sketch(map.to_design(hover)), pick_mm(map), &[])
+                .nearest_curve(obj.to_sketch(map.to_design(hover)), pick_mm(st, map), &[])
                 .filter(|(c, _)| is_line(s, *c))
         {
             snap = Snap::on_curve(q, c);
@@ -520,7 +520,7 @@ pub fn draw_overlay(painter: &egui::Painter, ui: &egui::Ui, map: &ViewMap, st: &
         && let Some(b) = e.clicks.first()
         && let Some(hover) = ui.ctx().pointer_hover_pos().filter(|p| map.rect.contains(*p))
     {
-        let at = infer::snap(s, obj.to_sketch(map.to_design(hover)), pick_mm(map), &[]).at;
+        let at = infer::snap(s, obj.to_sketch(map.to_design(hover)), pick_mm(st, map), &[]).at;
         let d = at - b.at;
         let mut ghost = s.clone();
         let _ = ghost.transform_parts(&[], &e.source_points, &|p| p + d, 1.0, false, false);
@@ -546,7 +546,7 @@ pub fn draw_overlay(painter: &egui::Painter, ui: &egui::Ui, map: &ViewMap, st: &
     if e.tool.is_transform()
         && let Some(hover) = ui.ctx().pointer_hover_pos().filter(|p| map.rect.contains(*p))
     {
-        let at = infer::snap(s, obj.to_sketch(map.to_design(hover)), pick_mm(map), &[]).at;
+        let at = infer::snap(s, obj.to_sketch(map.to_design(hover)), pick_mm(st, map), &[]).at;
         let v = &e.values;
         let m = match (e.tool, e.clicks.first()) {
             (SketchTool::Move | SketchTool::Copy, Some(b)) => Some(Motion::Shift(at - b.at)),

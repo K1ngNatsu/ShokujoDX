@@ -34,6 +34,34 @@ On a phone or a tablet, "Add to Home Screen" makes it an app that also works off
 <noscript>ShokujoDX needs JavaScript and WebAssembly.</noscript>
 <script type="module">
   import init from "./emb-app.js";
+  // File > Check for Updates: the build of this page (tools/build-web.py
+  // writes it), the newest build on the server (version.json, never from a
+  // cache), and a reload that takes the newest.
+  window.shokujodxBuild = { version: "@VERSION@", built: "@BUILT@", commit: "@COMMIT@" };
+  window.shokujodxNewest = async () => {
+    const r = await fetch("version.json", { cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return await r.text();
+  };
+  window.shokujodxUpdate = async () => {
+    try {
+      const reg = "serviceWorker" in navigator ? await navigator.serviceWorker.getRegistration() : null;
+      if (reg) {
+        await reg.update();
+        // The new worker gets its files, then starts (web/sw.js).
+        const w = reg.installing || reg.waiting;
+        if (w) {
+          await new Promise((done) => {
+            const check = () => (w.state === "activated" || w.state === "redundant") && done();
+            w.addEventListener("statechange", check);
+            check();
+          });
+        }
+      }
+    } finally {
+      location.reload();
+    }
+  };
   const loading = document.getElementById("loading");
   const t0 = performance.now();
   try {

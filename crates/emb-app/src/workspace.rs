@@ -1125,13 +1125,27 @@ pub fn guide_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState) 
     let rect = response.rect;
     let view: CanvasView = st.view;
     let on_ruler = |p: Pos2| st.settings.show_rulers && (in_top_ruler(rect, p) || in_left_ruler(rect, p));
-    // A right click on a ruler: the menu of the guide of the marker there
-    // (a right click on a ruler is never a curve point).
+    // A right click (a long press on a touch screen) on a ruler: the menu
+    // of the guide of the marker there, else the menu of the ruler at that
+    // place (a right click on a ruler is never a curve point).
     if response.secondary_clicked()
         && let Some(p) = response.interact_pointer_pos()
         && on_ruler(p)
     {
-        st.guide_menu = crate::guides::marker_at(st, rect, p).map(crate::guides::MarkRef::Guide);
+        let marker = crate::guides::marker_at(st, rect, p);
+        st.guide_menu = marker.map(crate::guides::MarkRef::Guide);
+        st.ruler_menu = match marker {
+            Some(_) => None,
+            None => {
+                let mm = view.to_mm(rect, p);
+                // The top ruler measures X: a guide there is vertical.
+                let vertical = in_top_ruler(rect, p);
+                Some(crate::guides::RulerPick {
+                    vertical,
+                    pos: if vertical { mm.x } else { mm.y },
+                })
+            }
+        };
         return true;
     }
     // A double click on a marker: type the place of the guide.
@@ -1399,6 +1413,17 @@ pub fn options_window(ctx: &egui::Context, st: &mut AppState) {
                         ui.checkbox(&mut s.snap_guides, tr("Snap to Guides"));
                     });
                     ui.end_row();
+                    ui.label(tr("Panels"));
+                    if ui
+                        .button(tr("Reset the Panels"))
+                        .on_hover_text(tr(
+                    "Put all the panels back in their places, in one group at the right, and open the closed panels.",
+                ))
+                        .clicked()
+                    {
+                        st.reset_panels = true;
+                    }
+                    ui.end_row();
                     ui.label(tr("Machine files"));
                     ui.checkbox(&mut s.recognize_on_open, tr("Recognize objects when a file opens"))
                         .on_hover_text(tr(
@@ -1414,7 +1439,9 @@ pub fn options_window(ctx: &egui::Context, st: &mut AppState) {
                     ui.label(tr("New versions"));
                     ui.horizontal(|ui| {
                         let mut auto = s.updates.auto == Some(true);
-                        if ui
+                        // The browser version has no check at the start.
+                        if !cfg!(target_arch = "wasm32")
+                            && ui
                             .checkbox(&mut auto, tr("Check at the start"))
                             .on_hover_text(crate::update::what_it_does())
                             .changed()

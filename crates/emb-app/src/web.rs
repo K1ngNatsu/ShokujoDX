@@ -373,8 +373,172 @@ fn probe(st: &AppState, ctx: &eframe::egui::Context) {
     }
 }
 
+/// The build of a page: its version (a hash of the program), the time of
+/// the build and the commit (`tools/build-web.py` writes them).
+#[derive(Clone, Debug, Default, PartialEq, serde::Deserialize)]
+#[serde(default)]
+pub struct Build {
+    pub version: String,
+    pub built: String,
+    pub commit: String,
+}
+
+/// The state of File > Check for Updates.
+#[derive(Clone, Debug, PartialEq)]
+pub enum PageCheck {
+    Checking,
+    /// The page is the newest build.
+    Newest,
+    /// A newer build is on the server.
+    Newer(Build),
+    Failed(String),
+}
+
+static PAGE_CHECK: Mutex<Option<PageCheck>> = Mutex::new(None);
+
+/// The build of this page (`window.shokujodxBuild`).
+fn this_build() -> Build {
+    let field = |o: &wasm_bindgen::JsValue, k: &str| {
+        js_sys::Reflect::get(o, &k.into())
+            .ok()
+            .and_then(|v| v.as_string())
+            .unwrap_or_default()
+    };
+    web_sys::window()
+        .and_then(|w| js_sys::Reflect::get(&w, &"shokujodxBuild".into()).ok())
+        .filter(|o| o.is_object())
+        .map(|o| Build {
+            version: field(&o, "version"),
+            built: field(&o, "built"),
+            commit: field(&o, "commit"),
+        })
+        .unwrap_or_default()
+}
+
+/// The result of the check: the newest build (the text of version.json)
+/// against the build of this page.
+pub fn compare(this: &Build, newest: &str) -> PageCheck {
+    match serde_json::from_str::<Build>(newest) {
+        Ok(n) if n.version.is_empty() => PageCheck::Failed("version.json has no version".into()),
+        Ok(n) if n.version == this.version => PageCheck::Newest,
+        Ok(n) => PageCheck::Newer(n),
+        Err(e) => PageCheck::Failed(e.to_string()),
+    }
+}
+
+/// Calls the function `name` of the page (no arguments) and waits for its
+/// promise: the text that it gives.
+async fn call_page(name: &str) -> Result<String, String> {
+    let w = web_sys::window().ok_or("no window")?;
+    let f: js_sys::Function = js_sys::Reflect::get(&w, &name.into())
+        .ok()
+        .and_then(|f| f.dyn_into().ok())
+        .ok_or("the page is older than the program")?;
+    let promise: js_sys::Promise = f
+        .call0(&w)
+        .map_err(|e| format!("{e:?}"))?
+        .dyn_into()
+        .map_err(|_| "no promise".to_string())?;
+    let value = wasm_bindgen_futures::JsFuture::from(promise)
+        .await
+        .map_err(|e| e.as_string().unwrap_or_else(|| format!("{e:?}")))?;
+    Ok(value.as_string().unwrap_or_default())
+}
+
+/// File > Check for Updates in the browser: asks the server for the newest
+/// build; the window shows the result.
+pub fn check_for_update() {
+    if let Ok(mut c) = PAGE_CHECK.lock() {
+        *c = Some(PageCheck::Checking);
+    }
+    wasm_bindgen_futures::spawn_local(async {
+        let result = match call_page("shokujodxNewest").await {
+            Ok(text) => compare(&this_build(), &text),
+            Err(e) => PageCheck::Failed(e),
+        };
+        if let Ok(mut c) = PAGE_CHECK.lock() {
+            // The user can close the window before the answer comes.
+            if c.is_some() {
+                *c = Some(result);
+            }
+        }
+    });
+}
+
+/// The window of File > Check for Updates.
+fn update_window(ctx: &eframe::egui::Context) {
+    use eframe::egui;
+    let Some(state) = PAGE_CHECK.lock().ok().and_then(|c| c.clone()) else {
+        return;
+    };
+    let this = this_build();
+    let mut open = true;
+    let mut close = false;
+    let width = (ctx.content_rect().width() - 32.0).clamp(200.0, 420.0);
+    egui::Window::new(crate::i18n::tr("Check for Updates"))
+        .id(egui::Id::new("page_update"))
+        .open(&mut open)
+        .collapsible(false)
+        .resizable(false)
+        .max_width(width)
+        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+        .show(ctx, |ui| {
+            ui.set_max_width(width);
+            ui.label(crate::i18n::fill(
+                "This page: built {} (version {}).",
+                &[&this.built, &this.commit],
+            ));
+            ui.add_space(6.0);
+            match &state {
+                PageCheck::Checking => {
+                    ui.horizontal(|ui| {
+                        ui.spinner();
+                        ui.label(crate::i18n::tr("Looking for a newer version…"));
+                    });
+                }
+                PageCheck::Newest => {
+                    ui.label(crate::i18n::tr("This is the newest version."));
+                }
+                PageCheck::Newer(b) => {
+                    ui.label(crate::i18n::fill(
+                        "A newer version is ready: built {} (version {}).",
+                        &[&b.built, &b.commit],
+                    ));
+                    ui.label(crate::i18n::tr(
+                        "A reload closes the open designs. Save them first: File > Save downloads them.",
+                    ));
+                    ui.add_space(4.0);
+                    if ui.button(crate::i18n::tr("Reload Now")).clicked() {
+                        wasm_bindgen_futures::spawn_local(async {
+                            let _ = call_page("shokujodxUpdate").await;
+                        });
+                    }
+                }
+                PageCheck::Failed(e) => {
+                    ui.label(crate::i18n::fill(
+                        "The check did not work ({}). Is the device online?",
+                        &[e],
+                    ));
+                }
+            }
+            ui.add_space(4.0);
+            if ui.button(crate::i18n::tr("Close")).clicked() {
+                close = true;
+            }
+        });
+    if (!open || close)
+        && let Ok(mut c) = PAGE_CHECK.lock()
+    {
+        *c = None;
+    }
+    if state == PageCheck::Checking {
+        ctx.request_repaint_after(std::time::Duration::from_millis(100));
+    }
+}
+
 /// Each frame: the measures, the uploaded files and the notices.
 pub fn poll(st: &mut AppState, ctx: &eframe::egui::Context) {
+    update_window(ctx);
     if !STARTED.swap(true, std::sync::atomic::Ordering::Relaxed) {
         first_frame(st);
     }

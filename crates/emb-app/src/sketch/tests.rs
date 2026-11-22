@@ -1394,3 +1394,50 @@ fn the_sketch_tab_and_the_panels_draw() {
     h.st.check_sketch();
     assert!(h.st.sketch.is_none());
 }
+
+#[test]
+fn on_a_touch_screen_the_bar_makes_a_dimension_and_picks_are_wider() {
+    use eframe::egui::PointerButton;
+    let mut h = sketching();
+    h.st.set_sketch_tool(SketchTool::Rectangle);
+    let (a, b) = (h.screen(Point::new(-30.0, -20.0)), h.screen(Point::new(30.0, 20.0)));
+    h.click(PointerButton::Primary, a);
+    h.click(PointerButton::Primary, b);
+    h.st.touch_seen = true;
+    h.st.set_sketch_tool(SketchTool::Dimension);
+    // A finger 12 points away from the bottom line still picks it (a mouse
+    // must be within 7 points).
+    let bottom = h.screen(Point::new(0.0, -20.0)) + eframe::egui::Vec2::new(0.0, 12.0);
+    h.click(PointerButton::Primary, bottom);
+    assert!(
+        matches!(h.st.sketch.as_ref().unwrap().picks.as_slice(), [Pick::Curve(_)]),
+        "the line is picked"
+    );
+    // Length: the dimension of the line, with no second tap.
+    let n = sk(&h).constraints.len();
+    let length = h.widget("Length").expect("the touch bar shows Length");
+    h.click(PointerButton::Primary, length.center());
+    let s = sk(&h);
+    assert_eq!(s.constraints.len(), n + 1);
+    assert!(
+        matches!(s.constraints.last().map(|c| c.constraint), Some(Constraint::Length { mm, .. }) if (mm - 60.0).abs() < 0.01),
+        "{:?}",
+        s.constraints.last()
+    );
+    // The value box opens for the value.
+    assert!(h.st.sketch.as_ref().unwrap().value_edit.is_some());
+    h.st.sketch.as_mut().unwrap().value_edit = None;
+    // A circle: the dimension waits for a place; Add puts it in its own place.
+    h.st.set_sketch_tool(SketchTool::Circle);
+    let (c, r) = (h.screen(Point::new(60.0, 0.0)), h.screen(Point::new(70.0, 0.0)));
+    h.click(PointerButton::Primary, c);
+    h.click(PointerButton::Primary, r);
+    h.st.set_sketch_tool(SketchTool::Dimension);
+    h.click(PointerButton::Primary, r);
+    assert!(h.st.sketch.as_ref().unwrap().pending_dim.is_some());
+    let n = sk(&h).constraints.len();
+    let add = h.widget("Add Dimension").expect("the touch bar shows Add");
+    h.click(PointerButton::Primary, add.center());
+    assert_eq!(sk(&h).constraints.len(), n + 1);
+    assert!(h.st.sketch.as_ref().unwrap().pending_dim.is_none());
+}

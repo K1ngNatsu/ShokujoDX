@@ -13,7 +13,9 @@
 #       target/tools). --serve starts a local web server on the folder (port
 #       8765 if not given) for a test in a browser.
 
+import datetime
 import hashlib
+import json
 import os
 import re
 import shutil
@@ -69,16 +71,30 @@ def main():
             sys.exit("wasm-opt is not found (see the head of this file)")
         print("wasm-opt: %.1f MB to %.1f MB" % (before / 1e6, os.path.getsize(wasm) / 1e6))
     # The page, the manifest, the icons; the service worker gets the version
-    # (a hash of the program), so a new build is a new cache.
+    # (a hash of the program), so a new build is a new cache. The page and
+    # version.json get the version, the time of the build and the commit
+    # (File > Check for Updates compares them).
     with open(os.path.join(OUT, "emb-app_bg.wasm"), "rb") as f:
         version = hashlib.sha256(f.read()).hexdigest()[:12]
+    built = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        commit = "unknown"
+    stamps = {"@VERSION@": version, "@BUILT@": built, "@COMMIT@": commit}
     for name in os.listdir(os.path.join(ROOT, "web")):
         src = os.path.join(ROOT, "web", name)
-        if name == "sw.js":
-            text = open(src, encoding="utf-8").read().replace("@VERSION@", version)
+        if name in ("sw.js", "index.html"):
+            text = open(src, encoding="utf-8").read()
+            for key, value in stamps.items():
+                text = text.replace(key, value)
             open(os.path.join(OUT, name), "w", encoding="utf-8", newline="\n").write(text)
         else:
             shutil.copyfile(src, os.path.join(OUT, name))
+    with open(os.path.join(OUT, "version.json"), "w", encoding="utf-8", newline="\n") as f:
+        json.dump({"version": version, "built": built, "commit": commit}, f)
     stale = os.path.join(OUT, "icon.png")
     if os.path.isfile(stale):
         os.remove(stale)

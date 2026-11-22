@@ -68,7 +68,37 @@ const CASES = [
     [["phone-landscape-peek", () => finger(310, 13, 310, 13)]],
   ],
   ["tablet-portrait-design", 820, 1180, "?stress=20000", []],
+  [
+    "phone-menus",
+    390,
+    844,
+    "?stress=20000",
+    [
+      // A long press on the top ruler: the menu of the ruler.
+      ["phone-ruler-menu", () => hold(120, 202)],
+      ["phone-ruler-closed", () => key("Escape")],
+      // File: the menu with Check for Updates.
+      ["phone-file-menu", () => finger(34, 13, 34, 13)],
+      // Check for Updates…: the window with the build of the page.
+      ["phone-update-window", () => finger(95, 646, 95, 646)],
+    ],
+  ],
 ];
+
+// A finger that stays down (a long press).
+async function hold(x, y) {
+  await send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y, id: 0 }] });
+  await sleep(1400);
+  await send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await sleep(1200);
+}
+
+async function key(name) {
+  for (const type of ["keyDown", "keyUp"]) {
+    await send("Input.dispatchKeyEvent", { type, key: name, code: name, windowsVirtualKeyCode: name === "Escape" ? 27 : 0 });
+  }
+  await sleep(800);
+}
 
 async function closeBrowser(profile) {
   try {

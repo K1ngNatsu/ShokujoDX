@@ -25,13 +25,14 @@ pub(super) fn context_menu(response: &egui::Response, st: &mut AppState, map: &V
         }
         let pick = pick_at(st, map, pos);
         let at = st.sketch_obj().map(|o| o.to_sketch(map.to_design(pos)));
+        let tol = pick_mm(st, map);
         if let Some(e) = &mut st.sketch {
             if let Some(p) = pick
                 && !e.selection.contains(&p)
             {
                 e.selection = vec![p];
             }
-            e.menu_at = at.map(|a| (a, pick_mm(map)));
+            e.menu_at = at.map(|a| (a, tol));
         }
     }
     response.context_menu(|ui| sketch_menu(ui, st));

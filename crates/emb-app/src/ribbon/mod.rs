@@ -225,6 +225,7 @@ fn file_menu(ui: &mut egui::Ui, st: &mut AppState) {
     ui.separator();
     item(ui, st, Cmd::Assets, tr("My Assets…"));
     item(ui, st, Cmd::Options, tr("Options…"));
+    item(ui, st, Cmd::CheckUpdates, tr("Check for Updates…"));
     item(ui, st, Cmd::About, tr("About…"));
     ui.separator();
     if ui.button(crate::i18n::fill("{}  Exit", &[&(ph::SIGN_OUT)])).clicked() {
@@ -383,7 +384,7 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
         panels_row(ui, st, &s, settings.ribbon_tab, settings.simple_mode, width);
     } else if let Some(tab) = st.ribbon_peek {
         let screen = ctx.content_rect();
-        let shown = egui::Area::new(egui::Id::new("ribbon_peek"))
+        egui::Area::new(egui::Id::new("ribbon_peek"))
             .order(egui::Order::Foreground)
             .fixed_pos(row.left_bottom() + vec2(0.0, 2.0))
             .show(&ctx, |ui| {
@@ -393,9 +394,10 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
                     panels_row(ui, st, &s, tab, settings.simple_mode, width);
                 });
             });
-        // A tap outside the panels and the tabs closes the panels.
+        // A tap outside the panels, their lists and the tabs closes the
+        // panels.
         let on_tabs = ctx.input(|i| i.pointer.interact_pos().is_some_and(|p| row.contains(p)));
-        if shown.response.clicked_elsewhere() && !on_tabs {
+        if widgets::click_below_popups(&ctx) && !on_tabs {
             st.ribbon_peek = None;
         }
     }

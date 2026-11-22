@@ -314,6 +314,7 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
             && let Some(pos) = response.interact_pointer_pos()
         {
             st.guide_menu = None;
+            st.ruler_menu = None;
             match pick(st, st.view.to_mm(rect, pos)) {
                 Some(id) if !st.selection.contains(id) => st.selection.set(id),
                 Some(_) => {}
@@ -324,9 +325,10 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
                 }
             }
         }
-        response.context_menu(|ui| match st.guide_menu {
-            Some(target) => crate::guides::menu(ui, st, target),
-            None => commands::canvas_menu(ui, st),
+        response.context_menu(|ui| match (st.ruler_menu, st.guide_menu) {
+            (Some(at), _) => crate::guides::ruler_menu(ui, st, at),
+            (None, Some(target)) => crate::guides::menu(ui, st, target),
+            (None, None) => commands::canvas_menu(ui, st),
         });
         // Double-click on a guide or a mark (no object there): type its place.
         if response.double_clicked()
@@ -404,6 +406,18 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
         && !by_guides
     {
         st.guide_menu = None;
+    }
+    // The menu of a place on a ruler, in the same way.
+    if st.sketch.is_none()
+        && !st.hoopings_ui.mode
+        && (by_guides || st.tool != Tool::Select)
+        && let Some(at) = st.ruler_menu
+        && response
+            .context_menu(|ui| crate::guides::ruler_menu(ui, st, at))
+            .is_none()
+        && !by_guides
+    {
+        st.ruler_menu = None;
     }
 
     // Groups are selected together; locked objects cannot be selected.
@@ -521,6 +535,9 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
     }
     crate::viewer::draw_light(&painter, ui.ctx(), rect, st, response.hovered());
     touch_bar(ui, rect, st, drawing);
+    if st.sketch.is_some() {
+        crate::sketch::touch_bar(ui, rect, st);
+    }
     side_handle(ui, rect, st);
 }
 
@@ -565,7 +582,10 @@ fn touch_bar(ui: &mut egui::Ui, rect: Rect, st: &mut AppState, drawing: bool) {
             egui::Frame::popup(ui.style()).show(ui, |ui| {
                 ui.spacing_mut().button_padding = Vec2::new(14.0, 10.0);
                 ui.horizontal(|ui| {
-                    if ui.button(tr("Finish")).clicked() {
+                    // Next: the tool goes on to its next part (side B of a
+                    // column, the holes of a complex fill).
+                    let next = st.tool.enter_goes_on(st.draw.points.len(), st.draw.stages.len());
+                    if ui.button(if next { tr("Next") } else { tr("Finish") }).clicked() {
                         st.draw_key(egui::Key::Enter);
                     }
                     if ui.button(tr("Remove Point")).clicked() {

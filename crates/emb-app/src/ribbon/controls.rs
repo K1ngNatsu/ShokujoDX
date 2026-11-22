@@ -309,6 +309,17 @@ pub(super) fn panels_menu(ui: &mut egui::Ui, st: &mut AppState, _s: &SelInfo) {
                     st.set_panel_shown(tab, on);
                 }
             }
+            ui.separator();
+            if ui
+                .button(tr("Reset the Panels"))
+                .on_hover_text(tr(
+                    "Put all the panels back in their places, in one group at the right, and open the closed panels.",
+                ))
+                .clicked()
+            {
+                st.reset_panels = true;
+                ui.close();
+            }
         },
     );
 }

@@ -509,14 +509,10 @@ pub const SIMPLE_PANELS: [Tab; 5] = [Tab::Properties, Tab::Sequence, Tab::Thread
 
 /// The panels that go together when a closed panel opens again.
 pub fn panel_group(tab: Tab) -> &'static [Tab] {
-    match tab {
-        Tab::Properties | Tab::Styles | Tab::DesignInfo | Tab::Clipart => {
-            &[Tab::Properties, Tab::Styles, Tab::DesignInfo, Tab::Clipart]
-        }
-        Tab::Sequence | Tab::Threads | Tab::StitchList | Tab::Exports => {
-            &[Tab::Sequence, Tab::Threads, Tab::StitchList, Tab::Exports]
-        }
-        _ => &[Tab::Canvas, Tab::Library],
+    if crate::app::SIDE_PANELS.contains(&tab) {
+        &crate::app::SIDE_PANELS
+    } else {
+        &[Tab::Canvas, Tab::Library]
     }
 }
 
@@ -980,6 +976,15 @@ mod tests {
         let mut h = Harness::empty();
         h.st.save_settings = false;
         let mut dock = crate::app::default_dock();
+        // The side panels are one group at the start.
+        let side: Vec<_> = crate::app::SIDE_PANELS
+            .iter()
+            .map(|t| dock.find_tab(t).unwrap())
+            .collect();
+        assert!(
+            side.iter()
+                .all(|p| (p.surface, p.node) == (side[0].surface, side[0].node))
+        );
         h.st.set_panel_shown(Tab::Threads, false);
         assert!(!h.st.panel_shown(Tab::Threads));
         sync_panels(&mut dock, &mut h.st);
@@ -993,7 +998,7 @@ mod tests {
             dock.find_tab(&Tab::Sequence).unwrap(),
         );
         assert_eq!((t.surface, t.node), (s.surface, s.node));
-        // All of a group closed: a panel opens on its own right of the canvas.
+        // All of the group closed: a panel opens on its own right of the canvas.
         for tab in panel_group(Tab::Properties) {
             h.st.set_panel_shown(*tab, false);
         }
@@ -1004,6 +1009,8 @@ mod tests {
         sync_panels(&mut dock, &mut h.st);
         assert!(dock.find_tab(&Tab::Styles).is_some());
         assert!(h.st.panel_shown(Tab::Styles));
+        h.st.set_panel_shown(Tab::Threads, true);
+        sync_panels(&mut dock, &mut h.st);
         // Simple mode hides the panels that it does not need, and shows them again after.
         h.st.settings.simple_mode = true;
         sync_panels(&mut dock, &mut h.st);

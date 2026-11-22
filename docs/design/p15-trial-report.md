@@ -246,6 +246,56 @@ Start page and a design, a swipe on the tabs, the side panels hidden, the
 panels of a tab over the canvas) and of a tablet in the headless browser.
 Not tested on a real phone yet.
 
+## Upgrades and faults (the owner's second report, 2026-11-22)
+
+1. **The version.** File > Check for Updates… (also on the desktop, where
+   it is the check of Help > Check for Updates). In the browser it compares
+   the build of the page with `version.json` on the server
+   (`tools/build-web.py` writes the version, the time of the build and the
+   commit into the page and that file): the window shows the build of the
+   page and, if a newer build is there, Reload Now (the service worker
+   gets the new files first). The test page has one build only, so no
+   earlier build can be chosen.
+2. **One group of side panels.** `app::default_dock` puts all eight side
+   panels in one group at the right (`app::SIDE_PANELS`, their order in
+   the group); a closed panel opens again in that group.
+3. **Reset the Panels** (Options, row Panels, and View > Panels) puts the
+   dock back to the default and opens the closed panels
+   (`AppState::reset_panels`). On a phone (simple mode) the View tab is not
+   on the ribbon; the Options are in the File menu.
+4. **A list in a dropdown did not open** (the Machine and Hoop lists in
+   Design > Machine and Hoop when that panel folds on a narrow screen;
+   also on the desktop).
+   egui keeps one open popup in its memory, so the list closed the folded
+   panel, and the list did not show. The folded panels and the dropdowns of
+   the ribbon are now `widgets::holding_popup`: they keep their own open
+   state, and a click in any popup (the panel or a list in it) keeps them
+   open. The panels of a tab over the canvas (a phone held across) stay
+   open in the same way.
+5. **The ruler menu.** A right click on a ruler (a long press on a touch
+   screen) that is not on a marker opens the menu of that place: Add Guide
+   at (X or Y from the hoop center; the top ruler gives a vertical guide),
+   Construction Line, Construction Point (the tools) and Remove Guides
+   (`guides::ruler_menu`, `AppState::ruler_menu`).
+6. **Next or Finish.** The touch bar shows Next when Enter goes on to the
+   next part of the tool (side B of a column, the angle lines of a turning
+   fill, the holes of a complex fill or an appliqué) and Finish on the
+   last part (`Tool::enter_goes_on`).
+7. **Sketch dimensions on a touch screen.** A finger picks a point or a
+   curve from 18 points (a mouse from 7: `sketch::pick_px`). The sketch
+   touch bar (`sketch::touch_bar`) has Length when a line is picked (its
+   length dimension at once, with no second tap), Add Dimension when a
+   dimension waits for the place of its label (it goes to its default
+   place), Cancel, and Done and Cancel while a chain of lines or a spline
+   has points. Then the value box opens as before.
+
+Tests: `ribbon::tests::a_list_in_a_folded_panel_opens_and_picks` (it
+fails with the old popup), `guides::tests::a_right_click_on_a_ruler_adds_a_guide_there_and_starts_the_mark_tools`,
+`draw::tests::the_touch_bar_says_next_until_the_last_part` and
+`sketch::tests::on_a_touch_screen_the_bar_makes_a_dimension_and_picks_are_wider`;
+they find the buttons in the tree of the screen reader
+(`Harness::reader_nodes`, `Harness::widget`).
+
 ## Faults that the trial found (fixed in the branch)
 
 In a browser, these calls stop the program: `std::time::Instant::now`
