@@ -47,6 +47,19 @@ pub const GRID_CELLS: f64 = 200.0;
 /// A branch from a line end to a junction is removed when it is shorter
 /// than this many times the stroke half-width at the junction.
 const PRUNE: f64 = 1.6;
+/// In a piece of a split shape, the branches of ends can be up to this
+/// many times longer (see [`piece`]), if the columns lose at most
+/// [`PIECE_COVER_LOSS`] of the coverage and the longest line across a
+/// column is at most [`PIECE_WIDER`] times as long (a slanted end of "X":
+/// 1.4; a serif on the two sides of a stem is not a branch: the stem went
+/// across it, with stitches twice as long).
+const PIECE_PRUNE: f64 = 1.8;
+const PIECE_COVER_LOSS: f64 = 0.003;
+const PIECE_WIDER: f64 = 1.5;
+/// A piece of a stroke shorter than this many half-widths of another stroke
+/// (not counting its extended ends) does not cut back an extended end of
+/// that stroke: it is a side stroke (a flag serif).
+const SIDE_PIECE: f64 = 2.0;
 /// A branch is a side branch only if it stays inside this many
 /// half-widths of the junction (counting its own half-width): a branch to
 /// a corner does, a short thick arm (the bar of a condensed "T") does not.
@@ -434,7 +447,7 @@ impl Graph {
     /// corner. Together, the line ends at the fork, in the middle. Where all
     /// the branches of a junction are side branches (a small part), the
     /// longest stays.
-    fn prune(&mut self, radius_at: &dyn Fn(Point) -> f64) -> bool {
+    fn prune(&mut self, radius_at: &dyn Fn(Point) -> f64, scale: f64) -> bool {
         let mut spurs: HashMap<usize, Vec<usize>> = HashMap::new();
         for i in 0..self.edges.len() {
             let e = &self.edges[i];
@@ -455,7 +468,7 @@ impl Graph {
                 .iter()
                 .map(|&p| p.distance(pos) + radius_at(p))
                 .fold(0.0, f64::max);
-            if length(&self.edges[i].pts) < PRUNE * r && reach < SPUR_REACH * r {
+            if length(&self.edges[i].pts) < scale * PRUNE * r && reach < scale * SPUR_REACH * r {
                 spurs.entry(junction).or_default().push(i);
             }
         }
@@ -1288,13 +1301,19 @@ pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
 /// [`strokes`] after the split `split` of the outline: the columns of each
 /// piece, as one.
 pub fn strokes_split(rings: &[Vec<Point>], cap_height: f64, split: Split) -> Strokes {
+    strokes_split_soft(rings, cap_height, split, true).0
+}
+
+/// [`strokes_split`], with or without the bridges to curves (`soft`; for
+/// the scripts with notches), and `true` if the split has such a bridge.
+pub(crate) fn strokes_split_soft(rings: &[Vec<Point>], cap_height: f64, split: Split, soft: bool) -> (Strokes, bool) {
     if split != Split::Off
-        && let Some(s) = crate::split::split(rings, cap_height, split == Split::Notches)
+        && let Some(s) = crate::split::split(rings, cap_height, split == Split::Notches, soft)
     {
-        let parts: Vec<(Strokes, f64)> = s.pieces.iter().map(|p| (whole(&p.rings, cap_height), p.area)).collect();
-        return merged(parts);
+        let parts: Vec<(Strokes, f64)> = s.pieces.iter().map(|p| (piece(&p.rings, cap_height), p.area)).collect();
+        return (merged(parts), s.soft);
     }
-    whole(rings, cap_height)
+    (whole(rings, cap_height), false)
 }
 
 /// The columns of the pieces of a shape as one, with the coverage of each
@@ -1317,8 +1336,43 @@ fn merged(parts: Vec<(Strokes, f64)>) -> Strokes {
     out
 }
 
+/// The stroke finder on a piece of a split shape. A piece is one stroke,
+/// but where it ends on a bridge at a slant, or with the curve of a
+/// bracket of a serif, its middle line forks at the end, and the branches
+/// can be longer than side branches: with the branches of ends cut back as
+/// far as [`PIECE_PRUNE`] times the usual length, the piece keeps fewer
+/// columns if they cover it as well.
+fn piece(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
+    let s = whole_with(rings, cap_height, 1.0);
+    if s.satins.len() < 2 {
+        return s;
+    }
+    let t = whole_with(rings, cap_height, PIECE_PRUNE);
+    // The longest line across a column (a stitch).
+    let widest = |x: &Strokes| {
+        x.satins
+            .iter()
+            .flat_map(|g| g.rungs.iter().map(|(a, b)| a.distance(*b)))
+            .fold(0.0, f64::max)
+    };
+    if t.satins.len() < s.satins.len()
+        && t.coverage >= s.coverage - PIECE_COVER_LOSS
+        && widest(&t) <= PIECE_WIDER * widest(&s)
+    {
+        t
+    } else {
+        s
+    }
+}
+
 /// The stroke finder on a whole shape.
 fn whole(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
+    whole_with(rings, cap_height, 1.0)
+}
+
+/// [`whole`] with side branches pruned up to `prune` times the usual
+/// length.
+fn whole_with(rings: &[Vec<Point>], cap_height: f64, prune: f64) -> Strokes {
     let Some(bb) = BBox::from_points(rings.iter().flatten().copied()) else {
         return Strokes::default();
     };
@@ -1336,7 +1390,7 @@ fn whole(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
     let skel = thin(&g);
     let mut graph = Graph::build(&g, &skel, &radius);
     loop {
-        let pruned = graph.prune(&radius_at);
+        let pruned = graph.prune(&radius_at, prune);
         graph.merge();
         let joined = graph.join_near();
         if !pruned && !joined {
@@ -1563,11 +1617,24 @@ fn whole(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
         // The pieces before this one (also of the same stroke: the legs of
         // an "A" are two pieces cut at the apex). The extended parts are
         // near the edge of the shape, where the half-width is small: the
-        // middle half-width of the stroke counts.
+        // middle half-width of the stroke counts. Not a short piece just
+        // before this one on the same middle line, cut from it at a corner
+        // (a flag serif at the top of a stem): the stem goes on through it
+        // to the edge, and the flag stops at the stem (`trim_ends`). Cut
+        // back, the stem stopped under the flag, and the flag went on across
+        // the stem at a slant and out of the letter (P21: "l" in Bree
+        // Serif). A serif on the two sides of a stem is a stroke of its own
+        // and still cuts the stem back.
+        let (stroke, r_this) = (all[k].0, all[k].2);
         let earlier: Vec<(Vec<Point>, f64)> = all[..k]
             .iter()
-            .filter(|(_, f, _, p)| f.is_none() && p.pts.len() >= 2)
-            .map(|(_, _, r, p)| (p.pts.clone(), *r))
+            .enumerate()
+            .filter(|&(j, (s, f, _, p))| {
+                let core = &p.pts[p.ext[0].min(p.pts.len())..p.ext[1].min(p.pts.len())];
+                let flag = *s == stroke && j + 1 == k && !p.closed && length(core) < SIDE_PIECE * r_this;
+                f.is_none() && p.pts.len() >= 2 && !flag
+            })
+            .map(|(_, (_, _, r, p))| (p.pts.clone(), *r))
             .collect();
         let earlier: Vec<(&[Point], Option<f64>)> = earlier.iter().map(|(l, r)| (l.as_slice(), Some(*r))).collect();
         let r_med = all[k].2;
@@ -1614,7 +1681,7 @@ fn whole(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
         }
     }
     trim_ends(&mut columns);
-    for c in columns.iter().filter(|c| c.a.len() >= 2) {
+    for c in columns.iter().filter(|c| c.sewable(cell)) {
         let (satin, quads) = c.geometry(Some((&outline, cell)));
         for q in &quads {
             fill_into(&g, std::slice::from_ref(q), &mut cover);
@@ -2297,6 +2364,36 @@ fn free_end(
 }
 
 /// The satin column of a piece, its widest width and the quads it covers.
+/// The points of an extension `ext` (from its first point, on the middle
+/// line) up to where it leaves the outline. The walk on the grid can stop a
+/// part of a cell past the outline, and the width of a point out of the
+/// outline is not held at the outline: the column went out of the letter
+/// (P21: the flag of "l" in Bree Serif).
+fn in_outline(ext: &[Point], outline: &Rings, segs: &[(Point, Point)]) -> Vec<Point> {
+    let inside = |p: Point| outline.rings.iter().filter(|r| ring_contains(r, p)).count() % 2 == 1;
+    let mut out: Vec<Point> = Vec::with_capacity(ext.len());
+    for &p in ext {
+        let Some(&prev) = out.last() else {
+            out.push(p);
+            continue;
+        };
+        if inside(p) {
+            out.push(p);
+            continue;
+        }
+        let u = segs
+            .iter()
+            .filter_map(|&(c, d)| Point::crossing(prev, p, c, d).map(|(u, _)| u))
+            .fold(1.0f64, f64::min);
+        let q = prev.lerp(p, u);
+        if q.distance(prev) > 1e-9 {
+            out.push(q);
+        }
+        break;
+    }
+    out
+}
+
 fn rails(
     piece: &Piece,
     r_med: f64,
@@ -2317,8 +2414,11 @@ fn rails(
     let mut pts = Vec::new();
     let mut is_ext = Vec::new();
     if piece.ext[0] > 0 {
-        let head = resample(&piece.pts[..=piece.ext[0]], false, step);
-        let k = head.len() - 1;
+        let mut head = resample(&piece.pts[..=piece.ext[0]], false, step);
+        head.reverse();
+        let mut head = in_outline(&head, outline, segs);
+        head.reverse();
+        let k = head.len().saturating_sub(1);
         pts.extend_from_slice(&head[..k]);
         is_ext.extend(std::iter::repeat_n(true, k));
     }
@@ -2331,9 +2431,9 @@ fn rails(
     pts.extend_from_slice(&body);
     is_ext.extend(std::iter::repeat_n(false, nb));
     if piece.ext[1] < piece.pts.len() {
-        let tail = resample(&piece.pts[piece.ext[1] - 1..], false, step);
-        pts.extend_from_slice(&tail[1..]);
-        is_ext.extend(std::iter::repeat_n(true, tail.len() - 1));
+        let tail = in_outline(&resample(&piece.pts[piece.ext[1] - 1..], false, step), outline, segs);
+        pts.extend_from_slice(&tail[1.min(tail.len())..]);
+        is_ext.extend(std::iter::repeat_n(true, tail.len().saturating_sub(1)));
     }
     let n = pts.len();
     if n < 2 {
@@ -2659,7 +2759,7 @@ pub fn trim_column_ends(satins: &mut Vec<SatinGeometry>, rings: &[Vec<Point>], c
         // A column that did not change keeps its rails and rungs.
         if c.closed || (c.a == a && c.b == b) {
             out.push(g.clone());
-        } else if c.a.len() >= 2 {
+        } else if c.sewable(cell) {
             out.push(c.geometry(Some((&outline, cell))).0);
         }
     }
@@ -2675,6 +2775,15 @@ struct Rails {
 }
 
 impl Rails {
+    /// The column has two pairs or more and some length on each rail. A
+    /// cut end can leave a column of two pairs with one rail at one point
+    /// (P21 Milestone 9: the apex of Varsity "a"), which has no stitch
+    /// across it and that an Ink/Stitch file cannot keep.
+    fn sewable(&self, cell: f64) -> bool {
+        let len = |v: &[Point]| v.windows(2).map(|w| w[0].distance(w[1])).sum::<f64>();
+        self.a.len() >= 2 && (self.closed || (len(&self.a) > 0.1 * cell && len(&self.b) > 0.1 * cell))
+    }
+
     /// The satin column and the quads that it covers. With `outline` (the
     /// rings and the cell of the grid), each rail follows the outline
     /// between two of its points that are on it (P21 Milestone 1).
@@ -2958,6 +3067,28 @@ fn trim_ends(columns: &mut [Rails]) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn an_extension_stops_at_the_outline() {
+        let square = vec![
+            Point::new(0.0, 0.0),
+            Point::new(10.0, 0.0),
+            Point::new(10.0, 10.0),
+            Point::new(0.0, 10.0),
+        ];
+        let rings = [square];
+        let outline = Rings::new(&rings);
+        let segs: Vec<(Point, Point)> = (0..4).map(|k| (rings[0][k], rings[0][(k + 1) % 4])).collect();
+        let ext = [
+            Point::new(5.0, 5.0),
+            Point::new(8.0, 5.0),
+            Point::new(11.0, 5.0),
+            Point::new(14.0, 5.0),
+        ];
+        let kept = in_outline(&ext, &outline, &segs);
+        assert_eq!(kept.len(), 3, "{kept:?}");
+        assert!(kept[2].distance(Point::new(10.0, 5.0)) < 1e-9, "{kept:?}");
+    }
+
     use super::*;
 
     #[test]

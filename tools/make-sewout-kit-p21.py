@@ -43,8 +43,10 @@ JP_FONT = os.path.join(ROOT, "target", "font-packages", "japanese", "noto-sans-j
 # The four fonts of the letter fault bench, and the texts of their sheets
 # (the first that fits the hoop): the letters whose joints the split
 # changed most ("N", "M", "W", "Z", "k", "x"), then the letters with the
-# most faults of each font in the bench of 2026-11-23.
+# most faults of each font in the bench of 2026-11-23. Friendly Serif: the
+# joints of slab serifs (Milestone 9, ADR 0155).
 JOINTS = [
+    ("friendly-serif", "Friendly Serif", ["MNVXYn hklruvw", "MNVXYn hkru", "MNVXYn"]),
     ("block-sans", "Block Sans", ["NMWZkx rAEK", "NMWZkx r", "NMWZkx"]),
     ("anton", "Anton", ["NMWZkx tGcSs369", "NMWZkx tGcS", "NMWZkx"]),
     ("pacifico", "Pacifico", ["NMWZkx wm4", "NMWZkx", "NMkx"]),
@@ -104,7 +106,7 @@ def main():
 CHECKLIST = """# P21 sew-out kit: checklist
 
 Made on {date} by `tools/make-sewout-kit-p21.py`, with the fonts made
-again in P21 Milestone 6. Machine: Husqvarna Viking Topaz 20 (the `.vp3`
+again in P21 Milestones 6 and 9. Machine: Husqvarna Viking Topaz 20 (the `.vp3`
 files; DST files too), hoop 260 x 200 mm. Sew each design on a medium
 woven fabric with a tear-away stabilizer, as a normal job.
 
@@ -144,11 +146,15 @@ The exit test of P21: no spikes, bulges or open corners.
 5. **The serifs of Varsity**: a stem ends in a serif at each end, so one
    serif sews before the stem. Does the end of the stem show on that
    serif?
-6. **Kanji**: at a crossing the thinner stroke stops at the sides of the
+6. **The serifs of Friendly Serif**: is a joint the same on the two sides
+   of a letter ("M", "V", "Y")? Does the stem of "n" go straight to the
+   top, with the curve starting on its side? Is there a lump where a
+   serif meets a slanted stroke ("V", "X", "Y")?
+7. **Kanji**: at a crossing the thinner stroke stops at the sides of the
    stroke that goes through (十, 木, 林, 東). Is there a lump or a gap?
-7. **Arabic**: each letter starts on its right and ends on its left,
+8. **Arabic**: each letter starts on its right and ends on its left,
    where the next one starts. Is there a long stitch between letters?
-8. **Trims and travel**: does a travel stitch show anywhere?
+9. **Trims and travel**: does a travel stitch show anywhere?
 
 Write the answers in the session or in a file next to this one, with
 photos if you can.

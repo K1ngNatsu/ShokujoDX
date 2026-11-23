@@ -480,7 +480,12 @@ pub fn cut_column(g: &SatinGeometry, at: Point, overlap: f64) -> Option<(SatinGe
         (first, second)
     };
     let ((a1, a2), (b1, b2)) = (cut(&a, sa), cut(&b, sb));
-    if a1.len() < 2 || a2.len() < 2 || b1.len() < 2 || b2.len() < 2 {
+    // Each half has some length on each rail: a cut near the end of a
+    // short column left a half with a rail of no length (P21 Milestone 9:
+    // the "a" of Varsity), which no stitch can sew.
+    let long =
+        |v: &[Point]| v.len() >= 2 && v.windows(2).map(|w| w[0].distance(w[1])).sum::<f64>() >= overlap.max(1e-6);
+    if !(long(&a1) && long(&a2) && long(&b1) && long(&b2)) {
         return None;
     }
     let (mut r1, mut r2) = (Vec::new(), Vec::new());

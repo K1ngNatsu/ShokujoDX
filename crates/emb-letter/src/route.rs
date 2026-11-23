@@ -1104,11 +1104,16 @@ fn split_places(letter: &EmbLetter, cap: f64) -> Vec<(usize, Point)> {
     out
 }
 
-/// `letter` with the column `part` cut at `at`.
+/// `letter` with the column `part` cut at `at`. Not a closed column (a
+/// ring): the cut lost the part where the ring closes, and the bowl of a
+/// "g" had a gap (P21 Milestone 9).
 fn with_split(letter: &EmbLetter, part: usize, at: Point, cap: f64) -> Option<EmbLetter> {
     let ObjectKind::Satin { geometry, params } = &letter.parts[part] else {
         return None;
     };
+    if geometry.rail_a.is_closed() || geometry.rail_b.is_closed() {
+        return None;
+    }
     let (first, second) = crate::quality::cut_column(geometry, at, SEAM_OVERLAP * cap)?;
     let mut out = letter.clone();
     let half = |geometry: SatinGeometry| ObjectKind::Satin {
@@ -1214,6 +1219,30 @@ mod tests {
             ),
             params: Default::default(),
         }
+    }
+
+    #[test]
+    fn a_ring_is_not_cut() {
+        // A closed column (the bowl of a "g"): a cut lost the part where it
+        // closes.
+        let ring = |r: f64| {
+            let mut p = Path::new().move_to(Point::new(r, 0.0));
+            for k in 1..16 {
+                let t = emb_geom::math::to_radians(22.5 * f64::from(k));
+                p = p.line_to(Point::new(r * emb_geom::math::cos(t), r * emb_geom::math::sin(t)));
+            }
+            p.close()
+        };
+        let bowl = ObjectKind::Satin {
+            geometry: SatinGeometry {
+                rail_a: ring(5.0),
+                rail_b: ring(3.0),
+                rungs: Vec::new(),
+            },
+            params: Default::default(),
+        };
+        let l = letter(vec![bowl, column((4.0, 0.0), (12.0, 0.0), 2.0)]);
+        assert!(with_split(&l, 0, Point::new(4.0, 0.0), 25.0).is_none());
     }
 
     fn letter(parts: Vec<ObjectKind>) -> EmbLetter {

@@ -758,9 +758,89 @@ lettering in TrueType fonts have more stitches (lettering-names 2481 to
 2597, mitre-corners 7623 to 7897, shaped-text 6899 to 6927) and the
 same trims.
 
+## Milestone 9: the joints of serif fonts (M)
+
+**Why.** On the proof pictures of Friendly Serif (from Bree Serif), the
+owner found joints that are not the same on the two sides of "M", "N",
+"V", "X" and "Y", and a large area with two layers where the stem of "n"
+meets its curve (2026-11-23). The causes (ADR 0155): a slab serif on a
+slanted stroke meets it at a sharp corner on one side and over a curve
+on the other, and the split joined two concave corners only; the inside
+of the shoulder of "n" goes into the stem with no corner; the cut from
+one top notch of "M" was a little longer than `NOTCH_MAX`; the fork of
+"Y" turns 1 degree less than `NOTCH_DEG`.
+
+**Steps.**
+
+1. Bridges to curves: a concave corner with no bridge and no cut gets a
+   bridge to the outline where it turns into the shape over a curve, on
+   each side where there is one (the fork of "Y" gets two).
+2. A short curve between two straight edges (the bracket of a serif)
+   goes with the stroke that goes through, where the stroke that ends is
+   square to it (the stems of "n" and "r").
+3. The cuts from notches: at most 2.5 widths long, and across the
+   outline at 45 degrees or more; they come before the bridges to curves.
+4. The pieces: the branches at a slanted end can be cut back further if
+   the columns cover the piece as well (the "X"); a flag serif does not
+   cut back the end of a stem (the "l"); an extension of a middle line
+   stops at the outline; a column with a rail of no length goes (the
+   apex of Varsity "a"); the route does not cut a closed column (the
+   bowl of "g" had a gap) or leave a half with a rail of no length.
+5. For each glyph, the split with bridges to curves only if its spikes,
+   crossing pairs (half each) and open area are no more than without
+   them (Anton: 25 to 80 spikes with them in all letters). In a piece,
+   the end branches are cut back further only if no line across a column
+   gets more than 1.5 times longer (a serif on the two sides of a stem
+   is not a branch).
+6. All fonts made again; Friendly Serif in the sew-out kit.
+
+**Exit test.** The letters "M", "N", "V", "X", "Y" and "n" of Friendly
+Serif: no spikes, joints of the same kind on the two sides, no place
+with three columns on top of each other. The letter fault bench: no font
+worse in spikes or open area. The lettering bench of P20: the kana and
+kanji no worse.
+
+**Made (2026-11-23, ADR 0155).** Friendly Serif as lettering in Bree
+Serif at 25 mm:
+
+| Letter | Spikes | Open area mm2 | Columns on top |
+| --- | --- | --- | --- |
+| M | 0 to 0 | 4.07 to 0.38 | 0 to 0 |
+| N | 1 to 1 | 0.83 to 0.16 | 2 to 0 |
+| V | 0 to 0 | 0.56 to 0.05 | 1 to 1 |
+| X | 8 to 0 | 2.33 to 0.01 | 1 to 1 |
+| Y | 4 to 0 | 1.86 to 0.04 | 1 to 2 |
+| n | 6 to 0 | 1.90 to 0.47 | 3 to 1 |
+
+The fork of "Y" has a bridge on each side: the stem ends in a point and
+each arm ends on it. The stem of "n" goes to the top, and its curve
+starts on the side of the stem (0.1 of the bridge into it). Eighteen
+letters of the font ("MNVXYnmhuAWKkvwxyz"): spikes 37 to 3, crossing
+pairs 16 to 14, open area 33.3 to 10.1 mm2, open corners 25 to 19,
+columns on top 25 to 19, trims 5 to 6, no bulges. The "N" has one spike
+at the end of a serif, as before.
+
+The letter fault bench (lettering in the source fonts at 25 mm):
+
+| Font | Spikes | Crossing pairs | Open area | Open corners | Bulges mm | Columns on top | Trims |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Block Sans | 2 to 2 | 15 to 12 | 0.14 % to 0.12 % | 14 to 16 | 0.0 to 0.0 | 5 to 6 | 2 to 2 |
+| Anton | 25 to 17 | 23 to 21 | 1.12 % to 1.06 % | 26 to 26 | 2.9 to 2.3 | 11 to 8 | 2 to 3 |
+| Pacifico | 27 to 29 | 22 to 14 | 0.30 % to 0.23 % | - | 14.2 to 14.5 | 10 to 7 | 2 to 2 |
+| Varsity | 0 to 0 | 6 to 3 | 0.03 % to 0.03 % | 0 to 0 | 0.0 to 0.0 | 52 to 53 | 19 to 18 |
+
+Worse letters: Pacifico "k" (a bulge of 2.3 mm at the foot of the stem),
+"m" and "w" (spikes), Block Sans "9" (2 spikes). In the letters of the
+snapshot, Pacifico has 11 spikes (5 before). The lettering bench of P20: trims of the
+words fewer (東京 8, 8, 8, 8, 8 to 7, 7, 8, 8, 8; 龍 9, 8, 9, 9, 9 to 6,
+7, 8, 8, 8), characters over 3 % with two layers 6 to 9 at 10 mm, 7 to 7
+at 15 mm, 5 to 6 at 25 mm, the same at 50 and 80 mm (the flag rule and
+the end branches in the pieces of kanji). The fonts: the 55 fonts of the program have a mean score of 84.8 (85.5 before; 5 higher, 19 the same, 31 lower by 1 to 4): the point of the stem at a fork is narrow at the smallest size (Bebas Neue "Y" 74 to 55), and a slanted end has longer stitches at the largest size; no font is below the limit. The golden designs with lettering: -1.8 % to +7.1 % stitches, 1 fewer trim in all (embroidery-fonts-4 48 to 50, keyboard-designs 12 to 10).
+
 ## Exit test of the phase
 
-The exit tests of the six milestones, and the sew-out of Milestone 6.
+The exit tests of the six milestones, and the sew-out of Milestone 6
+(with the serif joints of Milestone 9).
 
 ## Order
 
@@ -771,7 +851,9 @@ before Milestone 6, for the same reason; the owner chose to make it
 before Milestone 5 (2026-11-23). The bench (Milestone 1, step 1)
 comes first, as the measure of each milestone. The bundled fonts are made
 again only in Milestone 6, so the sew-outs of the older milestones use
-lettering in the TrueType fonts.
+lettering in the TrueType fonts. Milestone 9 (the owner's request of
+2026-11-23, after Milestone 6) makes the fonts again before the
+sew-out.
 
 ## Not in this phase
 
