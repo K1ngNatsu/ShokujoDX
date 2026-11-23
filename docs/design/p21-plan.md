@@ -5,7 +5,8 @@ the review of the font pipeline, in this order). Milestone 1 is made
 (ADR 0147); its faults at the ends of columns go to Milestone 2.
 Milestone 2 is made (ADR 0148); its exit test is met in part. Milestone
 3 is made (ADR 0149); its exit test is met in part. Milestone 4 is made
-(ADR 0150).
+(ADR 0150). Milestone 7 (a middle line from a Voronoi diagram, a trial)
+was added by the owner on 2026-11-23.
 
 ## Goal
 
@@ -339,13 +340,52 @@ in their source fonts or better; each font has a score of
 `quality::LIMIT` or more; the owner sews the kit and sees no spikes,
 bulges or open corners.
 
+## Milestone 7: a middle line from a Voronoi diagram (trial) (M)
+
+Added by the owner on 2026-11-23, after a look at open-source tools. No
+open-source program converts a font to satin letters automatically
+(Ink/Stitch uses fonts that people digitize by hand); the programs that do
+it are closed. But open-source libraries make the middle line of a shape
+with no grid.
+
+The stroke finder makes the middle line on a grid of cells (thinning,
+`grid::thin`), and many fixes of Milestones 1 to 3 are for faults of the
+grid: the middle line is up to one cell off the middle, its ends bend to
+a corner, side branches need rules, and the feet on the outline must be
+found again. The Voronoi diagram of the segments of the outline gives the
+exact middle line: each of its edges has the two segments of the outline
+that make it (the feet of Milestone 1) and its distance to them (the
+half-width).
+
+1. **The middle line from the outline**, in a new module of the stroke
+   finder, beside the grid: `boostvoronoi` (a port of the Voronoi diagram
+   of Boost.Polygon to pure Rust, licence BSL-1.0), or `centerline`
+   (built on it, MIT or Apache-2.0; for shapes like letters: rings with
+   holes). An ADR, the licence list (`tools/third-party-licenses.py`), and
+   rule 9 (pure Rust: no exception).
+2. **The graph of the strokes from it**: the junctions, the side
+   branches, the links at junctions and the pieces. The rails, the ends
+   and the mitres of Milestones 1 to 3 stay.
+3. **Outlines that the library does not take** (rings that touch other
+   rings): clean them first, or keep the grid for that glyph.
+4. **A switch** between the two middle lines, and the letter fault bench
+   and the lettering bench of P20 for both.
+
+**Decision (exit test):** the new middle line stays if, in the four fonts
+of the bench, it is better in spikes, crossing pairs, open area, open
+corners and bulges, the lettering bench of P20 keeps its exit tests, and
+a glyph takes at most two times as long. Else the grid stays, and the
+plan records the numbers of the trial.
+
 ## Exit test of the phase
 
 The exit tests of the six milestones, and the sew-out of Milestone 6.
 
 ## Order
 
-The owner's order: Milestones 1 to 6. The bench (Milestone 1, step 1)
+The owner's order: Milestones 1 to 6. Milestone 7 (the trial) comes
+before Milestone 6, so the fonts are made again with the middle line that
+wins. The bench (Milestone 1, step 1)
 comes first, as the measure of each milestone. The bundled fonts are made
 again only in Milestone 6, so the sew-outs of the older milestones use
 lettering in the TrueType fonts.
