@@ -51,8 +51,10 @@ const BEAM: usize = 12;
 const EDGE_POINTS: usize = 8;
 /// A letter goes on into the next letter if a stroke of it ends this near
 /// to the end of its place in the line, or after it (a part of the capital
-/// height).
-const TOUCH: f64 = 0.03;
+/// height). P21: 0 (it was 0.03): the end of a column reaches the corner of
+/// its stroke now, and the feet of an "A" at the edge of its place were
+/// taken as a tail (a run from the left foot, sewn as one long stitch).
+const TOUCH: f64 = 0.0;
 /// For a letter with a tail: a route that ends 1 mm nearer to the end of
 /// the tail is as good as a route with this much less travel, in mm.
 const TAIL_END: f64 = 12.0;

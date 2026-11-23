@@ -3,6 +3,7 @@
 Date: 2026-11-23 · Status: Accepted (owner, 2026-11-23: the six fixes of
 the review of the font pipeline, in this order). Milestone 1 is made
 (ADR 0147); its faults at the ends of columns go to Milestone 2.
+Milestone 2 is made (ADR 0148); its exit test is met in part.
 
 ## Goal
 
@@ -183,6 +184,43 @@ area at corners at most a quarter of today. And the targets of
 Milestone 1 that the ends make: at most a quarter of the crossing pairs
 of today, at most 0.5 mm of sides that go back, at most half the bulges
 of today in Anton and Pacifico.
+
+**Made (2026-11-23, ADR 0148).** A free end follows the outline round it
+from a pair back from the end (`stroke::free_end`): the pairs are the
+points of its two sides at the same places along the stroke, so the
+stitches stay across the stroke and end on the end edge, on the slant of a
+slanted end, or round a round end. A corner of a stroke ends both pieces
+on its mitre (`stroke::mitre_at`, `close_mitre`) where the mitre is clear
+(a turn of at most 110°, at most 1.6 widths of the thinner piece, across
+both pieces, in the letter); other corners and the junctions are made as
+before. The tails of the route must reach the end of the place of the
+letter (`route::TOUCH` 0), so the feet of an "A" are not a tail.
+`trace_side` stays for ends with no outline round them, and
+`tune::extend_ends` stays until the fonts are made again (Milestone 6).
+
+| Bench, ttf (before P21 → after M1 → after M2) | Block Sans | Anton | Pacifico | Varsity |
+| --- | --- | --- | --- | --- |
+| Spikes | 61 → 33 → 20 | 123 → 90 → 50 | 101 → 73 → 33 | 18 → 15 → 15 |
+| Out with no pull compensation | 98 → 55 → 33 | 194 → 128 → 68 | 148 → 132 → 57 | 27 → 16 → 16 |
+| Crossing pairs | 10 → 25 → 20 | 94 → 106 → 48 | 66 → 73 → 41 | 23 → 47 → 14 |
+| Sides that go back (mm) | 0.5 → 0.9 → 2.0 | 7.4 → 6.9 → 2.6 | 5.3 → 5.5 → 12.7 | 2.0 → 3.2 → 0.7 |
+| Bulges (mm) | 0.4 → 2.2 → 2.3 | 9.1 → 6.1 → 4.3 | 13.7 → 17.1 → 17.8 | 0.2 → 0.0 → 0.0 |
+| Notches | 24 → 0 → 0 | 11 → 2 → 2 | 0 → 5 → 5 | 0 → 0 → 0 |
+| Open area (%) | 1.47 → 1.34 → 0.98 | 2.84 → 2.49 → 1.84 | 2.01 → 1.54 → 0.92 | 0.93 → 0.89 → 0.80 |
+| Open area at corners (mm²) | 19.4 → 18.6 → 13.0 | 36.5 → 26.0 → 21.4 | (none) | 25.6 → 18.3 → 15.3 |
+| Corners open | 48 → 44 → 46 | 75 → 50 → 56 | (none) | 59 → 35 → 40 |
+
+The exit test is met for Anton's bulges (half of before P21) and nearly
+for the notches (2 and 5 are left). It is not met for the rest: the
+spikes are a third to a fifth of before P21 (the target is a tenth), the
+open corners are 8 % to 17 % (the target is 5 %), and the crossing pairs,
+the sides that go back and the bulges of Pacifico are not down enough.
+The pictures show what is left: the tips of very sharp ends, the joints
+where pieces meet at a sharp point (the V of "M", "W", "w", the crossing
+of "x"), which have no mitre and keep the ends of before, the short arms
+that a column covers (Milestone 3), and the round tips of Pacifico (the
+column turns at the tip). These go to Milestones 3 and 5; the targets stay
+the exit test of the phase.
 
 ## Milestone 3: the middle line (M)
 

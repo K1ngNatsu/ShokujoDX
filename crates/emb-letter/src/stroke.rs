@@ -140,6 +140,34 @@ const CROSS_PAST: f64 = 1.5;
 /// where the outline turns more than this (degrees) from the side.
 const END_BACK: f64 = 0.8;
 const END_TURN_DEG: f64 = 70.0;
+/// The two points of the mitre of a corner are at most this many
+/// half-widths from the middle line (P21 Milestone 2), and the outer
+/// corner is in this angle (degrees) of the line that halves the turn.
+const MITRE_REACH: f64 = 2.6;
+const MITRE_OUTER_DEG: f64 = 45.0;
+/// A mitre is at least this angle (degrees) off the direction of each
+/// piece.
+const MITRE_ACROSS_DEG: f64 = 25.0;
+/// A mitre is only where the middle line turns at most this (degrees).
+const MITRE_TURN_MAX_DEG: f64 = 110.0;
+/// A mitre is at most this many widths long (a square corner: 1.41).
+const MITRE_MAX: f64 = 1.6;
+/// The outline round a free end is at most this many widths long
+/// ([`free_end`]); longer, it goes into another stroke.
+const END_LOOP_MAX: f64 = 8.0;
+/// The front of a free end: the points of the outline at most this part of
+/// the width behind its farthest point (the end edge of a square end).
+const END_FLAT: f64 = 0.15;
+/// A side of a free end can go back this part of the width (a bump).
+const END_BACK_SLACK: f64 = 0.15;
+/// A free end stops where it is narrower than this part of the width (a
+/// pointed or a round end).
+const END_TIP: f64 = 0.06;
+/// The front of a free end is an end edge if its points are at most this
+/// part of the width from a straight line; else the end is round.
+const END_STRAIGHT: f64 = 0.03;
+/// The pairs of a free end are at most this part of the width apart.
+const END_STEP: f64 = 0.1;
 /// The traced sides of an end stay this near (a factor of the width of the
 /// stroke) to the place where the middle line meets the outline.
 const END_NEAR_TIP: f64 = 1.5;
@@ -838,6 +866,9 @@ struct Piece {
     /// The start and the end are the free ends of the pen stroke (not at
     /// another stroke, not at a cut of a corner).
     free: [bool; 2],
+    /// The mitre of an end at a cut of a corner (P21 Milestone 2): the
+    /// inner and the outer corner of the outline.
+    mitre: [Option<(Point, Point)>; 2],
 }
 
 /// The corners of the outline: the points where it turns more than
@@ -1099,6 +1130,7 @@ fn split_piece(p: &Piece, k: usize, x: Point, hold: f64) -> Option<(Piece, Piece
             ext: [p.ext[0], n1],
             hold: [p.hold[0], hold],
             free: [p.free[0], false],
+            mitre: [p.mitre[0], None],
         },
         Piece {
             pts: second,
@@ -1106,6 +1138,7 @@ fn split_piece(p: &Piece, k: usize, x: Point, hold: f64) -> Option<(Piece, Piece
             ext: [0, p.ext[1] - k],
             hold: [hold, p.hold[1]],
             free: [false, p.free[1]],
+            mitre: [None, p.mitre[1]],
         },
     ))
 }
@@ -1160,6 +1193,7 @@ fn extend(mut pts: Vec<Point>, free: [bool; 2], g: &Grid, reach: f64) -> Piece {
         ext,
         hold: [0.0; 2],
         free,
+        mitre: [None; 2],
     }
 }
 
@@ -1225,6 +1259,7 @@ pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
         .iter()
         .flat_map(|r| (0..r.len()).map(move |k| (r[k], r[(k + 1) % r.len()])))
         .collect();
+    let outline = Rings::new(rings);
     let mut out = Strokes::default();
     let mut cover = vec![false; g.inside.len()];
     let lines: Vec<Vec<Point>> = raws.iter().map(|r| r.pts.clone()).collect();
@@ -1286,6 +1321,53 @@ pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
         let smoothed = smooth(&raw.pts, raw.closed, win);
         let cuts = cut_corners(&smoothed, raw.closed, raw.free, 1.5 * r_med, &corners);
         let count = cuts.len();
+        // The mitre at a cut point of the smoothed line (P21 Milestone 2).
+        let ns = smoothed.len();
+        let span = {
+            let spacing = length(&smoothed) / ns.saturating_sub(1).max(1) as f64;
+            ((1.5 * r_med / spacing.max(1e-9)).round() as usize).clamp(1, ns / 4 + 1)
+        };
+        // The middle half-width of each piece: a mitre is for two pieces of
+        // about one width (not a thin diagonal on a thick stem).
+        let piece_r: Vec<f64> = cuts
+            .iter()
+            .map(|(idx, _, _)| {
+                let mut v: Vec<f64> = idx.iter().map(|&i| width_at(raw.pts[i])).collect();
+                v.sort_by(f64::total_cmp);
+                v.get(v.len() / 2).copied().unwrap_or(r_med).max(cell)
+            })
+            .collect();
+        let mitre = |c: usize, r: f64| -> Option<(Point, Point)> {
+            if raw.r_fix.is_some() {
+                return None;
+            }
+            let at = |i: isize| -> Point {
+                if raw.closed {
+                    smoothed[i.rem_euclid(ns as isize) as usize]
+                } else {
+                    smoothed[i.clamp(0, ns as isize - 1) as usize]
+                }
+            };
+            let (c, k) = (c as isize, span as isize);
+            let u1 = (at(c) - at(c - k)).normalized()?;
+            let u2 = (at(c + k) - at(c)).normalized()?;
+            // Not at a sharp point (the V of an "M", a "W"): its outer
+            // corner is far from the middle line. The smoothed line rounds
+            // the point, so the turn is measured over a longer part.
+            let (v1, v2) = (
+                (at(c) - at(c - 2 * k)).normalized()?,
+                (at(c + 2 * k) - at(c)).normalized()?,
+            );
+            if v1.dot(v2) < emb_geom::math::cos(emb_geom::math::to_radians(MITRE_TURN_MAX_DEG)) {
+                return None;
+            }
+            // The mitre is short (not the long line of a sharp corner, where
+            // the column would fan out) and in the letter (not across a
+            // counter at a turn of a curve).
+            mitre_at(at(c), u1, u2, r, &outline, &corners, &segs).filter(|&(p, q)| {
+                p.distance(q) <= MITRE_MAX * 2.0 * r && (1..10).all(|k| g.is_inside(p.lerp(q, f64::from(k) / 10.0)))
+            })
+        };
         let mut pieces: Vec<Piece> = cuts
             .into_iter()
             .enumerate()
@@ -1300,11 +1382,26 @@ pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
                         ext: [0, n],
                         hold: [0.0; 2],
                         free: [false; 2],
+                        mitre: [None; 2],
                     }
                 } else {
-                    let mut piece = extend(p, free, &g, r_med);
-                    for (hold, free) in piece.hold.iter_mut().zip(free) {
-                        if !free && raw.r_fix.is_none() {
+                    // The ends at a cut of a corner end on its mitre.
+                    let cut = [raw.closed || k > 0, raw.closed || k + 1 < count];
+                    let m = piece_r.len();
+                    let (before, after) = (piece_r[(k + m - 1) % m], piece_r[(k + 1) % m]);
+                    let mitres = [
+                        idx.first()
+                            .filter(|_| cut[0])
+                            .and_then(|&c| mitre(c, piece_r[k].min(before))),
+                        idx.last()
+                            .filter(|_| cut[1])
+                            .and_then(|&c| mitre(c, piece_r[k].min(after))),
+                    ];
+                    let extended = [free[0] && mitres[0].is_none(), free[1] && mitres[1].is_none()];
+                    let mut piece = extend(p, extended, &g, r_med);
+                    piece.mitre = mitres;
+                    for ((hold, free), m) in piece.hold.iter_mut().zip(free).zip(mitres) {
+                        if !free && m.is_none() && raw.r_fix.is_none() {
                             *hold = 1.5 * r_med;
                         }
                     }
@@ -1326,7 +1423,7 @@ pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
             for k in first..n {
                 let before = pieces[(k + n - 1) % n].pts.clone();
                 let piece = &mut pieces[k];
-                if piece.closed || piece.ext[0] > 0 {
+                if piece.closed || piece.ext[0] > 0 || piece.mitre[0].is_some() {
                     continue;
                 }
                 let gone = trim_start_out_of(&mut piece.pts, &[(&before, None)], &radius_at, cell, 0.0);
@@ -1388,7 +1485,6 @@ pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
     }
     cut_crossings(&mut all, &radius_at, cell);
     let mut columns: Vec<Rails> = Vec::new();
-    let outline = Rings::new(rings);
     for (_, fixed, r_med, piece) in &all {
         let fixed_at = |_: Point| fixed.unwrap_or(0.0);
         let width_at: &dyn Fn(Point) -> f64 = if fixed.is_some() { &fixed_at } else { &radius_at };
@@ -1493,6 +1589,12 @@ impl<'a> Rings<'a> {
     /// [`FOOT_CONE_DEG`] of `dir`), at most `reach` away; with `dir` zero,
     /// of all segments.
     fn nearest(&self, p: Point, dir: Point, reach: f64) -> Option<Foot> {
+        self.nearest_with(p, dir, reach, true)
+    }
+
+    /// [`Rings::nearest`]; with `along` false, of all the segments whose
+    /// nearest point is in the angle of `dir`.
+    fn nearest_with(&self, p: Point, dir: Point, reach: f64, along: bool) -> Option<Foot> {
         let cos = emb_geom::math::cos(emb_geom::math::to_radians(FOOT_CONE_DEG));
         let cos_along = emb_geom::math::cos(emb_geom::math::to_radians(FOOT_ALONG_DEG));
         let tangent = dir.perp();
@@ -1512,7 +1614,7 @@ impl<'a> Rings<'a> {
                         continue;
                     }
                     let seg = b - a;
-                    if seg.dot(tangent).abs() < cos_along * seg.length() {
+                    if along && seg.dot(tangent).abs() < cos_along * seg.length() {
                         continue;
                     }
                 }
@@ -1559,6 +1661,36 @@ impl<'a> Rings<'a> {
             .collect();
         ks.sort_by(|&x, &y| past(x).total_cmp(&past(y)));
         ks.into_iter().map(|k| ring[k]).collect()
+    }
+
+    /// The points of the ring from `a` to `b` (both on it), the way of the
+    /// ring with `forward`, else against it, with `a` first and `b` last.
+    /// `None` if that way is longer than `limit`.
+    fn path(&self, a: &Foot, b: &Foot, forward: bool, limit: f64) -> Option<Vec<Point>> {
+        if a.ring != b.ring {
+            return None;
+        }
+        let (ring, at) = (&self.rings[a.ring], &self.at[a.ring]);
+        let l = self.len(a.ring);
+        if ring.is_empty() || l <= 0.0 {
+            return None;
+        }
+        let d = if forward { b.s - a.s } else { a.s - b.s }.rem_euclid(l);
+        if d > limit {
+            return None;
+        }
+        let past = |k: usize| {
+            let x = if forward { at[k] - a.s } else { a.s - at[k] };
+            x.rem_euclid(l)
+        };
+        let mut ks: Vec<usize> = (0..ring.len())
+            .filter(|&k| past(k) > 1e-12 && past(k) < d - 1e-12)
+            .collect();
+        ks.sort_by(|&x, &y| past(x).total_cmp(&past(y)));
+        let mut out = vec![a.at];
+        out.extend(ks.into_iter().map(|k| ring[k]));
+        out.push(b.at);
+        Some(out)
     }
 
     /// The rail goes along the outline from `fa` to `fb` (the feet of the
@@ -1809,6 +1941,241 @@ fn side_rail(
     out
 }
 
+/// The mitre of a corner of a stroke at the point `q` of its middle line
+/// (P21 Milestone 2): the line from the inner corner of the outline to its
+/// outer corner. The two pieces of the stroke end on it, so the corner has
+/// stitches to its point and the pieces do not lie on each other. `u1` and
+/// `u2`: the directions of the middle line into the corner and out of it;
+/// `r`: the half-width of the stroke. The inner corner is the nearest point
+/// of the outline on the inner side of the turn; the outer corner is a
+/// corner of the outline on the outer side, near the line that halves the
+/// turn (the point of an "N", a "V"), else the point of the outline on that
+/// line (a flat apex of an "A", a round outer side). `None` if they are not
+/// there or the line is not across the stroke.
+fn mitre_at(
+    q: Point,
+    u1: Point,
+    u2: Point,
+    r: f64,
+    outline: &Rings,
+    corners: &[Corner],
+    segs: &[(Point, Point)],
+) -> Option<(Point, Point)> {
+    let inward = (u2 - u1).normalized()?;
+    let out = inward * -1.0;
+    let reach = MITRE_REACH * r;
+    let inner = outline.nearest_with(q, inward, reach, false)?.at;
+    let cos = emb_geom::math::cos(emb_geom::math::to_radians(MITRE_OUTER_DEG));
+    let along_out = |c: Point| (c - q).normalized().map_or(-1.0, |v| v.dot(out));
+    let outer = match corners
+        .iter()
+        .map(|c| c.0)
+        .filter(|&c| c.distance(q) <= reach && along_out(c) >= cos)
+        .max_by(|&x, &y| along_out(x).total_cmp(&along_out(y)))
+    {
+        Some(c) => c,
+        // A round outer side: the point on the line that halves the turn.
+        // A corner farther out (a sharp point) has no mitre.
+        None if corners
+            .iter()
+            .any(|c| c.0.distance(q) <= 2.0 * reach && along_out(c.0) >= cos) =>
+        {
+            return None;
+        }
+        None => ray(q, out, reach, segs).map(|t| q + out * t)?,
+    };
+    let len = inner.distance(outer);
+    // The mitre goes across both pieces, not along one of them.
+    let d = (outer - inner).normalized()?;
+    let across = emb_geom::math::cos(emb_geom::math::to_radians(MITRE_ACROSS_DEG));
+    (len > 0.8 * r
+        && (inner - q).dot(inward) > 0.0
+        && (outer - q).dot(out) > 0.0
+        && d.dot(u1).abs() <= across
+        && d.dot(u2).abs() <= across)
+        .then_some((inner, outer))
+}
+
+/// Ends the rails `a` and `b` of a column on the mitre `m` (at the start
+/// with `end` 0, at the end with 1): the pairs past the line of the mitre
+/// go, and the two points of the mitre are the last pair (P21 Milestone 2).
+fn close_mitre(a: &mut Vec<Point>, b: &mut Vec<Point>, end: usize, m: (Point, Point)) {
+    let n = a.len();
+    if n < 2 {
+        return;
+    }
+    let (m1, m2) = m;
+    let side = |p: Point| (m2 - m1).cross(p - m1);
+    // The side of the column: a pair back from the end by the length of
+    // the mitre (the middle of a column that curves round, a "G", can be
+    // on the other side of the line of the mitre).
+    let mid = m1.midpoint(m2);
+    let len = m1.distance(m2);
+    let order: Vec<usize> = if end == 1 {
+        (0..n).rev().collect()
+    } else {
+        (0..n).collect()
+    };
+    let at = order
+        .iter()
+        .copied()
+        .find(|&i| a[i].midpoint(b[i]).distance(mid) >= len)
+        .unwrap_or(order[n - 1]);
+    let inside = side(a[at].midpoint(b[at])).signum();
+    if inside == 0.0 {
+        return;
+    }
+    let keep: Vec<bool> = (0..n)
+        .map(|i| side(a[i]) * inside > 0.0 && side(b[i]) * inside > 0.0)
+        .collect();
+    // The pair that stays nearest the mitre; rail A takes the point of the
+    // mitre on its side (as the end pair of before).
+    let k = if end == 1 {
+        (0..n).rev().find(|&i| keep[i]).unwrap_or(0)
+    } else {
+        (0..n).find(|&i| keep[i]).unwrap_or(n - 1)
+    };
+    // A mitre that would take more than half of the column is not the
+    // corner of this column.
+    let gone = if end == 1 { n - 1 - k } else { k };
+    if 2 * gone > n {
+        return;
+    }
+    let last = if end == 1 { n - 1 } else { 0 };
+    let (ma, mb) = if a[last].distance(m1) + b[last].distance(m2) <= a[last].distance(m2) + b[last].distance(m1) {
+        (m1, m2)
+    } else {
+        (m2, m1)
+    };
+    if end == 1 {
+        a.truncate(k + 1);
+        b.truncate(k + 1);
+        a.push(ma);
+        b.push(mb);
+    } else {
+        a.drain(..k);
+        b.drain(..k);
+        a.insert(0, ma);
+        b.insert(0, mb);
+    }
+}
+
+/// The pairs of a free end of a column (the end of a pen stroke; P21
+/// Milestone 2), from the pair (`a_k`, `b_k`) on the outline to the end, in
+/// the direction `dir` of the stroke. The outline from `a_k` round the end
+/// to `b_k` is the end: its two sides go to the front of the stroke (its
+/// points farthest along `dir`), and the pairs are the points of the two
+/// sides at the same places along `dir`. So the stitches stay across the
+/// stroke and end on the outline: on the end edge of a square end (the
+/// last pair is its two corners), on the slant of an end cut at a slant,
+/// round a round end. Where the two sides come nearer than [`END_TIP`] of
+/// the width `w` (a pointed or a round end), the column ends. `None` if the
+/// two points are not on one ring, or the outline round the end is longer
+/// than [`END_LOOP_MAX`] widths (the end goes on into another stroke), or
+/// a side goes back against `dir` (an end that curves back).
+fn free_end(
+    a_k: Point,
+    b_k: Point,
+    dir: Point,
+    outline: &Rings,
+    w: f64,
+    cell: f64,
+    step: f64,
+) -> Option<Vec<(Point, Point)>> {
+    let tol = 0.05 * cell;
+    let fa = outline.nearest(a_k, Point::ZERO, tol)?;
+    let fb = outline.nearest(b_k, Point::ZERO, tol)?;
+    if fa.ring != fb.ring {
+        return None;
+    }
+    let o = a_k.midpoint(b_k);
+    let proj = |p: Point| (p - o).dot(dir);
+    // The two ways round the ring from `fa` to `fb`: the end is the shorter
+    // of those that go to the front.
+    let path = [true, false]
+        .into_iter()
+        .filter_map(|forward| outline.path(&fa, &fb, forward, END_LOOP_MAX * w))
+        .filter(|p| p.iter().map(|q| proj(*q)).fold(f64::MIN, f64::max) > 0.2 * w)
+        .min_by(|x, y| length(x).total_cmp(&length(y)))?;
+    let ps: Vec<f64> = path.iter().map(|p| proj(*p)).collect();
+    let top = ps.iter().copied().fold(f64::MIN, f64::max);
+    // The front: an end edge (straight), else the farthest point of a
+    // round end.
+    let front = |flat: f64| -> Option<(usize, usize)> {
+        Some((
+            ps.iter().position(|t| *t >= top - flat)?,
+            ps.iter().rposition(|t| *t >= top - flat)?,
+        ))
+    };
+    let (mut ia, mut ib) = front(END_FLAT * w)?;
+    if path[ia..=ib]
+        .iter()
+        .any(|p| p.distance_to_segment(path[ia], path[ib]) > END_STRAIGHT * w)
+    {
+        (ia, ib) = front(0.01 * w)?;
+    }
+    let side_a: Vec<Point> = path[..=ia].to_vec();
+    let side_b: Vec<Point> = path[ib..].iter().rev().copied().collect();
+    // Each side goes to the front (a little back is a bump of the outline).
+    let goes_front = |side: &[Point]| {
+        let mut most = f64::MIN;
+        side.iter().all(|p| {
+            most = most.max(proj(*p));
+            proj(*p) >= most - END_BACK_SLACK * w
+        })
+    };
+    if !goes_front(&side_a) || !goes_front(&side_b) {
+        return None;
+    }
+    // The point of a side where it first comes to `t` along `dir`.
+    let at = |side: &[Point], t: f64| -> Point {
+        let Some(&first) = side.first() else { return o };
+        if proj(first) >= t {
+            return first;
+        }
+        for s in side.windows(2) {
+            let (p0, p1) = (proj(s[0]), proj(s[1]));
+            if p1 >= t && p0 < t {
+                return s[0].lerp(s[1], (t - p0) / (p1 - p0));
+            }
+        }
+        *side.last().unwrap_or(&o)
+    };
+    let (ea, eb) = (*side_a.last()?, *side_b.last()?);
+    let t0 = proj(a_k).max(proj(b_k));
+    let t1 = proj(ea).min(proj(eb));
+    // The places of the pairs: even steps, and the points of the outline
+    // (the near corner of an end at a slant is one of them).
+    // Finer steps than the column: the end has its shape in a short length.
+    let step = step.min(END_STEP * w);
+    let m = ((t1 - t0) / step.max(1e-9)).ceil().max(1.0) as usize;
+    let mut ts: Vec<f64> = (1..m).map(|q| t0 + (t1 - t0) * q as f64 / m as f64).collect();
+    ts.extend(
+        side_a
+            .iter()
+            .chain(&side_b)
+            .map(|p| proj(*p))
+            .filter(|t| *t > t0 && *t < t1),
+    );
+    ts.sort_by(f64::total_cmp);
+    ts.dedup_by(|x, y| (*x - *y).abs() < 0.1 * step);
+    let mut pairs: Vec<(Point, Point)> = ts.iter().map(|&t| (at(&side_a, t), at(&side_b, t))).collect();
+    pairs.push((ea, eb));
+    // No pair on the pair before it (or on the first pair).
+    let mut last = (a_k, b_k);
+    pairs.retain(|&(p, q)| {
+        let new = p.distance(last.0) + q.distance(last.1) > 1e-6 * w;
+        if new {
+            last = (p, q);
+        }
+        new
+    });
+    if let Some(narrow) = pairs.iter().position(|(p, q)| p.distance(*q) < END_TIP * w) {
+        pairs.truncate(narrow);
+    }
+    Some(pairs)
+}
+
 /// The satin column of a piece, its widest width and the quads it covers.
 fn rails(
     piece: &Piece,
@@ -1933,7 +2300,12 @@ fn rails(
     if !closed {
         let w = 2.0 * r_med;
         for end in [1, 0] {
-            if !piece.free[end] || total < 2.0 * END_BACK * w + w {
+            // A cut of a corner: the mitre (P21 Milestone 2).
+            if let Some(m) = piece.mitre[end] {
+                close_mitre(&mut a, &mut b, end, m);
+                continue;
+            }
+            if !piece.free[end] {
                 continue;
             }
             let tip = if end == 0 { 0 } else { n - 1 };
@@ -1943,7 +2315,54 @@ fn rails(
             } else {
                 (0..n).rev().collect()
             };
-            let Some(&k) = order.iter().find(|&&i| !is_ext[i] && from_tip(i) >= END_BACK * w) else {
+            // The outline round the end, from a pair a little back from it
+            // (the middle line bends to a corner of the end), or from the
+            // middle of a short column (P21 Milestone 2).
+            let far = order
+                .iter()
+                .filter(|&&i| !is_ext[i])
+                .map(|&i| from_tip(i))
+                .fold(0.0, f64::max);
+            let back = (END_BACK * w).min(0.5 * far);
+            let free = order
+                .iter()
+                .find(|&&i| !is_ext[i] && from_tip(i) >= back - 1e-9)
+                .filter(|&&k| k < a.len())
+                .and_then(|&k| {
+                    // The direction of the stroke: square to the pair (the
+                    // middle line bends at the end).
+                    let across = (b[k] - a[k]).normalized()?.perp();
+                    let dir = if across.dot(pts[tip] - pts[k]) >= 0.0 {
+                        across
+                    } else {
+                        across * -1.0
+                    };
+                    free_end(a[k], b[k], dir, outline, w, cell, step).map(|pairs| (k, pairs))
+                });
+            if let Some((k, pairs)) = free {
+                if end == 1 {
+                    a.truncate(k + 1);
+                    b.truncate(k + 1);
+                    a.extend(pairs.iter().map(|p| p.0));
+                    b.extend(pairs.iter().map(|p| p.1));
+                } else {
+                    let mut na: Vec<Point> = pairs.iter().rev().map(|p| p.0).collect();
+                    let mut nb: Vec<Point> = pairs.iter().rev().map(|p| p.1).collect();
+                    na.extend_from_slice(&a[k..]);
+                    nb.extend_from_slice(&b[k..]);
+                    a = na;
+                    b = nb;
+                }
+                continue;
+            }
+            // Else the sides of before (traced to the corners of the end).
+            if total < 2.0 * END_BACK * w + w {
+                continue;
+            }
+            let Some(&k) = order
+                .iter()
+                .find(|&&i| !is_ext[i] && from_tip(i) >= END_BACK * w && i < a.len())
+            else {
                 continue;
             };
             let Some(dir) = (pts[tip] - pts[k]).normalized() else {
