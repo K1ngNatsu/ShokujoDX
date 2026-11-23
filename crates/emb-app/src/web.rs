@@ -53,6 +53,7 @@ static FRESH: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new
 /// Starts the program on the canvas `shokujodx` of the page.
 pub fn start() {
     FRESH.store(stored(SETTINGS_KEY).is_none(), std::sync::atomic::Ordering::Relaxed);
+    listen_for_pen();
     let mut options = eframe::WebOptions::default();
     // `?gl=1`: WebGL2 only, as in a browser with no WebGPU (a measure).
     if param("gl").is_some()
@@ -266,6 +267,205 @@ pub fn touch_hint(raw: &mut eframe::egui::RawInput) {
             pos: Pos2::ZERO,
             force: None,
         });
+    }
+}
+
+/// A pen (an Apple Pencil, a stylus) and the palm (the owner, 2026-11-23).
+/// The page tells the program a pen by the type of its pointer events
+/// ("pen"). While the pen is in use (down, or used in the last
+/// [`PEN_HOLD_MS`], or a touch that started then is still down), the
+/// touches on the screen are not input: a palm that rests on the screen
+/// moves and taps nothing. The program gets the events of the pen itself,
+/// as a mouse with one button. egui made the first touch on the screen the
+/// pointer, so a palm that touched the screen first took the pointer from
+/// the pen; filtering the touch events alone was not enough.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum PenEvent {
+    /// Down, at (x, y) in the page (CSS pixels).
+    Down(f32, f32),
+    /// A move, down or over the screen.
+    Move(f32, f32),
+    Up(f32, f32),
+    /// The system took the pen (a gesture of the system).
+    Cancel,
+}
+
+#[derive(Debug, Default)]
+struct Pen {
+    /// The pen events since the last frame.
+    events: Vec<PenEvent>,
+    down: bool,
+    /// The time of the last pen event (ms, `Date.now`).
+    last_ms: f64,
+    /// The touches that are down (their identifiers).
+    touches: std::collections::BTreeSet<i32>,
+    /// The touches that started while the pen was in use (a palm).
+    palms: std::collections::BTreeSet<i32>,
+    /// The last frame was in pen mode.
+    active: bool,
+}
+
+/// After the pen goes up, touches are not input for this long (ms): the
+/// palm rests on the screen between two strokes of the pen.
+const PEN_HOLD_MS: f64 = 1000.0;
+
+static PEN: Mutex<Pen> = Mutex::new(Pen {
+    events: Vec::new(),
+    down: false,
+    last_ms: f64::NEG_INFINITY,
+    touches: std::collections::BTreeSet::new(),
+    palms: std::collections::BTreeSet::new(),
+    active: false,
+});
+
+impl Pen {
+    fn in_use(&self, now: f64) -> bool {
+        self.down || now - self.last_ms < PEN_HOLD_MS || !self.palms.is_empty() || !self.events.is_empty()
+    }
+}
+
+/// Listens to the pointer and touch events of the page before the canvas
+/// does (capture on the window), to know the pen and the palm.
+fn listen_for_pen() {
+    use wasm_bindgen::closure::Closure;
+    let Some(window) = web_sys::window() else { return };
+    let options = web_sys::AddEventListenerOptions::new();
+    options.set_capture(true);
+    options.set_passive(true);
+    for name in ["pointerdown", "pointermove", "pointerup", "pointercancel"] {
+        let on = Closure::<dyn FnMut(web_sys::PointerEvent)>::new(move |e: web_sys::PointerEvent| {
+            if e.pointer_type() != "pen" {
+                return;
+            }
+            let (x, y) = (e.client_x() as f32, e.client_y() as f32);
+            if let Ok(mut pen) = PEN.lock() {
+                let event = match name {
+                    "pointerdown" => {
+                        pen.down = true;
+                        PenEvent::Down(x, y)
+                    }
+                    "pointerup" => {
+                        pen.down = false;
+                        PenEvent::Up(x, y)
+                    }
+                    "pointercancel" => {
+                        pen.down = false;
+                        PenEvent::Cancel
+                    }
+                    _ => PenEvent::Move(x, y),
+                };
+                pen.events.push(event);
+                pen.last_ms = js_sys::Date::now();
+            }
+            if let Some(ctx) = CONTEXT.get() {
+                ctx.request_repaint();
+            }
+        });
+        let _ = window.add_event_listener_with_callback_and_add_event_listener_options(
+            name,
+            on.as_ref().unchecked_ref(),
+            &options,
+        );
+        on.forget();
+    }
+    for name in ["touchstart", "touchend", "touchcancel"] {
+        let on = Closure::<dyn FnMut(web_sys::TouchEvent)>::new(move |e: web_sys::TouchEvent| {
+            let Ok(mut pen) = PEN.lock() else { return };
+            let in_use = pen.in_use(js_sys::Date::now());
+            let changed = e.changed_touches();
+            for k in 0..changed.length() {
+                let Some(t) = changed.item(k) else { continue };
+                let id = t.identifier();
+                if name == "touchstart" {
+                    pen.touches.insert(id);
+                    if in_use {
+                        pen.palms.insert(id);
+                    }
+                } else {
+                    pen.touches.remove(&id);
+                    pen.palms.remove(&id);
+                }
+            }
+        });
+        let _ = window.add_event_listener_with_callback_and_add_event_listener_options(
+            name,
+            on.as_ref().unchecked_ref(),
+            &options,
+        );
+        on.forget();
+    }
+}
+
+/// While a pen is in use: no touch input (the touches that are down end),
+/// and the events of the pen as the pointer.
+pub fn pen_filter(ctx: &eframe::egui::Context, raw: &mut eframe::egui::RawInput) {
+    use eframe::egui::{Event, PointerButton, Pos2, TouchDeviceId, TouchId, TouchPhase};
+    let Ok(mut pen) = PEN.lock() else { return };
+    if !pen.in_use(js_sys::Date::now()) {
+        pen.active = false;
+        return;
+    }
+    let events = std::mem::take(&mut pen.events);
+    raw.events.retain(|e| {
+        !matches!(
+            e,
+            Event::Touch { .. } | Event::PointerMoved(_) | Event::PointerButton { .. } | Event::PointerGone
+        )
+    });
+    if !pen.active {
+        pen.active = true;
+        for &id in &pen.touches {
+            raw.events.push(Event::Touch {
+                device_id: TouchDeviceId(0),
+                id: TouchId::from(id),
+                phase: TouchPhase::Cancel,
+                pos: Pos2::ZERO,
+                force: None,
+            });
+        }
+    }
+    // The place on the canvas, as eframe finds it for a mouse.
+    let origin = web_sys::window()
+        .and_then(|w| w.document())
+        .and_then(|d| d.get_element_by_id("shokujodx"))
+        .map(|c| c.get_bounding_client_rect())
+        .map_or((0.0, 0.0), |r| (r.left() as f32, r.top() as f32));
+    let zoom = ctx.zoom_factor();
+    let at = |x: f32, y: f32| Pos2::new((x - origin.0) / zoom, (y - origin.1) / zoom);
+    let modifiers = ctx.input(|i| i.modifiers);
+    let button = |pos, pressed| Event::PointerButton {
+        pos,
+        button: PointerButton::Primary,
+        pressed,
+        modifiers,
+    };
+    let mut last = None;
+    for e in events {
+        match e {
+            PenEvent::Down(x, y) => {
+                let p = at(x, y);
+                raw.events.push(Event::PointerMoved(p));
+                raw.events.push(button(p, true));
+                last = Some(p);
+            }
+            PenEvent::Move(x, y) => {
+                let p = at(x, y);
+                raw.events.push(Event::PointerMoved(p));
+                last = Some(p);
+            }
+            PenEvent::Up(x, y) => {
+                let p = at(x, y);
+                raw.events.push(Event::PointerMoved(p));
+                raw.events.push(button(p, false));
+                last = Some(p);
+            }
+            PenEvent::Cancel => {
+                if let Some(p) = last {
+                    raw.events.push(button(p, false));
+                }
+                raw.events.push(Event::PointerGone);
+            }
+        }
     }
 }
 

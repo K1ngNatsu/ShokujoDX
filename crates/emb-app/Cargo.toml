@@ -59,6 +59,15 @@ web-sys = { version = "0.3", features = [
     "Storage",
     "MediaQueryList",
     "console",
+    "AddEventListenerOptions",
+    "DomRect",
+    "Event",
+    "EventTarget",
+    "MouseEvent",
+    "PointerEvent",
+    "Touch",
+    "TouchEvent",
+    "TouchList",
 ] }
 
 [build-dependencies]

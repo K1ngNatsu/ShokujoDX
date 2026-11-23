@@ -1791,10 +1791,12 @@ impl TabViewer for AppState {
 
 impl eframe::App for EmbApp {
     /// On a touch screen in the browser, egui knows the touch screen from
-    /// the first frame (`web::touch_hint`).
+    /// the first frame (`web::touch_hint`), and a palm on the screen is not
+    /// input while a pen is in use (`web::pen_filter`).
     #[cfg(target_arch = "wasm32")]
-    fn raw_input_hook(&mut self, _ctx: &egui::Context, raw_input: &mut egui::RawInput) {
+    fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
         crate::web::touch_hint(raw_input);
+        crate::web::pen_filter(ctx, raw_input);
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
