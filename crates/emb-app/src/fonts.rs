@@ -910,7 +910,7 @@ mod tests {
             assert!(score >= emb_letter::quality::LIMIT, "{}: {score}", f.label());
         }
         assert_eq!(st.fonts.score(&FontRef::new("Lato", "Bold")), None);
-        assert_eq!(st.fonts.score(&FontRef::embroidery("Varsity", "")), Some(98));
+        assert_eq!(st.fonts.score(&FontRef::embroidery("Varsity", "")), Some(96));
         // By quality: the best first, the fonts with no score last.
         let mut all = embroidery.clone();
         all.insert(3, FontRef::new("Lato", "Bold"));

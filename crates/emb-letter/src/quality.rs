@@ -97,6 +97,20 @@ pub const OUTSIDE_ALL: f64 = 0.2;
 /// with 45 % has two columns on the same stroke.
 pub const OVERLAP_FREE: f64 = 0.2;
 pub const OVERLAP_ALL: f64 = 0.5;
+/// A needle point of a column is out of the outline when it is more than
+/// this far out (mm at the design size), sewn with no pull compensation
+/// (P21 Milestone 4): a spike that the shape of the column makes.
+pub const SPIKE_MM: f64 = 0.2;
+/// The part of the needle points of the columns out of the outline: up to
+/// [`SPIKES_FREE`] takes nothing from the score, and [`SPIKES_ALL`] more
+/// takes all of it.
+pub const SPIKES_FREE: f64 = 0.01;
+pub const SPIKES_ALL: f64 = 0.1;
+/// The part of the pairs of the columns that cross the pair after them
+/// (stitches on each other): up to [`CROSSING_FREE`] takes nothing, and
+/// [`CROSSING_ALL`] more takes all of the score.
+pub const CROSSING_FREE: f64 = 0.01;
+pub const CROSSING_ALL: f64 = 0.2;
 /// The shape value of a letter with columns is 0 at this coverage and
 /// below, and 1 at [`FULL`] and above. Below [`EMPTY`] the converter does
 /// not use the columns of the stroke finder
@@ -172,6 +186,11 @@ pub struct LetterQuality {
     pub outside: f64,
     /// The part of the area of the parts that two or more parts cover.
     pub overlap: f64,
+    /// The part of the needle points of the columns out of the outline
+    /// ([`needle_faults`]).
+    pub spikes: f64,
+    /// The part of the pairs of the columns that cross the pair after them.
+    pub crossing: f64,
 }
 
 impl LetterQuality {
@@ -193,7 +212,69 @@ impl LetterQuality {
         let look = if self.fill { FILL_LETTER } else { 1.0 };
         let outside = (1.0 - (self.outside - OUTSIDE_FREE).max(0.0) / OUTSIDE_ALL).clamp(0.0, 1.0);
         let overlap = (1.0 - (self.overlap - OVERLAP_FREE).max(0.0) / OVERLAP_ALL).clamp(0.0, 1.0);
-        shape * look * outside * overlap
+        let spikes = (1.0 - (self.spikes - SPIKES_FREE).max(0.0) / SPIKES_ALL).clamp(0.0, 1.0);
+        let crossing = (1.0 - (self.crossing - CROSSING_FREE).max(0.0) / CROSSING_ALL).clamp(0.0, 1.0);
+        shape * look * outside * overlap * spikes * crossing
+    }
+}
+
+/// The faults of the needle points of the columns of a letter (P21
+/// Milestone 4; the measures of the letter fault bench): the part of the
+/// needle points out of the outline by more than [`SPIKE_MM`] with no pull
+/// compensation, and the part of the pairs that cross the pair after them.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct NeedleFaults {
+    pub spikes: f64,
+    pub crossing: f64,
+}
+
+/// How far `p` is out of `outline` (0 in it).
+fn outside_by(outline: &Outline, p: Point) -> f64 {
+    let ring_in = |r: &[Point]| emb_geom::region::ring_contains(r, p);
+    if outline.iter().any(|(o, h)| ring_in(o) && !h.iter().any(|h| ring_in(h))) {
+        return 0.0;
+    }
+    outline
+        .iter()
+        .flat_map(|(o, h)| std::iter::once(o).chain(h.iter()))
+        .flat_map(|r| (0..r.len()).map(move |i| p.distance_to_segment(r[i], r[(i + 1) % r.len()])))
+        .fold(f64::MAX, f64::min)
+}
+
+/// The needle faults of the columns of `parts` (sewn with the default
+/// satin settings and no pull compensation) against `outline`, both in mm.
+pub fn needle_faults(parts: &[ObjectKind], outline: &Outline) -> NeedleFaults {
+    let params = emb_model::SatinParams {
+        pull_compensation_mm: 0.0,
+        ..emb_model::SatinParams::default()
+    };
+    let (mut points, mut out, mut pairs, mut cross) = (0usize, 0usize, 0usize, 0usize);
+    for part in parts {
+        let ObjectKind::Satin { geometry, .. } = part else {
+            continue;
+        };
+        let Some(col) = emb_stitch::satin::Column::new(geometry) else {
+            continue;
+        };
+        let (s, _) = col.start();
+        if let Some(pts) = emb_stitch::satin::satin(geometry, &params, s, None) {
+            points += pts.len();
+            out += pts.iter().filter(|p| outside_by(outline, **p) > SPIKE_MM).count();
+        }
+        let pr = col.pairs(0.2);
+        for w in pr.windows(2) {
+            pairs += 1;
+            if let Some((u, v)) = Point::crossing(w[0].0, w[0].1, w[1].0, w[1].1)
+                && (1e-3..=1.0 - 1e-3).contains(&u)
+                && (1e-3..=1.0 - 1e-3).contains(&v)
+            {
+                cross += 1;
+            }
+        }
+    }
+    NeedleFaults {
+        spikes: out as f64 / points.max(1) as f64,
+        crossing: cross as f64 / pairs.max(1) as f64,
     }
 }
 
@@ -649,6 +730,8 @@ pub fn letter_quality(font: &EmbFont, letter: &EmbLetter, outline: &Outline) -> 
                 fill: !font.fill,
                 outside: areas.outside,
                 overlap: areas.overlap,
+                spikes: 0.0,
+                crossing: 0.0,
             });
         }
     }
@@ -669,6 +752,7 @@ pub fn letter_quality(font: &EmbFont, letter: &EmbLetter, outline: &Outline) -> 
         }
     }
     let fill = total <= 0.0;
+    let needles = needle_faults(&letter.parts, outline);
     Some(LetterQuality {
         coverage: cover,
         narrow: if fill { 0.0 } else { narrow / total },
@@ -676,6 +760,8 @@ pub fn letter_quality(font: &EmbFont, letter: &EmbLetter, outline: &Outline) -> 
         fill,
         outside: areas.outside,
         overlap: areas.overlap,
+        spikes: needles.spikes,
+        crossing: needles.crossing,
     })
 }
 
@@ -834,6 +920,27 @@ mod tests {
     }
 
     #[test]
+    fn a_column_out_of_its_outline_has_needle_faults() {
+        // A bar 20 mm long, 4 mm high; a column on it, and a column 2 mm
+        // longer than it (P21 Milestone 4).
+        let p = |x: f64, y: f64| Point::new(x, y);
+        let bar = vec![(vec![p(0.0, 0.0), p(20.0, 0.0), p(20.0, 4.0), p(0.0, 4.0)], Vec::new())];
+        let column = |x1: f64| ObjectKind::Satin {
+            geometry: SatinGeometry {
+                rail_a: Path::new().move_to(p(0.0, 0.0)).line_to(p(x1, 0.0)),
+                rail_b: Path::new().move_to(p(0.0, 4.0)).line_to(p(x1, 4.0)),
+                rungs: Vec::new(),
+            },
+            params: Default::default(),
+        };
+        let good = needle_faults(&[column(20.0)], &bar);
+        assert_eq!(good, NeedleFaults::default());
+        let long = needle_faults(&[column(22.0)], &bar);
+        assert!(long.spikes > SPIKES_FREE, "{long:?}");
+        assert_eq!(long.crossing, 0.0);
+    }
+
+    #[test]
     fn the_score_of_a_letter() {
         let q = |coverage, narrow, long| LetterQuality {
             coverage,
@@ -842,6 +949,8 @@ mod tests {
             fill: false,
             outside: 0.0,
             overlap: 0.0,
+            spikes: 0.0,
+            crossing: 0.0,
         };
         assert!((q(1.0, 0.0, 0.0).score() - 1.0).abs() < 1e-9);
         assert!((q(FULL, 0.0, 0.0).score() - 1.0).abs() < 1e-9);
@@ -855,6 +964,8 @@ mod tests {
             fill: true,
             outside: 0.0,
             overlap: 0.0,
+            spikes: 0.0,
+            crossing: 0.0,
         };
         assert_eq!(fill.score(), FILL_LETTER);
         // Narrow columns and long stitches take from the score.
@@ -875,6 +986,15 @@ mod tests {
         assert!((more(0.0, OVERLAP_FREE + 0.5 * OVERLAP_ALL).score() - 0.5).abs() < 1e-9);
         assert_eq!(more(0.5, 0.0).score(), 0.0);
         assert_eq!(more(0.0, 0.9).score(), 0.0);
+        // Spikes and crossing stitches take from the score (P21 Milestone 4).
+        let faults = |spikes, crossing| LetterQuality {
+            spikes,
+            crossing,
+            ..q(1.0, 0.0, 0.0)
+        };
+        assert!((faults(SPIKES_FREE, CROSSING_FREE).score() - 1.0).abs() < 1e-9);
+        assert!((faults(SPIKES_FREE + 0.5 * SPIKES_ALL, 0.0).score() - 0.5).abs() < 1e-9);
+        assert!((faults(0.0, CROSSING_FREE + 0.5 * CROSSING_ALL).score() - 0.5).abs() < 1e-9);
         // A fill letter in a font of satin letters with a part too narrow.
         let thin_fill = LetterQuality { narrow: 0.25, ..fill };
         assert!((thin_fill.score() - 0.5 * FILL_LETTER).abs() < 1e-9);

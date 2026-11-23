@@ -30,6 +30,7 @@
 
 use emb_geom::region::ring_contains;
 use emb_geom::{BBox, Path, Point, Transform};
+use emb_letter::grid::Grid;
 use emb_letter::{EmbFont, EmbLetter, Font};
 use emb_model::{ObjectKind, SatinGeometry, SatinParams};
 use emb_stitch::satin::{Column, satin};
@@ -456,21 +457,35 @@ fn open_area(o: &Outline, covers: &[Cover], f: &mut Faults) -> (Vec<[f64; 2]>, V
     let mut near_in = vec![0usize; corners.len()];
     let mut near_cov = vec![0usize; corners.len()];
     let mut open = Vec::new();
-    let (nx, ny) = (
-        (bb.width() / CELL_MM).ceil() as usize,
-        (bb.height() / CELL_MM).ceil() as usize,
-    );
-    for j in 0..ny {
-        for i in 0..nx {
-            let p = Point::new(
-                bb.min.x + (i as f64 + 0.5) * CELL_MM,
-                bb.min.y + (j as f64 + 0.5) * CELL_MM,
-            );
-            if !inside(o, p) {
+    // The cells of the outline and of the parts, filled on one grid.
+    let grid = Grid::new(bb, CELL_MM, 1);
+    let cell = grid.cell;
+    let glyph = emb_letter::tune::outline_mask(&grid, o);
+    let mut cover = vec![false; grid.w * grid.h];
+    for c in covers {
+        match c {
+            Cover::Quads(quads, _) => {
+                for q in quads {
+                    emb_letter::grid::fill_into(&grid, &[q.to_vec()], &mut cover);
+                }
+            }
+            Cover::Fill(fo) => {
+                for (k, m) in emb_letter::tune::outline_mask(&grid, fo).into_iter().enumerate() {
+                    cover[k] |= m;
+                }
+            }
+            Cover::None => {}
+        }
+    }
+    for j in 0..grid.h {
+        for i in 0..grid.w {
+            let k = grid.idx(i, j);
+            if !glyph[k] {
                 continue;
             }
-            f.area += CELL_MM * CELL_MM;
-            let covered = covers.iter().any(|c| c.holds(p));
+            let p = grid.center(i, j);
+            f.area += cell * cell;
+            let covered = cover[k];
             let mut at_corner = false;
             for (k, c) in corners.iter().enumerate() {
                 let d = c.distance(p);
@@ -482,9 +497,9 @@ fn open_area(o: &Outline, covers: &[Cover], f: &mut Faults) -> (Vec<[f64; 2]>, V
             }
             if !covered {
                 if at_corner {
-                    f.open_corner += CELL_MM * CELL_MM;
+                    f.open_corner += cell * cell;
                 } else {
-                    f.open_other += CELL_MM * CELL_MM;
+                    f.open_other += cell * cell;
                 }
                 if (i + j) % 2 == 0 {
                     open.push([p.x, p.y]);
@@ -538,6 +553,15 @@ pub fn outline(src: &Font, c: char) -> Outline {
 /// Measures the fonts of [`FONTS`] in both ways. `truetype_only`: only the
 /// TrueType path (the stroke finder of today).
 pub fn run(truetype_only: bool) -> Vec<FontFaults> {
+    run_on(truetype_only, &chars())
+}
+
+/// The letters of the snapshot test (`tests/letter_faults.rs`): letters
+/// with corners, curves, crossings, junctions and slanted ends.
+pub const SNAPSHOT_CHARS: &str = "AEGKMNRSVWXaegkmnrstwx249";
+
+/// [`run`] for the characters `chars`.
+pub fn run_on(truetype_only: bool, chars: &[char]) -> Vec<FontFaults> {
     let mut out = Vec::new();
     for (family, src_family, src_style) in FONTS {
         let Some(src) = emb_letter::bundled::font(src_family, src_style) else {
@@ -552,7 +576,7 @@ pub fn run(truetype_only: bool) -> Vec<FontFaults> {
         for &way in ways {
             let mut sum = Faults::default();
             let mut letters = Vec::new();
-            for c in chars() {
+            for &c in chars {
                 let o = outline(&src, c);
                 if o.is_empty() {
                     continue;
@@ -583,9 +607,16 @@ pub fn run(truetype_only: bool) -> Vec<FontFaults> {
 
 /// The measures as a table, and the worst letters of each measure.
 pub fn report(fonts: &[FontFaults]) -> String {
+    let mut s = table(fonts);
+    s.push_str(&worst(fonts));
+    s
+}
+
+/// The measures of each font as a table.
+pub fn table(fonts: &[FontFaults]) -> String {
     let mut s = String::new();
     s.push_str(&format!(
-        "Letters A-Z, a-z, 0-9 at {CAP_MM} mm, default satin settings. Spikes: needle points over {SPIKE_MM} mm outside (at ends / in the middle), and over {BARE_MM} mm with no pull compensation.\n\n"
+        "At {CAP_MM} mm, default satin settings. Spikes: needle points over {SPIKE_MM} mm outside (at ends / in the middle), and over {BARE_MM} mm with no pull compensation.\n\n"
     ));
     s.push_str("| Font | Way | Spikes | Bare | Rail pts out (ends / middle) | Crossing | Back mm | Fans mm | Bulges mm | Notches | Runs out mm | Open % (corners / other mm2) | Corners open | Ends on top / under |\n");
     s.push_str("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
@@ -615,6 +646,12 @@ pub fn report(fonts: &[FontFaults]) -> String {
             t.under,
         ));
     }
+    s
+}
+
+/// The letters with the most faults of each measure.
+fn worst(fonts: &[FontFaults]) -> String {
+    let mut s = String::new();
     let all: Vec<&Letter> = fonts.iter().flat_map(|f| f.letters.iter()).collect();
     type Key = fn(&Faults) -> f64;
     let measures: [(&str, Key); 8] = [

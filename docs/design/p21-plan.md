@@ -4,7 +4,8 @@ Date: 2026-11-23 · Status: Accepted (owner, 2026-11-23: the six fixes of
 the review of the font pipeline, in this order). Milestone 1 is made
 (ADR 0147); its faults at the ends of columns go to Milestone 2.
 Milestone 2 is made (ADR 0148); its exit test is met in part. Milestone
-3 is made (ADR 0149); its exit test is met in part.
+3 is made (ADR 0149); its exit test is met in part. Milestone 4 is made
+(ADR 0150).
 
 ## Goal
 
@@ -289,6 +290,23 @@ mean stays 1.2 %).
 **Exit test:** the snapshot runs in CI; a letter with spikes gets a lower
 score than the same letter with none; no font of the program goes below
 the score limit.
+
+**Made (2026-11-23, ADR 0150).** `emb-letter` uses `emb-stitch`. The
+score of a letter has `spikes` (needle points more than 0.2 mm out of the
+outline with no pull compensation) and `crossing` (pairs that cross), from
+`quality::needle_faults`; so the font score and the choice of columns or
+fill see them. The fault bench is the snapshot test `tests/letter_faults.rs`
+(25 letters of the four fonts as lettering in their source fonts, 28 s in
+a debug build). The coverage of Auto and the second pass of the stroke
+finder did not change (the thin bands of ADR 0147 already keep a missing
+part out of the slivers).
+
+The exit test is met: the snapshot runs in CI, a test shows that a column
+out of its outline has spikes and that spikes take from the score, and
+the four bundled fonts with a source font in the program, measured again,
+are at the limit or more (Block Sans 84, Anton 72, Pacifico 68, Varsity
+96; before 88, 82, 84, 98: they were made with the stroke finder of
+before P21). The other bundled fonts are measured again in Milestone 6.
 
 ## Milestone 5: the sew order at joints (M)
 

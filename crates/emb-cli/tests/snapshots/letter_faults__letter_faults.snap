@@ -1,0 +1,12 @@
+---
+source: crates/emb-cli/tests/letter_faults.rs
+expression: "emb_cli::letter_faults::table(&fonts)"
+---
+At 25 mm, default satin settings. Spikes: needle points over 0.4 mm outside (at ends / in the middle), and over 0.2 mm with no pull compensation.
+
+| Font | Way | Spikes | Bare | Rail pts out (ends / middle) | Crossing | Back mm | Fans mm | Bulges mm | Notches | Runs out mm | Open % (corners / other mm2) | Corners open | Ends on top / under |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Block Sans | truetype | 10 / 0 | 11 | 17 / 0 | 23 | 2.3 | 0.0 | 0.0 | 0 | 0.0 | 0.75 (7.5 / 34.0) | 28 of 103 | 12 / 44 |
+| Anton | truetype | 37 / 0 | 48 | 64 / 0 | 24 | 1.2 | 0.0 | 4.3 | 2 | 1.7 | 1.94 (10.2 / 106.7) | 30 of 163 | 24 / 39 |
+| Pacifico | truetype | 13 / 0 | 25 | 34 / 0 | 17 | 5.1 | 0.2 | 9.8 | 0 | 0.0 | 0.68 (0.0 / 37.6) | 0 of 0 | 16 / 51 |
+| Varsity | truetype | 12 / 0 | 13 | 23 / 0 | 5 | 0.3 | 0.5 | 0.0 | 0 | 0.2 | 0.89 (10.1 / 35.6) | 25 of 277 | 61 / 74 |

@@ -1313,6 +1313,7 @@ dependencies = [
  "emb-formats",
  "emb-geom",
  "emb-model",
+ "emb-stitch",
  "flate2",
  "harfrust",
  "serde",
