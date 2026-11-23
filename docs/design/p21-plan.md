@@ -6,7 +6,8 @@ the review of the font pipeline, in this order). Milestone 1 is made
 Milestone 2 is made (ADR 0148); its exit test is met in part. Milestone
 3 is made (ADR 0149); its exit test is met in part. Milestone 4 is made
 (ADR 0150). Milestone 7 (a middle line from a Voronoi diagram, a trial)
-was added by the owner on 2026-11-23.
+was added by the owner on 2026-11-23; it is made, and the grid stays (ADR
+0151).
 
 ## Goal
 
@@ -377,6 +378,75 @@ corners and bulges, the lettering bench of P20 keeps its exit tests, and
 a glyph takes at most two times as long. Else the grid stays, and the
 plan records the numbers of the trial.
 
+**Made (2026-11-23, ADR 0151): the grid stays.** The module `medial`
+made the middle line from the diagram of `boostvoronoi` 0.12.1: the
+edges inside the outline (nonzero winding), with the exact half-width at
+their points, into the graph of the stroke finder (`Graph::from_medial`);
+the prune, the links, the chains and all the steps after them did not
+change. A shape with segments that cross or overlap got the grid (3
+characters of the Japanese reference set, none of the bench letters).
+The trial measured three ways at the corners of the outline: (1) no edge
+of the diagram from a corner; (2) the edge from each corner where the
+outline turns 40 degrees or more, as the grid has a branch there; (3)
+the half of that edge that is nearer to the middle line. The letter
+fault bench (lettering in the source fonts, 25 mm):
+
+| Font | Way | Spikes | Crossing pairs | Open area | Open corners | Bulges mm |
+| --- | --- | --- | --- | --- | --- | --- |
+| Block Sans | grid | 17 | 27 | 0.57 % | 43 of 233 | 0.0 |
+| Block Sans | 1: no corner edges | 63 | 14 | 0.61 % | 66 | 0.0 |
+| Block Sans | 2: corner edges | 122 | 4 | 0.52 % | 44 | 0.0 |
+| Block Sans | 3: half corner edges | 73 | 11 | 0.61 % | 55 | 0.0 |
+| Anton | grid | 44 | 40 | 1.67 % | 54 of 330 | 4.3 |
+| Anton | 1 | 28 | 52 | 1.84 % | 62 | 5.8 |
+| Anton | 2 | 95 | 81 | 1.26 % | 30 | 8.9 |
+| Anton | 3 | 53 | 49 | 1.69 % | 61 | 5.4 |
+| Pacifico | grid | 37 | 40 | 0.56 % | - | 13.5 |
+| Pacifico | 1, 2 and 3 | 12 | 33 | 0.35 % | - | 14.7 |
+| Varsity | grid | 15 | 11 | 0.49 % | 33 of 531 | 0.0 |
+| Varsity | 1 | 24 | 19 | 0.54 % | 67 | 0.0 |
+| Varsity | 2 | 90 | 27 | 0.52 % | 52 | 0.0 |
+| Varsity | 3 | 32 | 24 | 0.38 % | 56 | 0.0 |
+
+The lettering bench of P20 (the test font, 25 mm):
+
+| Way | Covered, lowest | Two layers, mean | Characters over 3 % |
+| --- | --- | --- | --- |
+| grid | 96.0 % (ぎ) | 1.2 % | 19 |
+| 1 | 92.7 % (ァ) | 1.2 % | 12 |
+| 2 | 93.8 % (ぬ) | 3.9 % | 154 |
+| 3 | 94.4 % (ぬ) | 1.6 % | 32 |
+
+No way is better in all four fonts, and no way keeps the coverage of the
+P20 exit test (95 % of each character). The time is not a problem: the
+fault bench took 23.1 s with the diagram and 21.9 s with the grid, the
+lettering bench 7.6 s and 8.0 s.
+
+What the numbers and the proof pictures show:
+
+- The middle line from the diagram is better on round strokes. In
+  Pacifico all three ways have fewer spikes (37 to 12), fewer crossing
+  pairs (40 to 33) and less open area (0.56 % to 0.35 %); the open wedge
+  at the top of the middle arch of "m" is gone. Way 1 also has fewer
+  Japanese characters with two layers (19 to 12).
+- It is worse at square ends and sharp corners. The steps after the
+  middle line (the prune of side branches, the free ends, the mitres)
+  were tuned on the middle line of the grid. Thinning takes the line far
+  into a square end and stops it before a sharp corner; the diagram
+  stops at the fork of a square end and goes into the point of a sharp
+  corner. With no corner edges (way 1), the flat base of Anton "v" is
+  open (the short line from the junction to the base goes as a side
+  branch) and the ends of the diagonal of Block Sans "Z" go out of the
+  letter. With the corner edges (ways 2 and 3), long edges to sharp
+  corners are not side branches, and they become columns.
+
+The code of way 1 is on the branch `trial/voronoi-middle-line` (not in
+`main`): `emb_letter::medial`, `stroke::MiddleLine`, `strokes_with`, and
+`--middle grid|voronoi` for the benches. A middle line from the diagram of
+each stroke alone (after a split of the outline into strokes) has no
+junctions and no side branches at its corners; a later trial can use
+this code for it.
+
 ## Exit test of the phase
 
 The exit tests of the six milestones, and the sew-out of Milestone 6.
@@ -385,7 +455,7 @@ The exit tests of the six milestones, and the sew-out of Milestone 6.
 
 The owner's order: Milestones 1 to 6. Milestone 7 (the trial) comes
 before Milestone 6, so the fonts are made again with the middle line that
-wins. The bench (Milestone 1, step 1)
+wins (the grid, ADR 0151). The bench (Milestone 1, step 1)
 comes first, as the measure of each milestone. The bundled fonts are made
 again only in Milestone 6, so the sew-outs of the older milestones use
 lettering in the TrueType fonts.
