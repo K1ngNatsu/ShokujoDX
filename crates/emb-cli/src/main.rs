@@ -163,7 +163,7 @@ Usage:
       part with two layers, and the narrowest and the widest column; and
       the trims of words. --face: the face of a font collection (.ttc; 0 is
       the first). --letters: one line for each character and size too.
-  emb-cli letter-faults [--proof <pictures.json>]
+  emb-cli letter-faults [--proof <pictures.json>] [--middle grid|voronoi]
       The letter fault bench (P21): the letters A-Z, a-z and 0-9 of the
       four embroidery fonts with a source font in the program, as the
       embroidery font and as lettering in the source font, sewn at 25 mm
@@ -171,7 +171,9 @@ Usage:
       outside it, crossing stitches, fans, bulges, open area and open
       corners, columns that end on top of other columns, travel runs
       outside. --proof: the pictures of the letters as JSON, for
-      tools/letter-faults.py.
+      tools/letter-faults.py. --middle: the middle line of the stroke
+      finder (P21 Milestone 7, a trial; also for lettering-bench, font and
+      font-quality): grid (the default) or voronoi.
   emb-cli view-bench [--out <folder>] [--stress] [--sew]
       The bench of the 3D view (ADR 0122). Make the pictures of the
       reference set (twelve small corpus designs, each for one thing that a
@@ -418,6 +420,14 @@ fn run(args: &[String]) -> Result<(), String> {
             }
             "--source" => audit_source = Some(PathBuf::from(it.next().ok_or("--source needs a font file")?)),
             "--proof" => audit_proof = Some(PathBuf::from(it.next().ok_or("--proof needs a file")?)),
+            "--middle" => {
+                let m = match it.next().map(String::as_str) {
+                    Some("grid") => emb_letter::stroke::MiddleLine::Grid,
+                    Some("voronoi") => emb_letter::stroke::MiddleLine::Voronoi,
+                    _ => return Err("--middle needs grid or voronoi".into()),
+                };
+                emb_letter::stroke::set_middle_line(m);
+            }
             "--sizes" => {
                 sheet_sizes = it
                     .next()
@@ -894,6 +904,7 @@ fn run(args: &[String]) -> Result<(), String> {
         ["letter-faults"] => {
             let fonts = emb_cli::letter_faults::run(false);
             print!("{}", emb_cli::letter_faults::report(&fonts));
+            print_middle_line();
             if let Some(p) = &audit_proof {
                 std::fs::write(p, emb_cli::letter_faults::pictures(&fonts))
                     .map_err(|e| format!("{}: {e}", p.display()))?;
@@ -906,6 +917,7 @@ fn run(args: &[String]) -> Result<(), String> {
             let font = emb_letter::Font::from_bytes(bytes, face).map_err(|e| format!("{input}: {e}"))?;
             let b = emb_cli::lettering_bench::run(&font);
             print!("{}", emb_cli::lettering_bench::report(&b, all_letters));
+            print_middle_line();
             Ok(())
         }
         ["font-quality", input] => {
@@ -1173,6 +1185,17 @@ fn read_fabric(input: &str, fabric: &Option<String>) -> Result<emb_cli::Input, S
         emb_cli::set_fabric(&mut i, f)?;
     }
     Ok(i)
+}
+
+/// With the Voronoi middle line (P21 Milestone 7, a trial): the number of
+/// shapes that got the grid in place of it.
+fn print_middle_line() {
+    if emb_letter::stroke::middle_line() == emb_letter::stroke::MiddleLine::Voronoi {
+        println!(
+            "middle line: voronoi ({} shapes on the grid: segments that cross)",
+            emb_letter::stroke::grid_instead_of_voronoi()
+        );
+    }
 }
 
 fn main() -> ExitCode {

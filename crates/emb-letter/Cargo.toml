@@ -19,6 +19,7 @@ ttf-parser.workspace = true
 harfrust.workspace = true
 unicode-bidi.workspace = true
 flate2.workspace = true
+boostvoronoi.workspace = true
 
 [build-dependencies]
 flate2.workspace = true

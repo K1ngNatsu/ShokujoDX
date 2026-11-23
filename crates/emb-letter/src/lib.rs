@@ -26,6 +26,7 @@ pub mod inkstitch;
 pub mod japanese;
 pub mod keyboard;
 pub mod layout;
+mod medial;
 pub mod monogram;
 pub mod quality;
 pub mod route;

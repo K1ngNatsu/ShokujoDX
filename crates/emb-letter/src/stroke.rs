@@ -31,6 +31,7 @@
 //! along its long axis.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use emb_geom::region::ring_contains;
 use emb_geom::{BBox, Path, Point};
@@ -191,6 +192,42 @@ const SIDE_IN: f64 = 0.12;
 const END_LEAD: f64 = 0.6;
 
 const NONE: usize = usize::MAX;
+
+/// The middle line of the stroke finder (P21 Milestone 7, a trial; ADR
+/// 0151).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum MiddleLine {
+    /// The thinned shape on the grid of the stroke finder.
+    #[default]
+    Grid,
+    /// The Voronoi diagram of the segments of the outline; the grid for a
+    /// shape whose segments cross or overlap.
+    Voronoi,
+}
+
+static VORONOI: AtomicBool = AtomicBool::new(false);
+static GRID_INSTEAD: AtomicUsize = AtomicUsize::new(0);
+
+/// Sets the middle line of [`strokes`] for this process (the benches of the
+/// trial set it; the program uses the grid).
+pub fn set_middle_line(m: MiddleLine) {
+    VORONOI.store(m == MiddleLine::Voronoi, Ordering::Relaxed);
+}
+
+/// The middle line of [`strokes`] in this process.
+pub fn middle_line() -> MiddleLine {
+    if VORONOI.load(Ordering::Relaxed) {
+        MiddleLine::Voronoi
+    } else {
+        MiddleLine::Grid
+    }
+}
+
+/// The number of shapes that got the grid in place of the Voronoi diagram
+/// in this process.
+pub fn grid_instead_of_voronoi() -> usize {
+    GRID_INSTEAD.load(Ordering::Relaxed)
+}
 
 /// Satin columns for a glyph, with checks of how well they fit it.
 #[derive(Debug, Clone, Default)]
@@ -360,6 +397,24 @@ impl Graph {
                 });
             }
         }
+        Graph { nodes, edges }
+    }
+
+    /// The graph of the middle line from the Voronoi diagram, with points
+    /// about `step` apart (as the cells of the grid).
+    fn from_medial(m: crate::medial::Medial, step: f64) -> Graph {
+        let nodes = m.nodes.iter().map(|&(pos, r)| Node { pos, r }).collect();
+        let edges = m
+            .edges
+            .into_iter()
+            .map(|e| Edge {
+                pts: resample(&e.pts, e.closed, step),
+                ends: e.ends.map(|n| if n == crate::medial::NONE { NONE } else { n }),
+                closed: e.closed,
+                alive: true,
+            })
+            .filter(|e| e.pts.len() >= if e.closed { 3 } else { 2 })
+            .collect();
         Graph { nodes, edges }
     }
 
@@ -1247,6 +1302,11 @@ fn extend(mut pts: Vec<Point>, free: [bool; 2], g: &Grid, reach: f64) -> Piece {
 
 /// Satin columns for a glyph shape (rings in font units, Y down).
 pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
+    strokes_with(rings, cap_height, middle_line())
+}
+
+/// [`strokes`] with the middle line `middle`.
+pub fn strokes_with(rings: &[Vec<Point>], cap_height: f64, middle: MiddleLine) -> Strokes {
     let Some(bb) = BBox::from_points(rings.iter().flatten().copied()) else {
         return Strokes::default();
     };
@@ -1261,8 +1321,20 @@ pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
     // Half-width at a cell: the distance to the edge, not to the next outside center.
     let radius = |k: usize| (dist[k] - 0.5).max(0.5) * cell;
     let radius_at = |p: Point| g.cell_of(p).map_or(0.5 * cell, |(i, j)| radius(g.idx(i, j)));
-    let skel = thin(&g);
-    let mut graph = Graph::build(&g, &skel, &radius);
+    let medial = match middle {
+        MiddleLine::Grid => None,
+        MiddleLine::Voronoi => {
+            let m = crate::medial::middle_line(rings, cell);
+            if m.is_none() {
+                GRID_INSTEAD.fetch_add(1, Ordering::Relaxed);
+            }
+            m
+        }
+    };
+    let mut graph = match medial {
+        Some(m) => Graph::from_medial(m, cell),
+        None => Graph::build(&g, &thin(&g), &radius),
+    };
     loop {
         let pruned = graph.prune(&radius_at);
         graph.merge();
@@ -2929,6 +3001,29 @@ mod tests {
         out.extend(corner(-1.0, n2 * -1.0, n1 * -1.0));
         out.push(a - n1);
         out
+    }
+
+    #[test]
+    fn the_voronoi_middle_line_gives_the_columns_of_a_bar_and_a_ring() {
+        // P21 Milestone 7 (the trial): the same columns as the grid.
+        let bar = strokes_with(&[rect(0.0, -700.0, 100.0, 0.0)], 700.0, MiddleLine::Voronoi);
+        assert_eq!(bar.satins.len(), 1);
+        assert!(bar.coverage > 0.95, "{}", bar.coverage);
+        let circle = |r: f64, hole: bool| -> Vec<Point> {
+            let mut v: Vec<Point> = (0..96)
+                .map(|k| {
+                    let a = emb_geom::math::to_radians(f64::from(k) * 3.75);
+                    Point::new(350.0 + r * emb_geom::math::cos(a), -350.0 + r * emb_geom::math::sin(a))
+                })
+                .collect();
+            if hole {
+                v.reverse();
+            }
+            v
+        };
+        let ring = strokes_with(&[circle(350.0, false), circle(260.0, true)], 700.0, MiddleLine::Voronoi);
+        assert_eq!(ring.satins.len(), 1);
+        assert!(ring.coverage > 0.95, "{}", ring.coverage);
     }
 
     #[test]

@@ -46,6 +46,10 @@ ttf-parser = { version = "0.25", default-features = false, features = ["std", "o
 # Text shaping for lettering (ADR 0114); both are also in the tree of the UI stack.
 harfrust = "0.12"
 unicode-bidi = "0.3"
+# The Voronoi diagram of the outline of a letter, for the middle line of the
+# stroke finder (P21 Milestone 7, a trial; ADR 0151). Pure Rust (a port of
+# Boost.Polygon), BSL-1.0, no default features.
+boostvoronoi = { version = "0.12.1", default-features = false }
 base64 = "0.22"
 # Backdrop bitmaps in the app. Pure Rust decoders only.
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "bmp", "tiff", "gif"] }
