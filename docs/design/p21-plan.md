@@ -3,7 +3,8 @@
 Date: 2026-11-23 · Status: Accepted (owner, 2026-11-23: the six fixes of
 the review of the font pipeline, in this order). Milestone 1 is made
 (ADR 0147); its faults at the ends of columns go to Milestone 2.
-Milestone 2 is made (ADR 0148); its exit test is met in part.
+Milestone 2 is made (ADR 0148); its exit test is met in part. Milestone
+3 is made (ADR 0149); its exit test is met in part.
 
 ## Goal
 
@@ -243,6 +244,34 @@ The faults of the middle line that Milestones 1 and 2 do not remove:
 **Exit test:** the bench, ttf: no open corner in Anton "t", Block Sans
 "E", "F", "k" and Varsity "X", "x"; at most 1 mm of bulges and at most
 0.5 % open area in each font.
+
+**Made (2026-11-23, ADR 0149).** Side branches are measured with the
+half-width of the strokes that they hang on (`Graph::side_radius`), not of
+their junction, and go together; so the short arms of a crossing (the bar
+of "t") are strokes. An end at a junction holds its width for 0.5
+half-widths (1.5 before), and its rails follow the outline beyond that.
+The rails go round a short arm that is still a side branch only up to 2.0
+half-widths. Steps 1, 3 and 4 needed no change: the thinning of these
+fonts leaves no fork at a square end, and the free ends and mitres of
+Milestone 2 do not use the bent end of the middle line.
+
+| Bench, ttf (after M2 → after M3) | Block Sans | Anton | Pacifico | Varsity |
+| --- | --- | --- | --- | --- |
+| Spikes | 20 → 17 | 50 → 44 | 33 → 37 | 15 → 15 |
+| Rail points out (ends) | 100 → 38 | 105 → 84 | 111 → 76 | 53 → 30 |
+| Crossing pairs | 20 → 27 | 48 → 40 | 41 → 40 | 14 → 11 |
+| Bulges (mm) | 2.3 → 0.0 | 4.3 → 4.3 | 17.8 → 13.5 | 0.0 → 0.0 |
+| Open area (%) | 0.98 → 0.57 | 1.84 → 1.66 | 0.92 → 0.56 | 0.80 → 0.47 |
+| Corners open | 46 → 43 | 56 → 54 | (none) | 40 → 33 |
+
+The exit test is met for Anton "t" and Block Sans "E", "F", "k" (no open
+corner), for the bulges of Block Sans and Varsity, and for the open area
+of Varsity. It is not met for Varsity "X" (3 open corners) and "x" (2:
+where the diagonals widen into the serifs), for the bulges of Anton
+(4.3 mm) and Pacifico (13.5 mm), and for the open area of Block Sans
+(0.57 %), Anton (1.66 %) and Pacifico (0.56 %). The lettering bench of
+P20 has more characters with more than 3 % of two layers (8 to 18; the
+mean stays 1.2 %).
 
 ## Milestone 4: the needle points decide (M)
 

@@ -123,10 +123,13 @@ const FOLLOW_NEAR: f64 = 1.6;
 /// lines square to the middle line did before. Milestone 3 makes such arms
 /// strokes.
 const STUB_ARC: f64 = 3.5;
-const STUB_NEAR: f64 = 2.2;
+const STUB_NEAR: f64 = 2.0;
 /// Points of the outline that a rail follows go if they are nearer than
 /// this (a factor of the cell) to the line through the points that stay.
 const FOLLOW_THIN: f64 = 0.1;
+/// Near an end at a junction or a crossing, the width of a column is held
+/// for this many half-widths.
+const HOLD: f64 = 0.5;
 /// A stroke that ends where another stroke goes through goes into it this
 /// part of its half-width (from its edge), so there is no gap at the join.
 const JOIN_OVERLAP: f64 = 0.3;
@@ -388,9 +391,16 @@ impl Graph {
         p
     }
 
-    /// Removes short branches from line ends to junctions.
+    /// Removes short branches from line ends to junctions. The side
+    /// branches of a junction are found first and go together (P21
+    /// Milestone 3): at a square end of a stroke, the middle line forks to
+    /// the two corners of the end; one by one, the second branch was no
+    /// longer a side branch when the first went, and the line bent to one
+    /// corner. Together, the line ends at the fork, in the middle. Where all
+    /// the branches of a junction are side branches (a small part), the
+    /// longest stays.
     fn prune(&mut self, radius_at: &dyn Fn(Point) -> f64) -> bool {
-        let mut changed = false;
+        let mut spurs: HashMap<usize, Vec<usize>> = HashMap::new();
         for i in 0..self.edges.len() {
             let e = &self.edges[i];
             if !e.alive || e.closed {
@@ -403,18 +413,56 @@ impl Graph {
                 (d, 1) if d >= 3 => a,
                 _ => continue,
             };
-            let (pos, r) = (self.nodes[junction].pos, self.nodes[junction].r);
+            let pos = self.nodes[junction].pos;
+            let r = self.side_radius(junction, i, radius_at);
             let reach = self.edges[i]
                 .pts
                 .iter()
                 .map(|&p| p.distance(pos) + radius_at(p))
                 .fold(0.0, f64::max);
             if length(&self.edges[i].pts) < PRUNE * r && reach < SPUR_REACH * r {
+                spurs.entry(junction).or_default().push(i);
+            }
+        }
+        let mut changed = false;
+        let mut junctions: Vec<usize> = spurs.keys().copied().collect();
+        junctions.sort_unstable();
+        for junction in junctions {
+            let mut list = spurs.remove(&junction).unwrap_or_default();
+            if list.len() >= self.degree(junction) {
+                list.sort_by(|&x, &y| length(&self.edges[y].pts).total_cmp(&length(&self.edges[x].pts)));
+                list.remove(0);
+            }
+            for i in list {
                 self.edges[i].alive = false;
                 changed = true;
             }
         }
         changed
+    }
+
+    /// The half-width of the strokes that a branch `spur` at the node `n`
+    /// hangs on (P21 Milestone 3): the middle half-width of the other edges
+    /// of the node, from one to three times the half-width of the node from
+    /// it. Not the half-width of the node: where strokes cross, the circle
+    /// in the crossing is larger than the strokes, and the short arms of a
+    /// crossing (the bar of a "t") were taken as side branches. The
+    /// half-width of the node if the other edges have no points there.
+    fn side_radius(&self, n: usize, spur: usize, radius_at: &dyn Fn(Point) -> f64) -> f64 {
+        let (pos, r) = (self.nodes[n].pos, self.nodes[n].r);
+        let mut v: Vec<f64> = self
+            .halves(n)
+            .into_iter()
+            .filter(|&(e, _)| e != spur)
+            .flat_map(|(e, _)| self.edges[e].pts.iter().copied())
+            .filter(|p| (r..=3.0 * r).contains(&p.distance(pos)))
+            .map(radius_at)
+            .collect();
+        if v.is_empty() {
+            return r;
+        }
+        v.sort_by(f64::total_cmp);
+        v[v.len() / 2].min(r)
     }
 
     /// Joins the two edges at each node with two edges.
@@ -1402,7 +1450,7 @@ pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
                     piece.mitre = mitres;
                     for ((hold, free), m) in piece.hold.iter_mut().zip(free).zip(mitres) {
                         if !free && m.is_none() && raw.r_fix.is_none() {
-                            *hold = 1.5 * r_med;
+                            *hold = HOLD * r_med;
                         }
                     }
                     // The ends of the pen stroke, not the ends at a cut of
@@ -2881,6 +2929,46 @@ mod tests {
         out.extend(corner(-1.0, n2 * -1.0, n1 * -1.0));
         out.push(a - n1);
         out
+    }
+
+    #[test]
+    fn the_short_arms_of_a_crossing_are_strokes() {
+        // A "t": a stem 100 wide and a bar 100 high that goes 40 past each
+        // side of the stem (0.8 of the half-width of the stem). The circle
+        // in the crossing is larger than the strokes; measured with it, the
+        // arms were side branches, and the stem covered them with a bulge
+        // (P21 Milestone 3).
+        let p = |x: f64, y: f64| Point::new(x, y);
+        let ring = vec![
+            p(0.0, 0.0),
+            p(100.0, 0.0),
+            p(100.0, 250.0),
+            p(140.0, 250.0),
+            p(140.0, 350.0),
+            p(100.0, 350.0),
+            p(100.0, 700.0),
+            p(0.0, 700.0),
+            p(0.0, 350.0),
+            p(-40.0, 350.0),
+            p(-40.0, 250.0),
+            p(0.0, 250.0),
+        ];
+        let s = strokes(&[ring], 700.0);
+        assert!(s.satins.len() >= 2, "{} columns", s.satins.len());
+        // A column of an arm goes to the end of each arm, across the bar.
+        let arm = |x_end: f64| {
+            s.satins.iter().any(|g| {
+                g.rungs
+                    .iter()
+                    .chain(std::iter::once(&(
+                        g.rail_a.points().last().unwrap_or_default(),
+                        g.rail_b.points().last().unwrap_or_default(),
+                    )))
+                    .any(|(a, b)| (a.x - x_end).abs() < 15.0 && (b.x - x_end).abs() < 15.0 && (a.y - b.y).abs() > 60.0)
+            })
+        };
+        assert!(arm(-40.0) || arm(140.0), "no column of an arm");
+        assert!(s.coverage > 0.95, "{}", s.coverage);
     }
 
     #[test]

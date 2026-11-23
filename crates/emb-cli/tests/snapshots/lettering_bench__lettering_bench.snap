@@ -7,59 +7,59 @@ Lettering bench: Noto Sans JP Bold; 248 characters of the reference set
 10 mm
   characters all fill: 0 
   characters partly fill: 0 
-  parts: satin 1350, split satin 0, tatami column 0, fill 0, run 49
-  covered: mean 98.6 %, lowest 63.1 % (書)
-  outside: mean 0.1 %, highest 0.8 % (タ)
-  two layers: mean 1.1 %, highest 4.4 % (糸); characters over 3 %: 8
+  parts: satin 1381, split satin 0, tatami column 0, fill 0, run 55
+  covered: mean 98.8 %, lowest 63.9 % (書)
+  outside: mean 0.1 %, highest 0.6 % (ァ)
+  two layers: mean 1.2 %, highest 4.5 % (ゥ); characters over 3 %: 18
   narrowest column: 0.80 mm (ぎ); characters with a column under 0.8 mm: 0
   widest column: 1.90 mm (、); columns over 8 mm: 0, satin with no split stitches: 0
 
 15 mm
   characters all fill: 0 
   characters partly fill: 0 
-  parts: satin 1387, split satin 0, tatami column 0, fill 0, run 12
-  covered: mean 99.3 %, lowest 95.6 % (ぎ)
-  outside: mean 0.1 %, highest 0.8 % (タ)
-  two layers: mean 1.1 %, highest 4.4 % (糸); characters over 3 %: 11
-  narrowest column: 0.84 mm (女); characters with a column under 0.8 mm: 0
+  parts: satin 1423, split satin 0, tatami column 0, fill 0, run 13
+  covered: mean 99.5 %, lowest 96.1 % (ぎ)
+  outside: mean 0.1 %, highest 0.7 % (ァ)
+  two layers: mean 1.2 %, highest 4.7 % (木); characters over 3 %: 19
+  narrowest column: 0.84 mm (年); characters with a column under 0.8 mm: 0
   widest column: 2.84 mm (、); columns over 8 mm: 0, satin with no split stitches: 0
 
 25 mm
   characters all fill: 0 
   characters partly fill: 0 
-  parts: satin 1394, split satin 1, tatami column 0, fill 0, run 4
-  covered: mean 99.3 %, lowest 95.6 % (ぎ)
-  outside: mean 0.1 %, highest 0.8 % (タ)
-  two layers: mean 1.1 %, highest 4.3 % (糸); characters over 3 %: 10
-  narrowest column: 1.16 mm (海); characters with a column under 0.8 mm: 0
+  parts: satin 1431, split satin 0, tatami column 0, fill 0, run 5
+  covered: mean 99.5 %, lowest 96.0 % (ぎ)
+  outside: mean 0.1 %, highest 0.7 % (ァ)
+  two layers: mean 1.2 %, highest 4.8 % (ゥ); characters over 3 %: 19
+  narrowest column: 0.83 mm (繍); characters with a column under 0.8 mm: 0
   widest column: 4.74 mm (、); columns over 8 mm: 0, satin with no split stitches: 0
 
 50 mm
   characters all fill: 0 
   characters partly fill: 0 
-  parts: satin 849, split satin 549, tatami column 0, fill 0, run 1
-  covered: mean 99.3 %, lowest 95.5 % (ぎ)
-  outside: mean 0.1 %, highest 0.8 % (タ)
-  two layers: mean 1.1 %, highest 4.3 % (繍); characters over 3 %: 8
-  narrowest column: 1.21 mm (年); characters with a column under 0.8 mm: 0
-  widest column: 9.48 mm (、); columns over 8 mm: 6, satin with no split stitches: 0
+  parts: satin 882, split satin 551, tatami column 0, fill 0, run 3
+  covered: mean 99.5 %, lowest 96.1 % (ぎ)
+  outside: mean 0.1 %, highest 0.8 % (ァ)
+  two layers: mean 1.2 %, highest 4.5 % (ゥ); characters over 3 %: 18
+  narrowest column: 1.09 mm (あ); characters with a column under 0.8 mm: 0
+  widest column: 9.48 mm (、); columns over 8 mm: 3, satin with no split stitches: 0
 
 80 mm
   characters all fill: 0 
   characters partly fill: 0 
-  parts: satin 60, split satin 1298, tatami column 41, fill 0, run 0
-  covered: mean 99.3 %, lowest 95.6 % (ぎ)
-  outside: mean 0.1 %, highest 0.8 % (タ)
-  two layers: mean 1.1 %, highest 4.3 % (繍); characters over 3 %: 11
-  narrowest column: 0.80 mm (星); characters with a column under 0.8 mm: 0
-  widest column: 15.17 mm (、); columns over 8 mm: 1190, satin with no split stitches: 0
+  parts: satin 67, split satin 1325, tatami column 41, fill 0, run 3
+  covered: mean 99.5 %, lowest 96.0 % (ぎ)
+  outside: mean 0.1 %, highest 0.7 % (ァ)
+  two layers: mean 1.2 %, highest 4.6 % (ゥ); characters over 3 %: 18
+  narrowest column: 1.74 mm (あ); characters with a column under 0.8 mm: 0
+  widest column: 15.17 mm (、); columns over 8 mm: 1206, satin with no split stitches: 0
 
 Trims of the words at 10, 15, 25, 50, 80 mm
-  刺繍: 10, 10, 13, 13, 13
+  刺繍: 12, 14, 16, 17, 17
   東京: 8, 8, 8, 8, 8
   ありがとう: 6, 6, 7, 7, 7
   サムライ: 4, 4, 4, 4, 4
-  龍: 7, 8, 8, 9, 9
+  龍: 6, 6, 7, 8, 8
   山田太郎: 7, 6, 7, 7, 7
   さくら: 4, 4, 4, 4, 4
   日本: 1, 1, 1, 1, 1
