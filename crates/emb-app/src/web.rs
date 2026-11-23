@@ -393,6 +393,8 @@ fn probe(st: &AppState, ctx: &eframe::egui::Context) {
     let (touching, middle) = ctx.input(|i| (i.any_touches(), i.multi_touch().map(|t| t.center_pos)));
     let rect = ctx.content_rect();
     let state = serde_json::json!({
+        "tool": st.tool.label(),
+        "message": st.message,
         "zoom": st.view.zoom,
         "cx": st.view.center.x,
         "cy": st.view.center.y,

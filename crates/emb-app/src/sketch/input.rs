@@ -742,7 +742,8 @@ pub fn touch_bar(ui: &egui::Ui, rect: Rect, st: &mut AppState) {
         return;
     }
     let labels: Vec<&str> = buttons.iter().map(|(_, l)| *l).collect();
-    let Some(i) = crate::canvas::touch_buttons(ui, "sketch_touch_bar", rect, &labels) else {
+    let Some(i) = crate::canvas::touch_buttons(ui, "sketch_touch_bar", rect, crate::canvas::bar_gap(st), &labels)
+    else {
         return;
     };
     match buttons[i].0 {

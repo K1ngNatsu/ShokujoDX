@@ -853,6 +853,45 @@ mod tests {
     }
 
     #[test]
+    fn on_a_touch_screen_a_mark_tool_has_a_way_out() {
+        // The owner's phone: the Construction Line tool from the ruler menu
+        // held the phone (no Esc key; Cancel only took the points away).
+        let mut h = Harness::empty();
+        h.frame(crate::test_util::touch_screen());
+        let c = h.st.doc.design().hoop.center;
+        let rect = h.map().rect;
+        let ruler = Pos2::new(h.screen(c).x, rect.min.y + RULER / 2.0);
+        let pick_line = |h: &mut Harness| {
+            h.click(PointerButton::Secondary, ruler);
+            let item = h.widget(Tool::ConstructionLine.label()).expect("the ruler menu");
+            h.click(PointerButton::Primary, item.center());
+            assert_eq!(h.st.tool, Tool::ConstructionLine);
+        };
+        // No points yet: Done goes back to Select.
+        pick_line(&mut h);
+        let done = h.widget("Done").expect("Done on the touch bar");
+        h.click(PointerButton::Primary, done.center());
+        assert_eq!(h.st.tool, Tool::Select);
+        // Two taps make the line, and the tool goes back to Select.
+        pick_line(&mut h);
+        for p in [Point::new(-10.0, -10.0), Point::new(10.0, 10.0)] {
+            h.click(PointerButton::Primary, h.screen(c + p));
+        }
+        assert_eq!(h.st.doc.design().marks.len(), 1);
+        assert_eq!(h.st.tool, Tool::Select);
+        // One point, Cancel: the point goes, then Done leaves the tool.
+        pick_line(&mut h);
+        h.click(PointerButton::Primary, h.screen(c));
+        let cancel = h.widget("Cancel").expect("Cancel while a point is there");
+        h.click(PointerButton::Primary, cancel.center());
+        assert!(h.st.draw.points.is_empty());
+        let done = h.widget("Done").expect("Done after Cancel");
+        h.click(PointerButton::Primary, done.center());
+        assert_eq!(h.st.tool, Tool::Select);
+        assert_eq!(h.st.doc.design().marks.len(), 1);
+    }
+
+    #[test]
     fn a_right_click_on_a_ruler_adds_a_guide_there_and_starts_the_mark_tools() {
         for tool in [Tool::Select, Tool::Line] {
             let mut h = Harness::empty();

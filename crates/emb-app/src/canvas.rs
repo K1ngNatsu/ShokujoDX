@@ -523,7 +523,7 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
         crate::viewer::draw_magnifier(&painter, ui.ctx(), rect, pos, st);
     }
     crate::viewer::draw_light(&painter, ui.ctx(), rect, st, response.hovered());
-    touch_bar(ui, rect, st, drawing);
+    touch_bar(ui, rect, st);
     if st.sketch.is_some() {
         crate::sketch::touch_bar(ui, rect, st);
     }
@@ -571,9 +571,17 @@ fn side_handle(ui: &mut egui::Ui, rect: Rect, st: &mut AppState) {
 /// draw tools (Enter, Backspace, Esc) at the bottom of the canvas while a
 /// shape has points (P15 step 3). It shows only after a touch, so a computer
 /// with a mouse does not get it.
-fn touch_bar(ui: &mut egui::Ui, rect: Rect, st: &mut AppState, drawing: bool) {
+fn touch_bar(ui: &mut egui::Ui, rect: Rect, st: &mut AppState) {
+    if st.tool == Tool::Select || st.sketch.is_some() || !st.touch_seen {
+        return;
+    }
     let has_points = !st.draw.points.is_empty() || !st.draw.stages.is_empty();
-    if !drawing || !has_points || !st.touch_seen {
+    if !has_points {
+        // No shape in work: the way back to the Select tool (Esc on a
+        // keyboard), so a tool never holds a phone.
+        if touch_buttons(ui, "touch_draw_bar", rect, bar_gap(st), &[tr("Done")]).is_some() {
+            st.set_tool(Tool::Select);
+        }
         return;
     }
     let next = st.tool.enter_goes_on(st.draw.points.len(), st.draw.stages.len());
@@ -583,19 +591,28 @@ fn touch_bar(ui: &mut egui::Ui, rect: Rect, st: &mut AppState, drawing: bool) {
         tr("Cancel"),
     ];
     let keys = [egui::Key::Enter, egui::Key::Backspace, egui::Key::Escape];
-    if let Some(i) = touch_buttons(ui, "touch_draw_bar", rect, &labels) {
+    if let Some(i) = touch_buttons(ui, "touch_draw_bar", rect, bar_gap(st), &labels) {
         st.draw_key(keys[i]);
     }
 }
 
+/// The space under a touch bar at the bottom of the canvas: more when the
+/// button that hides the side panels is at the bottom edge.
+pub(crate) fn bar_gap(st: &AppState) -> f32 {
+    if st.panels_below { 56.0 } else { 16.0 }
+}
+
 /// A row of large buttons in the middle of the bottom of the canvas `rect`,
 /// over the canvas (the touch bars); the button that was tapped.
-pub(crate) fn touch_buttons(ui: &egui::Ui, id: &str, rect: Rect, labels: &[&str]) -> Option<usize> {
+pub(crate) fn touch_buttons(ui: &egui::Ui, id: &str, rect: Rect, gap: f32, labels: &[&str]) -> Option<usize> {
     let mut tapped = None;
-    egui::Area::new(egui::Id::new(id))
+    // An area for each number of buttons: an area keeps its size of the
+    // frame before, so a bar of other buttons would be off the middle for
+    // one frame (a tap there would miss).
+    egui::Area::new(egui::Id::new(id).with(labels.len()))
         .order(egui::Order::Foreground)
         .pivot(egui::Align2::CENTER_BOTTOM)
-        .fixed_pos(rect.center_bottom() - Vec2::new(0.0, 16.0))
+        .fixed_pos(rect.center_bottom() - Vec2::new(0.0, gap))
         .show(ui.ctx(), |ui| {
             egui::Frame::popup(ui.style()).show(ui, |ui| {
                 ui.spacing_mut().button_padding = Vec2::new(14.0, 10.0);

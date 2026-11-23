@@ -980,6 +980,11 @@ impl AppState {
         }
         self.draw = DrawState::default();
         f(self, &pts);
+        // A touch screen has no Esc key: the tool goes back to Select (as
+        // after an object), so a tap does not start the next one.
+        if self.touch_seen {
+            self.set_tool(Tool::Select);
+        }
         true
     }
 
