@@ -311,13 +311,16 @@ mod tests {
 
     fn font() -> EmbFont {
         let f = bundled::font("Lato", "Bold").unwrap();
-        embfont::convert(
+        let mut e = embfont::convert(
             &f,
             "Block Sans",
             "",
             LetterStitch::Auto,
             &"HTLio".chars().collect::<Vec<_>>(),
-        )
+        );
+        // The coordinates of a file, as the converter writes them.
+        e.round_letters();
+        e
     }
 
     fn column(from: (f64, f64), to: (f64, f64)) -> ObjectKind {

@@ -2,7 +2,7 @@
 
 Date: 2026-11-20 · Status: Accepted (P20 Milestone 3,
 `docs/design/p20-plan.md`). Decision 1 replaces the stitch of each column
-of ADR 0142.
+of ADR 0142. ADR 0147 replaces decision 3 (the rails are the outline).
 
 ## Context
 

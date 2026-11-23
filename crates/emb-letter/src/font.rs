@@ -47,6 +47,9 @@ struct Shared {
     units_per_em: f64,
     cap_height: f64,
     shapes: Mutex<HashMap<u16, Arc<GlyphShapes>>>,
+    /// The character of each glyph (the lowest one that maps to it), for
+    /// the split of its outline (ADR 0152). Made when first used.
+    chars: std::sync::OnceLock<HashMap<u16, char>>,
     /// The route of each glyph that has one made (`None`: no columns to
     /// route).
     routes: Mutex<HashMap<u16, Option<Arc<Vec<ObjectKind>>>>>,
@@ -64,6 +67,35 @@ impl Shared {
             face.set_variation(*axis, *value);
         }
         face
+    }
+
+    /// The character of a glyph: the lowest character that the Unicode
+    /// tables of the font map to it. `None` for a glyph that only shaping
+    /// gives (a ligature, a form in a word).
+    fn char_of(&self, glyph: u16) -> Option<char> {
+        self.chars
+            .get_or_init(|| {
+                let mut map: HashMap<u16, char> = HashMap::new();
+                let face = self.face();
+                if let Some(cmap) = face.tables().cmap {
+                    for table in cmap.subtables {
+                        if !table.is_unicode() {
+                            continue;
+                        }
+                        table.codepoints(|cp| {
+                            if let (Some(c), Some(g)) = (char::from_u32(cp), table.glyph_index(cp)) {
+                                let e = map.entry(g.0).or_insert(c);
+                                if c < *e {
+                                    *e = c;
+                                }
+                            }
+                        });
+                    }
+                }
+                map
+            })
+            .get(&glyph)
+            .copied()
     }
 
     fn contours(&self, glyph: u16) -> Vec<Vec<Point>> {
@@ -92,7 +124,10 @@ impl Shared {
         if let Some(s) = self.shapes.lock().ok().and_then(|c| c.get(&glyph).cloned()) {
             return s;
         }
-        let s = Arc::new(GlyphShapes::new(&self.contours(glyph), self.cap_height));
+        let split = self
+            .char_of(glyph)
+            .map_or(crate::stroke::Split::Off, crate::stroke::Split::for_char);
+        let s = Arc::new(GlyphShapes::with_split(&self.contours(glyph), self.cap_height, split));
         if let Ok(mut c) = self.shapes.lock() {
             c.insert(glyph, s.clone());
         }
@@ -112,6 +147,21 @@ impl Shared {
         for p in &mut parts {
             p.transform(&Transform::scale(s, s));
         }
+        // The steps of the converter (`EmbFont::extend_ends`, P21 Milestone
+        // 6): round dots, and ends of columns on to the corners of the
+        // outline where that adds no needle point out of it. Not for kana
+        // and kanji: the Japanese fonts are made with no `--extend` (it
+        // makes the ends that stop at a crossing long again).
+        if !self.char_of(glyph).is_some_and(crate::layout::is_cjk) {
+            let scale = |r: &Vec<Point>| -> Vec<Point> { r.iter().map(|p| Point::new(p.x * s, p.y * s)).collect() };
+            let fills: Vec<(Vec<Point>, Vec<Vec<Point>>)> = shapes
+                .fills
+                .iter()
+                .map(|(outer, holes)| (scale(outer), holes.iter().map(scale).collect()))
+                .collect();
+            crate::tune::round_parts(&mut parts, &fills, crate::embfont::DESIGN_CAP_MM);
+            crate::tune::extend_ends(&mut parts, &fills, crate::embfont::DESIGN_CAP_MM);
+        }
         let advance = f64::from(self.face().glyph_hor_advance(GlyphId(glyph)).unwrap_or(0));
         let letter = crate::embfont::EmbLetter {
             advance_mm: advance * s,
@@ -120,7 +170,14 @@ impl Shared {
             tuning: Vec::new(),
             fill_parts: Vec::new(),
         };
-        let (routed, _) = crate::route::route_with_splits(&letter, crate::embfont::DESIGN_CAP_MM);
+        let outline: Vec<Vec<Point>> = self
+            .contours(glyph)
+            .into_iter()
+            .map(|r| r.into_iter().map(|p| Point::new(p.x * s, p.y * s)).collect())
+            .collect();
+        let rtl = self.char_of(glyph).is_some_and(crate::route::is_rtl);
+        let (routed, _) =
+            crate::route::route_with_splits_dir(&letter, crate::embfont::DESIGN_CAP_MM, Some(&outline), rtl);
         let mut parts = routed.parts;
         for p in &mut parts {
             p.transform(&Transform::scale(1.0 / s, 1.0 / s));
@@ -280,6 +337,7 @@ impl Font {
                 units_per_em,
                 cap_height,
                 shapes: Mutex::new(HashMap::new()),
+                chars: std::sync::OnceLock::new(),
                 routes: Mutex::new(HashMap::new()),
                 todo: Mutex::new(Vec::new()),
                 working: AtomicBool::new(false),
@@ -438,6 +496,12 @@ impl Font {
     pub fn shapes(&self, glyph: u16) -> Arc<GlyphShapes> {
         self.shared.shapes(glyph)
     }
+
+    /// The character of a glyph: the lowest character that the Unicode
+    /// tables of the font map to it (`None` for a glyph from shaping only).
+    pub fn char_of(&self, glyph: u16) -> Option<char> {
+        self.shared.char_of(glyph)
+    }
 }
 
 /// The x-advance change of the first glyph of a pair in the lookups of the
@@ -555,6 +619,16 @@ fn cap_height_of(declared: Option<f64>, h_top: Option<f64>, units_per_em: f64) -
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_glyph_knows_its_character_for_the_split() {
+        let f = crate::bundled::font("Anton", "Regular").expect("bundled font");
+        for c in ['A', 'g', '4'] {
+            let g = f.glyph(c).expect("glyph");
+            assert_eq!(f.shared.char_of(g), Some(c));
+        }
+        assert_eq!(f.shared.char_of(0), None);
+    }
+
     #[test]
     fn a_wrong_cap_height_is_not_used() {
         use super::cap_height_of;

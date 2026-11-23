@@ -32,6 +32,7 @@ pub mod route;
 pub mod shape;
 pub mod sheet;
 pub mod source;
+mod split;
 pub mod stroke;
 pub mod style;
 pub mod teamnames;
@@ -563,11 +564,13 @@ mod tests {
             assert_eq!(bundled::quality(family), Some(q), "{family}");
             assert!(q.coverage > 0.9 && q.narrow < 0.2 && q.long < 0.2, "{family}: {q:?}");
         }
-        // The new fonts of P17 Milestone 7 have the score of a font of the
-        // program.
+        // The new fonts of P17 Milestone 7 came into the program with the
+        // score of a font of the program; a font keeps its place while its
+        // score is the limit or more (ADR 0116; P21 Milestone 6: the score
+        // of today counts the needle points, and Pangolin has 75).
         for (family, _) in &bundled::EMBROIDERY[bundled::P11_EMBROIDERY..] {
             let q = bundled::quality(family).unwrap();
-            assert!(q.score >= quality::BUNDLE, "{family}: {q:?}");
+            assert!(q.score >= quality::LIMIT, "{family}: {q:?}");
         }
         assert_eq!(bundled::quality("no such font"), None);
         assert_eq!(bundled::EMBROIDERY.len(), 65);

@@ -67,6 +67,22 @@ fn with_letter_parts(d: &Design) -> (Design, std::collections::HashSet<usize>) {
     (out, travel)
 }
 
+/// A part with a smaller box (mm2) is not measured: it has a few stitches,
+/// and no outline takes them from the larger parts round it (P21 Milestone
+/// 9: the small pieces of serifs, 15 of 1841 objects).
+const MIN_BOX_MM2: f64 = 1.0;
+
+/// The area of the box of the outline of `kind` (mm2).
+fn box_mm2(kind: &ObjectKind) -> f64 {
+    match emb_model::vector::to_vector(kind, emb_model::Rgb(0, 0, 0)) {
+        Some(ObjectKind::Vector { path, .. }) => {
+            BBox::from_points(path.flatten(0.1).into_iter().flat_map(|l| l.points))
+                .map_or(0.0, |b| b.width() * b.height())
+        }
+        _ => 0.0,
+    }
+}
+
 #[derive(Default)]
 struct Count {
     measured: usize,
@@ -150,7 +166,7 @@ fn check(name: &str, c: &mut Count) {
     let t = d.output_transform();
     for (i, o) in d.objects().iter().enumerate() {
         let Some(want) = source_kind(&o.kind) else { continue };
-        if travel.contains(&i) || !ids.values().any(|&v| v == i) {
+        if travel.contains(&i) || !ids.values().any(|&v| v == i) || box_mm2(&o.kind) < MIN_BOX_MM2 {
             continue;
         }
         c.measured += 1;

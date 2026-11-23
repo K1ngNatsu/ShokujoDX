@@ -97,6 +97,20 @@ pub const OUTSIDE_ALL: f64 = 0.2;
 /// with 45 % has two columns on the same stroke.
 pub const OVERLAP_FREE: f64 = 0.2;
 pub const OVERLAP_ALL: f64 = 0.5;
+/// A needle point of a column is out of the outline when it is more than
+/// this far out (mm at the design size), sewn with no pull compensation
+/// (P21 Milestone 4): a spike that the shape of the column makes.
+pub const SPIKE_MM: f64 = 0.2;
+/// The part of the needle points of the columns out of the outline: up to
+/// [`SPIKES_FREE`] takes nothing from the score, and [`SPIKES_ALL`] more
+/// takes all of it.
+pub const SPIKES_FREE: f64 = 0.01;
+pub const SPIKES_ALL: f64 = 0.1;
+/// The part of the pairs of the columns that cross the pair after them
+/// (stitches on each other): up to [`CROSSING_FREE`] takes nothing, and
+/// [`CROSSING_ALL`] more takes all of the score.
+pub const CROSSING_FREE: f64 = 0.01;
+pub const CROSSING_ALL: f64 = 0.2;
 /// The shape value of a letter with columns is 0 at this coverage and
 /// below, and 1 at [`FULL`] and above. Below [`EMPTY`] the converter does
 /// not use the columns of the stroke finder
@@ -172,6 +186,11 @@ pub struct LetterQuality {
     pub outside: f64,
     /// The part of the area of the parts that two or more parts cover.
     pub overlap: f64,
+    /// The part of the needle points of the columns out of the outline
+    /// ([`needle_faults`]).
+    pub spikes: f64,
+    /// The part of the pairs of the columns that cross the pair after them.
+    pub crossing: f64,
 }
 
 impl LetterQuality {
@@ -193,7 +212,111 @@ impl LetterQuality {
         let look = if self.fill { FILL_LETTER } else { 1.0 };
         let outside = (1.0 - (self.outside - OUTSIDE_FREE).max(0.0) / OUTSIDE_ALL).clamp(0.0, 1.0);
         let overlap = (1.0 - (self.overlap - OVERLAP_FREE).max(0.0) / OVERLAP_ALL).clamp(0.0, 1.0);
-        shape * look * outside * overlap
+        let spikes = (1.0 - (self.spikes - SPIKES_FREE).max(0.0) / SPIKES_ALL).clamp(0.0, 1.0);
+        let crossing = (1.0 - (self.crossing - CROSSING_FREE).max(0.0) / CROSSING_ALL).clamp(0.0, 1.0);
+        shape * look * outside * overlap * spikes * crossing
+    }
+}
+
+/// The faults of the needle points of the columns of a letter (P21
+/// Milestone 4; the measures of the letter fault bench): the part of the
+/// needle points out of the outline by more than [`SPIKE_MM`] with no pull
+/// compensation, and the part of the pairs that cross the pair after them.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct NeedleFaults {
+    pub spikes: f64,
+    pub crossing: f64,
+}
+
+/// How far `p` is out of `outline` (0 in it).
+fn outside_by(outline: &Outline, p: Point) -> f64 {
+    let ring_in = |r: &[Point]| emb_geom::region::ring_contains(r, p);
+    if outline.iter().any(|(o, h)| ring_in(o) && !h.iter().any(|h| ring_in(h))) {
+        return 0.0;
+    }
+    outline
+        .iter()
+        .flat_map(|(o, h)| std::iter::once(o).chain(h.iter()))
+        .flat_map(|r| (0..r.len()).map(move |i| p.distance_to_segment(r[i], r[(i + 1) % r.len()])))
+        .fold(f64::MAX, f64::min)
+}
+
+/// The needle faults of the columns of `parts` (sewn with the default
+/// satin settings and no pull compensation) against `outline`, both in mm.
+/// The needle points of the columns of `parts` more than [`SPIKE_MM`] out
+/// of the outline, sewn with no pull compensation (P21 Milestone 6: the
+/// tuning of the ends keeps no change that adds one).
+pub fn spike_points(parts: &[ObjectKind], outline: &Outline) -> usize {
+    let params = emb_model::SatinParams {
+        pull_compensation_mm: 0.0,
+        ..emb_model::SatinParams::default()
+    };
+    parts
+        .iter()
+        .filter_map(|part| {
+            let ObjectKind::Satin { geometry, .. } = part else {
+                return None;
+            };
+            let (s, _) = emb_stitch::satin::Column::new(geometry)?.start();
+            let pts = emb_stitch::satin::satin(geometry, &params, s, None)?;
+            Some(pts.iter().filter(|p| outside_by(outline, **p) > SPIKE_MM).count())
+        })
+        .sum()
+}
+
+/// The shortest stitch of the columns of `parts` (sewn with the default
+/// satin settings); `f64::MAX` with no columns (P21 Milestone 6: the tuning
+/// of the ends keeps no change that makes a stitch too short to sew).
+pub fn shortest_stitch(parts: &[ObjectKind]) -> f64 {
+    let params = emb_model::SatinParams::default();
+    parts
+        .iter()
+        .filter_map(|part| {
+            let ObjectKind::Satin { geometry, .. } = part else {
+                return None;
+            };
+            let (s, _) = emb_stitch::satin::Column::new(geometry)?.start();
+            let pts = emb_stitch::satin::satin(geometry, &params, s, None)?;
+            pts.windows(2)
+                .map(|w| w[0].distance(w[1]))
+                .filter(|&d| d > 1e-6)
+                .reduce(f64::min)
+        })
+        .fold(f64::MAX, f64::min)
+}
+
+pub fn needle_faults(parts: &[ObjectKind], outline: &Outline) -> NeedleFaults {
+    let params = emb_model::SatinParams {
+        pull_compensation_mm: 0.0,
+        ..emb_model::SatinParams::default()
+    };
+    let (mut points, mut out, mut pairs, mut cross) = (0usize, 0usize, 0usize, 0usize);
+    for part in parts {
+        let ObjectKind::Satin { geometry, .. } = part else {
+            continue;
+        };
+        let Some(col) = emb_stitch::satin::Column::new(geometry) else {
+            continue;
+        };
+        let (s, _) = col.start();
+        if let Some(pts) = emb_stitch::satin::satin(geometry, &params, s, None) {
+            points += pts.len();
+            out += pts.iter().filter(|p| outside_by(outline, **p) > SPIKE_MM).count();
+        }
+        let pr = col.pairs(0.2);
+        for w in pr.windows(2) {
+            pairs += 1;
+            if let Some((u, v)) = Point::crossing(w[0].0, w[0].1, w[1].0, w[1].1)
+                && (1e-3..=1.0 - 1e-3).contains(&u)
+                && (1e-3..=1.0 - 1e-3).contains(&v)
+            {
+                cross += 1;
+            }
+        }
+    }
+    NeedleFaults {
+        spikes: out as f64 / points.max(1) as f64,
+        crossing: cross as f64 / pairs.max(1) as f64,
     }
 }
 
@@ -236,23 +359,46 @@ impl Rail {
         self.pts[i - 1] + (self.pts[i] - self.pts[i - 1]) * f
     }
 
-    /// The length along the rail of the point of it nearest to `p`.
-    fn project(&self, p: Point) -> f64 {
-        let mut best = (f64::MAX, 0.0);
-        for (i, w) in self.pts.windows(2).enumerate() {
-            let d = w[1] - w[0];
-            let n = d.x * d.x + d.y * d.y;
-            let f = if n > 0.0 {
-                (((p.x - w[0].x) * d.x + (p.y - w[0].y) * d.y) / n).clamp(0.0, 1.0)
-            } else {
-                0.0
-            };
-            let dist = (w[0] + d * f).distance(p);
-            if dist < best.0 {
-                best = (dist, self.at[i] + f * (self.at[i + 1] - self.at[i]));
-            }
-        }
-        best.1
+    /// The length along the rail of the point of it nearest to `p`; where
+    /// the rail passes `p` more than one time, the place nearest to the
+    /// part `near` (0 to 1) of its length (as the stitch engine does).
+    fn project(&self, p: Point, near: Option<f64>) -> f64 {
+        let places: Vec<(f64, f64)> = self
+            .pts
+            .windows(2)
+            .enumerate()
+            .map(|(i, w)| {
+                let d = w[1] - w[0];
+                let n = d.x * d.x + d.y * d.y;
+                let f = if n > 0.0 {
+                    (((p.x - w[0].x) * d.x + (p.y - w[0].y) * d.y) / n).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+                (
+                    (w[0] + d * f).distance(p),
+                    self.at[i] + f * (self.at[i + 1] - self.at[i]),
+                )
+            })
+            .collect();
+        let best = places.iter().map(|x| x.0).fold(f64::INFINITY, f64::min);
+        let tie = best + 1e-9 * self.len().max(1.0);
+        let len = self.len().max(1e-12);
+        places
+            .iter()
+            .filter(|x| x.0 <= tie)
+            .min_by(|x, y| match near {
+                Some(f) => (x.1 / len - f).abs().total_cmp(&(y.1 / len - f).abs()),
+                None => x.1.total_cmp(&y.1),
+            })
+            .map_or(0.0, |x| x.1)
+    }
+
+    /// The places of the two points of a rung on rails `a` and `b`.
+    fn rung(a: &Rail, b: &Rail, pa: Point, pb: Point) -> (f64, f64) {
+        let sa = a.project(pa, None);
+        let sb = b.project(pb, Some(sa / a.len().max(1e-12)));
+        (a.project(pa, Some(sb / b.len().max(1e-12))), sb)
     }
 }
 
@@ -273,11 +419,17 @@ pub fn column_pairs(g: &SatinGeometry, step: f64) -> Vec<(Point, Point, f64)> {
     let (Some(a), Some(b)) = (Rail::new(&g.rail_a), Rail::new(&g.rail_b)) else {
         return Vec::new();
     };
-    let mut inner: Vec<(f64, f64)> = g
-        .rungs
-        .iter()
-        .map(|(pa, pb)| (a.project(*pa), b.project(*pb)))
-        .collect();
+    pair_places(g, &a, &b, step)
+        .into_iter()
+        .map(|(sa, sb, len)| (a.point(sa), b.point(sb), len))
+        .collect()
+}
+
+/// The places of the pairs of [`column_pairs`] along the rails `a` and `b`
+/// of `g` (lengths from their starts), with the length of the piece of the
+/// column at each pair.
+fn pair_places(g: &SatinGeometry, a: &Rail, b: &Rail, step: f64) -> Vec<(f64, f64, f64)> {
+    let mut inner: Vec<(f64, f64)> = g.rungs.iter().map(|(pa, pb)| Rail::rung(a, b, *pa, *pb)).collect();
     inner.sort_by(|x, y| x.0.total_cmp(&y.0));
     let mut rungs = vec![(0.0, 0.0)];
     for r in inner {
@@ -295,10 +447,75 @@ pub fn column_pairs(g: &SatinGeometry, step: f64) -> Vec<(Point, Point, f64)> {
         let n = (mid / step.max(1e-6)).ceil().max(1.0) as usize;
         for q in 0..n {
             let f = (q as f64 + 0.5) / n as f64;
-            out.push((a.point(w[0].0 + f * la), b.point(w[0].1 + f * lb), mid / n as f64));
+            out.push((w[0].0 + f * la, w[0].1 + f * lb, mid / n as f64));
         }
     }
     out
+}
+
+/// The column `g` as two columns that meet at the pair of its stitches
+/// whose middle is nearest `at`: the first one from the start of `g`, the
+/// second one to its end, each `overlap` past the cut. Both rails are cut
+/// at the same pair (P21: each rail was cut at its own point nearest `at`,
+/// so a column whose rail comes near `at` two times, a stroke that goes
+/// round and ends at itself, was cut at two places). A rung goes to the
+/// half that both its points are in.
+pub fn cut_column(g: &SatinGeometry, at: Point, overlap: f64) -> Option<(SatinGeometry, SatinGeometry)> {
+    let (a, b) = (Rail::new(&g.rail_a)?, Rail::new(&g.rail_b)?);
+    let step = overlap.max(1e-6);
+    let (sa, sb, _) = pair_places(g, &a, &b, step).into_iter().min_by(|x, y| {
+        let d = |p: &(f64, f64, f64)| a.point(p.0).midpoint(b.point(p.1)).distance(at);
+        d(x).total_cmp(&d(y))
+    })?;
+    // The points of a rail up to `s` and from `s`, each `overlap` past it.
+    let cut = |r: &Rail, s: f64| -> (Vec<Point>, Vec<Point>) {
+        let (s1, s2) = ((s + overlap).min(r.len()), (s - overlap).max(0.0));
+        let mut first: Vec<Point> = (0..r.pts.len())
+            .filter(|&i| r.at[i] < s1 - 1e-9)
+            .map(|i| r.pts[i])
+            .collect();
+        first.push(r.point(s1));
+        let mut second = vec![r.point(s2)];
+        second.extend((0..r.pts.len()).filter(|&i| r.at[i] > s2 + 1e-9).map(|i| r.pts[i]));
+        (first, second)
+    };
+    let ((a1, a2), (b1, b2)) = (cut(&a, sa), cut(&b, sb));
+    // Each half has some length on each rail: a cut near the end of a
+    // short column left a half with a rail of no length (P21 Milestone 9:
+    // the "a" of Varsity), which no stitch can sew.
+    let long =
+        |v: &[Point]| v.len() >= 2 && v.windows(2).map(|w| w[0].distance(w[1])).sum::<f64>() >= overlap.max(1e-6);
+    if !(long(&a1) && long(&a2) && long(&b1) && long(&b2)) {
+        return None;
+    }
+    let (mut r1, mut r2) = (Vec::new(), Vec::new());
+    for &(pa, pb) in &g.rungs {
+        let (ta, tb) = Rail::rung(&a, &b, pa, pb);
+        if ta < sa && tb < sb {
+            r1.push((pa, pb));
+        } else if ta > sa && tb > sb {
+            r2.push((pa, pb));
+        }
+    }
+    let line = |pts: &[Point]| {
+        let mut path = Path::new().move_to(pts[0]);
+        for p in &pts[1..] {
+            path = path.line_to(*p);
+        }
+        path
+    };
+    Some((
+        SatinGeometry {
+            rail_a: line(&a1),
+            rail_b: line(&b1),
+            rungs: r1,
+        },
+        SatinGeometry {
+            rail_a: line(&a2),
+            rail_b: line(&b2),
+            rungs: r2,
+        },
+    ))
 }
 
 /// The local width of each inside cell of `g`, in cells: the diameter of
@@ -560,6 +777,8 @@ pub fn letter_quality(font: &EmbFont, letter: &EmbLetter, outline: &Outline) -> 
                 fill: !font.fill,
                 outside: areas.outside,
                 overlap: areas.overlap,
+                spikes: 0.0,
+                crossing: 0.0,
             });
         }
     }
@@ -580,6 +799,7 @@ pub fn letter_quality(font: &EmbFont, letter: &EmbLetter, outline: &Outline) -> 
         }
     }
     let fill = total <= 0.0;
+    let needles = needle_faults(&letter.parts, outline);
     Some(LetterQuality {
         coverage: cover,
         narrow: if fill { 0.0 } else { narrow / total },
@@ -587,6 +807,8 @@ pub fn letter_quality(font: &EmbFont, letter: &EmbLetter, outline: &Outline) -> 
         fill,
         outside: areas.outside,
         overlap: areas.overlap,
+        spikes: needles.spikes,
+        crossing: needles.crossing,
     })
 }
 
@@ -745,6 +967,27 @@ mod tests {
     }
 
     #[test]
+    fn a_column_out_of_its_outline_has_needle_faults() {
+        // A bar 20 mm long, 4 mm high; a column on it, and a column 2 mm
+        // longer than it (P21 Milestone 4).
+        let p = |x: f64, y: f64| Point::new(x, y);
+        let bar = vec![(vec![p(0.0, 0.0), p(20.0, 0.0), p(20.0, 4.0), p(0.0, 4.0)], Vec::new())];
+        let column = |x1: f64| ObjectKind::Satin {
+            geometry: SatinGeometry {
+                rail_a: Path::new().move_to(p(0.0, 0.0)).line_to(p(x1, 0.0)),
+                rail_b: Path::new().move_to(p(0.0, 4.0)).line_to(p(x1, 4.0)),
+                rungs: Vec::new(),
+            },
+            params: Default::default(),
+        };
+        let good = needle_faults(&[column(20.0)], &bar);
+        assert_eq!(good, NeedleFaults::default());
+        let long = needle_faults(&[column(22.0)], &bar);
+        assert!(long.spikes > SPIKES_FREE, "{long:?}");
+        assert_eq!(long.crossing, 0.0);
+    }
+
+    #[test]
     fn the_score_of_a_letter() {
         let q = |coverage, narrow, long| LetterQuality {
             coverage,
@@ -753,6 +996,8 @@ mod tests {
             fill: false,
             outside: 0.0,
             overlap: 0.0,
+            spikes: 0.0,
+            crossing: 0.0,
         };
         assert!((q(1.0, 0.0, 0.0).score() - 1.0).abs() < 1e-9);
         assert!((q(FULL, 0.0, 0.0).score() - 1.0).abs() < 1e-9);
@@ -766,6 +1011,8 @@ mod tests {
             fill: true,
             outside: 0.0,
             overlap: 0.0,
+            spikes: 0.0,
+            crossing: 0.0,
         };
         assert_eq!(fill.score(), FILL_LETTER);
         // Narrow columns and long stitches take from the score.
@@ -786,6 +1033,15 @@ mod tests {
         assert!((more(0.0, OVERLAP_FREE + 0.5 * OVERLAP_ALL).score() - 0.5).abs() < 1e-9);
         assert_eq!(more(0.5, 0.0).score(), 0.0);
         assert_eq!(more(0.0, 0.9).score(), 0.0);
+        // Spikes and crossing stitches take from the score (P21 Milestone 4).
+        let faults = |spikes, crossing| LetterQuality {
+            spikes,
+            crossing,
+            ..q(1.0, 0.0, 0.0)
+        };
+        assert!((faults(SPIKES_FREE, CROSSING_FREE).score() - 1.0).abs() < 1e-9);
+        assert!((faults(SPIKES_FREE + 0.5 * SPIKES_ALL, 0.0).score() - 0.5).abs() < 1e-9);
+        assert!((faults(0.0, CROSSING_FREE + 0.5 * CROSSING_ALL).score() - 0.5).abs() < 1e-9);
         // A fill letter in a font of satin letters with a part too narrow.
         let thin_fill = LetterQuality { narrow: 0.25, ..fill };
         assert!((thin_fill.score() - 0.5 * FILL_LETTER).abs() < 1e-9);

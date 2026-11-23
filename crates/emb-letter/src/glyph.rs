@@ -46,6 +46,9 @@ const LEFT_MIN_SHARE: f64 = 0.15;
 /// little narrower than the outline there) if at least this part of its
 /// edge touches the strokes. Else it is a thin stroke on its own.
 const SLIVER_TOUCH: f64 = 0.3;
+/// A sliver is at most this thick on average (a factor of the widest
+/// stroke).
+const SLIVER_THICK: f64 = 0.16;
 /// The strokes of a part go this far (a factor of the widest stroke) into
 /// the strokes around it, so that there is no gap at the join.
 const LEFT_OVERLAP: f64 = 0.05;
@@ -59,10 +62,31 @@ pub struct GlyphShapes {
 
 impl GlyphShapes {
     pub fn new(rings: &[Vec<Point>], cap_height: f64) -> GlyphShapes {
+        GlyphShapes::with_split(rings, cap_height, crate::stroke::Split::Off)
+    }
+
+    /// [`GlyphShapes::new`] with the outline split into strokes first
+    /// (`stroke::Split::for_char` of the character of the glyph, ADR 0152).
+    ///
+    /// A split with bridges to curves (the brackets of serifs, the shoulder
+    /// of an "n") is kept only if its columns have no more faults than the
+    /// split without them ([`split_faults`]): in some shapes (the bowls of a
+    /// condensed font) the pieces sew worse.
+    pub fn with_split(rings: &[Vec<Point>], cap_height: f64, split: crate::stroke::Split) -> GlyphShapes {
         let fills = regions(rings);
-        let mut strokes = strokes(rings, cap_height);
-        add_missed_strokes(&fills, &mut strokes, cap_height);
-        tune_ends(&fills, &mut strokes, cap_height);
+        let make = |soft: bool| {
+            let (mut strokes, used) = crate::stroke::strokes_split_soft(rings, cap_height, split, soft);
+            add_missed_strokes(&fills, &mut strokes, cap_height);
+            tune_ends(&fills, &mut strokes, cap_height);
+            (strokes, used)
+        };
+        let (mut strokes, used) = make(true);
+        if used {
+            let (without, _) = make(false);
+            if split_faults(&without, &fills, cap_height) < split_faults(&strokes, &fills, cap_height) {
+                strokes = without;
+            }
+        }
         GlyphShapes { fills, strokes }
     }
 
@@ -306,18 +330,29 @@ fn tune_ends(fills: &[(Vec<Point>, Vec<Vec<Point>>)], s: &mut Strokes, cap_heigh
             params: SatinParams::default(),
         })
         .collect();
+    // The rings of the outline and the cell of the stroke finder, for the
+    // rails of the columns that change.
+    let rings: Vec<Vec<Point>> = fills
+        .iter()
+        .flat_map(|(o, h)| std::iter::once(o.clone()).chain(h.iter().cloned()))
+        .collect();
+    let cell = cap_height / crate::stroke::GRID_CELLS;
     if crate::tune::round_parts(&mut parts, fills, cap_height) == 0 {
         // The second pass of the stroke finder can add columns.
-        crate::stroke::trim_column_ends(&mut s.satins);
+        crate::stroke::trim_column_ends(&mut s.satins, &rings, cell);
         return;
     }
-    for (g, p) in s.satins.iter_mut().zip(parts) {
-        if let ObjectKind::Satin { geometry, .. } = p {
-            *g = geometry;
-        }
-    }
+    // The parts are the columns again (a round part can have one column
+    // in place of more).
+    s.satins = parts
+        .into_iter()
+        .filter_map(|p| match p {
+            ObjectKind::Satin { geometry, .. } => Some(geometry),
+            _ => None,
+        })
+        .collect();
     // The ends that went on into other columns stop at them again.
-    crate::stroke::trim_column_ends(&mut s.satins);
+    crate::stroke::trim_column_ends(&mut s.satins, &rings, cell);
 }
 
 /// The area of a satin: its two rails as one ring.
@@ -403,7 +438,12 @@ fn add_missed_strokes(fills: &[(Vec<Point>, Vec<Vec<Point>>)], s: &mut Strokes, 
         if !broad {
             let edge = edges(&part);
             let touch = length(&region::clip_lines(&near, &edge)) / length(&edge).max(1e-9);
-            if touch >= SLIVER_TOUCH {
+            // The mean thickness of the part: a sliver is a thin band
+            // along the edge of a stroke, not the narrow tail of a comma
+            // (P21: with the rails on the outline, the tail of the comma
+            // of Lato was not broad, and it counted as covered).
+            let thick = 2.0 * part.area() / length(&edge).max(1e-9);
+            if touch >= SLIVER_TOUCH && thick <= SLIVER_THICK * w {
                 slivers += part.area();
                 continue;
             }
@@ -438,6 +478,67 @@ fn add_missed_strokes(fills: &[(Vec<Point>, Vec<Vec<Point>>)], s: &mut Strokes, 
 /// Outer rings and their holes: a ring inside an even number of other
 /// rings is an outer ring; a ring inside an odd number is a hole of the
 /// smallest outer ring around it.
+/// The capital height (mm) at which [`split_faults`] measures.
+const SPLIT_CAP_MM: f64 = 25.0;
+/// The pairs across a column for [`split_faults`] are this far apart (mm),
+/// as in the letter fault bench.
+const SPLIT_STEP_MM: f64 = 0.2;
+/// A pair that crosses the next is a smaller fault than a needle point out
+/// of the letter: it counts as this much (with each 1 mm2 open as 1).
+const SPLIT_CROSS: f64 = 0.5;
+
+/// The faults of the columns of `strokes` in the outline `fills` (font
+/// units), for the choice of a split: the needle points out of the outline
+/// (`quality::spike_points`), the pairs across a column that cross the
+/// next pair ([`SPLIT_CROSS`] each), and the open area in mm2, at a
+/// capital height of [`SPLIT_CAP_MM`].
+fn split_faults(strokes: &Strokes, fills: &[(Vec<Point>, Vec<Vec<Point>>)], cap_height: f64) -> f64 {
+    let k = SPLIT_CAP_MM / cap_height.max(1e-9);
+    let t = emb_geom::Transform::scale(k, k);
+    let parts: Vec<ObjectKind> = strokes
+        .satins
+        .iter()
+        .map(|g| {
+            let mut p = ObjectKind::Satin {
+                geometry: g.clone(),
+                params: SatinParams::default(),
+            };
+            p.transform(&t);
+            p
+        })
+        .collect();
+    let scale = |r: &Vec<Point>| -> Vec<Point> { r.iter().map(|&p| p * k).collect() };
+    let outline: Vec<(Vec<Point>, Vec<Vec<Point>>)> = fills
+        .iter()
+        .map(|(o, h)| (scale(o), h.iter().map(scale).collect()))
+        .collect();
+    let area: f64 = outline
+        .iter()
+        .map(|(o, h)| {
+            region::ring_signed_area(o).abs() - h.iter().map(|r| region::ring_signed_area(r).abs()).sum::<f64>()
+        })
+        .sum();
+    let crossing = parts
+        .iter()
+        .filter_map(|p| match p {
+            ObjectKind::Satin { geometry, .. } => emb_stitch::satin::Column::new(geometry),
+            _ => None,
+        })
+        .map(|c| {
+            c.pairs(SPLIT_STEP_MM)
+                .windows(2)
+                .filter(|w| {
+                    Point::crossing(w[0].0, w[0].1, w[1].0, w[1].1)
+                        .is_some_and(|(u, v)| (1e-3..=1.0 - 1e-3).contains(&u) && (1e-3..=1.0 - 1e-3).contains(&v))
+                })
+                .count()
+        })
+        .sum::<usize>();
+    crate::quality::spike_points(&parts, &outline) as f64
+        + SPLIT_CROSS * crossing as f64
+        + (1.0 - strokes.coverage).max(0.0) * area
+}
+
 fn regions(rings: &[Vec<Point>]) -> Vec<(Vec<Point>, Vec<Vec<Point>>)> {
     let area = |r: &[Point]| emb_geom::region::ring_signed_area(r).abs();
     let inside =

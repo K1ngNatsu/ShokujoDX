@@ -10,7 +10,9 @@
 //!
 //! The search (over all orders and both directions of each column, as in
 //! `emb_stitch` for the closest order, ADR 0018) takes the route with the
-//! fewest trims, then the shortest travel. A routed letter is fixed
+//! fewest trims, then the fewest columns that end on top of a column sewn
+//! before them (P21 Milestone 5: a column that ends in another column sews
+//! first, so the other covers its end), then the shortest travel. A routed letter is fixed
 //! (`EmbLetter::fixed`): the stitch engine sews it as it is.
 
 use std::cell::RefCell;
@@ -18,7 +20,7 @@ use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap};
 use std::rc::Rc;
 
-use emb_geom::{BBox, Path, Point};
+use emb_geom::{BBox, Path, Point, Transform};
 use emb_model::{ObjectKind, PartTuning, RunningParams, SatinGeometry};
 
 use crate::embfont::EmbLetter;
@@ -51,8 +53,10 @@ const BEAM: usize = 12;
 const EDGE_POINTS: usize = 8;
 /// A letter goes on into the next letter if a stroke of it ends this near
 /// to the end of its place in the line, or after it (a part of the capital
-/// height).
-const TOUCH: f64 = 0.03;
+/// height). P21: 0 (it was 0.03): the end of a column reaches the corner of
+/// its stroke now, and the feet of an "A" at the edge of its place were
+/// taken as a tail (a run from the left foot, sewn as one long stitch).
+const TOUCH: f64 = 0.0;
 /// For a letter with a tail: a route that ends 1 mm nearer to the end of
 /// the tail is as good as a route with this much less travel, in mm.
 const TAIL_END: f64 = 12.0;
@@ -66,7 +70,6 @@ const FLOW: f64 = 1.5;
 /// or to the right (a stroke that is more level than upright). The trims
 /// come first: this is a choice between routes with the same trims.
 const PEN: f64 = 0.5;
-
 /// What [`route`] found.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Routed {
@@ -76,6 +79,9 @@ pub struct Routed {
     pub runs: usize,
     /// The columns that were cut at a junction.
     pub splits: usize,
+    /// The columns that end on top of a column sewn before them (P21
+    /// Milestone 5).
+    pub on_top: usize,
 }
 
 /// The start or the end of a column: the ends of its two rails there. A
@@ -196,6 +202,59 @@ fn nearest_on(rings: &[Vec<Point>], p: Point) -> Point {
     best.1
 }
 
+/// The area of a part: rings to fill, and rings to take out (see
+/// [`area_of`]).
+type Area = (Vec<Vec<Point>>, Vec<Vec<Point>>);
+
+/// `p` is inside an odd number of `rings`.
+fn in_rings(rings: &[Vec<Point>], p: Point) -> bool {
+    rings.iter().filter(|r| emb_geom::region::ring_contains(r, p)).count() % 2 == 1
+}
+
+/// For each part, the columns that the middle of an end of it lies in, as
+/// bits; not where each of two columns ends in the other.
+fn joints(parts: &[ObjectKind]) -> Vec<u64> {
+    let lies_in: Vec<u64> = end_joints(parts).iter().map(|e| e[0] | e[1]).collect();
+    let n = lies_in.len();
+    let mutual: Vec<u64> = (0..n)
+        .map(|j| {
+            (0..n)
+                .filter(|&i| lies_in[j] & (1 << i) != 0 && lies_in[i] & (1 << j) != 0)
+                .fold(0, |m, i| m | (1 << i))
+        })
+        .collect();
+    lies_in.iter().zip(mutual).map(|(l, m)| l & !m).collect()
+}
+
+/// For each part, the columns that the middle of its start and of its end
+/// lie in, as bits.
+fn end_joints(parts: &[ObjectKind]) -> Vec<[u64; 2]> {
+    let n = parts.len().min(64);
+    let areas: Vec<Option<Area>> = parts[..n]
+        .iter()
+        .map(|k| matches!(k, ObjectKind::Satin { .. }).then(|| area_of(k)))
+        .collect();
+    let inside = in_rings;
+    let mut out = vec![[0u64; 2]; n];
+    for (j, part) in parts[..n].iter().enumerate() {
+        let (ObjectKind::Satin { .. }, Some((s, e))) = (part, part_edges(part)) else {
+            continue;
+        };
+        for (k, p) in [s.0.midpoint(s.1), e.0.midpoint(e.1)].into_iter().enumerate() {
+            for (i, area) in areas.iter().enumerate() {
+                if let Some((fill, holes)) = area
+                    && i != j
+                    && inside(fill, p)
+                    && !inside(holes, p)
+                {
+                    out[j][k] |= 1 << i;
+                }
+            }
+        }
+    }
+    out
+}
+
 /// A way to sew a part: the part, and for a column `true` if it sews from
 /// its end to its start.
 type Mode = (usize, bool);
@@ -226,6 +285,15 @@ type Joins = HashMap<usize, (f64, Point)>;
 struct Router {
     grid: Grid,
     pieces: Vec<Piece>,
+    /// For each part, the columns that an end of it lies in: it sews
+    /// before them, so they cover its end (P21 Milestone 5). Not where
+    /// each of two columns ends in the other (the two legs at a cut from a
+    /// notch, ADR 0152): one end is on top in each order.
+    lies_in: Vec<u64>,
+    /// The cells in the outline of the letter, if the route knows it: runs
+    /// stay in it (P21 Milestone 5; a column that goes out of the outline,
+    /// or a fan over an opening, does not hide a run there).
+    letter: Option<Vec<bool>>,
     cap: f64,
     /// The parts near each edge (see [`Router::near`]).
     near: RefCell<HashMap<EdgeKey, u64>>,
@@ -236,7 +304,7 @@ struct Router {
 }
 
 impl Router {
-    fn new(parts: &[ObjectKind], cap: f64) -> Option<Router> {
+    fn new(parts: &[ObjectKind], cap: f64, outline: Option<&[Vec<Point>]>) -> Option<Router> {
         let bounds = parts.iter().filter_map(|p| p.control_bbox()).reduce(BBox::union)?;
         let cell = Grid::cell_for(bounds, cap / CELLS);
         let grid = Grid::new(bounds, cell, 2);
@@ -268,14 +336,55 @@ impl Router {
                 }
             })
             .collect();
+        let lies_in = joints(parts);
+        // The outline with the even-odd rule: each ring alone, as one.
+        let letter = outline.map(|rings| {
+            let mut mask = vec![false; grid.w * grid.h];
+            for ring in rings {
+                let mut one = vec![false; grid.w * grid.h];
+                grid::fill_into(&grid, std::slice::from_ref(ring), &mut one);
+                for (m, o) in mask.iter_mut().zip(one) {
+                    *m ^= o;
+                }
+            }
+            mask
+        });
         Some(Router {
             grid,
             pieces,
+            lies_in,
+            letter,
             cap,
             near: RefCell::new(HashMap::new()),
             joins: RefCell::new(HashMap::new()),
             links: HashMap::new(),
         })
+    }
+
+    /// The cell is in the outline of the letter (or the route does not know
+    /// the outline).
+    fn in_letter(&self, idx: usize) -> bool {
+        self.letter.as_ref().is_none_or(|m| m[idx])
+    }
+
+    /// Points along an edge, only those in the outline if some are.
+    fn along_in(&self, e: Edge) -> Vec<Point> {
+        let all = along(e);
+        let inside: Vec<Point> = all
+            .iter()
+            .copied()
+            .filter(|&p| {
+                self.grid
+                    .cell_of(p)
+                    .is_some_and(|(i, j)| self.in_letter(self.grid.idx(i, j)))
+            })
+            .collect();
+        if inside.is_empty() { all } else { inside }
+    }
+
+    /// The columns sewn before `part` (in `sewn`) that it ends on.
+    fn on_top(&self, part: usize, sewn: u64) -> u32 {
+        (self.lies_in[part] & sewn).count_ones()
     }
 
     fn modes(&self) -> Vec<Mode> {
@@ -399,6 +508,9 @@ impl Router {
     /// part of `unsewn`. Returns how near the middle of that part it is
     /// (0: at the limit, 1: in the middle).
     fn passable(&self, idx: usize, unsewn: u64) -> Option<f64> {
+        if !self.in_letter(idx) {
+            return None;
+        }
         self.pieces
             .iter()
             .enumerate()
@@ -415,10 +527,10 @@ impl Router {
         (0..=steps).map(|i| a.lerp(b, i as f64 / steps as f64)).all(|p| {
             p.distance(a) <= free
                 || p.distance(b) <= free
-                || self
-                    .grid
-                    .cell_of(p)
-                    .is_some_and(|(i, j)| self.covered(self.grid.idx(i, j), unsewn))
+                || self.grid.cell_of(p).is_some_and(|(i, j)| {
+                    let idx = self.grid.idx(i, j);
+                    self.covered(idx, unsewn) && self.in_letter(idx)
+                })
         })
     }
 
@@ -432,7 +544,7 @@ impl Router {
             return j.clone();
         }
         let mut out: Joins = HashMap::new();
-        for p in along(e) {
+        for p in self.along_in(e) {
             for (idx, d) in self.joins_of(p, key.1) {
                 if out.get(&idx).is_none_or(|(best, _)| d < *best) {
                     out.insert(idx, (d, p));
@@ -503,7 +615,7 @@ impl Router {
     /// parts of `unsewn` (the part that starts at `to` with them) are not
     /// sewn.
     fn link(&self, from: Edge, to: Edge, unsewn: u64) -> Link {
-        let (ps, qs) = (along(from), along(to));
+        let (ps, qs) = (self.along_in(from), self.along_in(to));
         let pairs = || ps.iter().flat_map(|p| qs.iter().map(move |q| (*p, *q)));
         let gap = pairs().map(|(p, q)| p.distance(q)).fold(f64::MAX, f64::min);
         if gap <= NO_RUN * self.cap {
@@ -641,12 +753,13 @@ impl Router {
     /// time the nearest part with no trim sews next (the route before) used
     /// up the parts that would hide the runs later, so kanji had many
     /// trims.
-    fn beam(&self, modes: &[Mode], all: u64, entry: Point) -> (Vec<usize>, usize) {
+    fn beam(&self, modes: &[Mode], all: u64, entry: Point) -> (Vec<usize>, usize, usize) {
         #[derive(Clone)]
         struct State {
             order: Vec<usize>,
             sewn: u64,
             trims: usize,
+            on_top: u32,
             travel: f64,
             at: Option<(Point, Edge)>,
         }
@@ -654,6 +767,7 @@ impl Router {
             order: Vec::new(),
             sewn: 0,
             trims: 0,
+            on_top: 0,
             travel: 0.0,
             at: None,
         }];
@@ -678,12 +792,18 @@ impl Router {
                         order,
                         sewn: s.sewn | (1 << m.0),
                         trims: s.trims + usize::from(trim),
+                        on_top: s.on_top + self.on_top(m.0, s.sewn),
                         travel: s.travel + length + self.pen(*m),
                         at: Some((self.end(*m, start), self.end_edge(*m, start))),
                     });
                 }
             }
-            next.sort_by(|a, b| a.trims.cmp(&b.trims).then(a.travel.total_cmp(&b.travel)));
+            next.sort_by(|a, b| {
+                a.trims
+                    .cmp(&b.trims)
+                    .then(a.on_top.cmp(&b.on_top))
+                    .then(a.travel.total_cmp(&b.travel))
+            });
             // One route for each set of sewn parts and last part: the best.
             let mut seen = std::collections::HashSet::new();
             next.retain(|s| seen.insert((s.sewn, s.order.last().map(|&j| modes[j].0))));
@@ -693,7 +813,9 @@ impl Router {
             }
             beam = next;
         }
-        beam.into_iter().next().map_or((Vec::new(), 0), |s| (s.order, s.trims))
+        beam.into_iter()
+            .next()
+            .map_or((Vec::new(), 0, 0), |s| (s.order, s.trims, s.on_top as usize))
     }
 
     fn link_of(&mut self, from_key: usize, from: Edge, to: Mode, unsewn: u64) -> Link {
@@ -714,6 +836,12 @@ impl Router {
 /// route of a beam search ([`BEAM`]). A letter with a part that is not a
 /// column, a fill or a run stays as it is.
 pub fn route(letter: &EmbLetter, cap_mm: f64) -> (EmbLetter, Routed) {
+    route_in(letter, cap_mm, None)
+}
+
+/// [`route`] with the outline of the letter (its rings, even-odd), if it
+/// is known: the travel runs stay in it.
+pub fn route_in(letter: &EmbLetter, cap_mm: f64, outline: Option<&[Vec<Point>]>) -> (EmbLetter, Routed) {
     let n = letter.parts.len();
     let keep = |trims: usize| {
         let mut l = letter.clone();
@@ -735,7 +863,7 @@ pub fn route(letter: &EmbLetter, cap_mm: f64) -> (EmbLetter, Routed) {
     if n == 0 || !supported {
         return (letter.clone(), Routed::default());
     }
-    let Some(mut r) = Router::new(&letter.parts, cap_mm) else {
+    let Some(mut r) = Router::new(&letter.parts, cap_mm, outline) else {
         return (letter.clone(), Routed::default());
     };
     if n > MOST_PARTS {
@@ -764,13 +892,14 @@ pub fn route(letter: &EmbLetter, cap_mm: f64) -> (EmbLetter, Routed) {
         .max_by(|a, b| a.x.total_cmp(&b.x))
         .filter(|p| p.x >= letter.advance_mm - TOUCH * cap_mm);
     let lead = tail.and_then(|p| r.nearest_covered(Point::new(p.x - letter.advance_mm, p.y), all));
-    let (order, trims): (Vec<usize>, usize) = if n > MAX_PARTS {
+    let (order, trims, on_top): (Vec<usize>, usize, usize) = if n > MAX_PARTS {
         // Too many parts for the search of all orders.
         r.beam(&modes, all, lead.unwrap_or(entry))
     } else {
         let size = 1usize << n;
-        // best[mask][mode] = (trims, travel, the mode before, the start point)
-        type Step = (u32, f64, usize, Point);
+        // best[mask][mode] = (trims, columns on top, travel, the mode
+        // before, the start point)
+        type Step = (u32, u32, f64, usize, Point);
         let mut best: Vec<Vec<Option<Step>>> = vec![vec![None; modes.len()]; size];
         for (j, m) in modes.iter().enumerate() {
             let start = r.start(*m, lead.unwrap_or(entry));
@@ -779,11 +908,13 @@ pub fn route(letter: &EmbLetter, cap_mm: f64) -> (EmbLetter, Routed) {
                 Some(p) => p.distance(start),
                 None => FLOW * (start.x - entry.x),
             };
-            best[1 << m.0][j] = Some((0, cost + r.pen(*m), usize::MAX, start));
+            best[1 << m.0][j] = Some((0, 0, cost + r.pen(*m), usize::MAX, start));
         }
         for mask in 1..size {
             for i in 0..modes.len() {
-                let Some((t0, d0, _, s0)) = best[mask][i] else { continue };
+                let Some((t0, l0, d0, _, s0)) = best[mask][i] else {
+                    continue;
+                };
                 if mask & (1 << modes[i].0) == 0 {
                     continue;
                 }
@@ -802,11 +933,17 @@ pub fn route(letter: &EmbLetter, cap_mm: f64) -> (EmbLetter, Routed) {
                         modes.len() + mask
                     };
                     let link = r.link_of(from_key, from_edge, *m, unsewn);
-                    let cost = (t0 + u32::from(link.trim), d0 + link.length + r.pen(*m));
+                    let cost = (
+                        t0 + u32::from(link.trim),
+                        l0 + r.on_top(m.0, mask as u64),
+                        d0 + link.length + r.pen(*m),
+                    );
                     let next = mask | (1 << m.0);
-                    let better = best[next][j].is_none_or(|b| cost.0 < b.0 || (cost.0 == b.0 && cost.1 < b.1 - 1e-9));
+                    let better = best[next][j].is_none_or(|b| {
+                        (cost.0, cost.1) < (b.0, b.1) || ((cost.0, cost.1) == (b.0, b.1) && cost.2 < b.2 - 1e-9)
+                    });
                     if better {
-                        best[next][j] = Some((cost.0, cost.1, i, r.start(*m, from)));
+                        best[next][j] = Some((cost.0, cost.1, cost.2, i, r.start(*m, from)));
                     }
                 }
             }
@@ -814,7 +951,7 @@ pub fn route(letter: &EmbLetter, cap_mm: f64) -> (EmbLetter, Routed) {
         // A route that ends on the right is better (the next letter is there).
         // A letter with a tail ends at the end of its tail if it can.
         let flow = |j: usize| {
-            best[size - 1][j].map_or(0.0, |(_, _, _, s)| {
+            best[size - 1][j].map_or(0.0, |(_, _, _, _, s)| {
                 let end = r.end(modes[j], s);
                 match tail {
                     Some(t) => TAIL_END * end.distance(t),
@@ -825,19 +962,22 @@ pub fn route(letter: &EmbLetter, cap_mm: f64) -> (EmbLetter, Routed) {
         let Some(mut j) = (0..modes.len())
             .filter(|&j| best[size - 1][j].is_some())
             .min_by(|&a, &b| {
-                let (ta, da, ..) = best[size - 1][a].unwrap_or((u32::MAX, 0.0, 0, entry));
-                let (tb, db, ..) = best[size - 1][b].unwrap_or((u32::MAX, 0.0, 0, entry));
-                ta.cmp(&tb).then((da + flow(a)).total_cmp(&(db + flow(b))))
+                let (ta, la, da, ..) = best[size - 1][a].unwrap_or((u32::MAX, u32::MAX, 0.0, 0, entry));
+                let (tb, lb, db, ..) = best[size - 1][b].unwrap_or((u32::MAX, u32::MAX, 0.0, 0, entry));
+                ta.cmp(&tb)
+                    .then(la.cmp(&lb))
+                    .then((da + flow(a)).total_cmp(&(db + flow(b))))
             })
         else {
             return keep(n - 1);
         };
         let trims = best[size - 1][j].map_or(0, |b| b.0 as usize);
+        let on_top = best[size - 1][j].map_or(0, |b| b.1 as usize);
         let mut order: Vec<usize> = Vec::with_capacity(n);
         let mut mask = size - 1;
         loop {
             order.push(j);
-            let Some((_, _, prev, _)) = best[mask][j] else { break };
+            let Some((_, _, _, prev, _)) = best[mask][j] else { break };
             mask &= !(1 << modes[j].0);
             if prev == usize::MAX {
                 break;
@@ -845,7 +985,7 @@ pub fn route(letter: &EmbLetter, cap_mm: f64) -> (EmbLetter, Routed) {
             j = prev;
         }
         order.reverse();
-        (order, trims)
+        (order, trims, on_top)
     };
     // The parts in the order of the route, with the runs between them.
     let tuned = letter.tuning.len() == n;
@@ -898,7 +1038,12 @@ pub fn route(letter: &EmbLetter, cap_mm: f64) -> (EmbLetter, Routed) {
             tuning,
             fill_parts: letter.fill_parts.clone(),
         },
-        Routed { trims, runs, splits: 0 },
+        Routed {
+            trims,
+            runs,
+            splits: 0,
+            on_top,
+        },
     )
 }
 
@@ -910,81 +1055,14 @@ const SPLIT_FROM_END: f64 = 0.9;
 /// At most this many cuts in one letter.
 const MAX_SPLITS: usize = 2;
 
-/// The index of the point of `pts` nearest `p`, and the point of the line
-/// nearest `p` on the segment after it or before it.
-fn nearest_at(pts: &[Point], p: Point) -> (usize, Point) {
-    let mut best = (f64::MAX, 0, pts[0]);
-    for i in 0..pts.len() - 1 {
-        let (a, b) = (pts[i], pts[i + 1]);
-        let ab = b - a;
-        let t = if ab.length_sq() > 0.0 {
-            ((p - a).dot(ab) / ab.length_sq()).clamp(0.0, 1.0)
-        } else {
-            0.0
-        };
-        let q = a + ab * t;
-        if q.distance(p) < best.0 {
-            best = (q.distance(p), i, q);
-        }
-    }
-    (best.1, best.2)
-}
-
-fn line_path(pts: &[Point]) -> Path {
-    let mut path = Path::new().move_to(pts[0]);
-    for p in &pts[1..] {
-        path = path.line_to(*p);
-    }
-    path
-}
-
-/// The column `g` as two columns that meet at the place nearest `at`: the
-/// first one from the start of `g`, the second one to its end. Each goes
-/// `overlap` past the cut.
-fn split_satin(g: &SatinGeometry, at: Point, overlap: f64) -> Option<(SatinGeometry, SatinGeometry)> {
-    let flat = |p: &Path| -> Vec<Point> { p.flatten(0.02).into_iter().flat_map(|pl| pl.points).collect() };
-    let (ra, rb) = (flat(&g.rail_a), flat(&g.rail_b));
-    if ra.len() < 2 || rb.len() < 2 {
-        return None;
-    }
-    let cut = |pts: &[Point]| -> Option<(Vec<Point>, Vec<Point>)> {
-        let (i, q) = nearest_at(pts, at);
-        let d = (pts[i + 1] - pts[i]).normalized()?;
-        let mut first: Vec<Point> = pts[..=i].iter().copied().filter(|p| p.distance(q) > 1e-6).collect();
-        first.push(q + d * overlap);
-        let mut second = vec![q - d * overlap];
-        second.extend(pts[i + 1..].iter().copied().filter(|p| p.distance(q) > 1e-6));
-        (first.len() >= 2 && second.len() >= 2).then_some((first, second))
-    };
-    let ((a1, a2), (b1, b2)) = (cut(&ra)?, cut(&rb)?);
-    // Each rung goes to the half that its point on the first rail is in.
-    let (ia, qa) = nearest_at(&ra, at);
-    let before = |p: Point| {
-        let (i, q) = nearest_at(&ra, p);
-        i < ia || (i == ia && q.distance(ra[i]) < qa.distance(ra[i]))
-    };
-    let (r1, r2): (Vec<Edge>, Vec<Edge>) = g.rungs.iter().partition(|(p, _)| before(*p));
-    Some((
-        SatinGeometry {
-            rail_a: line_path(&a1),
-            rail_b: line_path(&b1),
-            rungs: r1,
-        },
-        SatinGeometry {
-            rail_a: line_path(&a2),
-            rail_b: line_path(&b2),
-            rungs: r2,
-        },
-    ))
-}
-
 /// The places where a column of `letter` can be cut: (part, point). A
 /// column can be cut where another part lies on it, away from its ends: a
 /// junction (the bar of "H" on its stem) or a crossing ("X").
 fn split_places(letter: &EmbLetter, cap: f64) -> Vec<(usize, Point)> {
-    let Some(r) = Router::new(&letter.parts, cap) else {
+    let Some(r) = Router::new(&letter.parts, cap, None) else {
         return Vec::new();
     };
+    let ends = end_joints(&letter.parts);
     let mut out = Vec::new();
     for (i, x) in r.pieces.iter().enumerate() {
         let (Some((start, end)), true) = (x.ends, matches!(letter.parts[i], ObjectKind::Satin { .. })) else {
@@ -1011,16 +1089,32 @@ fn split_places(letter: &EmbLetter, cap: f64) -> Vec<(usize, Point)> {
                 out.push((i, c));
             }
         }
+        // A column with each end in another column (a stem between two
+        // serifs): cut in its middle, each half sews before the column that
+        // its end lies in, with no trim (P21 Milestone 5).
+        let [at_start, at_end] = ends[i];
+        if at_start != 0
+            && at_end != 0
+            && at_start != at_end
+            && start.distance(end) > 2.0 * SPLIT_FROM_END * 2.0 * x.half
+        {
+            out.push((i, start.midpoint(end)));
+        }
     }
     out
 }
 
-/// `letter` with the column `part` cut at `at`.
+/// `letter` with the column `part` cut at `at`. Not a closed column (a
+/// ring): the cut lost the part where the ring closes, and the bowl of a
+/// "g" had a gap (P21 Milestone 9).
 fn with_split(letter: &EmbLetter, part: usize, at: Point, cap: f64) -> Option<EmbLetter> {
     let ObjectKind::Satin { geometry, params } = &letter.parts[part] else {
         return None;
     };
-    let (first, second) = split_satin(geometry, at, SEAM_OVERLAP * cap)?;
+    if geometry.rail_a.is_closed() || geometry.rail_b.is_closed() {
+        return None;
+    }
+    let (first, second) = crate::quality::cut_column(geometry, at, SEAM_OVERLAP * cap)?;
     let mut out = letter.clone();
     let half = |geometry: SatinGeometry| ObjectKind::Satin {
         geometry,
@@ -1034,15 +1128,57 @@ fn with_split(letter: &EmbLetter, part: usize, at: Point, cap: f64) -> Option<Em
     Some(out)
 }
 
-/// [`route`], and with cuts: if the letter still has trims, a column is
-/// cut at a junction or a crossing where that gives fewer trims (the stem
-/// of "H" at its bar: each half sews to the bar). At most [`MAX_SPLITS`]
-/// cuts.
+/// [`route`], and with cuts: if the letter still has trims or columns
+/// that end on top of others, a column is cut at a junction or a crossing
+/// (the stem of "H" at its bar: each half sews to the bar), or in its
+/// middle if each end lies in another column, where that gives fewer trims,
+/// or as many trims and fewer columns on top. At most [`MAX_SPLITS`] cuts.
 pub fn route_with_splits(letter: &EmbLetter, cap_mm: f64) -> (EmbLetter, Routed) {
+    route_with_splits_in(letter, cap_mm, None)
+}
+
+/// [`route_with_splits_in`] for a letter of a script that goes from right
+/// to left (`rtl`: Arabic, Hebrew): the route of its mirror image, mirrored
+/// back. So the letter starts on its right and ends on its left, where the
+/// next letter is, and its tail is on its left (P21 Milestone 5: the
+/// letters of Arabic text were routed as if they went from left to right,
+/// and the needle went from the end of a letter back to the far side of the
+/// next one with long stitches and no trim).
+pub fn route_with_splits_dir(
+    letter: &EmbLetter,
+    cap_mm: f64,
+    outline: Option<&[Vec<Point>]>,
+    rtl: bool,
+) -> (EmbLetter, Routed) {
+    if !rtl {
+        return route_with_splits_in(letter, cap_mm, outline);
+    }
+    let mirror = Transform::scale(-1.0, 1.0).then(Transform::translate(letter.advance_mm, 0.0));
+    let mut mirrored = letter.clone();
+    for p in &mut mirrored.parts {
+        p.transform(&mirror);
+    }
+    let rings: Option<Vec<Vec<Point>>> =
+        outline.map(|o| o.iter().map(|r| r.iter().map(|&p| mirror.apply(p)).collect()).collect());
+    let (mut routed, found) = route_with_splits_in(&mirrored, cap_mm, rings.as_deref());
+    for p in &mut routed.parts {
+        p.transform(&mirror);
+    }
+    routed.fill_parts = letter.fill_parts.clone();
+    (routed, found)
+}
+
+/// `true` for a character of a script that goes from right to left.
+pub fn is_rtl(c: char) -> bool {
+    matches!(c as u32, 0x0590..=0x08FF | 0xFB1D..=0xFDFF | 0xFE70..=0xFEFF | 0x10800..=0x10FFF | 0x1E800..=0x1EFFF)
+}
+
+/// [`route_with_splits`] with the outline of the letter (see [`route_in`]).
+pub fn route_with_splits_in(letter: &EmbLetter, cap_mm: f64, outline: Option<&[Vec<Point>]>) -> (EmbLetter, Routed) {
     let mut source = letter.clone();
-    let (mut best, mut found) = route(&source, cap_mm);
+    let (mut best, mut found) = route_in(&source, cap_mm, outline);
     for _ in 0..MAX_SPLITS {
-        if found.trims == 0 || source.parts.len() >= MAX_PARTS {
+        if (found.trims == 0 && found.on_top == 0) || source.parts.len() >= MAX_PARTS {
             break;
         }
         let mut better: Option<(EmbLetter, EmbLetter, Routed)> = None;
@@ -1050,8 +1186,11 @@ pub fn route_with_splits(letter: &EmbLetter, cap_mm: f64) -> (EmbLetter, Routed)
             let Some(cut) = with_split(&source, part, at, cap_mm) else {
                 continue;
             };
-            let (routed, f) = route(&cut, cap_mm);
-            if f.trims < better.as_ref().map_or(found.trims, |b| b.2.trims) {
+            let (routed, f) = route_in(&cut, cap_mm, outline);
+            let now = better
+                .as_ref()
+                .map_or((found.trims, found.on_top), |b| (b.2.trims, b.2.on_top));
+            if (f.trims, f.on_top) < now {
                 better = Some((cut, routed, f));
             }
         }
@@ -1080,6 +1219,30 @@ mod tests {
             ),
             params: Default::default(),
         }
+    }
+
+    #[test]
+    fn a_ring_is_not_cut() {
+        // A closed column (the bowl of a "g"): a cut lost the part where it
+        // closes.
+        let ring = |r: f64| {
+            let mut p = Path::new().move_to(Point::new(r, 0.0));
+            for k in 1..16 {
+                let t = emb_geom::math::to_radians(22.5 * f64::from(k));
+                p = p.line_to(Point::new(r * emb_geom::math::cos(t), r * emb_geom::math::sin(t)));
+            }
+            p.close()
+        };
+        let bowl = ObjectKind::Satin {
+            geometry: SatinGeometry {
+                rail_a: ring(5.0),
+                rail_b: ring(3.0),
+                rungs: Vec::new(),
+            },
+            params: Default::default(),
+        };
+        let l = letter(vec![bowl, column((4.0, 0.0), (12.0, 0.0), 2.0)]);
+        assert!(with_split(&l, 0, Point::new(4.0, 0.0), 25.0).is_none());
     }
 
     fn letter(parts: Vec<ObjectKind>) -> EmbLetter {
@@ -1133,6 +1296,71 @@ mod tests {
             .filter(|p| matches!(p, ObjectKind::Satin { .. }))
             .count();
         assert_eq!(columns, 41);
+    }
+
+    fn middle_x(part: &ObjectKind) -> Option<(f64, f64)> {
+        let ObjectKind::Satin { geometry, .. } = part else {
+            return None;
+        };
+        let a: Vec<Point> = geometry.rail_a.points().collect();
+        let b: Vec<Point> = geometry.rail_b.points().collect();
+        Some((a[0].midpoint(b[0]).x, a[a.len() - 1].midpoint(b[b.len() - 1]).x))
+    }
+
+    #[test]
+    fn the_arms_of_an_e_sew_before_the_stem_that_covers_their_ends() {
+        // P21 Milestone 5: an arm ends in the stem, so the arm sews first,
+        // with no trim (the travel goes under the stem and the next arm).
+        let (after, found) = route(&e(), 25.0);
+        assert_eq!((found.trims, found.on_top), (0, 0), "{found:?}");
+        let columns: Vec<(f64, f64)> = after.parts.iter().filter_map(middle_x).collect();
+        let last = columns[columns.len() - 1];
+        assert!(
+            (last.0 - 2.0).abs() < 1e-6 && (last.1 - 2.0).abs() < 1e-6,
+            "{columns:?}"
+        );
+    }
+
+    #[test]
+    fn a_letter_from_right_to_left_ends_on_its_left() {
+        let two = letter(vec![
+            column((3.0, -2.0), (3.0, -20.0), 3.0),
+            column((17.0, -2.0), (17.0, -20.0), 3.0),
+        ]);
+        let end_x = |l: &EmbLetter| l.parts.iter().filter_map(middle_x).next_back().map(|x| x.1);
+        let (ltr, _) = route_with_splits_dir(&two, 25.0, None, false);
+        let (rtl, _) = route_with_splits_dir(&two, 25.0, None, true);
+        assert!(end_x(&ltr).is_some_and(|x| x > 10.0), "{:?}", end_x(&ltr));
+        assert!(end_x(&rtl).is_some_and(|x| x < 10.0), "{:?}", end_x(&rtl));
+    }
+
+    #[test]
+    fn a_run_stays_in_the_outline_of_the_letter() {
+        // Two bars and a wide column over the opening between them (a fan
+        // out of the outline): with the outline known, no run goes under it.
+        let parts = vec![
+            column((10.0, -2.0), (6.0, -2.0), 2.0),
+            column((6.0, -12.0), (10.0, -12.0), 2.0),
+            column((5.5, -1.5), (5.5, -12.5), 6.0),
+        ];
+        let bars: Vec<Vec<Point>> = [-2.0, -12.0]
+            .iter()
+            .map(|&y| {
+                vec![
+                    Point::new(0.0, y - 1.2),
+                    Point::new(11.0, y - 1.2),
+                    Point::new(11.0, y + 1.2),
+                    Point::new(0.0, y + 1.2),
+                ]
+            })
+            .collect();
+        let edges = |k: usize| part_edges(&parts[k]).expect("a column");
+        let (from, to) = (edges(0).1, edges(1).0);
+        let unsewn = 0b110;
+        let free = Router::new(&parts, 25.0, None).expect("a router");
+        let kept = Router::new(&parts, 25.0, Some(&bars)).expect("a router");
+        assert!(!free.link(from, to, unsewn).trim);
+        assert!(kept.link(from, to, unsewn).trim);
     }
 
     #[test]

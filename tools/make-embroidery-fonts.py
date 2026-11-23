@@ -37,6 +37,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -205,9 +206,11 @@ FONTS = [
 ]
 
 # The Japanese fonts: the sets of characters, and the weight of a variable
-# font. They get no --extend: the stroke finder takes the ends of the
-# strokes to the corners of the outline (ADR 0143), and the end steps of
-# --extend would make the ends that stop at a crossing long again.
+# font. The converter does not extend the ends of kana and kanji (the
+# stroke finder takes the ends of the strokes to the corners of the
+# outline, ADR 0143, and the end steps would make the ends that stop at a
+# crossing long again), only of their Latin letters, as lettering in
+# TrueType fonts does (P21 Milestone 6).
 JAPANESE = {
     "noto-sans-jp": ["--weight", "700"],
     "zen-maru-gothic": [],
@@ -332,7 +335,7 @@ def make_font(exe, gfonts, row):
     if slug in FILL:
         cmd += ["--stitch", "fill"]
     elif slug in JAPANESE:
-        cmd += ["--sets", "latin,kana,kanji", "--route"] + JAPANESE[slug]
+        cmd += ["--sets", "latin,kana,kanji", "--extend", "--route"] + JAPANESE[slug]
     else:
         cmd += ["--extend", "--route"]
     if slug in TUNED:
@@ -340,7 +343,14 @@ def make_font(exe, gfonts, row):
     fixes = os.path.join(OUT, "corrections", slug + ".json")
     if os.path.isfile(fixes):
         cmd += ["--corrections", fixes]
-    done = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
+    # Windows refuses to write a file that another program has open (a
+    # virus scanner reads each new font file: "os error 1224"). Try again a
+    # few times.
+    for attempt in range(5):
+        done = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
+        if done.returncode == 0 or "os error 1224" not in (done.stderr + done.stdout):
+            break
+        time.sleep(3 * (attempt + 1))
     if done.returncode != 0:
         return "", done.stderr.strip() or done.stdout.strip()
     text = done.stdout.strip()

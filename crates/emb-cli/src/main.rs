@@ -163,6 +163,15 @@ Usage:
       part with two layers, and the narrowest and the widest column; and
       the trims of words. --face: the face of a font collection (.ttc; 0 is
       the first). --letters: one line for each character and size too.
+  emb-cli letter-faults [--proof <pictures.json>]
+      The letter fault bench (P21): the letters A-Z, a-z and 0-9 of the
+      four embroidery fonts with a source font in the program, as the
+      embroidery font and as lettering in the source font, sewn at 25 mm
+      and measured against the outline of the source font: needle points
+      outside it, crossing stitches, fans, bulges, open area and open
+      corners, columns that end on top of other columns, travel runs
+      outside. --proof: the pictures of the letters as JSON, for
+      tools/letter-faults.py.
   emb-cli view-bench [--out <folder>] [--stress] [--sew]
       The bench of the 3D view (ADR 0122). Make the pictures of the
       reference set (twelve small corpus designs, each for one thing that a
@@ -771,7 +780,7 @@ fn run(args: &[String]) -> Result<(), String> {
                     .collect();
             }
             if route_letters {
-                let found = f.route();
+                let found = f.route_from(source_font.as_ref());
                 println!(
                     "routed: {} trims in the letters, {} travel runs, {} columns cut at a junction",
                     found.trims, found.runs, found.splits
@@ -790,7 +799,9 @@ fn run(args: &[String]) -> Result<(), String> {
                     println!("fill letters for large sizes: {large}, above {} mm", f.column_max_mm());
                 }
             }
-            // The quality of the letters as they are now (ADR 0115).
+            // The quality of the letters as they are now (ADR 0115), with
+            // the coordinates of the file.
+            f.round_letters();
             if let Some(font) = &source_font {
                 f.measure_quality(font);
             }
@@ -882,6 +893,16 @@ fn run(args: &[String]) -> Result<(), String> {
             );
             Ok(())
         }
+        ["letter-faults"] => {
+            let fonts = emb_cli::letter_faults::run(false);
+            print!("{}", emb_cli::letter_faults::report(&fonts));
+            if let Some(p) = &audit_proof {
+                std::fs::write(p, emb_cli::letter_faults::pictures(&fonts))
+                    .map_err(|e| format!("{}: {e}", p.display()))?;
+                println!("pictures: {}", p.display());
+            }
+            Ok(())
+        }
         ["lettering-bench", input] => {
             let bytes = std::fs::read(input).map_err(|e| format!("{input}: {e}"))?;
             let font = emb_letter::Font::from_bytes(bytes, face).map_err(|e| format!("{input}: {e}"))?;
@@ -931,7 +952,7 @@ fn run(args: &[String]) -> Result<(), String> {
                 println!("extended: {} ends of columns", f.extend_ends(source));
             }
             if route_letters {
-                let found = f.route();
+                let found = f.route_from(source.as_ref());
                 println!(
                     "routed: {} trims in the letters, {} travel runs, {} columns cut at a junction",
                     found.trims, found.runs, found.splits

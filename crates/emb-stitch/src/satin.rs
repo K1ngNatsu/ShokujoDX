@@ -87,21 +87,52 @@ impl Rail {
 
     /// Length along the rail of the rail point nearest to `p`.
     fn project(&self, p: Point) -> f64 {
-        let mut best = (f64::INFINITY, 0.0);
-        for (i, w) in self.pts.windows(2).enumerate() {
-            let d = w[1] - w[0];
-            let l2 = d.length_sq();
-            let t = if l2 > 0.0 {
-                ((p - w[0]).dot(d) / l2).clamp(0.0, 1.0)
-            } else {
-                0.0
-            };
-            let dist = p.distance(w[0].lerp(w[1], t));
-            if dist < best.0 {
-                best = (dist, self.at_len[i] + t * (self.at_len[i + 1] - self.at_len[i]));
-            }
-        }
-        best.1
+        self.project_near(p, None)
+    }
+
+    /// [`Rail::project`]; where the rail passes `p` more than one time (as
+    /// near), the place nearest to the part `near` (0 to 1) of its length.
+    fn project_near(&self, p: Point, near: Option<f64>) -> f64 {
+        let places: Vec<(f64, f64)> = self
+            .pts
+            .windows(2)
+            .enumerate()
+            .map(|(i, w)| {
+                let d = w[1] - w[0];
+                let l2 = d.length_sq();
+                let t = if l2 > 0.0 {
+                    ((p - w[0]).dot(d) / l2).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+                (
+                    p.distance(w[0].lerp(w[1], t)),
+                    self.at_len[i] + t * (self.at_len[i + 1] - self.at_len[i]),
+                )
+            })
+            .collect();
+        let best = places.iter().map(|x| x.0).fold(f64::INFINITY, f64::min);
+        let tie = best + 1e-9 * self.len().max(1.0);
+        let len = self.len().max(1e-12);
+        places
+            .iter()
+            .filter(|x| x.0 <= tie)
+            .min_by(|x, y| match near {
+                Some(f) => (x.1 / len - f).abs().total_cmp(&(y.1 / len - f).abs()),
+                None => x.1.total_cmp(&y.1),
+            })
+            .map_or(0.0, |x| x.1)
+    }
+
+    /// The places of the two points of a rung on rails `a` and `b`. A rail
+    /// that goes over the same points two times (a stroke of a letter that
+    /// goes round and ends on itself) has two places for a point: the
+    /// place in the part of the column of the other point is taken.
+    fn rung(a: &Rail, b: &Rail, pa: Point, pb: Point) -> (f64, f64) {
+        let sa = a.project(pa);
+        let sb = b.project_near(pb, Some(sa / a.len().max(1e-12)));
+        let sa = a.project_near(pa, Some(sb / b.len().max(1e-12)));
+        (sa, sb)
     }
 }
 
@@ -125,11 +156,7 @@ impl Column {
     pub fn new(g: &SatinGeometry) -> Option<Column> {
         let a = Rail::new(&g.rail_a)?;
         let b = Rail::new(&g.rail_b)?;
-        let mut inner: Vec<(f64, f64)> = g
-            .rungs
-            .iter()
-            .map(|(pa, pb)| (a.project(*pa), b.project(*pb)))
-            .collect();
+        let mut inner: Vec<(f64, f64)> = g.rungs.iter().map(|(pa, pb)| Rail::rung(&a, &b, *pa, *pb)).collect();
         inner.sort_by(|x, y| x.0.total_cmp(&y.0));
         let mut rungs = vec![(0.0, 0.0)];
         for r in inner {

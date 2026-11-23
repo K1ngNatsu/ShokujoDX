@@ -575,6 +575,16 @@ impl EmbFont {
         changed
     }
 
+    /// Rounds the coordinates of all letters as in the file (the converter
+    /// does it when the font is done, before its score).
+    pub fn round_letters(&mut self) {
+        for letter in self.letters.values_mut() {
+            for p in letter.parts.iter_mut().chain(letter.fill_parts.iter_mut()) {
+                round_part(p);
+            }
+        }
+    }
+
     /// Sets the letter of `c`, with its coordinates rounded as in the file.
     pub fn set_letter(&mut self, c: char, mut letter: EmbLetter) {
         for p in &mut letter.parts {
@@ -594,7 +604,9 @@ impl EmbFont {
     /// Makes the ends of the columns longer where the outline of the
     /// source font has a part with no stitches ([`crate::tune::extend_ends`]).
     /// `source` is the font that this font was converted from. Returns the
-    /// number of ends that changed.
+    /// number of ends that changed. Not for kana and kanji: their ends
+    /// that stop at a crossing would be long again (ADR 0146); lettering in
+    /// TrueType fonts does the same (P21 Milestone 6).
     pub fn extend_ends(&mut self, source: &Font) -> usize {
         let s = self.cap_height_mm / source.cap_height;
         let scale = |r: &Vec<emb_geom::Point>| -> Vec<emb_geom::Point> {
@@ -603,6 +615,11 @@ impl EmbFont {
         let cap = self.cap_height_mm;
         let mut changed = 0;
         for (c, letter) in &mut self.letters {
+            // A letter with settings for its parts (corrections) keeps its
+            // parts: the round parts can take the place of more columns.
+            if crate::layout::is_cjk(*c) || !letter.tuning.is_empty() {
+                continue;
+            }
             let Some(g) = source.glyph(*c) else { continue };
             let outline: Vec<_> = source
                 .shapes(g)
@@ -610,14 +627,8 @@ impl EmbFont {
                 .iter()
                 .map(|(outer, holes)| (scale(outer), holes.iter().map(scale).collect::<Vec<_>>()))
                 .collect();
-            let n = crate::tune::round_parts(&mut letter.parts, &outline, cap)
+            changed += crate::tune::round_parts(&mut letter.parts, &outline, cap)
                 + crate::tune::extend_ends(&mut letter.parts, &outline, cap);
-            if n > 0 {
-                for p in &mut letter.parts {
-                    round_part(p);
-                }
-            }
-            changed += n;
         }
         changed
     }
@@ -628,7 +639,14 @@ impl EmbFont {
     /// put in order stays as it is. Returns the trims and the runs of the
     /// routed letters.
     pub fn route(&mut self) -> crate::route::Routed {
-        self.route_until(&Default::default(), &Default::default())
+        self.route_until(&Default::default(), &Default::default(), None)
+    }
+
+    /// [`EmbFont::route`] with the font that this font was converted from:
+    /// the travel runs stay in the outline of each letter (P21 Milestone 6,
+    /// ADR 0153).
+    pub fn route_from(&mut self, source: Option<&Font>) -> crate::route::Routed {
+        self.route_until(&Default::default(), &Default::default(), source)
     }
 
     /// The number of letters that [`EmbFont::route`] routes.
@@ -647,13 +665,38 @@ impl EmbFont {
         &mut self,
         done: &std::sync::atomic::AtomicUsize,
         stop: &std::sync::atomic::AtomicBool,
+        source: Option<&Font>,
     ) -> crate::route::Routed {
         use std::sync::atomic::Ordering;
         let cap = self.cap_height_mm;
-        let mut todo: Vec<&mut EmbLetter> = self
+        // The outline of each letter in the source font, in mm (as
+        // `extend_ends`): its rings.
+        let outlines: BTreeMap<char, Vec<Vec<emb_geom::Point>>> = source.map_or_else(BTreeMap::new, |src| {
+            let s = cap / src.cap_height;
+            self.letters
+                .iter()
+                .filter(|(_, l)| !l.fixed && !l.parts.is_empty())
+                .filter_map(|(c, _)| {
+                    let g = src.glyph(*c)?;
+                    let rings = src
+                        .shapes(g)
+                        .fills
+                        .iter()
+                        .flat_map(|(outer, holes)| std::iter::once(outer).chain(holes))
+                        .map(|r| r.iter().map(|p| emb_geom::Point::new(p.x * s, p.y * s)).collect())
+                        .collect();
+                    Some((*c, rings))
+                })
+                .collect()
+        });
+        // A letter of a script from right to left is routed from its right
+        // (P21 Milestone 5).
+        type Job<'a> = (bool, Option<&'a Vec<Vec<emb_geom::Point>>>, &'a mut EmbLetter);
+        let mut todo: Vec<Job> = self
             .letters
-            .values_mut()
-            .filter(|l| !l.fixed && !l.parts.is_empty())
+            .iter_mut()
+            .filter(|(_, l)| !l.fixed && !l.parts.is_empty())
+            .map(|(c, l)| (crate::route::is_rtl(*c), outlines.get(c), l))
             .collect();
         // The letters do not depend on each other: one thread for each
         // group of them.
@@ -665,11 +708,12 @@ impl EmbFont {
                 .map(|group| {
                     scope.spawn(move || {
                         let mut sum = crate::route::Routed::default();
-                        for letter in group.iter_mut() {
+                        for (rtl, outline, letter) in group.iter_mut() {
                             if stop.load(Ordering::Relaxed) {
                                 break;
                             }
-                            let (mut routed, found) = crate::route::route_with_splits(letter, cap);
+                            let (mut routed, found) =
+                                crate::route::route_with_splits_dir(letter, cap, outline.map(|o| o.as_slice()), *rtl);
                             for p in &mut routed.parts {
                                 round_part(p);
                             }
@@ -678,6 +722,7 @@ impl EmbFont {
                             sum.trims += found.trims;
                             sum.runs += found.runs;
                             sum.splits += found.splits;
+                            sum.on_top += found.on_top;
                         }
                         sum
                     })
@@ -691,6 +736,7 @@ impl EmbFont {
                 trims: a.trims + b.trims,
                 runs: a.runs + b.runs,
                 splits: a.splits + b.splits,
+                on_top: a.on_top + b.on_top,
             })
     }
 
@@ -1013,9 +1059,12 @@ pub fn convert_with(
         } else {
             shapes.fill_parts()
         };
+        // The coordinates are rounded when the font is done
+        // (`EmbFont::round_letters`): the tuning of the ends sees the exact
+        // columns (P21 Milestone 6: rounded to 0.01 mm, the ends of Anton
+        // "S" went on less far than in lettering).
         for p in &mut parts {
             p.transform(&t);
-            round_part(p);
         }
         letters.insert(
             c,
@@ -1244,13 +1293,17 @@ mod tests {
     #[test]
     fn convert_save_load_and_layout() {
         let f = bundled::font("Lato", "Bold").unwrap();
-        let e = convert(
+        let mut e = convert(
             &f,
             "Block Sans",
             "",
             LetterStitch::Auto,
             &"AVHno ".chars().collect::<Vec<_>>(),
         );
+        // The steps of the font tool (`--extend`): lettering in the TrueType
+        // font has them too (P21 Milestone 6).
+        e.extend_ends(&f);
+        e.round_letters();
         assert_eq!(e.letters.len(), 6);
         assert!(e.letters[&' '].parts.is_empty());
         assert!(e.kerning.get("AV").is_some_and(|k| *k < 0.0));

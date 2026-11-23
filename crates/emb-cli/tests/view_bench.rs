@@ -86,7 +86,10 @@ fn the_surface_has_the_heights_of_a_sew_out() {
     assert!(puff > emb_render::strand::FOAM_MM, "{puff}");
     for r in view::REFERENCE.iter().filter(|r| r.name != "view-puff") {
         let h = laid(r.name).0.max_height_in(all);
-        assert!(h < puff - 0.5, "{}: {h} (puff {puff})", r.name);
+        // P21 Milestone 6: the puff letters have no column on top of
+        // another now, so puff is the foam and one layer of thread (it was
+        // more than 0.5 mm above the stones).
+        assert!(h < puff - 0.3, "{}: {h} (puff {puff})", r.name);
     }
 }
 

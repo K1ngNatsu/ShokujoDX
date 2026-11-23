@@ -7,59 +7,59 @@ Lettering bench: Noto Sans JP Bold; 248 characters of the reference set
 10 mm
   characters all fill: 0 
   characters partly fill: 0 
-  parts: satin 1361, split satin 0, tatami column 0, fill 0, run 36
-  covered: mean 98.3 %, lowest 61.3 % (書)
-  outside: mean 0.3 %, highest 1.3 % (鶴)
-  two layers: mean 1.4 %, highest 5.0 % (本); characters over 3 %: 16
+  parts: satin 1369, split satin 0, tatami column 0, fill 0, run 46
+  covered: mean 99.0 %, lowest 76.6 % (書)
+  outside: mean 0.1 %, highest 0.6 % (ア)
+  two layers: mean 1.2 %, highest 3.6 % (東); characters over 3 %: 9
   narrowest column: 0.81 mm (龍); characters with a column under 0.8 mm: 0
-  widest column: 2.02 mm (、); columns over 8 mm: 0, satin with no split stitches: 0
+  widest column: 1.90 mm (、); columns over 8 mm: 0, satin with no split stitches: 0
 
 15 mm
   characters all fill: 0 
   characters partly fill: 0 
-  parts: satin 1393, split satin 0, tatami column 0, fill 0, run 4
-  covered: mean 98.9 %, lowest 95.7 % (愛)
-  outside: mean 0.3 %, highest 1.1 % (鶴)
-  two layers: mean 1.4 %, highest 4.7 % (本); characters over 3 %: 18
-  narrowest column: 0.93 mm (鶴); characters with a column under 0.8 mm: 0
-  widest column: 3.04 mm (、); columns over 8 mm: 0, satin with no split stitches: 0
+  parts: satin 1407, split satin 0, tatami column 0, fill 0, run 8
+  covered: mean 99.6 %, lowest 96.9 % (の)
+  outside: mean 0.1 %, highest 0.5 % (ァ)
+  two layers: mean 1.2 %, highest 3.7 % (海); characters over 3 %: 7
+  narrowest column: 0.94 mm (鶴); characters with a column under 0.8 mm: 0
+  widest column: 2.84 mm (、); columns over 8 mm: 0, satin with no split stitches: 0
 
 25 mm
   characters all fill: 0 
   characters partly fill: 0 
-  parts: satin 1394, split satin 1, tatami column 0, fill 0, run 2
-  covered: mean 98.9 %, lowest 95.8 % (愛)
-  outside: mean 0.3 %, highest 1.1 % (鶴)
-  two layers: mean 1.4 %, highest 5.1 % (本); characters over 3 %: 18
-  narrowest column: 0.85 mm (星); characters with a column under 0.8 mm: 0
-  widest column: 5.06 mm (、); columns over 8 mm: 0, satin with no split stitches: 0
+  parts: satin 1412, split satin 0, tatami column 0, fill 0, run 3
+  covered: mean 99.6 %, lowest 96.9 % (の)
+  outside: mean 0.1 %, highest 0.6 % (ァ)
+  two layers: mean 1.2 %, highest 3.7 % (夢); characters over 3 %: 6
+  narrowest column: 0.85 mm (繍); characters with a column under 0.8 mm: 0
+  widest column: 4.74 mm (、); columns over 8 mm: 0, satin with no split stitches: 0
 
 50 mm
   characters all fill: 0 
   characters partly fill: 0 
-  parts: satin 938, split satin 459, tatami column 0, fill 0, run 0
-  covered: mean 98.9 %, lowest 95.8 % (愛)
-  outside: mean 0.3 %, highest 1.1 % (鶴)
-  two layers: mean 1.4 %, highest 5.0 % (本); characters over 3 %: 19
-  narrowest column: 1.21 mm (年); characters with a column under 0.8 mm: 0
-  widest column: 10.12 mm (、); columns over 8 mm: 5, satin with no split stitches: 0
+  parts: satin 850, split satin 562, tatami column 0, fill 0, run 3
+  covered: mean 99.6 %, lowest 96.9 % (の)
+  outside: mean 0.1 %, highest 0.6 % (ァ)
+  two layers: mean 1.2 %, highest 3.6 % (夢); characters over 3 %: 6
+  narrowest column: 1.61 mm (や); characters with a column under 0.8 mm: 0
+  widest column: 9.48 mm (、); columns over 8 mm: 3, satin with no split stitches: 0
 
 80 mm
   characters all fill: 0 
   characters partly fill: 0 
-  parts: satin 41, split satin 1316, tatami column 40, fill 0, run 0
-  covered: mean 98.9 %, lowest 95.8 % (愛)
-  outside: mean 0.3 %, highest 1.1 % (鶴)
-  two layers: mean 1.4 %, highest 5.0 % (本); characters over 3 %: 19
-  narrowest column: 1.94 mm (年); characters with a column under 0.8 mm: 0
-  widest column: 16.20 mm (、); columns over 8 mm: 1174, satin with no split stitches: 0
+  parts: satin 52, split satin 1319, tatami column 41, fill 0, run 3
+  covered: mean 99.6 %, lowest 96.9 % (の)
+  outside: mean 0.1 %, highest 0.6 % (ァ)
+  two layers: mean 1.2 %, highest 3.6 % (夢); characters over 3 %: 6
+  narrowest column: 2.52 mm (や); characters with a column under 0.8 mm: 0
+  widest column: 15.17 mm (、); columns over 8 mm: 1191, satin with no split stitches: 0
 
 Trims of the words at 10, 15, 25, 50, 80 mm
-  刺繍: 12, 13, 14, 14, 14
-  東京: 8, 8, 8, 8, 8
+  刺繍: 11, 12, 15, 15, 15
+  東京: 7, 7, 8, 8, 8
   ありがとう: 6, 6, 7, 7, 7
   サムライ: 4, 4, 4, 4, 4
-  龍: 7, 7, 7, 9, 9
-  山田太郎: 6, 6, 6, 6, 6
+  龍: 6, 7, 8, 8, 8
+  山田太郎: 5, 6, 6, 6, 6
   さくら: 4, 4, 4, 4, 4
   日本: 1, 1, 1, 1, 1
