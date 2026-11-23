@@ -112,8 +112,19 @@ impl AppState {
         self.message = tr("Backdrop loaded and locked. Unlock it in the Backdrop panel to move it.").into();
     }
 
-    /// Asks for a picture file and loads it as the backdrop.
+    /// Asks for a picture file and loads it as the backdrop. In the browser
+    /// the picture comes in a later frame (an upload).
     pub fn import_bitmap_dialog(&mut self) {
+        #[cfg(target_arch = "wasm32")]
+        crate::web::upload_picture(false);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.import_bitmap_file();
+    }
+
+    /// Asks for a picture file with the dialog of the system and loads it
+    /// as the backdrop.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn import_bitmap_file(&mut self) {
         let Some(p) = crate::dialog::FileDialog::new()
             .set_title(tr("Load backdrop picture"))
             .add_filter(tr("Pictures (PNG, JPEG, BMP, TIFF, GIF)"), &FILE_TYPES)

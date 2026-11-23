@@ -1536,8 +1536,15 @@ impl Work {
 
 impl AppState {
     /// Picture to design: asks for a picture if the design has no backdrop
-    /// yet (it becomes the backdrop), then opens the wizard on it.
+    /// yet (it becomes the backdrop), then opens the wizard on it. In the
+    /// browser the picture comes in a later frame (an upload), and the
+    /// wizard opens then.
     pub fn picture_to_design(&mut self) {
+        #[cfg(target_arch = "wasm32")]
+        if self.doc.design().backdrop.is_none() {
+            crate::web::upload_picture(true);
+            return;
+        }
         if self.doc.design().backdrop.is_none() {
             self.import_bitmap_dialog();
             if self.doc.design().backdrop.is_none() {

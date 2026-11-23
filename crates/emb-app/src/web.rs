@@ -1,8 +1,9 @@
 //! The browser trial (roadmap P15, step 1; branch `trial/browser`): the
 //! program in a web page. The page starts it on its canvas; files come in
-//! by an upload (File > Open) and go out by a download (Save, Export). The
-//! commands that need the desktop (the file dialogs, Send to USB, the
-//! folders of the user) show a notice. The settings are not kept.
+//! by an upload (File > Open; a picture for Picture to Design, Load Picture
+//! and the Backdrop panel) and go out by a download (Save, Export). The
+//! other commands that need the desktop (their file dialogs, Send to USB,
+//! the folders of the user) show a notice.
 
 use std::sync::Mutex;
 
@@ -14,8 +15,36 @@ use crate::file::Notice;
 
 /// The notices of commands that are not in the browser.
 static NOTICES: Mutex<Vec<String>> = Mutex::new(Vec::new());
-/// The files that the user uploaded: their names and bytes.
-static UPLOADS: Mutex<Vec<(String, Vec<u8>)>> = Mutex::new(Vec::new());
+/// The files that the user uploaded: their names, bytes and what to do
+/// with them.
+static UPLOADS: Mutex<Vec<(String, Vec<u8>, Then)>> = Mutex::new(Vec::new());
+
+/// The context of the program: an upload wakes it, as the program draws a
+/// frame only after an input (with no move of the pointer, the file waited
+/// for one).
+static CONTEXT: std::sync::OnceLock<eframe::egui::Context> = std::sync::OnceLock::new();
+
+/// Keeps the file `name` with its `bytes` for the next frame, and asks for
+/// that frame.
+fn uploaded(name: String, bytes: Vec<u8>, then: Then) {
+    if let Ok(mut u) = UPLOADS.lock() {
+        u.push((name, bytes, then));
+    }
+    if let Some(ctx) = CONTEXT.get() {
+        ctx.request_repaint();
+    }
+}
+
+/// What the program does with an uploaded file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Then {
+    /// File > Open: a design, a machine file, artwork or a picture.
+    Open,
+    /// A picture as the backdrop (Load Picture, Replace).
+    Backdrop,
+    /// A picture as the backdrop, then the Picture to Design wizard on it.
+    Wizard,
+}
 
 /// No settings were in the storage of the page when the program started: a
 /// first visit (the program saves its settings while it starts).
@@ -105,21 +134,38 @@ pub fn not_in_the_browser() {
 
 /// Asks the browser for a file to open. The file comes in a later frame.
 pub fn upload() {
-    wasm_bindgen_futures::spawn_local(async {
-        let mut all = vec![project::FILE_EXTENSION];
-        all.extend(emb_formats::READ_EXTENSIONS);
-        all.extend(["svg", "pdf", "ai", "eps", "png", "jpg", "jpeg", "bmp"]);
+    let mut all = vec![project::FILE_EXTENSION];
+    all.extend(emb_formats::READ_EXTENSIONS);
+    all.extend(["svg", "pdf", "ai", "eps", "png", "jpg", "jpeg", "bmp"]);
+    ask_for_file("Designs, machine files, artwork and pictures".into(), all, Then::Open);
+}
+
+/// Asks the browser for a picture: it becomes the backdrop and, with
+/// `wizard`, the Picture to Design wizard opens on it. The desktop asks
+/// with the dialog of the system; in the browser that dialog is not there,
+/// and the command only said so (the owner, 2026-11-23).
+pub fn upload_picture(wizard: bool) {
+    let then = if wizard { Then::Wizard } else { Then::Backdrop };
+    ask_for_file(
+        crate::i18n::tr("Pictures (PNG, JPEG, BMP, TIFF, GIF)").to_string(),
+        crate::backdrop::FILE_TYPES.to_vec(),
+        then,
+    );
+}
+
+/// Asks the browser for a file of the types `extensions`; it comes in a
+/// later frame, with `then`.
+fn ask_for_file(filter: String, extensions: Vec<&'static str>, then: Then) {
+    wasm_bindgen_futures::spawn_local(async move {
         let Some(file) = rfd::AsyncFileDialog::new()
-            .add_filter("Designs, machine files, artwork and pictures", &all)
+            .add_filter(&filter, &extensions)
             .pick_file()
             .await
         else {
             return;
         };
         let bytes = file.read().await;
-        if let Ok(mut u) = UPLOADS.lock() {
-            u.push((file.file_name(), bytes));
-        }
+        uploaded(file.file_name(), bytes, then);
     });
 }
 
@@ -189,9 +235,7 @@ fn fetch_as_upload(url: String) {
         };
         let bytes = js_sys::Uint8Array::new(&buffer).to_vec();
         let name = url.rsplit('/').next().unwrap_or("design").to_string();
-        if let Ok(mut u) = UPLOADS.lock() {
-            u.push((name, bytes));
-        }
+        uploaded(name, bytes, Then::Open);
     });
 }
 
@@ -606,6 +650,7 @@ fn large_design_word(st: &mut AppState) {
 
 /// Each frame: the measures, the uploaded files and the notices.
 pub fn poll(st: &mut AppState, ctx: &eframe::egui::Context) {
+    CONTEXT.get_or_init(|| ctx.clone());
     large_design_word(st);
     update_window(ctx);
     if !STARTED.swap(true, std::sync::atomic::Ordering::Relaxed) {
@@ -614,8 +659,17 @@ pub fn poll(st: &mut AppState, ctx: &eframe::egui::Context) {
     bench_frame(st, ctx);
     probe(st, ctx);
     let uploads = UPLOADS.lock().map(|mut u| std::mem::take(&mut *u)).unwrap_or_default();
-    for (name, bytes) in uploads {
-        st.open_upload(&name, bytes);
+    for (name, bytes, then) in uploads {
+        match then {
+            Then::Open => st.open_upload(&name, bytes),
+            Then::Backdrop => st.import_bitmap_bytes(bytes, &name),
+            Then::Wizard => {
+                st.import_bitmap_bytes(bytes, &name);
+                if st.doc.design().backdrop.is_some() {
+                    st.open_wizard();
+                }
+            }
+        }
         let export = EXPORT_AFTER_OPEN.lock().ok().and_then(|mut e| e.take());
         if let Some(ext) = export {
             let format = crate::export::Format::ALL
