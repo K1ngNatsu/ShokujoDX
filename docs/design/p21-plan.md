@@ -6,7 +6,9 @@ the review of the font pipeline, in this order). Milestone 1 is made
 Milestone 2 is made (ADR 0148); its exit test is met in part. Milestone
 3 is made (ADR 0149); its exit test is met in part. Milestone 4 is made
 (ADR 0150). Milestone 7 (a middle line from a Voronoi diagram, a trial)
-was added by the owner on 2026-11-23.
+was added by the owner on 2026-11-23; it is made, and the grid stays (ADR
+0151). Milestone 8 (strokes from a split of the outline at its concave
+corners, a trial) was added by the owner on 2026-11-23.
 
 ## Goal
 
@@ -377,6 +379,155 @@ corners and bulges, the lettering bench of P20 keeps its exit tests, and
 a glyph takes at most two times as long. Else the grid stays, and the
 plan records the numbers of the trial.
 
+**Made (2026-11-23, ADR 0151): the grid stays.** The module `medial`
+made the middle line from the diagram of `boostvoronoi` 0.12.1: the
+edges inside the outline (nonzero winding), with the exact half-width at
+their points, into the graph of the stroke finder (`Graph::from_medial`);
+the prune, the links, the chains and all the steps after them did not
+change. A shape with segments that cross or overlap got the grid (3
+characters of the Japanese reference set, none of the bench letters).
+The trial measured three ways at the corners of the outline: (1) no edge
+of the diagram from a corner; (2) the edge from each corner where the
+outline turns 40 degrees or more, as the grid has a branch there; (3)
+the half of that edge that is nearer to the middle line. The letter
+fault bench (lettering in the source fonts, 25 mm):
+
+| Font | Way | Spikes | Crossing pairs | Open area | Open corners | Bulges mm |
+| --- | --- | --- | --- | --- | --- | --- |
+| Block Sans | grid | 17 | 27 | 0.57 % | 43 of 233 | 0.0 |
+| Block Sans | 1: no corner edges | 63 | 14 | 0.61 % | 66 | 0.0 |
+| Block Sans | 2: corner edges | 122 | 4 | 0.52 % | 44 | 0.0 |
+| Block Sans | 3: half corner edges | 73 | 11 | 0.61 % | 55 | 0.0 |
+| Anton | grid | 44 | 40 | 1.67 % | 54 of 330 | 4.3 |
+| Anton | 1 | 28 | 52 | 1.84 % | 62 | 5.8 |
+| Anton | 2 | 95 | 81 | 1.26 % | 30 | 8.9 |
+| Anton | 3 | 53 | 49 | 1.69 % | 61 | 5.4 |
+| Pacifico | grid | 37 | 40 | 0.56 % | - | 13.5 |
+| Pacifico | 1, 2 and 3 | 12 | 33 | 0.35 % | - | 14.7 |
+| Varsity | grid | 15 | 11 | 0.49 % | 33 of 531 | 0.0 |
+| Varsity | 1 | 24 | 19 | 0.54 % | 67 | 0.0 |
+| Varsity | 2 | 90 | 27 | 0.52 % | 52 | 0.0 |
+| Varsity | 3 | 32 | 24 | 0.38 % | 56 | 0.0 |
+
+The lettering bench of P20 (the test font, 25 mm):
+
+| Way | Covered, lowest | Two layers, mean | Characters over 3 % |
+| --- | --- | --- | --- |
+| grid | 96.0 % (ぎ) | 1.2 % | 19 |
+| 1 | 92.7 % (ァ) | 1.2 % | 12 |
+| 2 | 93.8 % (ぬ) | 3.9 % | 154 |
+| 3 | 94.4 % (ぬ) | 1.6 % | 32 |
+
+No way is better in all four fonts, and no way keeps the coverage of the
+P20 exit test (95 % of each character). The time is not a problem: the
+fault bench took 23.1 s with the diagram and 21.9 s with the grid, the
+lettering bench 7.6 s and 8.0 s.
+
+What the numbers and the proof pictures show:
+
+- The middle line from the diagram is better on round strokes. In
+  Pacifico all three ways have fewer spikes (37 to 12), fewer crossing
+  pairs (40 to 33) and less open area (0.56 % to 0.35 %); the open wedge
+  at the top of the middle arch of "m" is gone. Way 1 also has fewer
+  Japanese characters with two layers (19 to 12).
+- It is worse at square ends and sharp corners. The steps after the
+  middle line (the prune of side branches, the free ends, the mitres)
+  were tuned on the middle line of the grid. Thinning takes the line far
+  into a square end and stops it before a sharp corner; the diagram
+  stops at the fork of a square end and goes into the point of a sharp
+  corner. With no corner edges (way 1), the flat base of Anton "v" is
+  open (the short line from the junction to the base goes as a side
+  branch) and the ends of the diagonal of Block Sans "Z" go out of the
+  letter. With the corner edges (ways 2 and 3), long edges to sharp
+  corners are not side branches, and they become columns.
+
+The code of way 1 is on the branch `trial/voronoi-middle-line` (not in
+`main`): `emb_letter::medial`, `stroke::MiddleLine`, `strokes_with`, and
+`--middle grid|voronoi` for the benches. A middle line from the diagram of
+each stroke alone (after a split of the outline into strokes) has no
+junctions and no side branches at its corners; a later trial can use
+this code for it.
+
+## Milestone 8: strokes from a split of the outline (trial) (L)
+
+Added by the owner on 2026-11-23, after the trial of Milestone 7 and a
+look at the research on the strokes of Chinese and Japanese characters.
+
+The stroke finder finds the strokes from the middle line of the whole
+letter: at each junction it links the edges that continue most straight,
+cuts the shorter of two strokes that cross, and holds and cuts back the
+ends that meet another stroke. Most faults at joints come from these
+rules (Milestones 1 to 3), and the trial of Milestone 7 failed at them:
+they are tuned on the middle line of the grid.
+
+Research on Chinese characters (Make Me a Hanzi,
+<https://github.com/skishore/makemeahanzi>; StrokeStyles, Berio and
+others, ACM Transactions on Graphics 2022) splits the outline first. Where
+a stroke meets or crosses another stroke, the outline has two concave
+corners (corners that turn into the shape), one on each side of the
+stroke that ends. A straight line between them (a bridge) continues the
+edge of the stroke that goes through. The outline cut along all the
+bridges gives pieces, and each piece is one stroke with no junction. The
+middle line of each piece then needs no rules for junctions.
+
+The code of Make Me a Hanzi has no license, so no code is copied: this
+trial uses the method from its description, in our own code. Its stroke
+data (Arphic Public License) is not used.
+
+1. **Concave corners.** The points where the outline turns into the
+   shape more than an angle over a short length (as `outline_corners`
+   does for all corners), with the directions of the outline before and
+   after each point.
+2. **Bridges.** A bridge joins two concave corners. It is a candidate if
+   it is in the shape (it touches the outline only at its ends), it is at
+   most a factor of the width of the stroke at its ends long, and at each
+   end it continues one of the two directions of the outline (the edge of
+   the stroke that goes through). The cost of a candidate is its length
+   (a factor of the width) and its angles to these directions. The
+   bridges are the candidates with the least sum of costs, with each
+   corner in one bridge at most (a corner can have no bridge: the inner
+   corner of an "L" or of a stroke that turns). Where the bridges of two
+   strokes cross (a "+", 十), the bridges that keep the longer stroke
+   whole stay, as in `stroke::cut_crossings` today.
+3. **Pieces.** The outline cut along each bridge. Each side of a piece
+   is an edge of the outline or a bridge.
+4. **Columns of a piece.** The stroke finder of today on each piece, with
+   the middle line of the grid and with the middle line of the Voronoi
+   diagram (the code of Milestone 7 on the branch
+   `trial/voronoi-middle-line`). An end of a piece at a bridge is not a
+   free end: the column ends on the bridge and goes `END_OVERLAP` into the
+   piece on the other side. So the rules for ends at junctions (the held
+   width, `trim_start_out_of`, `trim_ends`) are not used for these ends.
+5. **A way back.** A letter whose bridges cross the outline or cross
+   each other in a way that step 2 does not take, or a piece that still
+   has a junction, gets the stroke finder of today for that letter or
+   that piece.
+6. **A switch** between the split and the stroke finder of today, for the
+   letter fault bench and the lettering bench of P20, and proof pictures
+   of the reference set of P20 with the bridges drawn.
+
+Not in this trial: stroke data for each character (KanjiVG,
+<https://kanjivg.tagaini.net>, CC BY-SA 3.0) to choose which pieces are
+one stroke. It needs an ADR on the license of the data and a converted
+data file; it is a later step if the trial wins and its joins are the
+weak point.
+
+**Decision (exit test):** each script is decided alone.
+
+- Latin letters get the split if, in the four fonts of the letter fault
+  bench, it is better in spikes, crossing pairs, open area, open corners
+  and bulges (the rule of Milestone 7).
+- Kana and kanji get the split if, in the lettering bench of P20, fewer
+  characters have more than 3 % with two layers, each character is at
+  least 95 % covered, the eight words have no more trims, and the proof
+  pictures of the reference set show no new faults.
+- A letter takes at most two times as long.
+
+Else the stroke finder of today stays for that script, and the plan
+records the numbers of the trial. The code is on the branch
+`trial/stroke-split` (from `trial/voronoi-middle-line`) until a script
+gets the split.
+
 ## Exit test of the phase
 
 The exit tests of the six milestones, and the sew-out of Milestone 6.
@@ -385,7 +536,8 @@ The exit tests of the six milestones, and the sew-out of Milestone 6.
 
 The owner's order: Milestones 1 to 6. Milestone 7 (the trial) comes
 before Milestone 6, so the fonts are made again with the middle line that
-wins. The bench (Milestone 1, step 1)
+wins (the grid, ADR 0151). Milestone 8 (the trial of the split) comes
+after Milestone 5 and before Milestone 6, for the same reason. The bench (Milestone 1, step 1)
 comes first, as the measure of each milestone. The bundled fonts are made
 again only in Milestone 6, so the sew-outs of the older milestones use
 lettering in the TrueType fonts.
@@ -395,4 +547,6 @@ lettering in the TrueType fonts.
 - New fonts, and letter corrections by hand.
 - The fill letters, and the stitch engine of fills.
 - Japanese characters as a target: the lettering bench of P20 shows the
-  changes there, and they are checked with it.
+  changes there, and they are checked with it. Milestone 8 is the one
+  exception (the owner, 2026-11-23): its split is for the junctions of
+  kana and kanji as much as for Latin letters.
