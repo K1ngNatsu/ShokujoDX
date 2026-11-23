@@ -323,6 +323,37 @@ breathes), and the loader fades out when the program runs
 is lit, 1 s after Starting). Checked in a headless browser with
 a download of 6 MB a second; not on a phone yet.
 
+## Tuning for touch and large designs (owner, 2026-11-22)
+
+- **Targets for a finger.** One rule, `AppState::reach`: on a touch screen
+  a point or a line takes a touch from 20 points at least
+  (`canvas::FINGER_REACH`), and the tools take the nearest target in
+  reach (`canvas::nearest`): the handles of the selection, the sketch,
+  the nodes, handles, rungs and markers of Reshape, the handles of
+  lettering, the lines of hooping, the guides, their markers and the
+  construction marks, Trim Segment. Not larger: a tap on the first point
+  that closes a shape (Finish on the touch bar closes it).
+- **The side panels under the canvas** on a screen that is narrower than
+  700 points and taller than wide (a phone held upright;
+  `AppState::panels_below`, `app::default_dock_for`); when the screen
+  turns, the default layout of the other side comes, with the tabs that
+  were in front. The button that hides them is at the bottom edge then.
+- **Large designs.** A phone starts on the quality Fast of the 3D look
+  (no surface: less memory and work; View > Thread Look > Quality). A
+  design of more than 150,000 stitches on a phone or a tablet gets a
+  word one time: save often, and a reload frees the memory. The first lay
+  of the surface is made in steps in the browser, one in each frame
+  (`surface::Layer`, the same result as `surface::lay`; `LaySteps`).
+- **Measures** (`tools/web-bench.mjs`, 200,000 stitches, the development
+  computer): a mean frame of 44 ms with the 3D look Best (93 ms before)
+  and 26 ms with Good while it pans (59 ms); memory 400 MB (493 MB). The
+  longest frame is still about 0.95 s (Best) and 0.51 s (Good): a profile
+  shows that it is one tile of the surface far out (`Laid::tile`,
+  `Surface::finish` and `half_with`: a tile at a small scale is made at 16
+  pixels for each mm and then made smaller). The next step is tiles in
+  parts in the browser (the parts of a tile that a change makes again
+  exist: `patch`).
+
 ## The audit of the work of 2026-11-22
 
 Four reviews (reuse, simpler code, wasted work, the depth of each fix)

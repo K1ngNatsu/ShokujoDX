@@ -598,7 +598,11 @@ pub fn sync_panels(dock: &mut egui_dock::DockState<Tab>, st: &mut AppState, side
                     Some(p) => dock[p.surface][p.node].append_tab(tab),
                     None => {
                         if let Some(p) = dock.find_tab(&Tab::Canvas) {
-                            dock[p.surface].split_right(p.node, 0.74, vec![tab]);
+                            if st.panels_below {
+                                dock[p.surface].split_below(p.node, crate::app::CANVAS_PART_ABOVE, vec![tab]);
+                            } else {
+                                dock[p.surface].split_right(p.node, crate::app::CANVAS_PART, vec![tab]);
+                            }
                         }
                     }
                 }

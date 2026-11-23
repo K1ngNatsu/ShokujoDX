@@ -129,28 +129,21 @@ fn baseline_nodes(l: &Lettering) -> Option<NodePath> {
 
 fn hit(st: &AppState, map: &ViewMap, pos: Pos2) -> Option<Hit> {
     let sel = selected_letter(st);
+    let reach = st.reach(HIT);
     with_target(st, |_, l| {
-        let near = |p: Option<Point>| p.is_some_and(|p| map.to_screen(p).distance(pos) <= HIT);
+        let mut points: Vec<(Hit, Option<Point>)> = Vec::new();
         if let Some(i) = sel {
-            if near(turn_handle(l, i)) {
-                return Some(Hit::Turn(i));
-            }
-            if near(size_handle(l, i)) {
-                return Some(Hit::Size(i));
-            }
+            points.push((Hit::Turn(i), turn_handle(l, i)));
+            points.push((Hit::Size(i), size_handle(l, i)));
         }
-        if near(radius_handle(l)) {
-            return Some(Hit::Radius);
+        points.push((Hit::Radius, radius_handle(l)));
+        if let Some(np) = baseline_nodes(l) {
+            points.extend(np.nodes().map(|(n, p)| (Hit::BaselineNode(n), Some(p))));
         }
-        if let Some(np) = baseline_nodes(l)
-            && let Some((n, _)) = np.nodes().find(|(_, p)| near(Some(*p)))
-        {
-            return Some(Hit::BaselineNode(n));
-        }
-        (0..l.letters.len())
-            .rev()
-            .find(|&i| near(anchor(l, i)))
-            .map(Hit::Letter)
+        // The last letter is on top.
+        points.extend((0..l.letters.len()).rev().map(|i| (Hit::Letter(i), anchor(l, i))));
+        let on_screen = points.into_iter().filter_map(|(h, p)| Some((h, map.to_screen(p?))));
+        crate::canvas::nearest(pos, reach, on_screen)
     })
     .flatten()
 }

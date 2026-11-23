@@ -339,9 +339,50 @@ struct Lay {
     generation: u64,
 }
 
-/// A thread that lays the stitches of a plan.
-struct LayJob {
-    rx: mpsc::Receiver<LayDone>,
+/// A job that lays the stitches of a plan: a thread, or (no threads and a
+/// budget for each frame: the browser) a lay in steps, one in each frame,
+/// so the first 3D view does not stop the page.
+enum LayJob {
+    Thread(mpsc::Receiver<LayDone>),
+    Steps(Box<LaySteps>),
+}
+
+struct LaySteps {
+    layer: surface::Layer,
+    strands: Vec<Strand>,
+    state: u64,
+    plan: Arc<StitchPlan>,
+    back: Transform,
+    /// The time of the steps until now, ms.
+    ms: f64,
+    /// The frame of the last step.
+    frame: u64,
+}
+
+impl LaySteps {
+    /// One step of at most `budget` in frame `frame` (one step a frame);
+    /// the lay when all is laid.
+    fn step(&mut self, frame: u64, budget: Duration) -> Option<LayDone> {
+        if self.frame == frame {
+            return None;
+        }
+        self.frame = frame;
+        let t0 = Instant::now();
+        let all = self.layer.step(&self.strands, || t0.elapsed() < budget);
+        self.ms += t0.elapsed().as_secs_f64() * 1000.0;
+        all.then(|| {
+            let layer = std::mem::replace(&mut self.layer, surface::Layer::new(&[], &[]));
+            LayDone {
+                state: self.state,
+                laid: layer.finish(),
+                changes: Changes::everywhere(),
+                plan: self.plan.clone(),
+                back: self.back,
+                ms: self.ms,
+                relaid: false,
+            }
+        })
+    }
 }
 
 struct LayDone {
@@ -685,9 +726,15 @@ impl TileCache {
         let frame = ctx.cumulative_pass_nr();
         loop {
             for d in self.designs.values_mut() {
-                if let Some(job) = &d.job
-                    && let Ok(done) = job.rx.recv_timeout(Duration::from_millis(1))
-                {
+                let done = match &mut d.job {
+                    Some(LayJob::Thread(rx)) => rx.recv_timeout(Duration::from_millis(1)).ok(),
+                    Some(LayJob::Steps(s)) => {
+                        let frame = s.frame.wrapping_add(1);
+                        s.step(frame, limit)
+                    }
+                    None => None,
+                };
+                if let Some(done) = done {
                     d.job = None;
                     adopt(d, done, &mut self.stats);
                 }
@@ -1442,8 +1489,8 @@ impl TileCache {
     fn update_lay(&mut self, ctx: &egui::Context, scene: &Scene) {
         let d = self.designs.entry(scene.doc).or_default();
         d.used = Some(Instant::now());
-        if let Some(job) = &d.job {
-            match job.rx.try_recv() {
+        match &mut d.job {
+            Some(LayJob::Thread(rx)) => match rx.try_recv() {
                 Ok(done) => {
                     d.job = None;
                     adopt(d, done, &mut self.stats);
@@ -1453,12 +1500,23 @@ impl TileCache {
                     d.job = None;
                     d.failed = Some(scene.state);
                 }
+            },
+            Some(LayJob::Steps(s)) => {
+                let budget = self.frame_budget.unwrap_or(Duration::from_millis(30));
+                match s.step(ctx.cumulative_pass_nr(), budget) {
+                    Some(done) => {
+                        d.job = None;
+                        adopt(d, done, &mut self.stats);
+                    }
+                    None => ctx.request_repaint(),
+                }
             }
+            None => {}
         }
         let wanted = d.lay.as_ref().is_none_or(|l| l.state != scene.state);
         let frozen = !scene.moving.is_empty() && d.lay.is_some();
         if wanted && d.job.is_none() && !frozen && d.failed != Some(scene.state) {
-            start_lay(d, ctx, scene, self.sync, &mut self.stats);
+            start_lay(d, ctx, scene, self.sync, self.frame_budget.is_some(), &mut self.stats);
         }
     }
 
@@ -1770,8 +1828,10 @@ fn adopt(d: &mut DesignLay, done: LayDone, stats: &mut Stats) {
 
 /// Lays the stitches of the plan of `scene` on a thread (in place with
 /// `sync`): again from the lay before where it has the same place on the
-/// canvas.
-fn start_lay(d: &mut DesignLay, ctx: &egui::Context, scene: &Scene, sync: bool, stats: &mut Stats) {
+/// canvas. With `steps` (and `sync`: the browser), a first lay is made in
+/// steps, one in each frame (`LaySteps`); a lay again after a change is
+/// quick and is made at once.
+fn start_lay(d: &mut DesignLay, ctx: &egui::Context, scene: &Scene, sync: bool, steps: bool, stats: &mut Stats) {
     let plan = scene.plan.clone();
     let back = scene.design.from_hoop_transform();
     let marks = emb_render::strand::marks(scene.design, plan.spans.iter().map(|s| (s.object, s.records.clone())));
@@ -1781,16 +1841,33 @@ fn start_lay(d: &mut DesignLay, ctx: &egui::Context, scene: &Scene, sync: bool, 
         .collect();
     let old = d.lay.as_ref().filter(|l| l.back == back).map(|l| l.laid.clone());
     let state = scene.state;
-    let work = move || {
-        let t0 = Instant::now();
-        let strands: Vec<Strand> = emb_render::strand::strands(&plan.stitches, &marks)
+    let strands_of = move |plan: &StitchPlan| -> Vec<Strand> {
+        emb_render::strand::strands(&plan.stitches, &marks)
             .into_iter()
             .map(|s| Strand {
                 a: back.apply(s.a),
                 b: back.apply(s.b),
                 ..s
             })
-            .collect();
+            .collect()
+    };
+    if sync && steps && old.is_none() {
+        let strands = strands_of(&plan);
+        d.job = Some(LayJob::Steps(Box::new(LaySteps {
+            layer: surface::Layer::new(&strands, &areas),
+            strands,
+            state,
+            plan,
+            back,
+            ms: 0.0,
+            frame: u64::MAX,
+        })));
+        ctx.request_repaint();
+        return;
+    }
+    let work = move || {
+        let t0 = Instant::now();
+        let strands = strands_of(&plan);
         let (laid, changes, relaid) = match &old {
             Some(o) => {
                 let (l, c) = surface::relay(o, &strands, &areas);
@@ -1822,7 +1899,7 @@ fn start_lay(d: &mut DesignLay, ctx: &egui::Context, scene: &Scene, sync: bool, 
             repaint.request_repaint();
         });
     match started {
-        Ok(_) => d.job = Some(LayJob { rx }),
+        Ok(_) => d.job = Some(LayJob::Thread(rx)),
         Err(_) => d.failed = Some(state),
     }
 }
@@ -2168,6 +2245,30 @@ mod tests {
         let s = &h.st.stitch_tiles.stats;
         assert_eq!((s.lays, s.relays), (1, 0));
         assert!(h.st.stitch_tiles.bytes() > 0);
+    }
+
+    #[test]
+    fn the_browser_lays_a_design_in_steps() {
+        // With a budget for each frame (the browser has no threads), the
+        // first lay comes in steps, one in each frame, so the page does not
+        // stop; then the tiles come as before.
+        let mut h = harness(1.0);
+        h.st.stitch_tiles.frame_budget = Some(Duration::ZERO);
+        let mut frames = 0;
+        while frame_or_none(&mut h).is_none() {
+            frames += 1;
+            assert!(frames < 10_000, "the lay does not come");
+            h.frame(vec![]);
+        }
+        assert!(frames > 2, "the lay took {frames} frames");
+        assert_eq!(h.st.stitch_tiles.stats.lays, 1);
+        for _ in 0..200 {
+            h.frame(vec![]);
+            if frame(&mut h).complete {
+                return;
+            }
+        }
+        panic!("the tiles do not come");
     }
 
     #[test]

@@ -299,7 +299,7 @@ pub fn marker_at(st: &AppState, rect: Rect, p: Pos2) -> Option<usize> {
     };
     (0..d.guides.len())
         .filter_map(|i| near(i).map(|dist| (dist, i)))
-        .filter(|(dist, _)| *dist <= MARKER_HIT)
+        .filter(|(dist, _)| *dist <= st.reach(MARKER_HIT))
         .min_by(|a, b| a.0.total_cmp(&b.0))
         .map(|(_, i)| i)
 }
@@ -309,9 +309,10 @@ pub fn marker_at(st: &AppState, rect: Rect, p: Pos2) -> Option<usize> {
 pub fn mark_at(st: &AppState, rect: Rect, p: Pos2, movable: bool) -> Option<MarkRef> {
     let d = st.doc.design();
     let free = |s: &GuideStyle| !(movable && s.locked);
+    let reach = st.reach(HIT);
     let mut best: Option<(f32, MarkRef)> = None;
     let mut keep = |dist: f32, r: MarkRef| {
-        if dist <= HIT && best.is_none_or(|(b, _)| dist < b) {
+        if dist <= reach && best.is_none_or(|(b, _)| dist < b) {
             best = Some((dist, r));
         }
     };

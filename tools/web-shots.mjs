@@ -49,12 +49,19 @@ const CASES = [
     "phone-portrait-design",
     390,
     844,
-    "?stress=20000",
+    "?stress=20000&probe=1",
     [
       // A swipe on the tab row shows the tabs at its end.
       ["phone-portrait-tabs-swiped", () => finger(330, 13, 40, 13)],
-      // A tap on the button at the edge of the canvas hides the side panels.
-      ["phone-portrait-side-hidden", () => finger(199, 493, 199, 493)],
+      // A tap on the button at the edge of the canvas hides the side panels
+      // (upright: at the bottom edge; the place of the canvas from ?probe=1).
+      [
+        "phone-portrait-side-hidden",
+        async () => {
+          const [x0, , x1, y1] = JSON.parse(await evaluate("window.shokujodxView")).canvas;
+          await finger((x0 + x1) / 2, y1 - 15, (x0 + x1) / 2, y1 - 15);
+        },
+      ],
     ],
   ],
   ["phone-landscape-start", 844, 390, "", []],

@@ -96,10 +96,10 @@ pub(super) fn pick_mm(st: &AppState, map: &ViewMap) -> f64 {
     f64::from(pick_px(st)) / map.view.scale()
 }
 
-/// How near a click must be to a point or a curve, in screen points: a
-/// finger needs more (P15).
+/// How near a click must be to a point or a curve, in screen points (more
+/// for a finger: `AppState::reach`).
 pub(super) fn pick_px(st: &AppState) -> f32 {
-    if st.touch_seen { TOUCH_PICK_PX } else { PICK_PX }
+    st.reach(PICK_PX)
 }
 
 /// The snap of a click at screen position `pos`: a point or a curve of the

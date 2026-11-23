@@ -235,7 +235,9 @@ fn page_width() -> f64 {
 
 /// The first visit on a touch screen (P15 step 3): larger controls on a
 /// tablet (text size 125 %), simple mode on a phone (large buttons, fewer
-/// tools). Only with no saved settings, so a choice of the user stays.
+/// tools) and the quality Fast of the 3D look (less memory and work; View >
+/// Thread Look > Quality changes it). Only with no saved settings, so a
+/// choice of the user stays.
 fn touch_defaults(st: &mut AppState) {
     if !FRESH.load(std::sync::atomic::Ordering::Relaxed) || !touch_device() {
         return;
@@ -243,6 +245,7 @@ fn touch_defaults(st: &mut AppState) {
     let mut s = st.settings.clone();
     if page_width() < 700.0 {
         s.simple_mode = true;
+        s.look.set_quality(crate::viewtools::Quality::Fast);
     } else {
         s.text_scale = 1.25;
     }
@@ -567,8 +570,33 @@ fn update_window(ctx: &eframe::egui::Context) {
     }
 }
 
+/// A design with more stitches than this is large for a phone or a tablet.
+const LARGE_ON_TOUCH: usize = 150_000;
+
+/// On a phone or a tablet, a large design gets a word one time (the design
+/// with its document number): the memory of the page does not get smaller
+/// while it is open, and the browser can close a page that has too much.
+fn large_design_word(st: &mut AppState) {
+    static TOLD: Mutex<Option<u64>> = Mutex::new(None);
+    if !st.touch_seen || TOLD.lock().ok().and_then(|t| *t) == Some(st.doc_id) {
+        return;
+    }
+    let stitches = st.shown_plan().plan.stitches.records.len();
+    if stitches <= LARGE_ON_TOUCH {
+        return;
+    }
+    if let Ok(mut t) = TOLD.lock() {
+        *t = Some(st.doc_id);
+    }
+    st.message = crate::i18n::fill(
+        "A large design for a phone or a tablet ({} stitches). The browser can close the page when its memory is full: save often (File > Save downloads the design), and reload the page to free the memory.",
+        &[&stitches],
+    );
+}
+
 /// Each frame: the measures, the uploaded files and the notices.
 pub fn poll(st: &mut AppState, ctx: &eframe::egui::Context) {
+    large_design_word(st);
     update_window(ctx);
     if !STARTED.swap(true, std::sync::atomic::Ordering::Relaxed) {
         first_frame(st);

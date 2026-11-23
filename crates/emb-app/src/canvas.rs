@@ -534,19 +534,31 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
 /// panels (P15 step 3): the canvas gets the width, and one tap brings them
 /// back. Larger on a touch screen.
 fn side_handle(ui: &mut egui::Ui, rect: Rect, st: &mut AppState) {
+    use egui_phosphor::regular as ph;
     let size = if st.touch_seen {
         Vec2::new(26.0, 64.0)
     } else {
         Vec2::new(16.0, 44.0)
     };
-    let at = Rect::from_min_size(
-        Pos2::new(rect.right() - size.x - 2.0, rect.center().y - size.y / 2.0),
-        size,
-    );
-    let (glyph, tip) = if st.side_hidden {
-        (egui_phosphor::regular::CARET_LEFT, tr("Show the side panels"))
+    // At the edge where the panels are: the right, or the bottom.
+    let (at, show, hide) = if st.panels_below {
+        let size = Vec2::new(size.y, size.x);
+        let at = Rect::from_min_size(
+            Pos2::new(rect.center().x - size.x / 2.0, rect.bottom() - size.y - 2.0),
+            size,
+        );
+        (at, ph::CARET_UP, ph::CARET_DOWN)
     } else {
-        (egui_phosphor::regular::CARET_RIGHT, tr("Hide the side panels"))
+        let at = Rect::from_min_size(
+            Pos2::new(rect.right() - size.x - 2.0, rect.center().y - size.y / 2.0),
+            size,
+        );
+        (at, ph::CARET_LEFT, ph::CARET_RIGHT)
+    };
+    let (glyph, tip) = if st.side_hidden {
+        (show, tr("Show the side panels"))
+    } else {
+        (hide, tr("Hide the side panels"))
     };
     let resp = ui.put(at, egui::Button::new(egui::RichText::new(glyph).size(14.0)));
     let resp = crate::a11y::named(resp, tip).on_hover_text(tip);
@@ -597,6 +609,32 @@ pub(crate) fn touch_buttons(ui: &egui::Ui, id: &str, rect: Rect, labels: &[&str]
             });
         });
     tapped
+}
+
+/// On a touch screen, a point or a line takes a touch from this far at
+/// least (screen points): about the half of a fingertip.
+pub const FINGER_REACH: f32 = 20.0;
+
+impl AppState {
+    /// How near the pointer must be to a point or a line to take it, in
+    /// screen points: `px` with a mouse, at least `FINGER_REACH` on a touch
+    /// screen (P15). The tools then take the nearest target in reach.
+    pub fn reach(&self, px: f32) -> f32 {
+        if self.touch_seen { px.max(FINGER_REACH) } else { px }
+    }
+}
+
+/// The nearest of `targets` (a target and its place on the screen) within
+/// `reach` of `pos`; of two at the same distance, the first.
+pub(crate) fn nearest<T>(pos: Pos2, reach: f32, targets: impl IntoIterator<Item = (T, Pos2)>) -> Option<T> {
+    let mut best: Option<(T, f32)> = None;
+    for (t, p) in targets {
+        let d = p.distance(pos);
+        if d <= reach && best.as_ref().is_none_or(|(_, b)| d < *b) {
+            best = Some((t, d));
+        }
+    }
+    best.map(|(t, _)| t)
 }
 
 /// Returns the topmost object at the point (view mm), by its real shape.
@@ -1170,6 +1208,31 @@ pub fn thread_mesh_3d(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_finger_reaches_farther_and_takes_the_nearest() {
+        let mut st = AppState::new(
+            emb_model::HoopCatalog::builtin(),
+            emb_model::MachineCatalog::builtin(),
+            String::new(),
+        );
+        assert_eq!(st.reach(7.0), 7.0);
+        st.touch_seen = true;
+        assert_eq!(st.reach(7.0), FINGER_REACH);
+        assert_eq!(st.reach(30.0), 30.0, "a larger reach stays");
+        let at = Pos2::new(100.0, 100.0);
+        let targets = [
+            ("a", Pos2::new(112.0, 100.0)),
+            ("b", Pos2::new(95.0, 100.0)),
+            ("c", Pos2::new(95.0, 100.0)),
+        ];
+        assert_eq!(
+            nearest(at, 20.0, targets),
+            Some("b"),
+            "the nearest; the first of two at one place"
+        );
+        assert_eq!(nearest(at, 4.0, targets), None);
+    }
 
     #[test]
     fn two_fingers_zoom_about_their_middle_pan_and_move_nothing() {

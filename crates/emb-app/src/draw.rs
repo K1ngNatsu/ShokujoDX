@@ -47,6 +47,8 @@ use crate::manipulate::ViewMap;
 use crate::workspace::{Defaults, SnapHit, SnapKind};
 
 /// Snap distance to close a shape on its first point, in screen points.
+/// (Not larger on a touch screen: a finger near the first point can want a
+/// new point there, and Finish on the touch bar closes the outline.)
 const CLOSE_SNAP: f32 = 8.0;
 /// Color of the first thread in a new design.
 const FIRST_THREAD: Rgb = Rgb(30, 60, 140);

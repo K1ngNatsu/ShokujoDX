@@ -1173,33 +1173,100 @@ fn put_pieces(grid: &mut Grid, pieces: &[Piece], floors: &[Floor]) {
 /// Lays `strands` in sew order on the `pieces` (appliqué fabric, stones
 /// and padding, under all stitches).
 pub fn lay(strands: &[Strand], pieces: &[Piece]) -> Laid {
-    let b = extent(strands, pieces);
-    let cell = cell_for(b);
-    let mut grid = Grid::new(b, cell);
-    let floors = floors_of(&grid, pieces);
-    put_pieces(&mut grid, pieces, &floors);
-    let mut laid: Vec<LaidStrand> = Vec::with_capacity(strands.len());
-    let mut z: Vec<f32> = Vec::new();
-    let mut sc = Scratch::default();
-    // The stitch just before is laid on the grid after the next one.
-    let mut waiting: Option<usize> = None;
-    for s in strands {
-        let g = &grid;
-        let Some(ls) = lay_one(s, cell, z.len(), |p| (g.height_at(p), g.layers_at(p)), &mut sc) else {
-            continue;
-        };
-        z.extend_from_slice(&sc.z);
-        laid.push(ls);
-        if let Some(w) = waiting.replace(laid.len() - 1) {
-            let ls = laid[w];
-            grid.stamp(&ls, &z);
+    let mut layer = Layer::new(strands, pieces);
+    layer.step(strands, || true);
+    layer.finish()
+}
+
+/// A lay in steps: the same result as [`lay`], a part of the stitches in
+/// each step (the browser has no threads, so a step is the part of one
+/// frame).
+pub struct Layer {
+    b: BBox,
+    cell: f64,
+    grid: Grid,
+    pieces: Vec<Piece>,
+    floors: Vec<Floor>,
+    laid: Vec<LaidStrand>,
+    z: Vec<f32>,
+    sc: Scratch,
+    /// The stitch just before: it is laid on the grid after the next one.
+    waiting: Option<usize>,
+    /// The next strand to lay.
+    next: usize,
+}
+
+impl Layer {
+    /// A lay of `strands` on the `pieces`, with no stitch laid yet.
+    pub fn new(strands: &[Strand], pieces: &[Piece]) -> Layer {
+        let b = extent(strands, pieces);
+        let cell = cell_for(b);
+        let mut grid = Grid::new(b, cell);
+        let floors = floors_of(&grid, pieces);
+        put_pieces(&mut grid, pieces, &floors);
+        Layer {
+            b,
+            cell,
+            grid,
+            pieces: pieces.to_vec(),
+            floors,
+            laid: Vec::with_capacity(strands.len()),
+            z: Vec::new(),
+            sc: Scratch::default(),
+            waiting: None,
+            next: 0,
         }
     }
-    if let Some(w) = waiting {
-        let ls = laid[w];
-        grid.stamp(&ls, &z);
+
+    /// Lays the next stitches of `strands` (the strands of [`Layer::new`])
+    /// while `more()` is true (it is asked after each 256 stitches).
+    /// `true` when all are laid.
+    pub fn step(&mut self, strands: &[Strand], mut more: impl FnMut() -> bool) -> bool {
+        while self.next < strands.len() {
+            let end = (self.next + 256).min(strands.len());
+            for s in &strands[self.next..end] {
+                let g = &self.grid;
+                let Some(ls) = lay_one(
+                    s,
+                    self.cell,
+                    self.z.len(),
+                    |p| (g.height_at(p), g.layers_at(p)),
+                    &mut self.sc,
+                ) else {
+                    continue;
+                };
+                self.z.extend_from_slice(&self.sc.z);
+                self.laid.push(ls);
+                if let Some(w) = self.waiting.replace(self.laid.len() - 1) {
+                    let ls = self.laid[w];
+                    self.grid.stamp(&ls, &self.z);
+                }
+            }
+            self.next = end;
+            if self.next < strands.len() && !more() {
+                return false;
+            }
+        }
+        true
     }
-    Laid::new(laid, z, pieces.to_vec(), floors, grid, b)
+
+    /// The part of the strands that is laid, from 0 to 1.
+    pub fn done(&self, strands: &[Strand]) -> f64 {
+        if strands.is_empty() {
+            1.0
+        } else {
+            self.next as f64 / strands.len() as f64
+        }
+    }
+
+    /// The lay (all stitches laid with [`Layer::step`]).
+    pub fn finish(mut self) -> Laid {
+        if let Some(w) = self.waiting.take() {
+            let ls = self.laid[w];
+            self.grid.stamp(&ls, &self.z);
+        }
+        Laid::new(self.laid, self.z, self.pieces, self.floors, self.grid, self.b)
+    }
 }
 
 /// The stitches `strands` laid again after a change of the design (ADR
@@ -2865,6 +2932,34 @@ mod tests {
 
     fn top() -> f64 {
         THICKNESS * emb_model::thread::WIDTH_40_MM
+    }
+
+    #[test]
+    fn a_lay_in_steps_is_the_lay() {
+        // Rows of stitches over each other, so later stitches lie on
+        // earlier ones.
+        let strands: Vec<Strand> = (0..2000)
+            .map(|i| {
+                let y = f64::from(i % 40) * 0.3;
+                let x = f64::from(i / 40) * 0.1;
+                strand((x, y), (x + 4.0, y + 0.2))
+            })
+            .collect();
+        let whole = lay(&strands, &[]);
+        let mut layer = Layer::new(&strands, &[]);
+        let mut steps = 0;
+        while !layer.step(&strands, || false) {
+            steps += 1;
+            assert!(layer.done(&strands) < 1.0);
+        }
+        assert!(steps >= 7, "{steps} steps of 256 stitches");
+        let parts = layer.finish();
+        assert_eq!(parts.z, whole.z);
+        assert_eq!(parts.strands.len(), whole.strands.len());
+        assert_eq!(parts.top, whole.top);
+        for (x, y) in [(1.0, 1.0), (3.0, 5.0), (6.0, 11.0)] {
+            assert_eq!(parts.height_at(Point::new(x, y)), whole.height_at(Point::new(x, y)));
+        }
     }
 
     #[test]

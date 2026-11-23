@@ -215,10 +215,9 @@ fn selection_box(st: &AppState) -> Option<BBox> {
 }
 
 /// On a touch screen (P15 step 3): the distance of the rotate handle over
-/// the box, the reach of a handle and the size of its drawing are for a
-/// finger.
+/// the box and the size of the drawing of a handle are for a finger (the
+/// reach is `AppState::reach`).
 const TOUCH_ROTATE_OFFSET: f32 = 44.0;
-const TOUCH_REACH: f32 = 22.0;
 const TOUCH_DRAW: f32 = 1.6;
 
 /// Screen positions of the handles for box `b` (`touch`: for a finger).
@@ -248,14 +247,9 @@ fn handles(map: &ViewMap, b: BBox, touch: bool) -> Vec<(Handle, Pos2)> {
 /// Returns the handle under `pos`, if a selection exists.
 pub fn hit_handle(st: &AppState, map: &ViewMap, pos: Pos2) -> Option<Handle> {
     let b = selection_box(st)?;
-    let reach = if st.touch_seen { TOUCH_REACH } else { HANDLE + 4.0 };
     // The nearest handle in reach: on a small box the reach of a finger
     // takes in more than one.
-    handles(map, b, st.touch_seen)
-        .into_iter()
-        .filter(|(_, p)| p.distance(pos) <= reach)
-        .min_by(|x, y| x.1.distance(pos).total_cmp(&y.1.distance(pos)))
-        .map(|(h, _)| h)
+    crate::canvas::nearest(pos, st.reach(HANDLE + 4.0), handles(map, b, st.touch_seen))
 }
 
 fn originals(st: &AppState) -> Vec<DesignObject> {

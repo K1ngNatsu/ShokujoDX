@@ -27,7 +27,7 @@ use crate::manipulate::ViewMap;
 /// Smart Fill: lines nearer than two times this close, in mm.
 const SMART_FILL_HALF_MM: f64 = 0.15;
 /// A click this near a line (screen points) is on it.
-const PICK_PX: f64 = 6.0;
+const PICK_PX: f32 = 6.0;
 
 /// The kinds whose outlines are borders for Smart Fill and Trim Segment.
 fn is_border(k: &ObjectKind) -> bool {
@@ -281,7 +281,7 @@ pub fn tool_input(response: &egui::Response, st: &mut AppState, map: &ViewMap) {
     let p = map.to_design(pos);
     match st.tool {
         crate::draw::Tool::SmartFill => st.smart_fill(p),
-        crate::draw::Tool::TrimSegment => st.trim_segment(p, PICK_PX / st.view.scale()),
+        crate::draw::Tool::TrimSegment => st.trim_segment(p, f64::from(st.reach(PICK_PX)) / st.view.scale()),
         _ => {}
     }
 }

@@ -125,26 +125,21 @@ fn markers(st: &mut AppState, id: ObjectId) -> Option<(Point, Point)> {
 
 fn hit(st: &mut AppState, map: &ViewMap, pos: Pos2) -> Option<Hit> {
     let obj = target(st)?;
+    // The points: the nearest in reach; at the same place the first (the
+    // end marker is on top: the markers are at one place for a closed loop).
+    let mut points: Vec<(Hit, Pos2)> = Vec::new();
     if let Some((s, e)) = markers(st, obj.id) {
-        // The end marker is on top (they are at the same place for a closed loop).
-        if map.to_screen(e).distance(pos) <= HIT {
-            return Some(Hit::Marker(Marker::End));
-        }
-        if map.to_screen(s).distance(pos) <= HIT {
-            return Some(Hit::Marker(Marker::Start));
-        }
+        points.push((Hit::Marker(Marker::End), map.to_screen(e)));
+        points.push((Hit::Marker(Marker::Start), map.to_screen(s)));
     }
     if let emb_model::ObjectKind::Satin { geometry, .. } = &obj.kind {
         for (i, (a, b)) in geometry.rungs.iter().enumerate() {
-            for (p, b_end) in [(*a, false), (*b, true)] {
-                if map.to_screen(p).distance(pos) <= HIT {
-                    return Some(Hit::Rung(i, b_end));
-                }
-            }
+            points.push((Hit::Rung(i, false), map.to_screen(*a)));
+            points.push((Hit::Rung(i, true), map.to_screen(*b)));
         }
     }
     let paths = node_paths(st, &obj);
-    // The selected node first, then (an option) all nodes.
+    // The handles of the selected node, then (an option) of all nodes.
     let all = st.settings.editing.all_handles;
     let with_handles = st.reshape.node.into_iter().chain(
         paths
@@ -158,22 +153,22 @@ fn hit(st: &mut AppState, map: &ViewMap, pos: Pos2) -> Option<Hit> {
         };
         for side in [Side::In, Side::Out] {
             if let Some(h) = np.handle(n, side)
-                && map.to_screen(h).distance(pos) <= HIT
                 && np.node(n).is_some_and(|p| p.distance(h) > 1e-9)
             {
-                return Some(Hit::Handle(k, n, side));
+                points.push((Hit::Handle(k, n, side), map.to_screen(h)));
             }
         }
     }
     for (k, np) in &paths {
         for (n, p) in np.nodes() {
-            if map.to_screen(p).distance(pos) <= HIT {
-                return Some(Hit::Node(*k, n));
-            }
+            points.push((Hit::Node(*k, n), map.to_screen(p)));
         }
     }
+    if let Some(h) = crate::canvas::nearest(pos, st.reach(HIT), points) {
+        return Some(h);
+    }
     let p = map.to_design(pos);
-    let tol = f64::from(OUTLINE_HIT) / map.view.scale();
+    let tol = f64::from(st.reach(OUTLINE_HIT)) / map.view.scale();
     paths
         .iter()
         .filter_map(|(k, np)| np.nearest(p).map(|(s, t, d)| (*k, s, t, d)))
@@ -735,6 +730,29 @@ mod tests {
         assert!(p[1].x == 10.0 && p[1].y.abs() > 2.0, "{p:?}");
         assert!(h.st.delete_node());
         assert_eq!(points(&h), vec![Point::new(0.0, 0.0), Point::new(20.0, 0.0)]);
+    }
+
+    #[test]
+    fn a_finger_takes_the_nearest_node_from_farther() {
+        let (mut h, _) = square();
+        let map = h.map();
+        let corner = h.screen(Point::new(20.0, 20.0));
+        // 15 points from the corner node: a mouse misses it, a finger takes it.
+        let near = corner + Vec2::new(15.0, 0.0);
+        assert!(!matches!(hit(&mut h.st, &map, near), Some(Hit::Node(..))));
+        h.frame(crate::test_util::touch_screen());
+        assert!(h.st.touch_seen);
+        let Some(Hit::Node(k, n)) = hit(&mut h.st, &map, near) else {
+            panic!("a finger takes the node")
+        };
+        let np = outer(&h, h.st.selection.single().unwrap());
+        assert_eq!((k, np.node(n)), (0, Some(Point::new(20.0, 20.0))));
+        // Of two nodes in reach, the nearer one.
+        let other = h.screen(Point::new(20.0, -20.0));
+        let Some(Hit::Node(_, m)) = hit(&mut h.st, &map, other + Vec2::new(0.0, -10.0)) else {
+            panic!("a node")
+        };
+        assert_eq!(np.node(m), Some(Point::new(20.0, -20.0)));
     }
 
     #[test]

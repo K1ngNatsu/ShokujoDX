@@ -219,6 +219,9 @@ pub struct AppState {
     /// The user hid the side panels with the button at the edge of the
     /// canvas (P15 step 3).
     pub side_hidden: bool,
+    /// The side panels are under the canvas (a tall narrow screen: a phone
+    /// held upright), not at its right.
+    pub panels_below: bool,
     /// Options > Reset the Panels: the next frame puts the dock back to
     /// `default_dock` and opens the closed panels.
     pub reset_panels: bool,
@@ -507,14 +510,40 @@ pub const SIDE_PANELS: [Tab; 8] = [
 /// one group with all the side panels on the right (the owner's choice of
 /// 2026-11-22; before, two groups one over the other).
 pub fn default_dock() -> DockState<Tab> {
+    default_dock_for(false)
+}
+
+/// A screen narrower than this (points) and taller than wide has the side
+/// panels under the canvas (a phone held upright).
+const PANELS_BELOW_WIDTH: f32 = 700.0;
+
+/// The part of the dock that the canvas has when the side panels are at
+/// its right, and when they are under it.
+pub const CANVAS_PART: f32 = 0.74;
+pub const CANVAS_PART_ABOVE: f32 = 0.6;
+
+/// The default dock with the side panels under the canvas (`below`) or at
+/// its right.
+pub fn default_dock_for(below: bool) -> DockState<Tab> {
     let mut dock = DockState::new(vec![Tab::Canvas, Tab::Library]);
     let surface = dock.main_surface_mut();
-    surface.split_right(NodeIndex::root(), 0.74, SIDE_PANELS.to_vec());
+    if below {
+        surface.split_below(NodeIndex::root(), CANVAS_PART_ABOVE, SIDE_PANELS.to_vec());
+    } else {
+        surface.split_right(NodeIndex::root(), CANVAS_PART, SIDE_PANELS.to_vec());
+    }
     // The Library tab is next to the canvas; the canvas shows first.
     if let Some(p) = dock.find_tab(&Tab::Canvas) {
         let _ = dock.set_active_tab(p);
     }
     dock
+}
+
+/// The tab in front of the group of the dock that has `tab`.
+fn front_tab(dock: &DockState<Tab>, tab: Tab) -> Option<Tab> {
+    let p = dock.find_tab(&tab)?;
+    let leaf = dock[p.surface][p.node].get_leaf()?;
+    leaf.tabs.get(leaf.active.0).cloned()
 }
 
 #[cfg(test)]
@@ -789,6 +818,7 @@ impl AppState {
             touch_gesture: false,
             touch_seen: false,
             side_hidden: false,
+            panels_below: false,
             reset_panels: false,
             ribbon_peek: None,
             focus_library: false,
@@ -1944,6 +1974,22 @@ impl EmbApp {
         // (a design shows them again) and while the user hid them with the
         // button at the edge of the canvas. The dock with them is kept and
         // comes back with the tab that shows then.
+        // A tall narrow screen (a phone held upright) has the side panels
+        // under the canvas; when the screen turns, the default layout of
+        // the other side comes, with the tabs that were in front.
+        let screen = ctx.content_rect();
+        let below = screen.width() < screen.height() && screen.width() < PANELS_BELOW_WIDTH;
+        let mut fronts = Vec::new();
+        if below != st.panels_below {
+            st.panels_below = below;
+            let full = self.saved_dock.as_ref().unwrap_or(&self.dock);
+            fronts.extend(front_tab(&self.dock, Tab::Canvas));
+            fronts.extend(SIDE_PANELS.iter().find_map(|t| front_tab(full, *t)));
+            match &mut self.saved_dock {
+                Some(saved) => *saved = default_dock_for(below),
+                None => self.dock = default_dock_for(below),
+            }
+        }
         let start_showing = self.dock.find_tab(&Tab::Start).is_some_and(|p| {
             self.dock[p.surface][p.node]
                 .get_leaf()
@@ -1951,7 +1997,7 @@ impl EmbApp {
         });
         // Options > Reset the Panels.
         if std::mem::take(&mut st.reset_panels) {
-            self.dock = default_dock();
+            self.dock = default_dock_for(st.panels_below);
             self.saved_dock = None;
             st.side_hidden = false;
             let mut s = st.settings.clone();
@@ -1963,11 +2009,7 @@ impl EmbApp {
         match (hide, self.saved_dock.is_some()) {
             (true, false) => self.saved_dock = Some(self.dock.clone()),
             (false, true) => {
-                let front = self.dock.find_tab(&Tab::Canvas).and_then(|p| {
-                    self.dock[p.surface][p.node]
-                        .get_leaf()
-                        .and_then(|l| l.tabs.get(l.active.0).cloned())
-                });
+                let front = front_tab(&self.dock, Tab::Canvas);
                 if let Some(full) = self.saved_dock.take() {
                     self.dock = full;
                 }
@@ -1992,6 +2034,11 @@ impl EmbApp {
                 self.dock.remove_tab(p);
             }
             _ => {}
+        }
+        for tab in fronts {
+            if let Some(p) = self.dock.find_tab(&tab) {
+                let _ = self.dock.set_active_tab(p);
+            }
         }
         if !kiosk {
             egui::CentralPanel::no_frame().show(ui, |ui| {
@@ -2086,5 +2133,42 @@ mod dock_tests {
             "all side panels back in one group"
         );
         assert!(app.state().panel_shown(Tab::Styles), "the closed panel opens");
+    }
+
+    fn frame_of(ctx: &egui::Context, app: &mut EmbApp, size: egui::Vec2) {
+        let input = egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, size)),
+            ..Default::default()
+        };
+        let mut out = ctx.run_ui(input, |ui| app.draw(ui));
+        out.textures_delta.clear();
+    }
+
+    /// The side group is under the canvas (a split from top to bottom).
+    fn side_below(dock: &DockState<Tab>) -> bool {
+        dock.main_surface()[NodeIndex::root()].is_vertical()
+    }
+
+    #[test]
+    fn a_phone_held_upright_has_the_side_panels_under_the_canvas() {
+        let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        st.save_settings = false;
+        st.show_start = false;
+        st.add_sample_objects();
+        let mut app = EmbApp::for_test(st);
+        let ctx = crate::test_util::ready_context();
+        frame_of(&ctx, &mut app, egui::vec2(390.0, 844.0));
+        assert!(app.state().panels_below && side_below(&app.dock));
+        assert!(crate::test_util::one_side_group(&app.dock));
+        // The Threads panel in front; the phone turns: the panels go right,
+        // and Threads stays in front.
+        let p = app.dock.find_tab(&Tab::Threads).unwrap();
+        let _ = app.dock.set_active_tab(p);
+        frame_of(&ctx, &mut app, egui::vec2(844.0, 390.0));
+        assert!(!app.state().panels_below && !side_below(&app.dock));
+        assert_eq!(front_tab(&app.dock, Tab::Threads), Some(Tab::Threads));
+        // A tablet held upright keeps them at the right.
+        frame_of(&ctx, &mut app, egui::vec2(820.0, 1180.0));
+        assert!(!app.state().panels_below);
     }
 }

@@ -1107,15 +1107,24 @@ fn in_left_ruler(rect: Rect, p: Pos2) -> bool {
 
 /// The guide under `p` on the canvas that a drag can move (not locked).
 fn guide_at(st: &AppState, rect: Rect, p: Pos2) -> Option<usize> {
-    st.doc.design().guides.iter().position(|g| {
-        if g.style.locked {
-            false
-        } else if g.vertical {
-            (st.view.to_screen(rect, Point::new(g.pos, 0.0)).x - p.x).abs() <= GUIDE_HIT
+    let distance = |g: &Guide| {
+        if g.vertical {
+            (st.view.to_screen(rect, Point::new(g.pos, 0.0)).x - p.x).abs()
         } else {
-            (st.view.to_screen(rect, Point::new(0.0, g.pos)).y - p.y).abs() <= GUIDE_HIT
+            (st.view.to_screen(rect, Point::new(0.0, g.pos)).y - p.y).abs()
         }
-    })
+    };
+    // The nearest guide in reach.
+    st.doc
+        .design()
+        .guides
+        .iter()
+        .enumerate()
+        .filter(|(_, g)| !g.style.locked)
+        .map(|(i, g)| (i, distance(g)))
+        .filter(|(_, d)| *d <= st.reach(GUIDE_HIT))
+        .min_by(|a, b| a.1.total_cmp(&b.1))
+        .map(|(i, _)| i)
 }
 
 /// Rulers and guides: drag from a ruler to make a guide, drag a guide to

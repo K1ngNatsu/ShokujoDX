@@ -465,5 +465,3 @@ impl SketchEdit {
 
 /// The screen distance (points) for a click on a point or a curve.
 const PICK_PX: f32 = 7.0;
-/// The same on a touch screen.
-const TOUCH_PICK_PX: f32 = 18.0;

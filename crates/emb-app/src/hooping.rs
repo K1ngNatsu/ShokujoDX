@@ -419,19 +419,27 @@ pub fn handle_keys(ctx: &egui::Context, st: &mut AppState) -> bool {
 fn hit(st: &AppState, map: &ViewMap, pos: Pos2) -> Option<(HoopingPick, Option<usize>)> {
     let layout = st.doc.design().hooping.as_ref()?;
     let to = |p: Point| map.view.to_screen(map.rect, p);
+    let reach = st.reach(HIT);
     if let Some(HoopingPick::Split(k)) = st.hoopings_ui.selected
         && let Some(line) = layout.splits.get(k)
-        && let Some(n) = line.iter().position(|p| to(*p).distance(pos) <= HIT)
+        && let Some(n) = crate::canvas::nearest(pos, reach, line.iter().enumerate().map(|(n, p)| (n, to(*p))))
     {
         return Some((HoopingPick::Split(k), Some(n)));
     }
-    for (k, line) in layout.splits.iter().enumerate() {
-        if line
-            .windows(2)
-            .any(|w| segment_distance(pos, to(w[0]), to(w[1])) <= HIT)
-        {
-            return Some((HoopingPick::Split(k), None));
-        }
+    let line_distance = |line: &Vec<Point>| {
+        line.windows(2)
+            .map(|w| segment_distance(pos, to(w[0]), to(w[1])))
+            .fold(f32::INFINITY, f32::min)
+    };
+    if let Some((k, _)) = layout
+        .splits
+        .iter()
+        .enumerate()
+        .map(|(k, line)| (k, line_distance(line)))
+        .filter(|(_, d)| *d <= reach)
+        .min_by(|a, b| a.1.total_cmp(&b.1))
+    {
+        return Some((HoopingPick::Split(k), None));
     }
     let hoop = st.layout_hoop()?;
     let p = map.view.to_mm(map.rect, pos);
