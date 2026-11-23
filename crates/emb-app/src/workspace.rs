@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::app::AppState;
 use crate::canvas::CanvasView;
+use crate::dock::FitScreen;
 use crate::draw::Tool;
 use crate::i18n::tr;
 use crate::manipulate::{DragOp, ViewMap};
@@ -1351,6 +1352,7 @@ pub fn options_window(ctx: &egui::Context, st: &mut AppState) {
         .vscroll(true)
         .default_height((ctx.input(|i| i.content_rect().height()) - 90.0).max(200.0))
         .max_height((ctx.input(|i| i.content_rect().height()) - 90.0).max(200.0))
+        .fit_screen(ctx)
         .show(ctx, |ui| {
             egui::Grid::new("options")
                 .num_columns(2)

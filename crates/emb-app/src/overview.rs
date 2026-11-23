@@ -6,6 +6,7 @@ use eframe::egui::{self, Color32, Rect, Sense, Shape, Stroke, Vec2};
 
 use crate::app::AppState;
 use crate::canvas::{CanvasView, stitch_mesh};
+use crate::dock::FitScreen;
 use crate::i18n::tr;
 
 const SIZE: Vec2 = Vec2::new(240.0, 180.0);
@@ -21,6 +22,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         .resizable(false)
         .collapsible(true)
         .default_pos(egui::pos2(ctx.content_rect().right() - SIZE.x - 380.0, 160.0))
+        .fit_screen(ctx)
         .show(ctx, |ui| contents(ui, st));
     if !open {
         st.show_overview = false;

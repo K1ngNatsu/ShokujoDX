@@ -43,6 +43,7 @@ use emb_model::{
 
 use crate::app::AppState;
 use crate::canvas::color32;
+use crate::dock::FitScreen;
 use crate::i18n::tr;
 
 /// The stitch picture of the Finish step is about this many pixels wide.
@@ -1762,16 +1763,19 @@ fn show_window(ctx: &egui::Context, st: &mut AppState) {
     let current = st.doc.design().current.clone();
     let mut open = true;
     let mut done = Done::No;
+    // At least 860 x 560 points, but not more than a small screen has.
+    let screen = ctx.content_rect().size();
     egui::Window::new(tr("Picture to Design"))
         .id(egui::Id::new("Picture to Design"))
         .open(&mut open)
         .default_size([1000.0, 660.0])
-        .min_size([860.0, 560.0])
+        .min_size([860.0f32.min(screen.x - 40.0), 560.0f32.min(screen.y - 40.0)])
         .resizable(true)
         .collapsible(false)
+        .fit_screen(ctx)
         .show(ctx, |ui| {
-            // The steps.
-            ui.horizontal(|ui| {
+            // The steps (on more than one line in a narrow window).
+            ui.horizontal_wrapped(|ui| {
                 let steps = w.steps();
                 for (i, &s) in steps.iter().enumerate() {
                     let label = format!("{} {}", i + 1, s.name());
@@ -1786,21 +1790,29 @@ fn show_window(ctx: &egui::Context, st: &mut AppState) {
             ui.separator();
             let avail = ui.available_size();
             let bottom = 36.0;
-            ui.horizontal(|ui| {
-                ui.allocate_ui_with_layout(
-                    vec2(290.0, (avail.y - bottom).max(200.0)),
-                    egui::Layout::top_down(egui::Align::Min),
-                    |ui| {
+            let height = (avail.y - bottom).max(200.0);
+            if avail.x < TWO_COLUMNS {
+                // A narrow window (a phone, a tablet held upright): the
+                // controls over the result, in one column that scrolls.
+                egui::ScrollArea::vertical().max_height(height).show(ui, |ui| {
+                    controls(ui, st, &mut w, &current, true);
+                    ui.separator();
+                    let side = ui.available_width();
+                    preview(ui, &mut w, vec2(side, side.min(height)), &current);
+                });
+            } else {
+                ui.horizontal(|ui| {
+                    ui.allocate_ui_with_layout(vec2(290.0, height), egui::Layout::top_down(egui::Align::Min), |ui| {
                         egui::ScrollArea::vertical().show(ui, |ui| {
                             ui.set_width(280.0);
-                            controls(ui, st, &mut w, &current);
+                            controls(ui, st, &mut w, &current, false);
                         });
-                    },
-                );
-                ui.separator();
-                let size = vec2(ui.available_width(), (avail.y - bottom).max(200.0));
-                preview(ui, &mut w, size, &current);
-            });
+                    });
+                    ui.separator();
+                    let size = vec2(ui.available_width(), height);
+                    preview(ui, &mut w, size, &current);
+                });
+            }
             ui.separator();
             ui.horizontal(|ui| {
                 if ui.button(tr("Cancel")).clicked() {
@@ -1857,6 +1869,11 @@ fn show_window(ctx: &egui::Context, st: &mut AppState) {
     }
 }
 
+/// A window narrower than this (points) has the controls over the result,
+/// not at its side: the controls take 290 points, and a result narrower
+/// than 300 is too small to see.
+const TWO_COLUMNS: f32 = 590.0;
+
 /// A slider for a design value, as the other windows have them.
 fn slider<'a>(v: &'a mut f64, range: std::ops::RangeInclusive<f64>, text: &str) -> egui::Slider<'a> {
     egui::Slider::new(v, range)
@@ -1895,12 +1912,16 @@ fn width_row(ui: &mut egui::Ui, w: &mut Wizard) {
 }
 
 /// The settings of the current step.
-fn controls(ui: &mut egui::Ui, st: &mut AppState, w: &mut Wizard, current: &CurrentProperties) {
+/// The controls of the step of `w`; `below`: the result is under them (a
+/// narrow window), not at their right.
+fn controls(ui: &mut egui::Ui, st: &mut AppState, w: &mut Wizard, current: &CurrentProperties, below: bool) {
     match w.step {
         Step::Picture => {
-            ui.label(tr(
-                "This wizard turns the picture into embroidery, step by step. Each step shows its result on the right.",
-            ));
+            ui.label(if below {
+                tr("This wizard turns the picture into embroidery, step by step. Each step shows its result below.")
+            } else {
+                tr("This wizard turns the picture into embroidery, step by step. Each step shows its result on the right.")
+            });
             ui.add_space(6.0);
             let (pw, ph) = w.source.dimensions();
             let width = w.mm_per_px * f64::from(pw);

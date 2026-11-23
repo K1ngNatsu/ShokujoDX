@@ -80,11 +80,33 @@ pub fn dock_of(ctx: &egui::Context, id: Id) -> Dock {
         .unwrap_or(Dock::Corner(Align2::LEFT_TOP))
 }
 
+/// The space (points) between a window that fits the screen and the edges
+/// of the screen.
+const SCREEN_MARGIN: f32 = 6.0;
+
+/// A window is no wider than the screen (the browser trial, P15: the
+/// owner's tablet held upright, where the Picture to Design window was
+/// wider than the screen). egui makes the first size of a window fit the
+/// screen, but a minimum size of the window and the size that it keeps
+/// from a wider screen (a tablet that turns) went past its edge. The limit
+/// is set in each frame; on the screen of a computer it does not change a
+/// window.
+pub trait FitScreen {
+    fn fit_screen(self, ctx: &egui::Context) -> Self;
+}
+
+impl FitScreen for egui::Window<'_> {
+    fn fit_screen(self, ctx: &egui::Context) -> Self {
+        let margin = ctx.global_style().spacing.window_margin.sum().x + 2.0 * SCREEN_MARGIN;
+        self.max_width((ctx.content_rect().width() - margin).max(120.0))
+    }
+}
+
 /// Sets where `window` (with the id `id`) goes in this frame: at its
 /// corner of `canvas` if it is docked, else where it is. Call it on each
 /// command window before `show`, in the same order in each frame.
 pub fn docked<'a>(window: egui::Window<'a>, ctx: &egui::Context, id: Id, canvas: Option<Rect>) -> egui::Window<'a> {
-    let window = window.drag_area(egui::WindowDrag::Anywhere);
+    let window = window.fit_screen(ctx).drag_area(egui::WindowDrag::Anywhere);
     let Some(canvas) = canvas else {
         return window;
     };

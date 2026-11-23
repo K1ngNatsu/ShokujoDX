@@ -20,6 +20,7 @@ use emb_render::Segment;
 
 use crate::app::AppState;
 use crate::canvas::{CanvasView, color32, stitch_mesh};
+use crate::dock::FitScreen;
 use crate::file::Notice;
 use crate::i18n::tr;
 use crate::manipulate::ViewMap;
@@ -677,6 +678,7 @@ pub fn preview_window(ctx: &egui::Context, st: &mut AppState) {
         .open(&mut open)
         .resizable(true)
         .default_width(2.0 * THUMB.x + 40.0)
+        .fit_screen(ctx)
         .show(ctx, |ui| {
             if views.is_empty() {
                 ui.label(tr("The design has no hoopings. Use Hooping > Auto Layout."));

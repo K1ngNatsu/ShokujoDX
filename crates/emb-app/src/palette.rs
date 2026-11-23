@@ -6,6 +6,7 @@
 use eframe::egui::{self, Key, KeyboardShortcut, Modifiers};
 
 use crate::app::AppState;
+use crate::dock::FitScreen;
 use crate::i18n::tr;
 use crate::ribbon::{Cmd, RibbonTab, SelInfo};
 
@@ -110,6 +111,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         .resizable(false)
         .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, 80.0))
         .default_width(420.0)
+        .fit_screen(ctx)
         .show(ctx, |ui| {
             let edit = ui.add(
                 egui::TextEdit::singleline(&mut pal.query)

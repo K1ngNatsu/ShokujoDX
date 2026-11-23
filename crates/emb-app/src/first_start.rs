@@ -8,6 +8,7 @@
 use eframe::egui;
 
 use crate::app::{AppState, GENERIC_MACHINE};
+use crate::dock::FitScreen;
 use crate::i18n::tr;
 
 /// The open "Which machine do you have?" step.
@@ -66,6 +67,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         .collapsible(false)
         .resizable(false)
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+        .fit_screen(ctx)
         .show(ctx, |ui| {
             ui.set_max_width(420.0);
             ui.heading(tr("Which machine do you have?"));

@@ -18,6 +18,7 @@ use emb_model::project;
 use serde::{Deserialize, Serialize};
 
 use crate::app::AppState;
+use crate::dock::FitScreen;
 use crate::i18n::tr;
 
 /// How often the app writes the heartbeat.
@@ -311,6 +312,7 @@ pub fn recovery_window(ctx: &egui::Context, st: &mut AppState) {
         .collapsible(false)
         .resizable(false)
         .default_width(460.0)
+        .fit_screen(ctx)
         .show(ctx, |ui| {
             ui.set_min_width(440.0);
             ui.label(tr(

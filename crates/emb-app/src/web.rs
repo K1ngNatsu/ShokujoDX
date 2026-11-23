@@ -11,6 +11,7 @@ use emb_model::project;
 use wasm_bindgen::JsCast;
 
 use crate::app::AppState;
+use crate::dock::FitScreen;
 use crate::file::Notice;
 
 /// The notices of commands that are not in the browser.
@@ -773,6 +774,7 @@ fn update_window(ctx: &eframe::egui::Context) {
         .resizable(false)
         .max_width(width)
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+        .fit_screen(ctx)
         .show(ctx, |ui| {
             ui.set_max_width(width);
             ui.label(crate::i18n::fill(

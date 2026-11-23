@@ -25,6 +25,7 @@ use std::collections::{HashMap, HashSet};
 use eframe::egui::{self, RichText};
 
 use crate::app::AppState;
+use crate::dock::FitScreen;
 use crate::draw::Tool;
 use crate::i18n::tr;
 use crate::ribbon::{Cmd, RibbonTab};
@@ -1130,6 +1131,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         .default_size([780.0, 560.0])
         .resizable(true)
         .collapsible(false)
+        .fit_screen(ctx)
         .show(ctx, |ui| {
             ui.horizontal(|ui| {
                 if ui

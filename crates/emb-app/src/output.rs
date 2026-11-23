@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 use crate::a11y::Named;
 use crate::app::AppState;
 use crate::canvas::color32;
+use crate::dock::FitScreen;
 use crate::file::Notice;
 use crate::i18n::tr;
 
@@ -1023,6 +1024,7 @@ fn output_window(ctx: &egui::Context, st: &mut AppState) {
         .open(&mut open)
         .collapsible(false)
         .resizable(false)
+        .fit_screen(ctx)
         .show(ctx, |ui| {
             egui::Grid::new("output_where").num_columns(2).show(ui, |ui| {
                 ui.label(tr("Folder"));
@@ -1086,6 +1088,7 @@ fn preview_window(ctx: &egui::Context, st: &mut AppState) {
         .id(egui::Id::new("Print Preview"))
         .open(&mut open)
         .default_size([620.0, 760.0])
+        .fit_screen(ctx)
         .show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.selectable_value(&mut pv.approval, false, tr("Production worksheet"));

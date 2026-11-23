@@ -18,6 +18,7 @@ use eframe::egui;
 use serde::{Deserialize, Serialize};
 
 use crate::app::AppState;
+use crate::dock::FitScreen;
 use crate::i18n::{fill, tr};
 
 /// The address that gives the newest release of the program (JSON).
@@ -465,6 +466,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         .open(&mut open)
         .resizable(false)
         .collapsible(false)
+        .fit_screen(ctx)
         .show(ctx, |ui| {
             ui.set_max_width(440.0);
             let current = crate::about::VERSION;
@@ -568,6 +570,7 @@ fn ask_window(ctx: &egui::Context, st: &mut AppState) {
         .collapsible(false)
         .resizable(false)
         .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+        .fit_screen(ctx)
         .show(ctx, |ui| {
             ui.set_max_width(420.0);
             ui.heading(tr("Look for new versions at the start?"));

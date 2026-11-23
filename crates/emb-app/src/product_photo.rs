@@ -17,6 +17,7 @@ use emb_model::{PhotoPlacement, ProductPicture, product};
 use emb_render::photo::MaskGrid;
 
 use crate::app::AppState;
+use crate::dock::FitScreen;
 use crate::file::Notice;
 use crate::i18n::{fill, tr};
 
@@ -367,6 +368,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         .id(egui::Id::new("Product Photo"))
         .open(&mut open)
         .resizable(false)
+        .fit_screen(ctx)
         .show(ctx, |ui| contents(ui, st));
     if !open {
         st.photo_editor.open = false;

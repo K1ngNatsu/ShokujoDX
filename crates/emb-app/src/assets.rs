@@ -19,6 +19,7 @@ use eframe::egui;
 use serde::{Deserialize, Serialize};
 
 use crate::app::AppState;
+use crate::dock::FitScreen;
 use crate::file::Notice;
 use crate::i18n::tr;
 
@@ -369,6 +370,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         .open(&mut open)
         .collapsible(false)
         .resizable(false)
+        .fit_screen(ctx)
         .show(ctx, |ui| {
             ui.label(tr(
                 "Your own templates, fonts, motifs, thread charts, clipart and hoops, for all designs.",
