@@ -155,7 +155,14 @@ impl Shared {
             tuning: Vec::new(),
             fill_parts: Vec::new(),
         };
-        let (routed, _) = crate::route::route_with_splits(&letter, crate::embfont::DESIGN_CAP_MM);
+        let outline: Vec<Vec<Point>> = self
+            .contours(glyph)
+            .into_iter()
+            .map(|r| r.into_iter().map(|p| Point::new(p.x * s, p.y * s)).collect())
+            .collect();
+        let rtl = self.char_of(glyph).is_some_and(crate::route::is_rtl);
+        let (routed, _) =
+            crate::route::route_with_splits_dir(&letter, crate::embfont::DESIGN_CAP_MM, Some(&outline), rtl);
         let mut parts = routed.parts;
         for p in &mut parts {
             p.transform(&Transform::scale(1.0 / s, 1.0 / s));
@@ -470,6 +477,12 @@ impl Font {
     /// The shapes of a glyph (cached).
     pub fn shapes(&self, glyph: u16) -> Arc<GlyphShapes> {
         self.shared.shapes(glyph)
+    }
+
+    /// The character of a glyph: the lowest character that the Unicode
+    /// tables of the font map to it (`None` for a glyph from shaping only).
+    pub fn char_of(&self, glyph: u16) -> Option<char> {
+        self.shared.char_of(glyph)
     }
 }
 

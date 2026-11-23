@@ -650,10 +650,13 @@ impl EmbFont {
     ) -> crate::route::Routed {
         use std::sync::atomic::Ordering;
         let cap = self.cap_height_mm;
-        let mut todo: Vec<&mut EmbLetter> = self
+        // A letter of a script from right to left is routed from its right
+        // (P21 Milestone 5).
+        let mut todo: Vec<(bool, &mut EmbLetter)> = self
             .letters
-            .values_mut()
-            .filter(|l| !l.fixed && !l.parts.is_empty())
+            .iter_mut()
+            .filter(|(_, l)| !l.fixed && !l.parts.is_empty())
+            .map(|(c, l)| (crate::route::is_rtl(*c), l))
             .collect();
         // The letters do not depend on each other: one thread for each
         // group of them.
@@ -665,11 +668,11 @@ impl EmbFont {
                 .map(|group| {
                     scope.spawn(move || {
                         let mut sum = crate::route::Routed::default();
-                        for letter in group.iter_mut() {
+                        for (rtl, letter) in group.iter_mut() {
                             if stop.load(Ordering::Relaxed) {
                                 break;
                             }
-                            let (mut routed, found) = crate::route::route_with_splits(letter, cap);
+                            let (mut routed, found) = crate::route::route_with_splits_dir(letter, cap, None, *rtl);
                             for p in &mut routed.parts {
                                 round_part(p);
                             }
@@ -678,6 +681,7 @@ impl EmbFont {
                             sum.trims += found.trims;
                             sum.runs += found.runs;
                             sum.splits += found.splits;
+                            sum.on_top += found.on_top;
                         }
                         sum
                     })
@@ -691,6 +695,7 @@ impl EmbFont {
                 trims: a.trims + b.trims,
                 runs: a.runs + b.runs,
                 splits: a.splits + b.splits,
+                on_top: a.on_top + b.on_top,
             })
     }
 

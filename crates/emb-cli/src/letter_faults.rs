@@ -96,6 +96,9 @@ pub struct Faults {
     pub corners_open: usize,
     pub on_top: usize,
     pub under: usize,
+    /// Places where the needle leaves one part and the next part starts
+    /// more than [`TRIM_GAP_MM`] away (P21 Milestone 5).
+    pub trims: usize,
 }
 
 impl Faults {
@@ -119,12 +122,43 @@ impl Faults {
         self.corners_open += o.corners_open;
         self.on_top += o.on_top;
         self.under += o.under;
+        self.trims += o.trims;
     }
 
     /// The open area as a part of the area of the outline, in percent.
     pub fn open_percent(&self) -> f64 {
         100.0 * (self.open_corner + self.open_other) / self.area.max(1e-9)
     }
+}
+
+/// A gap between two parts longer than this (mm, at [`CAP_MM`]) is a trim:
+/// the route joins parts nearer than this with no run (`route::NO_RUN`,
+/// 0.012 of the capital height).
+pub const TRIM_GAP_MM: f64 = 0.012 * CAP_MM;
+
+/// The start edge and the end edge of a column or a run (the ends of its
+/// rails there).
+fn part_edges(kind: &ObjectKind) -> Option<((Point, Point), (Point, Point))> {
+    let ends = |p: &emb_geom::Path| -> Option<(Point, Point)> {
+        let pts: Vec<Point> = p.points().collect();
+        pts.first().copied().zip(pts.last().copied())
+    };
+    match kind {
+        ObjectKind::Satin { geometry, .. } => {
+            let ((a0, a1), (b0, b1)) = (ends(&geometry.rail_a)?, ends(&geometry.rail_b)?);
+            (a0.distance(a1) > 1e-6).then_some(((a0, b0), (a1, b1)))
+        }
+        ObjectKind::Running { path, .. } => ends(path).map(|(a, b)| ((a, a), (b, b))),
+        _ => None,
+    }
+}
+
+/// The shortest distance between two edges (as the route measures it).
+fn edge_gap(a: (Point, Point), b: (Point, Point)) -> f64 {
+    let pts = |e: (Point, Point)| (0..=8).map(move |k| e.0.lerp(e.1, f64::from(k) / 8.0));
+    pts(a)
+        .flat_map(|p| pts(b).map(move |q| p.distance(q)))
+        .fold(f64::MAX, f64::min)
 }
 
 /// The faults of one letter, with what a picture of it needs.
@@ -317,7 +351,23 @@ pub fn measure(name: &str, parts: &[ObjectKind], o: &Outline) -> Letter {
             _ => {}
         }
     }
-    // Joints: the middle of an end of a column in another part.
+    // Trims: the gaps between the parts in their order.
+    let mut last: Option<(Point, Point)> = None;
+    for part in parts {
+        let Some((start, end)) = part_edges(part) else {
+            continue;
+        };
+        if let Some(prev) = last
+            && edge_gap(prev, start) > TRIM_GAP_MM
+        {
+            f.trims += 1;
+        }
+        last = Some(end);
+    }
+    // Joints: the middle of an end of a column in another column. Where each
+    // of two columns ends in the other (the two legs at a cut from a notch,
+    // ADR 0152), one end is on top in each order: not a joint to count.
+    let mut joints: Vec<(usize, usize)> = Vec::new();
     for (j, part) in parts.iter().enumerate() {
         let ObjectKind::Satin { geometry, .. } = part else {
             continue;
@@ -327,13 +377,19 @@ pub fn measure(name: &str, parts: &[ObjectKind], o: &Outline) -> Letter {
         for end in [s.0.midpoint(s.1), e.0.midpoint(e.1)] {
             for (i, c) in covers.iter().enumerate() {
                 if i != j && matches!(c, Cover::Quads(..)) && c.holds(end) {
-                    if i < j {
-                        f.on_top += 1;
-                    } else {
-                        f.under += 1;
-                    }
+                    joints.push((j, i));
                 }
             }
+        }
+    }
+    for &(j, i) in &joints {
+        if joints.contains(&(i, j)) {
+            continue;
+        }
+        if i < j {
+            f.on_top += 1;
+        } else {
+            f.under += 1;
         }
     }
     let (open, corners) = open_area(o, &covers, &mut f);
@@ -356,6 +412,10 @@ pub fn measure(name: &str, parts: &[ObjectKind], o: &Outline) -> Letter {
                 "open_corner": f.open_corner,
                 "open_other": f.open_other,
                 "corners_open": f.corners_open,
+                "on_top": f.on_top,
+                "under": f.under,
+                "trims": f.trims,
+                "run_out_mm": f.run_out_mm,
             },
         }),
         faults: f,
@@ -535,7 +595,11 @@ pub fn truetype_letter(src: &Font, c: char) -> Option<EmbLetter> {
         tuning: Vec::new(),
         fill_parts: Vec::new(),
     };
-    Some(emb_letter::route::route_with_splits(&letter, CAP_MM).0)
+    let rings: Vec<Vec<Point>> = outline(src, c)
+        .into_iter()
+        .flat_map(|(outer, holes)| std::iter::once(outer).chain(holes))
+        .collect();
+    Some(emb_letter::route::route_with_splits_in(&letter, CAP_MM, Some(&rings)).0)
 }
 
 /// The outline of `c` in `src`, in mm at [`CAP_MM`].
@@ -618,12 +682,12 @@ pub fn table(fonts: &[FontFaults]) -> String {
     s.push_str(&format!(
         "At {CAP_MM} mm, default satin settings. Spikes: needle points over {SPIKE_MM} mm outside (at ends / in the middle), and over {BARE_MM} mm with no pull compensation.\n\n"
     ));
-    s.push_str("| Font | Way | Spikes | Bare | Rail pts out (ends / middle) | Crossing | Back mm | Fans mm | Bulges mm | Notches | Runs out mm | Open % (corners / other mm2) | Corners open | Ends on top / under |\n");
-    s.push_str("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
+    s.push_str("| Font | Way | Spikes | Bare | Rail pts out (ends / middle) | Crossing | Back mm | Fans mm | Bulges mm | Notches | Runs out mm | Open % (corners / other mm2) | Corners open | Ends on top / under | Trims |\n");
+    s.push_str("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
     for f in fonts {
         let t = &f.sum;
         s.push_str(&format!(
-            "| {} | {} | {} / {} | {} | {} / {} | {} | {:.1} | {:.1} | {:.1} | {} | {:.1} | {:.2} ({:.1} / {:.1}) | {} of {} | {} / {} |\n",
+            "| {} | {} | {} / {} | {} | {} / {} | {} | {:.1} | {:.1} | {:.1} | {} | {:.1} | {:.2} ({:.1} / {:.1}) | {} of {} | {} / {} | {} |\n",
             f.family,
             f.way,
             t.spike_end,
@@ -644,6 +708,7 @@ pub fn table(fonts: &[FontFaults]) -> String {
             t.corners,
             t.on_top,
             t.under,
+            t.trims,
         ));
     }
     s

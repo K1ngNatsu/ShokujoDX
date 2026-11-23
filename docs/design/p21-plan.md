@@ -11,6 +11,7 @@ was added by the owner on 2026-11-23; it is made, and the grid stays (ADR
 corners, a trial) was added by the owner on 2026-11-23; the trial is
 made, and the owner chose the split for Latin letters and for kana and
 kanji (2026-11-23, ADR 0152). Milestones 5 and 6 are updated for it.
+Milestone 5 is made (ADR 0153); its exit test is met in part.
 
 ## Goal
 
@@ -344,6 +345,66 @@ out of the outline; the eight words of the lettering bench of P20 have
 no more trims than before the split (48, 49, 54, 56 and 56 at 10, 15,
 25, 50 and 80 mm).
 
+**Made (2026-11-23, ADR 0153).**
+
+1. The route finds the joints from the shapes of the parts: the middle
+   of an end of a column in another column (`route::joints`), not where
+   each of two columns ends in the other (the two legs at a cut from a
+   notch). So the same rule works for letters with no split and for the
+   embroidery fonts of before. Its cost is the trims, then the columns
+   that end on top of a column sewn before them (`Routed::on_top`), then
+   the travel. `route_with_splits` keeps a cut that gives as many trims
+   and fewer columns on top, and also tries a cut in the middle of a
+   column whose two ends lie in other columns (a stem between two
+   serifs).
+2. The trims of the split are back: the order that sees the joints keeps
+   other runs, and the eight words have 48, 49, 54, 54 and 54 trims (49,
+   50, 56, 56 and 56 with the split, 48, 49, 54, 56 and 56 before it).
+3. Travel runs stay in the outline of the letter when the route knows it
+   (`route_in`, `route_with_splits_in`: lettering in TrueType fonts and
+   the bench give it): a run goes only through cells in the outline, from
+   the points of the edges in it. The run across the opening of Anton "e"
+   (under the fan of a column) is gone. The constants `NO_RUN` and `EDGE`
+   did not change: at 80 mm a gap with no run is about 1 mm (one stitch),
+   and a run is farther from the edges at larger sizes. The 11.7 mm
+   stitch in the Arabic word of the corpus design `shaped-text` came from
+   the direction of the route: the letters of a script from right to
+   left are routed as their mirror images now (`route_with_splits_dir`,
+   `route::is_rtl`), so each letter ends on its left, where the next one
+   starts (the longest stitch of the design: 6.2 mm).
+4. The fault bench counts trims (gaps between the parts of more than
+   0.012 of the capital height) and does not count a joint where each
+   column ends in the other.
+
+The bench (lettering in the source fonts at 25 mm), before and after:
+
+| Font | Columns on top of a column sewn before them | Trims | Travel runs out of the outline |
+| --- | --- | --- | --- |
+| Block Sans | 16 to 5 of 82 (6 %) | 2 to 2 | 2.3 mm to 0.2 mm |
+| Anton | 29 to 11 of 70 (16 %) | 3 to 2 | 1.7 mm to 0.1 mm |
+| Pacifico | 19 to 10 of 104 (10 %) | 2 to 2 | 0.7 mm to 0.2 mm |
+| Varsity | 85 to 51 of 196 (26 %) | 19 to 20 | 0.2 mm to 0.0 mm |
+
+The exit test is met in part. The trims of the words are back, and the
+runs out of the outline are 0.2 mm or less in each font (short ends at
+the corners of columns). The columns on top are not at 5 %: most of the
+ones that stay are where the needle goes from one column into the next
+(half of a serif and then the stem on it); another order needs a trim
+there. The other orders that the trial measured:
+
+| Order | Block Sans on top / trims | Anton | Pacifico | Varsity | Trims of the words at 25 mm |
+| --- | --- | --- | --- | --- | --- |
+| trims first (made) | 5 / 2 | 11 / 2 | 10 / 2 | 51 / 20 | 54 |
+| one trim as two columns on top | 6 / 2 | 12 / 3 | 6 / 4 | 47 / 24 | 52 |
+| one trim as one column on top | 3 / 4 | 3 / 8 | 3 / 6 | 13 / 43 | 56 |
+| columns on top first | 0 / 7 | 3 / 8 | 0 / 9 | 2 / 54 | 59 |
+
+An end on top that went back to the edge of the column under it (a butt
+joint) took the columns on top to 1, 4, 6 and 38, but the gaps at the
+places where the needle goes on were trims (6, 3, 6 and 36): not made.
+The Varsity "I" shows the limit: its stem ends in a serif at each end,
+so one serif sews before the stem, or there is a trim.
+
 ## Milestone 6: one way for all letters, and new fonts (M)
 
 Updated on 2026-11-23 for the split of Milestone 8.
@@ -362,14 +423,17 @@ Updated on 2026-11-23 for the split of Milestone 8.
    split changes the parts of many letters. Each correction is checked
    against the new letter: one that the split made unnecessary goes, and
    one that no longer fits is made again from the proof pictures.
-4. The scores of all fonts are measured again. A font keeps its place
+4. The converter gives the route the outline of each letter of the
+   source font (lettering in TrueType fonts has it since Milestone 5), so
+   the travel runs of the embroidery fonts stay in their letters too.
+5. The scores of all fonts are measured again. A font keeps its place
    (ADR 0116); a font in a package that now has `quality::BUNDLE` or more
    is a candidate for the program (the owner decides).
-5. A sew-out kit: the test sheets of the ten tuned fonts at three sizes,
+6. A sew-out kit: the test sheets of the ten tuned fonts at three sizes,
    the letters with the most faults of the table above, the Latin
    letters whose joints the split changed most ("N", "M", "W", "Z", "k",
    "x") and kanji with crossings and junctions (十, 木, 林, 東, 龍).
-6. The characters that the split does not take (punctuation, Hangul,
+7. The characters that the split does not take (punctuation, Hangul,
    Arabic, Devanagari, Greek, Cyrillic) keep the stroke finder of today.
    Their measure with the split is open work for a later phase.
 

@@ -4,9 +4,9 @@ expression: "emb_cli::letter_faults::table(&fonts)"
 ---
 At 25 mm, default satin settings. Spikes: needle points over 0.4 mm outside (at ends / in the middle), and over 0.2 mm with no pull compensation.
 
-| Font | Way | Spikes | Bare | Rail pts out (ends / middle) | Crossing | Back mm | Fans mm | Bulges mm | Notches | Runs out mm | Open % (corners / other mm2) | Corners open | Ends on top / under |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Block Sans | truetype | 2 / 0 | 11 | 18 / 0 | 12 | 1.6 | 0.0 | 0.0 | 0 | 1.5 | 0.26 (4.5 / 10.0) | 16 of 103 | 7 / 36 |
-| Anton | truetype | 16 / 0 | 22 | 35 / 0 | 14 | 0.8 | 0.0 | 0.6 | 2 | 1.0 | 1.40 (9.0 / 75.4) | 26 of 163 | 25 / 31 |
-| Pacifico | truetype | 3 / 1 | 14 | 21 / 2 | 14 | 5.3 | 0.4 | 5.9 | 0 | 0.0 | 0.54 (0.0 / 30.1) | 0 of 0 | 10 / 51 |
-| Varsity | truetype | 0 / 0 | 5 | 6 / 0 | 6 | 0.0 | 0.5 | 0.0 | 5 | 0.2 | 0.05 (0.8 / 1.7) | 0 of 277 | 55 / 76 |
+| Font | Way | Spikes | Bare | Rail pts out (ends / middle) | Crossing | Back mm | Fans mm | Bulges mm | Notches | Runs out mm | Open % (corners / other mm2) | Corners open | Ends on top / under | Trims |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Block Sans | truetype | 2 / 0 | 10 | 18 / 0 | 12 | 1.6 | 0.0 | 0.0 | 0 | 0.0 | 0.26 (4.5 / 10.0) | 16 of 103 | 2 / 39 | 0 |
+| Anton | truetype | 16 / 0 | 22 | 35 / 0 | 11 | 0.8 | 0.0 | 0.6 | 2 | 0.0 | 1.40 (9.0 / 75.4) | 26 of 163 | 10 / 29 | 0 |
+| Pacifico | truetype | 3 / 1 | 14 | 21 / 2 | 14 | 5.3 | 0.4 | 5.9 | 0 | 0.0 | 0.54 (0.0 / 30.1) | 0 of 0 | 2 / 53 | 0 |
+| Varsity | truetype | 0 / 0 | 5 | 6 / 0 | 6 | 0.0 | 0.5 | 0.0 | 5 | 0.0 | 0.05 (0.8 / 1.7) | 0 of 277 | 18 / 83 | 15 |
