@@ -47,6 +47,9 @@ struct Shared {
     units_per_em: f64,
     cap_height: f64,
     shapes: Mutex<HashMap<u16, Arc<GlyphShapes>>>,
+    /// The character of each glyph (the lowest one that maps to it), for
+    /// the split of its outline (ADR 0152). Made when first used.
+    chars: std::sync::OnceLock<HashMap<u16, char>>,
     /// The route of each glyph that has one made (`None`: no columns to
     /// route).
     routes: Mutex<HashMap<u16, Option<Arc<Vec<ObjectKind>>>>>,
@@ -64,6 +67,35 @@ impl Shared {
             face.set_variation(*axis, *value);
         }
         face
+    }
+
+    /// The character of a glyph: the lowest character that the Unicode
+    /// tables of the font map to it. `None` for a glyph that only shaping
+    /// gives (a ligature, a form in a word).
+    fn char_of(&self, glyph: u16) -> Option<char> {
+        self.chars
+            .get_or_init(|| {
+                let mut map: HashMap<u16, char> = HashMap::new();
+                let face = self.face();
+                if let Some(cmap) = face.tables().cmap {
+                    for table in cmap.subtables {
+                        if !table.is_unicode() {
+                            continue;
+                        }
+                        table.codepoints(|cp| {
+                            if let (Some(c), Some(g)) = (char::from_u32(cp), table.glyph_index(cp)) {
+                                let e = map.entry(g.0).or_insert(c);
+                                if c < *e {
+                                    *e = c;
+                                }
+                            }
+                        });
+                    }
+                }
+                map
+            })
+            .get(&glyph)
+            .copied()
     }
 
     fn contours(&self, glyph: u16) -> Vec<Vec<Point>> {
@@ -92,7 +124,10 @@ impl Shared {
         if let Some(s) = self.shapes.lock().ok().and_then(|c| c.get(&glyph).cloned()) {
             return s;
         }
-        let s = Arc::new(GlyphShapes::new(&self.contours(glyph), self.cap_height));
+        let split = self
+            .char_of(glyph)
+            .map_or(crate::stroke::Split::Off, crate::stroke::Split::for_char);
+        let s = Arc::new(GlyphShapes::with_split(&self.contours(glyph), self.cap_height, split));
         if let Ok(mut c) = self.shapes.lock() {
             c.insert(glyph, s.clone());
         }
@@ -277,6 +312,7 @@ impl Font {
                 units_per_em,
                 cap_height,
                 shapes: Mutex::new(HashMap::new()),
+                chars: std::sync::OnceLock::new(),
                 routes: Mutex::new(HashMap::new()),
                 todo: Mutex::new(Vec::new()),
                 working: AtomicBool::new(false),
@@ -552,6 +588,16 @@ fn cap_height_of(declared: Option<f64>, h_top: Option<f64>, units_per_em: f64) -
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_glyph_knows_its_character_for_the_split() {
+        let f = crate::bundled::font("Anton", "Regular").expect("bundled font");
+        for c in ['A', 'g', '4'] {
+            let g = f.glyph(c).expect("glyph");
+            assert_eq!(f.shared.char_of(g), Some(c));
+        }
+        assert_eq!(f.shared.char_of(0), None);
+    }
+
     #[test]
     fn a_wrong_cap_height_is_not_used() {
         use super::cap_height_of;

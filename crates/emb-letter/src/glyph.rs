@@ -62,8 +62,14 @@ pub struct GlyphShapes {
 
 impl GlyphShapes {
     pub fn new(rings: &[Vec<Point>], cap_height: f64) -> GlyphShapes {
+        GlyphShapes::with_split(rings, cap_height, crate::stroke::Split::Off)
+    }
+
+    /// [`GlyphShapes::new`] with the outline split into strokes first
+    /// (`stroke::Split::for_char` of the character of the glyph, ADR 0152).
+    pub fn with_split(rings: &[Vec<Point>], cap_height: f64, split: crate::stroke::Split) -> GlyphShapes {
         let fills = regions(rings);
-        let mut strokes = strokes(rings, cap_height);
+        let mut strokes = crate::stroke::strokes_split(rings, cap_height, split);
         add_missed_strokes(&fills, &mut strokes, cap_height);
         tune_ends(&fills, &mut strokes, cap_height);
         GlyphShapes { fills, strokes }

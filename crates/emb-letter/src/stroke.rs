@@ -1,6 +1,10 @@
 //! Satin columns from the strokes of a glyph shape (our own method; see
 //! ADR 0015 and `docs/design/p4-plan.md`).
 //!
+//! The outline of a Latin letter or digit, or of a kana or kanji, is first
+//! split into strokes at its concave corners ([`Split`], `crate::split`,
+//! P21 Milestone 8, ADR 0152), and the steps below run on each piece.
+//!
 //! 1. Fill a grid of about [`GRID_CELLS`] cells for the capital height, and
 //!    find the distance of each cell to the edge.
 //! 2. Thin the shape to its middle lines and make a graph: nodes at line ends
@@ -191,6 +195,37 @@ const SIDE_IN: f64 = 0.12;
 const END_LEAD: f64 = 0.6;
 
 const NONE: usize = usize::MAX;
+
+/// The split of the outline of a glyph into strokes before the stroke
+/// finder (P21 Milestone 8, ADR 0152).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Split {
+    /// No split: the stroke finder on the whole glyph.
+    #[default]
+    Off,
+    /// Bridges between pairs of concave corners (kana and kanji).
+    Bridges,
+    /// Bridges, and a cut at each sharp concave corner with no bridge (the
+    /// notch of a "V"; Latin letters and digits).
+    Notches,
+}
+
+impl Split {
+    /// The split for the glyph of a character: the scripts that the trial
+    /// of P21 Milestone 8 measured. Other characters (punctuation, Hangul,
+    /// Arabic, Devanagari, Greek, Cyrillic) are not split.
+    pub fn for_char(c: char) -> Split {
+        let latin =
+            c.is_ascii_alphanumeric() || (c.is_alphabetic() && matches!(c as u32, 0x00C0..=0x024F | 0x1E00..=0x1EFF));
+        if latin {
+            Split::Notches
+        } else if crate::layout::is_cjk(c) && !matches!(c as u32, 0xAC00..=0xD7AF) {
+            Split::Bridges
+        } else {
+            Split::Off
+        }
+    }
+}
 
 /// Satin columns for a glyph, with checks of how well they fit it.
 #[derive(Debug, Clone, Default)]
@@ -1247,6 +1282,43 @@ fn extend(mut pts: Vec<Point>, free: [bool; 2], g: &Grid, reach: f64) -> Piece {
 
 /// Satin columns for a glyph shape (rings in font units, Y down).
 pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
+    strokes_split(rings, cap_height, Split::Off)
+}
+
+/// [`strokes`] after the split `split` of the outline: the columns of each
+/// piece, as one.
+pub fn strokes_split(rings: &[Vec<Point>], cap_height: f64, split: Split) -> Strokes {
+    if split != Split::Off
+        && let Some(s) = crate::split::split(rings, cap_height, split == Split::Notches)
+    {
+        let parts: Vec<(Strokes, f64)> = s.pieces.iter().map(|p| (whole(&p.rings, cap_height), p.area)).collect();
+        return merged(parts);
+    }
+    whole(rings, cap_height)
+}
+
+/// The columns of the pieces of a shape as one, with the coverage of each
+/// piece in proportion to its area.
+fn merged(parts: Vec<(Strokes, f64)>) -> Strokes {
+    let total: f64 = parts.iter().map(|p| p.1).sum::<f64>().max(1e-12);
+    let mut out = Strokes::default();
+    for (s, area) in parts {
+        out.coverage += s.coverage * area / total;
+        out.max_width = out.max_width.max(s.max_width);
+        out.satins.extend(s.satins);
+    }
+    let mut widths: Vec<f64> = out
+        .satins
+        .iter()
+        .flat_map(|s| s.rungs.iter().map(|(a, b)| a.distance(*b)))
+        .collect();
+    widths.sort_by(f64::total_cmp);
+    out.typical_width = widths.get(widths.len() / 2).copied().unwrap_or(out.max_width);
+    out
+}
+
+/// The stroke finder on a whole shape.
+fn whole(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
     let Some(bb) = BBox::from_points(rings.iter().flatten().copied()) else {
         return Strokes::default();
     };
@@ -2887,6 +2959,19 @@ fn trim_ends(columns: &mut [Rails]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_split_is_for_the_scripts_that_the_trial_measured() {
+        for c in ['A', 'z', '7', 'é', 'Ł'] {
+            assert_eq!(Split::for_char(c), Split::Notches, "{c}");
+        }
+        for c in ['あ', 'サ', '刺', '龍'] {
+            assert_eq!(Split::for_char(c), Split::Bridges, "{c}");
+        }
+        for c in ['한', '&', '。', 'Ж', 'Ω', 'ب'] {
+            assert_eq!(Split::for_char(c), Split::Off, "{c}");
+        }
+    }
 
     fn rect(x0: f64, y0: f64, x1: f64, y1: f64) -> Vec<Point> {
         vec![

@@ -9,8 +9,8 @@ Milestone 2 is made (ADR 0148); its exit test is met in part. Milestone
 was added by the owner on 2026-11-23; it is made, and the grid stays (ADR
 0151). Milestone 8 (strokes from a split of the outline at its concave
 corners, a trial) was added by the owner on 2026-11-23; the trial is
-made: Latin letters get the split, and kana and kanji miss one condition
-(trims).
+made, and the owner chose the split for Latin letters and for kana and
+kanji (2026-11-23, ADR 0152). Milestones 5 and 6 are updated for it.
 
 ## Goal
 
@@ -315,29 +315,63 @@ before P21). The other bundled fonts are measured again in Milestone 6.
 
 ## Milestone 5: the sew order at joints (M)
 
+Updated on 2026-11-23 for the split of Milestone 8: the split knows the
+joints of a letter before the route.
+
 1. **Layers.** A column that ends in another column sews before it, so
    the other column covers its end (a cost in the route between the
-   trims and the travel).
-2. **Travel at each size.** The route is made at 25 mm; the gaps that need
+   trims and the travel). The split gives the joints: at a bridge, the
+   piece whose end is on the bridge sews before the piece that goes
+   through; at a cut from a notch, the two pieces overlap each other, and
+   either one can sew first. The columns keep their joints (in `Strokes`
+   and in the parts of a letter), so the route does not find them again
+   from the shapes.
+2. **The trims of the split.** The split made more parts at the
+   junctions of kanji: the eight words of the lettering bench of P20 have
+   1, 1 and 2 more trims at 10, 15 and 25 mm (龍 and 東京). The pieces at a
+   bridge overlap, so a travel run can cross the joint under the piece
+   that sews later: the route uses the joints of step 1 as its paths.
+3. **Travel at each size.** The route is made at 25 mm; the gaps that need
    no run (`NO_RUN`) and the distance of a run from the edge (`EDGE`) are
    checked at the largest size of the font, in mm.
-3. **Seams.** A column that the route cuts at a junction is cut at one
+4. **Seams.** A column that the route cuts at a junction is cut at one
    pair across it, not at the nearest point of each rail. (Done in
    Milestone 1: `quality::cut_column`, ADR 0147.)
 
 **Exit test:** the bench: at most 5 % of the joints have the column that
-ends on top, with no more trims than today; no travel run out of the
-outline.
+ends on top, with no more trims than with the split today; no travel run
+out of the outline; the eight words of the lettering bench of P20 have
+no more trims than before the split (48, 49, 54, 56 and 56 at 10, 15,
+25, 50 and 80 mm).
 
 ## Milestone 6: one way for all letters, and new fonts (M)
 
-1. Lettering in TrueType fonts gets the same steps as the converter.
+Updated on 2026-11-23 for the split of Milestone 8.
+
+1. Lettering in TrueType fonts gets the same steps as the converter. (Both
+   get the split already: it is in `Font::shapes`.)
 2. The bundled embroidery fonts and the font packages are made again
    (`tools/make-embroidery-fonts.py`), audited, and the proof pictures of
    the ten tuned fonts are looked at. (This is also the open work of P20:
-   the fonts with the stroke finder of P20 Milestone 3.)
-3. A sew-out kit: the test sheets of the ten tuned fonts at three sizes,
-   and the letters with the most faults of the table above.
+   the fonts with the stroke finder of P20 Milestone 3.) Latin letters and
+   digits get the split with bridges and cuts, and the kana and kanji of
+   the package `japanese` the split with bridges.
+3. **The corrections of the bundled fonts**
+   (`data/fonts/embroidery/corrections/*.json`) name the parts of the
+   converted letter by their numbers (`order`, `reverse`, `join`), and the
+   split changes the parts of many letters. Each correction is checked
+   against the new letter: one that the split made unnecessary goes, and
+   one that no longer fits is made again from the proof pictures.
+4. The scores of all fonts are measured again. A font keeps its place
+   (ADR 0116); a font in a package that now has `quality::BUNDLE` or more
+   is a candidate for the program (the owner decides).
+5. A sew-out kit: the test sheets of the ten tuned fonts at three sizes,
+   the letters with the most faults of the table above, the Latin
+   letters whose joints the split changed most ("N", "M", "W", "Z", "k",
+   "x") and kanji with crossings and junctions (十, 木, 林, 東, 龍).
+6. The characters that the split does not take (punctuation, Hangul,
+   Arabic, Devanagari, Greek, Cyrillic) keep the stroke finder of today.
+   Their measure with the split is open work for a later phase.
 
 **Exit test:** the bench: the embroidery fonts are as good as lettering
 in their source fonts or better; each font has a score of
@@ -590,8 +624,21 @@ By the decision rule:
   +1; 山田太郎 -1), the same at 50 and 80 mm. It misses one condition;
   the owner decides.
 
-The code goes to `main` (without the Voronoi middle line) in the next
-step, with the snapshots and the scores of the fonts made again.
+**In the program (2026-11-23, ADR 0152).** The owner chose the split
+for both scripts: the trims of the kanji go to Milestone 5. The stroke
+finder splits the glyphs of a TrueType or OpenType font by their
+character (`stroke::Split::for_char`: Latin letters and digits with
+bridges and cuts, kana and kanji with bridges, other characters not;
+`Font` keeps the character of each glyph). The Voronoi middle line stays
+on its branch. In the program the numbers of the fault bench are the
+numbers of the trial; the lettering bench (the snapshot) has 5 to 7
+characters over 3 % with two layers (18 to 19 before) and each
+character 96.9 % covered or more at 15 mm and more (96.0 % before), with 1, 1 and 2 more
+trims at 10, 15 and 25 mm. Travel runs out of the outline: Block Sans
+0.4 mm to 2.3 mm (Milestone 5 removes them). The golden designs with
+lettering in TrueType fonts have more stitches (lettering-names 2481 to
+2597, mitre-corners 7623 to 7897, shaped-text 6899 to 6927) and the
+same trims.
 
 ## Exit test of the phase
 
