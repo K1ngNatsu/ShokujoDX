@@ -8,7 +8,9 @@ Milestone 2 is made (ADR 0148); its exit test is met in part. Milestone
 (ADR 0150). Milestone 7 (a middle line from a Voronoi diagram, a trial)
 was added by the owner on 2026-11-23; it is made, and the grid stays (ADR
 0151). Milestone 8 (strokes from a split of the outline at its concave
-corners, a trial) was added by the owner on 2026-11-23.
+corners, a trial) was added by the owner on 2026-11-23; the trial is
+made: Latin letters get the split, and kana and kanji miss one condition
+(trims).
 
 ## Goal
 
@@ -528,6 +530,69 @@ records the numbers of the trial. The code is on the branch
 `trial/stroke-split` (from `trial/voronoi-middle-line`) until a script
 gets the split.
 
+**Made (2026-11-23): the trial.** The module `split` (on the branch
+`trial/stroke-split`) finds the concave corners, the bridges and the
+pieces, and the stroke finder of today makes the columns of each piece
+(`stroke::Split`, `emb-cli ... --split` or `--split-bridges`). Changes to
+the steps above, from the measures:
+
+- A bridge that does not cut the shape (it joins the outline to a hole,
+  as at the bowl of an Anton "P" or "B") makes a slit, and the stroke
+  finder made fans across it: such a bridge goes.
+- A sharp concave corner with no bridge (a notch: the outline turns 110
+  degrees or more there, as in the "V" of a "w" or the inner corners of
+  an "N", "M" or "Z") gets a cut along the line that halves it, at most
+  2 widths long. Without these cuts, the pieces with a sharp "V" had
+  spikes (Varsity: spikes 15 to 20).
+- A bridge is at most 1.3 widths long (not 2): a longer bridge went
+  across the place where three strokes meet under the bar of 木 in 林,
+  and 林 was 94.8 % covered at 15 mm.
+- Where two strokes cross, the bridges that keep the longer stroke whole
+  (step 2 of the plan) made the Japanese bench worse (7 to 8 characters
+  over 3 % with two layers, 57 trims at 25 mm). The trial keeps the
+  bridges with the least cost: the thinner stroke is cut.
+- The end of a piece at a bridge or a cut goes 0.1 of the length of the
+  bridge into the next piece. Less at the cuts (0.03 or 0) gave more
+  crossing pairs in Varsity or less coverage in Japanese.
+
+The letter fault bench (lettering in the source fonts at 25 mm), the
+stroke finder of today and the split with bridges and cuts:
+
+| Font | Spikes | Crossing pairs | Open area | Open corners | Bulges mm |
+| --- | --- | --- | --- | --- | --- |
+| Block Sans | 17 to 2 | 27 to 15 | 0.57 % to 0.22 % | 43 to 27 | 0.0 to 0.0 |
+| Anton | 44 to 23 | 40 to 24 | 1.67 % to 1.33 % | 54 to 45 | 4.3 to 2.5 |
+| Pacifico | 37 to 25 | 40 to 22 | 0.56 % to 0.45 % | - | 13.5 to 13.4 |
+| Varsity | 15 to 0 | 11 to 6 | 0.49 % to 0.04 % | 33 to 1 | 0.0 to 0.0 |
+
+The lettering bench of P20 (the test font; 15, 25, 50 and 80 mm):
+
+| Way | Characters under 95 % covered | Characters over 3 % with two layers | Two layers, mean at 25 mm | Trims of the eight words at 10, 15, 25, 50, 80 mm |
+| --- | --- | --- | --- | --- |
+| today | 0 | 19, 19, 18, 18 | 1.22 % | 48, 49, 54, 56, 56 |
+| bridges | 0 | 6, 4, 6, 6 | 1.16 % | 49, 50, 56, 56, 56 |
+| bridges and cuts | 0 | 24, 21, 24, 24 | 1.46 % | 45, 50, 54, 56, 56 |
+
+With the middle line of the Voronoi diagram (Milestone 7) in the pieces,
+both scripts were worse: Block Sans 46 open corners, Pacifico bulges
+15.7 mm, ア and ァ under 95 % covered. The fault bench took 29.9 s with the
+split and 21.9 s without; the lettering bench 7.1 s and 8.0 s.
+
+By the decision rule:
+
+- Latin letters: the split with bridges and cuts is better in spikes,
+  crossing pairs, open area and open corners in all four fonts, and in
+  bulges where the stroke finder of today has any (Block Sans and Varsity
+  have none either way). Latin letters get the split.
+- Kana and kanji: the split with bridges has far fewer characters with
+  two layers (19 to 4) and keeps each character 95 % covered, but the
+  eight words have 1, 1 and 2 more trims at 10, 15 and 25 mm (龍 +2, 東京
+  +1; 山田太郎 -1), the same at 50 and 80 mm. It misses one condition;
+  the owner decides.
+
+The code goes to `main` (without the Voronoi middle line) in the next
+step, with the snapshots and the scores of the fonts made again.
+
 ## Exit test of the phase
 
 The exit tests of the six milestones, and the sew-out of Milestone 6.
@@ -537,7 +602,8 @@ The exit tests of the six milestones, and the sew-out of Milestone 6.
 The owner's order: Milestones 1 to 6. Milestone 7 (the trial) comes
 before Milestone 6, so the fonts are made again with the middle line that
 wins (the grid, ADR 0151). Milestone 8 (the trial of the split) comes
-after Milestone 5 and before Milestone 6, for the same reason. The bench (Milestone 1, step 1)
+before Milestone 6, for the same reason; the owner chose to make it
+before Milestone 5 (2026-11-23). The bench (Milestone 1, step 1)
 comes first, as the measure of each milestone. The bundled fonts are made
 again only in Milestone 6, so the sew-outs of the older milestones use
 lettering in the TrueType fonts.
