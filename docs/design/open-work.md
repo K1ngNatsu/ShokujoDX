@@ -53,7 +53,8 @@ machines and systems.
 | Feature | State | Where |
 | --- | --- | --- |
 | Help and tutorials: pictures in the help, Show Me, guided lessons, the sew-out doctor, samples and Try It, ways to start, the help on the web and as a manual, moving pictures, better answers | Proposed (2026-11-18): nine milestones | P19, `docs/design/p19-plan.md` |
-| Browser version | Later: after the first feedback of users on the desktop program (about v0.4) | P15 in the roadmap |
+| Browser version | A trial on the branch `trial/browser`, on GitHub Pages for testers (2026-11-21 and 22: touch, phones, the loader); step 2 (the web version for computers) not started | P15 in the roadmap, `docs/design/p15-trial-report.md` on the branch |
+| Touch in the desktop program (Windows touch screens) | Planned (owner, 2026-11-22). From the trial: two fingers pan and zoom, handles and targets for a finger, the touch bars (the draw tools and the sketch Dimension tool), the wider line between panels, the side panels under the canvas on a tall narrow screen. In the program today: the touch bar of the draw tools (Next or Finish), the ruler menu with a long press | P15 step 3 in the roadmap |
 | The assistant | Benched (owner) | P10 Milestone 9 |
 | Sequins and beads: sequin objects and lettering, sequin shapes and fixings, flip sequins, the sequin mode of DST | Waits for a tester with such a machine | P9 Milestone 6 |
 | Chenille and Schiffli | Waits for a tester with such a machine and a public description of the format | P9 Milestone 7 |

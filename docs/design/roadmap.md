@@ -1747,7 +1747,9 @@ Code signing (ADR 0062) does not wait for this phase.
    long press for menus, larger targets (from simple mode); an install
    for offline use ("Add to Home Screen"); tests on an iPad (memory of
    Safari) and an Android tablet. The tasks of a tablet first: lettering,
-   placement, colors and output.
+   placement, colors and output. The desktop program gets the same touch
+   support for touch screens on Windows (owner, 2026-11-22; see "Touch in
+   the desktop program" in `docs/design/open-work.md`).
 
 **Not in this phase.** Apps in the App Store or Google Play: the GPL and
 the terms of the App Store do not agree (and the code ported from
