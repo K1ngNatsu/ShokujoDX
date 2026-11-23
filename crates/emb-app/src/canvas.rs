@@ -486,7 +486,7 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
         crate::viewer::draw_magnifier(&painter, ui.ctx(), rect, pos, st);
     }
     crate::viewer::draw_light(&painter, ui.ctx(), rect, st, response.hovered());
-    touch_bar(ui, rect, st, drawing);
+    touch_bar(ui, rect, st);
 }
 
 /// On a touch screen with no keyboard, the buttons for the keys of the
@@ -495,9 +495,18 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
 /// after a touch, so a computer with a mouse does not get it. Next: the
 /// tool goes on to its next part (side B of a column, the holes of a
 /// complex fill); Finish on the last part.
-fn touch_bar(ui: &mut egui::Ui, rect: Rect, st: &mut AppState, drawing: bool) {
+fn touch_bar(ui: &mut egui::Ui, rect: Rect, st: &mut AppState) {
+    if st.tool == Tool::Select || st.sketch.is_some() || !ui.input(|i| i.has_touch_screen()) {
+        return;
+    }
     let has_points = !st.draw.points.is_empty() || !st.draw.stages.is_empty();
-    if !drawing || !has_points || !ui.input(|i| i.has_touch_screen()) {
+    if !has_points {
+        // No shape in work: the way back to the Select tool (Esc on a
+        // keyboard; Cancel takes the points away first), so a tool never
+        // holds a touch screen with no keyboard.
+        if touch_buttons(ui, "touch_draw_bar", rect, &[tr("Done")]).is_some() {
+            st.set_tool(Tool::Select);
+        }
         return;
     }
     let next = st.tool.enter_goes_on(st.draw.points.len(), st.draw.stages.len());
@@ -516,7 +525,10 @@ fn touch_bar(ui: &mut egui::Ui, rect: Rect, st: &mut AppState, drawing: bool) {
 /// over the canvas (the touch bars); the button that was tapped.
 pub(crate) fn touch_buttons(ui: &egui::Ui, id: &str, rect: Rect, labels: &[&str]) -> Option<usize> {
     let mut tapped = None;
-    egui::Area::new(egui::Id::new(id))
+    // An area for each number of buttons: an area keeps its size of the
+    // frame before, so a bar of other buttons would be off the middle for
+    // one frame (a tap there would miss).
+    egui::Area::new(egui::Id::new(id).with(labels.len()))
         .order(egui::Order::Foreground)
         .pivot(egui::Align2::CENTER_BOTTOM)
         .fixed_pos(rect.center_bottom() - Vec2::new(0.0, 16.0))

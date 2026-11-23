@@ -852,6 +852,37 @@ mod tests {
     }
 
     #[test]
+    fn on_a_touch_screen_a_tool_has_a_way_out() {
+        // A tool on a touch screen with no keyboard (no Esc): the touch bar
+        // has Done when no shape is in work, also after Cancel.
+        let mut h = Harness::empty();
+        let touch = |phase| egui::Event::Touch {
+            device_id: egui::TouchDeviceId(1),
+            id: egui::TouchId(0),
+            phase,
+            pos: Pos2::ZERO,
+            force: None,
+        };
+        h.frame(vec![touch(egui::TouchPhase::Cancel)]);
+        let c = h.st.doc.design().hoop.center;
+        let rect = h.map().rect;
+        h.click(
+            PointerButton::Secondary,
+            Pos2::new(h.screen(c).x, rect.min.y + RULER / 2.0),
+        );
+        let item = h.widget(Tool::ConstructionLine.label()).expect("the ruler menu");
+        h.click(PointerButton::Primary, item.center());
+        assert_eq!(h.st.tool, Tool::ConstructionLine);
+        h.click(PointerButton::Primary, h.screen(c));
+        let cancel = h.widget("Cancel").expect("Cancel while a point is there");
+        h.click(PointerButton::Primary, cancel.center());
+        assert!(h.st.draw.points.is_empty());
+        let done = h.widget("Done").expect("Done with no point");
+        h.click(PointerButton::Primary, done.center());
+        assert_eq!(h.st.tool, Tool::Select);
+    }
+
+    #[test]
     fn a_right_click_on_a_ruler_adds_a_guide_there_and_starts_the_mark_tools() {
         for tool in [Tool::Select, Tool::Line] {
             let mut h = Harness::empty();
