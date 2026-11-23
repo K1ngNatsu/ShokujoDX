@@ -164,6 +164,7 @@ Usage:
       the trims of words. --face: the face of a font collection (.ttc; 0 is
       the first). --letters: one line for each character and size too.
   emb-cli letter-faults [--proof <pictures.json>] [--middle grid|voronoi]
+                        [--split | --split-bridges]
       The letter fault bench (P21): the letters A-Z, a-z and 0-9 of the
       four embroidery fonts with a source font in the program, as the
       embroidery font and as lettering in the source font, sewn at 25 mm
@@ -173,7 +174,10 @@ Usage:
       outside. --proof: the pictures of the letters as JSON, for
       tools/letter-faults.py. --middle: the middle line of the stroke
       finder (P21 Milestone 7, a trial; also for lettering-bench, font and
-      font-quality): grid (the default) or voronoi.
+      font-quality): grid (the default) or voronoi. --split: split the
+      outline of each letter into strokes first, at bridges between its
+      concave corners and at its sharp notches (P21 Milestone 8, a trial);
+      --split-bridges: at the bridges only.
   emb-cli view-bench [--out <folder>] [--stress] [--sew]
       The bench of the 3D view (ADR 0122). Make the pictures of the
       reference set (twelve small corpus designs, each for one thing that a
@@ -428,6 +432,8 @@ fn run(args: &[String]) -> Result<(), String> {
                 };
                 emb_letter::stroke::set_middle_line(m);
             }
+            "--split" => emb_letter::stroke::set_split(emb_letter::stroke::Split::Notches),
+            "--split-bridges" => emb_letter::stroke::set_split(emb_letter::stroke::Split::Bridges),
             "--sizes" => {
                 sheet_sizes = it
                     .next()
@@ -1190,6 +1196,9 @@ fn read_fabric(input: &str, fabric: &Option<String>) -> Result<emb_cli::Input, S
 /// With the Voronoi middle line (P21 Milestone 7, a trial): the number of
 /// shapes that got the grid in place of it.
 fn print_middle_line() {
+    if emb_letter::stroke::split_mode() != emb_letter::stroke::Split::Off {
+        println!("split: {:?}", emb_letter::stroke::split_mode());
+    }
     if emb_letter::stroke::middle_line() == emb_letter::stroke::MiddleLine::Voronoi {
         println!(
             "middle line: voronoi ({} shapes on the grid: segments that cross)",

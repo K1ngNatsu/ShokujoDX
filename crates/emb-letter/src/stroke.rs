@@ -31,7 +31,7 @@
 //! along its long axis.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering};
 
 use emb_geom::region::ring_contains;
 use emb_geom::{BBox, Path, Point};
@@ -206,6 +206,37 @@ pub enum MiddleLine {
 }
 
 static VORONOI: AtomicBool = AtomicBool::new(false);
+static SPLIT: AtomicU8 = AtomicU8::new(0);
+
+/// The split of the outline at its concave corners before the stroke
+/// finder (P21 Milestone 8, a trial).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Split {
+    /// No split: the stroke finder of today.
+    #[default]
+    Off,
+    /// Bridges between pairs of concave corners (the measure of the trial
+    /// for kana and kanji).
+    Bridges,
+    /// Bridges, and a cut at each sharp concave corner with no bridge (the
+    /// measure of the trial for Latin letters).
+    Notches,
+}
+
+/// Sets the split of [`strokes`] in this process (the benches of the trial
+/// set it; the program does not split).
+pub fn set_split(mode: Split) {
+    SPLIT.store(mode as u8, Ordering::Relaxed);
+}
+
+/// The split of [`strokes`] in this process.
+pub fn split_mode() -> Split {
+    match SPLIT.load(Ordering::Relaxed) {
+        1 => Split::Bridges,
+        2 => Split::Notches,
+        _ => Split::Off,
+    }
+}
 static GRID_INSTEAD: AtomicUsize = AtomicUsize::new(0);
 
 /// Sets the middle line of [`strokes`] for this process (the benches of the
@@ -1302,7 +1333,40 @@ fn extend(mut pts: Vec<Point>, free: [bool; 2], g: &Grid, reach: f64) -> Piece {
 
 /// Satin columns for a glyph shape (rings in font units, Y down).
 pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
-    strokes_with(rings, cap_height, middle_line())
+    let middle = middle_line();
+    let mode = split_mode();
+    if mode != Split::Off
+        && let Some(split) = crate::split::split(rings, cap_height, mode == Split::Notches)
+    {
+        // Each piece is one stroke (P21 Milestone 8, a trial).
+        let parts: Vec<(Strokes, f64)> = split
+            .pieces
+            .iter()
+            .map(|p| (strokes_with(&p.rings, cap_height, middle), p.area))
+            .collect();
+        return merged(parts);
+    }
+    strokes_with(rings, cap_height, middle)
+}
+
+/// The columns of the pieces of a shape as one, with the coverage of each
+/// piece in proportion to its area.
+fn merged(parts: Vec<(Strokes, f64)>) -> Strokes {
+    let total: f64 = parts.iter().map(|p| p.1).sum::<f64>().max(1e-12);
+    let mut out = Strokes::default();
+    for (s, area) in parts {
+        out.coverage += s.coverage * area / total;
+        out.max_width = out.max_width.max(s.max_width);
+        out.satins.extend(s.satins);
+    }
+    let mut widths: Vec<f64> = out
+        .satins
+        .iter()
+        .flat_map(|s| s.rungs.iter().map(|(a, b)| a.distance(*b)))
+        .collect();
+    widths.sort_by(f64::total_cmp);
+    out.typical_width = widths.get(widths.len() / 2).copied().unwrap_or(out.max_width);
+    out
 }
 
 /// [`strokes`] with the middle line `middle`.

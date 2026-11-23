@@ -33,6 +33,7 @@ pub mod route;
 pub mod shape;
 pub mod sheet;
 pub mod source;
+mod split;
 pub mod stroke;
 pub mod style;
 pub mod teamnames;
