@@ -1,0 +1,226 @@
+# Plan: Letter shapes (phase P21)
+
+Date: 2026-11-23 · Status: Accepted (owner, 2026-11-23: the six fixes of
+the review of the font pipeline, in this order).
+
+## Goal
+
+The letters that the program makes from a font keep the shape of the
+font. The owner sees five faults in the letters of the embroidery fonts
+and of lettering in TrueType fonts:
+
+- spikes outside the shape of the letter;
+- bulges that look out of place;
+- a sew order that gives letters a bad shape;
+- areas with no stitches (most often at corners);
+- faults at the corners of letters.
+
+This phase removes the causes of these faults, not each fault alone. A
+measure on the needle points comes first, so each milestone shows what it
+changed.
+
+## The cause
+
+The stroke finder makes a column from the middle line of a stroke: lines
+square to the middle line meet the outline, and their ends are the rails
+(`stroke::rails`). The end of a column is one line square to the stroke.
+Then steps after it try to make the ends right: the ends go on to the
+edge of the shape (`stroke::extend`), go back out of other strokes
+(`trim_start_out_of`, `trim_ends`), follow the outline to the corners of
+a free end (`trace_side`), and go on into open corners
+(`tune::extend_ends`, for the embroidery fonts only). The outline is never
+the edge of a column, and no step looks at the needle points.
+
+- A letter ends at a slant (the feet of "A", the top of "M", the arms of
+  "k") or round (a script font), but the column ends square: one corner
+  of the end is out of the letter (a spike), the other corner has no
+  stitches.
+- A line square to the middle line goes on into a junction until its
+  limit (1.6 half-widths): the column is wider there (a bulge). Short arms
+  (the bar of a "t") are removed as side branches, and the stem covers
+  them with a bulge.
+- On the inside of a tight curve, the rail goes back: stitches cross.
+- The rails are straight lines between points 0.7 half-widths apart: they
+  cut the corners of the outline and lie inside its outer curves.
+- `trace_side` stops where the outline turns 70° from its first segment,
+  so on an end at a slant one side goes on along the end edge, and at a
+  junction into the next stroke ("r").
+- The checks (the coverage of Auto, the score, the tuning, the route) see
+  the area between the rails, not the needle points. A missing corner is
+  less than 3 % of a letter, so the second pass of the stroke finder
+  counts it as covered.
+- The route puts a column that ends in another column on top of it in a
+  third of the joints.
+- The bundled embroidery fonts were made on 2026-11-19, before the stroke
+  finder of P20 Milestone 3. Lettering in TrueType fonts does not get
+  `tune::extend_ends`.
+
+## What the measures of 2026-11-23 show
+
+The letter fault bench (Milestone 1, step 1): A to Z, a to z and 0 to 9
+of the four embroidery fonts with a source font in the program, at 25 mm,
+with the default satin settings. "emb": the bundled embroidery font;
+"ttf": lettering in its source font (the stroke finder of today).
+
+| Font | Spikes: at ends / middle | Out with no pull compensation | Rail points out: ends / middle | Crossing pairs | Bulges (mm) | Open area (%) | Corners open | Ends on top / under |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Block Sans emb | 149 / 4 | 239 | 424 / 67 | 5 | 0.6 | 0.96 | 35 of 233 | 33 / 77 |
+| Block Sans ttf | 59 / 2 | 98 | 198 / 36 | 10 | 0.4 | 1.47 | 48 of 233 | 24 / 71 |
+| Anton emb | 212 / 11 | 348 | 637 / 134 | 232 | 15.3 | 2.71 | 113 of 330 | 41 / 67 |
+| Anton ttf | 113 / 10 | 194 | 346 / 96 | 94 | 9.1 | 2.84 | 75 of 330 | 28 / 74 |
+| Pacifico emb | 566 / 9 | 748 | 1074 / 121 | 153 | 16.4 | 1.67 | (none) | 58 / 113 |
+| Pacifico ttf | 97 / 4 | 148 | 230 / 87 | 66 | 13.7 | 2.01 | (none) | 40 / 81 |
+| Varsity emb | 54 / 1 | 89 | 252 / 81 | 77 | 0.2 | 0.76 | 58 of 531 | 146 / 158 |
+| Varsity ttf | 17 / 1 | 27 | 121 / 63 | 23 | 0.2 | 0.93 | 59 of 531 | 131 / 148 |
+
+- Spikes: needle points more than 0.4 mm out of the outline (the pull
+  compensation is 0.2 mm). 96 % to 99 % are near the end of a column, and
+  most are out with no pull compensation too: the shape of the column is
+  wrong, not the compensation.
+- The letters with most faults: spikes in Pacifico "w", "m", "4" and
+  Anton "M"; crossing stitches in Anton "c", "S", "s", "3", "6", "9";
+  bulges in Anton "M", "W", "w", "t" and Pacifico "m"; open corners in
+  Varsity "X", "x", Anton "t", "G", "w"; stitches across a notch in Block
+  Sans "r".
+- Travel runs outside the outline: 0.6 mm to 13.6 mm in each font.
+
+## Milestone 1: the outline is the edge of a column (L)
+
+1. **The letter fault bench** (`emb_cli::letter_faults`,
+   `emb-cli letter-faults [--proof <file>]`, pictures with
+   `tools/letter-faults.py`): the measures of the table above. It is the
+   measure of each milestone of this phase.
+2. **Rails from the outline.** Each point of the middle line takes the
+   nearest point of the outline on each side (its foot), not the point of
+   a line square to the middle line. Between two feet on the same ring of
+   the outline, the rail follows the outline, with its points and its
+   corners.
+3. **Openings.** Where a side passes the place where another stroke meets
+   or crosses (the foot jumps far along the outline, or it is much
+   farther than the half-width of the stroke), the rail goes straight
+   across the opening, at the width of the stroke before and after it.
+4. **One way.** The feet on a side go along the outline one way only: a
+   foot that would go back stays at the foot before (the inside of a
+   tight curve), so stitches do not cross.
+5. The steps that make columns again (`stroke::trim_column_ends`) keep the
+   points of the outline.
+
+The ends of the columns do not change in this milestone (Milestone 2).
+
+**Exit test:** the bench, lettering in the four source fonts (ttf), in
+each font: no rail point more than 0.1 mm out of the outline in the
+middle of a column; at most a quarter of the crossing pairs of today; at
+most 0.5 mm of sides that go back; at most half the bulges of today in
+Anton and Pacifico; less open area than today; not more spikes or open
+corners than today. The tests and the golden snapshots pass (a change of
+a snapshot has a note).
+
+## Milestone 2: one way to end a column (L)
+
+Each end of a column is a line, and the rails end at its two points:
+
+1. **A free end** (the end of a pen stroke): the end edge of the outline
+   from the corner of one side to the corner of the other. A corner is
+   where the outline leaves the direction of the stroke (not the
+   direction of its first segment). The stitches turn to the angle of the
+   end over about one width of the column. A round end gets a short last
+   part whose rails close along the outline.
+2. **A corner** (a cut of a stroke that turns): a mitre line from the
+   inner corner to the outer corner of the outline. The two columns meet
+   on this line (as `emb_model::mitre` joins columns).
+3. **A junction or a crossing**: the edge of the other column, with a
+   small overlap into it.
+
+These replace `stroke::extend`, the cut of the start of a piece at a
+corner, `trace_side`, the cut back of ends in `trim_ends`, and
+`tune::extend_ends`. Short pieces and the pieces of a corner get the same
+ends as long pieces.
+
+**Exit test:** the bench, ttf, in each font: at most a tenth of the
+spikes and of the needle points out with no pull compensation of today;
+at most 5 % of the convex corners open; no stitch across a notch; open
+area at corners at most a quarter of today.
+
+## Milestone 3: the middle line (M)
+
+The faults of the middle line that Milestones 1 and 2 do not remove:
+
+1. A square end of a stroke: the middle line forks into its two corners;
+   the stroke finder keeps one branch, so the line bends to one corner.
+   Both branches go, and the line ends at the fork, in the middle.
+2. A short arm (the bar of "t", the arms of "E" and "F", serifs) is a
+   stroke of its own if it is longer than its distance into the junction,
+   not a side branch.
+3. At an L corner, the middle line bends into the outer corner. The bend
+   is cut, so each piece is straight up to the corner.
+4. The ends of smoothing: the first and the last points are smoothed too
+   (with the points of the line only).
+
+**Exit test:** the bench, ttf: no open corner in Anton "t", Block Sans
+"E", "F", "k" and Varsity "X", "x"; at most 1 mm of bulges and at most
+0.5 % open area in each font.
+
+## Milestone 4: the needle points decide (M)
+
+1. `emb-letter` uses `emb-stitch` (a new dependency between two engine
+   crates; an ADR and the dependency direction in the spec). The quality
+   score of a letter adds needle points out of the outline, crossing
+   stitches and open corners (`quality::LetterQuality`).
+2. The choices of the converter use them: columns or fill for each letter
+   (`EmbFont::choose_fills`), the ends, the coverage of Auto
+   (`glyph::AUTO_MIN_COVERAGE`), and the second pass of the stroke finder
+   (a missing corner is not a sliver).
+3. The bench becomes a snapshot test (`tests/letter_faults.rs`), so a
+   change that makes the letters worse shows in CI.
+
+**Exit test:** the snapshot runs in CI; a letter with spikes gets a lower
+score than the same letter with none; no font of the program goes below
+the score limit.
+
+## Milestone 5: the sew order at joints (M)
+
+1. **Layers.** A column that ends in another column sews before it, so
+   the other column covers its end (a cost in the route between the
+   trims and the travel).
+2. **Travel at each size.** The route is made at 25 mm; the gaps that need
+   no run (`NO_RUN`) and the distance of a run from the edge (`EDGE`) are
+   checked at the largest size of the font, in mm.
+3. **Seams.** A column that the route cuts at a junction is cut at one
+   pair across it, not at the nearest point of each rail.
+
+**Exit test:** the bench: at most 5 % of the joints have the column that
+ends on top, with no more trims than today; no travel run out of the
+outline.
+
+## Milestone 6: one way for all letters, and new fonts (M)
+
+1. Lettering in TrueType fonts gets the same steps as the converter.
+2. The bundled embroidery fonts and the font packages are made again
+   (`tools/make-embroidery-fonts.py`), audited, and the proof pictures of
+   the ten tuned fonts are looked at. (This is also the open work of P20:
+   the fonts with the stroke finder of P20 Milestone 3.)
+3. A sew-out kit: the test sheets of the ten tuned fonts at three sizes,
+   and the letters with the most faults of the table above.
+
+**Exit test:** the bench: the embroidery fonts are as good as lettering
+in their source fonts or better; each font has a score of
+`quality::LIMIT` or more; the owner sews the kit and sees no spikes,
+bulges or open corners.
+
+## Exit test of the phase
+
+The exit tests of the six milestones, and the sew-out of Milestone 6.
+
+## Order
+
+The owner's order: Milestones 1 to 6. The bench (Milestone 1, step 1)
+comes first, as the measure of each milestone. The bundled fonts are made
+again only in Milestone 6, so the sew-outs of the older milestones use
+lettering in the TrueType fonts.
+
+## Not in this phase
+
+- New fonts, and letter corrections by hand.
+- The fill letters, and the stitch engine of fills.
+- Japanese characters as a target: the lettering bench of P20 shows the
+  changes there, and they are checked with it.

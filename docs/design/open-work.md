@@ -17,7 +17,7 @@ machines and systems.
 | --- | --- | --- |
 | P20 Milestone 3 | Sew the crossings and junctions at 25 mm and 50 mm, and 刺繍 and 東京 at 40 mm. Then choose the stroke that goes through at a crossing (the longer stroke, or the stroke that sews first) | `out/p20-sewout` and its checklist (`tools/make-sewout-kit-p20.py`; made again after the audit of P20, so use the new files) |
 | P20 Milestone 6 | Sew the sheets of the two Japanese fonts at 20 mm; say which font looks better | The same kit |
-| P20 | After the sew-out: make the bundled embroidery fonts again with the new stroke finder (crossings cut, ends in the strokes they meet), audit them and look at the proof pictures | `tools/make-embroidery-fonts.py` |
+| P20 | After the sew-out: make the bundled embroidery fonts again with the new stroke finder (crossings cut, ends in the strokes they meet), audit them and look at the proof pictures. Now a part of P21 Milestone 6 | `tools/make-embroidery-fonts.py` |
 | P18 part 1 | Milestone 4: a logo with lettering from a machine file at 150 %. Milestone 6: a corpus design written for Ink/Stitch opens there; a converted Ink/Stitch font sews at its sizes. Milestone 7: outlines with a stitch file | "Audit of P18" in the roadmap |
 | P18 part 2 | Milestone 1: the sew-out of the reference set of the 3D view. Milestones 4 and 6: compare the view with photos. Milestone 7: compare with sew-outs. Milestone 8: check a design with the low light, the tilt view and a check view | "Audit of P18"; `docs/design/p18-view-m*-report.md` |
 | P17 | Milestone 1: the update notice with a real release. Milestone 4: a font test sheet. Milestone 5: the test sheets of the ten tuned fonts at three sizes (make the sheets again first; the fonts changed). Milestone 6: one word in Arabic, in Devanagari and in a script font. Milestone 8: five new items of each kind | `out/p17-sewout` (`tools/make-sewout-kit.py`); "Audit of P17" |
@@ -52,6 +52,7 @@ machines and systems.
 
 | Feature | State | Where |
 | --- | --- | --- |
+| Letter shapes: the outline is the edge of each column, one way to end a column, the middle line, checks on the needle points, the sew order at joints, the bundled fonts made again | Accepted (owner, 2026-11-23), started: six milestones | P21, `docs/design/p21-plan.md` |
 | Help and tutorials: pictures in the help, Show Me, guided lessons, the sew-out doctor, samples and Try It, ways to start, the help on the web and as a manual, moving pictures, better answers | Proposed (2026-11-18): nine milestones | P19, `docs/design/p19-plan.md` |
 | Browser version | A trial on the branch `trial/browser`, on GitHub Pages for testers (2026-11-21 and 22: touch, phones, the loader); step 2 (the web version for computers) not started | P15 in the roadmap, `docs/design/p15-trial-report.md` on the branch |
 | Touch in the desktop program (Windows touch screens) | Planned (owner, 2026-11-22). From the trial: two fingers pan and zoom, handles and targets for a finger, the touch bars (the draw tools and the sketch Dimension tool), the wider line between panels, the side panels under the canvas on a tall narrow screen. In the program today: the touch bar of the draw tools (Next or Finish), the ruler menu with a long press | P15 step 3 in the roadmap |

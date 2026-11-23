@@ -163,6 +163,15 @@ Usage:
       part with two layers, and the narrowest and the widest column; and
       the trims of words. --face: the face of a font collection (.ttc; 0 is
       the first). --letters: one line for each character and size too.
+  emb-cli letter-faults [--proof <pictures.json>]
+      The letter fault bench (P21): the letters A-Z, a-z and 0-9 of the
+      four embroidery fonts with a source font in the program, as the
+      embroidery font and as lettering in the source font, sewn at 25 mm
+      and measured against the outline of the source font: needle points
+      outside it, crossing stitches, fans, bulges, open area and open
+      corners, columns that end on top of other columns, travel runs
+      outside. --proof: the pictures of the letters as JSON, for
+      tools/letter-faults.py.
   emb-cli view-bench [--out <folder>] [--stress] [--sew]
       The bench of the 3D view (ADR 0122). Make the pictures of the
       reference set (twelve small corpus designs, each for one thing that a
@@ -880,6 +889,16 @@ fn run(args: &[String]) -> Result<(), String> {
                 count("borders"),
                 count("clipart")
             );
+            Ok(())
+        }
+        ["letter-faults"] => {
+            let fonts = emb_cli::letter_faults::run(false);
+            print!("{}", emb_cli::letter_faults::report(&fonts));
+            if let Some(p) = &audit_proof {
+                std::fs::write(p, emb_cli::letter_faults::pictures(&fonts))
+                    .map_err(|e| format!("{}: {e}", p.display()))?;
+                println!("pictures: {}", p.display());
+            }
             Ok(())
         }
         ["lettering-bench", input] => {
