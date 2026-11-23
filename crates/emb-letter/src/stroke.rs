@@ -17,11 +17,12 @@
 //! 5. Where two strokes cross, the longer one goes through, and the other
 //!    is cut into two strokes that end a little inside its edge (P20
 //!    Milestone 3): one layer of thread at a crossing, not two.
-//! 6. At points along each stroke, lines across the stroke meet the outline:
-//!    these points are the rails of a satin column. Where a line goes into
-//!    another stroke (at a crossing or a junction), that side takes the
-//!    width of the stroke before and after it, so the column has the width
-//!    of its stroke there and not the size of the junction.
+//! 6. Each point of a stroke takes the nearest point of the outline on each
+//!    side (its foot), and the rails of the satin column follow the outline
+//!    from foot to foot (P21 Milestone 1, ADR 0147). Where a side passes
+//!    the place where another stroke meets or crosses (an opening), the rail
+//!    goes straight across it, so the column has the width of its stroke
+//!    there and not the size of the junction.
 //! 7. The end of a column that lies in other columns (a corner, a
 //!    junction, an end that was extended through another stroke) is cut
 //!    back to [`END_OVERLAP`] inside them.
@@ -88,8 +89,44 @@ const OUTLINE_CORNER_ALONG_DEG: f64 = 30.0;
 
 /// A corner of the outline: the point and the directions of its two sides.
 type Corner = (Point, Point, Point);
-/// Rail points are at most this many half-widths from the middle line.
-const MAX_REACH: f64 = 1.6;
+/// A foot (the point of a rail) is at most this far from its middle point,
+/// a factor of the half-width there (the distance to the edge, at most
+/// 1.3 times the middle half-width of the stroke), and [`FOOT_SLACK`]
+/// cells more. Farther, the side is in an opening: a place where another
+/// stroke meets or crosses (P21 Milestone 1).
+const FOOT_REACH: f64 = 1.6;
+const FOOT_SLACK: f64 = 1.5;
+/// A foot is in this angle (degrees) of the normal of the middle line,
+/// on a segment of the outline in [`FOOT_ALONG_DEG`] of the direction of
+/// the middle line: a side of the stroke, not the outline of another
+/// stroke where it meets this one.
+const FOOT_CONE_DEG: f64 = 55.0;
+const FOOT_ALONG_DEG: f64 = 40.0;
+/// A foot that stays at the foot before (as the feet would go back) for
+/// longer than this many times its distance from the middle line (along
+/// the middle line) is not the inside of a curve: the side is in an
+/// opening there.
+const STAY_MAX: f64 = 3.5;
+/// A rail follows the outline between two feet if the outline between them
+/// is at most this many times as long as the line between them (and
+/// [`FOLLOW_SLACK`] cells), and its points are at most [`FOLLOW_NEAR`]
+/// times the half-width of the column from the middle line (and one
+/// cell). Else the outline goes away into another stroke: an opening.
+const FOLLOW_ARC: f64 = 2.0;
+const FOLLOW_SLACK: f64 = 2.0;
+const FOLLOW_NEAR: f64 = 1.6;
+/// A rail also follows the outline round a short arm that is not a stroke
+/// of its own (the graph of the middle lines took it as a side branch: the
+/// top of the stroke of ぁ above its bar): an outline at most this many
+/// times as long as the line between the feet, at most [`STUB_NEAR`]
+/// half-widths from the middle line. The column covers the arm, as the
+/// lines square to the middle line did before. Milestone 3 makes such arms
+/// strokes.
+const STUB_ARC: f64 = 3.5;
+const STUB_NEAR: f64 = 2.2;
+/// Points of the outline that a rail follows go if they are nearer than
+/// this (a factor of the cell) to the line through the points that stay.
+const FOLLOW_THIN: f64 = 0.1;
 /// A stroke that ends where another stroke goes through goes into it this
 /// part of its half-width (from its edge), so there is no gap at the join.
 const JOIN_OVERLAP: f64 = 0.3;
@@ -98,20 +135,23 @@ const JOIN_OVERLAP: f64 = 0.3;
 /// half-widths of the other from the crossing. Else one ends on the other
 /// (a T or an L), and the cut of [`trim_start_out_of`] is for it.
 const CROSS_PAST: f64 = 1.5;
-/// A side of a line across a stroke goes into another stroke when its end
-/// is nearer than this many half-widths of that stroke to its middle line.
-const INTO_OTHER: f64 = 0.8;
 /// At a free end, the rails follow the outline from a pair this far from
 /// the end (a factor of the width of the stroke) to the corners of the end,
 /// where the outline turns more than this (degrees) from the side.
 const END_BACK: f64 = 0.8;
 const END_TURN_DEG: f64 = 70.0;
+/// The traced sides of an end stay this near (a factor of the width of the
+/// stroke) to the place where the middle line meets the outline.
+const END_NEAR_TIP: f64 = 1.5;
 /// A traced end stops where the column is narrower than this part of the
 /// width of the stroke.
 const END_MIN_WIDTH: f64 = 0.3;
 /// The end of a column goes this far into the columns that it ends in (a
 /// factor of its width there), so that there is no gap between them.
 const END_OVERLAP: f64 = 0.08;
+/// The end of a column is cut back where it lies in its own part farther
+/// than this many times its middle width along it ([`trim_ends`]).
+const SELF_GAP: f64 = 3.0;
 /// The points of [`trim_ends`] across a column are this part of its width
 /// in from its sides.
 const SIDE_IN: f64 = 0.12;
@@ -1348,29 +1388,18 @@ pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
     }
     cut_crossings(&mut all, &radius_at, cell);
     let mut columns: Vec<Rails> = Vec::new();
-    // The middle line and the half-width of each piece, for the lines
-    // across the other pieces.
-    let lines: Vec<(Vec<Point>, f64)> = all
-        .iter()
-        .map(|(_, fixed, r_med, p)| (p.pts.clone(), fixed.unwrap_or(*r_med)))
-        .collect();
-    for (k, (_, fixed, r_med, piece)) in all.iter().enumerate() {
+    let outline = Rings::new(rings);
+    for (_, fixed, r_med, piece) in &all {
         let fixed_at = |_: Point| fixed.unwrap_or(0.0);
         let width_at: &dyn Fn(Point) -> f64 = if fixed.is_some() { &fixed_at } else { &radius_at };
-        let others: Vec<(&[Point], f64)> = lines
-            .iter()
-            .enumerate()
-            .filter(|(j, (l, _))| *j != k && l.len() >= 2)
-            .map(|(_, (l, r))| (l.as_slice(), *r))
-            .collect();
-        if let Some((a, b, closed, width)) = rails(piece, *r_med, width_at, &segs, rings, cell, &others) {
+        if let Some((a, b, closed, width)) = rails(piece, *r_med, width_at, &segs, &outline, cell) {
             out.max_width = out.max_width.max(width);
             columns.push(Rails { a, b, closed });
         }
     }
     trim_ends(&mut columns);
     for c in columns.iter().filter(|c| c.a.len() >= 2) {
-        let (satin, quads) = c.geometry();
+        let (satin, quads) = c.geometry(Some((&outline, cell)));
         for q in &quads {
             fill_into(&g, std::slice::from_ref(q), &mut cover);
         }
@@ -1420,15 +1449,374 @@ fn long_axis(g: &Grid, label: &[usize], l: usize, r: f64) -> Raw {
     }
 }
 
+/// The rings of the outline of a glyph, with the length along each ring at
+/// each of its points: the rails of the columns are made from them (P21
+/// Milestone 1).
+struct Rings<'a> {
+    rings: &'a [Vec<Point>],
+    /// For each ring, the length along it at each point, and its whole
+    /// length last.
+    at: Vec<Vec<f64>>,
+}
+
+/// A point of the outline: the point, its ring and the length along the
+/// ring to it.
+#[derive(Debug, Clone, Copy)]
+struct Foot {
+    at: Point,
+    ring: usize,
+    s: f64,
+}
+
+impl<'a> Rings<'a> {
+    fn new(rings: &'a [Vec<Point>]) -> Rings<'a> {
+        let at = rings
+            .iter()
+            .map(|r| {
+                let mut v = vec![0.0];
+                for k in 0..r.len() {
+                    v.push(v[k] + r[k].distance(r[(k + 1) % r.len()]));
+                }
+                v
+            })
+            .collect();
+        Rings { rings, at }
+    }
+
+    fn len(&self, ring: usize) -> f64 {
+        self.at[ring].last().copied().unwrap_or(0.0)
+    }
+
+    /// The nearest point of the outline to `p` (of the segments in the
+    /// angle [`FOOT_ALONG_DEG`] of the direction of the middle line, the
+    /// normal `dir` turned, whose nearest point is in the angle
+    /// [`FOOT_CONE_DEG`] of `dir`), at most `reach` away; with `dir` zero,
+    /// of all segments.
+    fn nearest(&self, p: Point, dir: Point, reach: f64) -> Option<Foot> {
+        let cos = emb_geom::math::cos(emb_geom::math::to_radians(FOOT_CONE_DEG));
+        let cos_along = emb_geom::math::cos(emb_geom::math::to_radians(FOOT_ALONG_DEG));
+        let tangent = dir.perp();
+        let mut best: Option<(f64, Foot)> = None;
+        for (r, ring) in self.rings.iter().enumerate() {
+            let m = ring.len();
+            for k in 0..m {
+                let (a, b) = (ring[k], ring[(k + 1) % m]);
+                let q = p.nearest_on_segment(a, b);
+                let v = q - p;
+                let d = v.length();
+                if d > reach || best.is_some_and(|(bd, _)| d >= bd) {
+                    continue;
+                }
+                if dir != Point::ZERO {
+                    if d > 1e-12 && v.dot(dir) < cos * d {
+                        continue;
+                    }
+                    let seg = b - a;
+                    if seg.dot(tangent).abs() < cos_along * seg.length() {
+                        continue;
+                    }
+                }
+                let foot = Foot {
+                    at: q,
+                    ring: r,
+                    s: self.at[r][k] + a.distance(q),
+                };
+                best = Some((d, foot));
+            }
+        }
+        best.map(|(_, f)| f)
+    }
+
+    /// The length along the ring from `a` to `b` the short way: positive
+    /// in the direction of the ring. Both are on the same ring.
+    fn delta(&self, a: &Foot, b: &Foot) -> f64 {
+        let l = self.len(a.ring);
+        let mut d = b.s - a.s;
+        if d > 0.5 * l {
+            d -= l;
+        } else if d < -0.5 * l {
+            d += l;
+        }
+        d
+    }
+
+    /// The points of the ring strictly between `a` and `b`, the short way,
+    /// in order from `a`.
+    fn between(&self, a: &Foot, b: &Foot) -> Vec<Point> {
+        let (ring, at) = (&self.rings[a.ring], &self.at[a.ring]);
+        let (m, l) = (ring.len(), self.len(a.ring));
+        let d = self.delta(a, b);
+        if m == 0 || l <= 0.0 || d.abs() < 1e-12 {
+            return Vec::new();
+        }
+        // How far point `k` is past `a` in the direction of travel.
+        let past = |k: usize| {
+            let x = if d > 0.0 { at[k] - a.s } else { a.s - at[k] };
+            x.rem_euclid(l)
+        };
+        let mut ks: Vec<usize> = (0..m)
+            .filter(|&k| past(k) > 1e-12 && past(k) < d.abs() - 1e-12)
+            .collect();
+        ks.sort_by(|&x, &y| past(x).total_cmp(&past(y)));
+        ks.into_iter().map(|k| ring[k]).collect()
+    }
+
+    /// The rail goes along the outline from `fa` to `fb` (the feet of the
+    /// middle points `ma` and `mb`): they are on one ring, and the outline
+    /// between them stays near the column. Else the outline goes away into
+    /// another stroke between them (an opening).
+    fn follows(&self, fa: &Foot, fb: &Foot, ma: Point, mb: Point, cell: f64) -> bool {
+        if fa.ring != fb.ring {
+            return false;
+        }
+        let chord = fa.at.distance(fb.at);
+        let arc = self.delta(fa, fb).abs();
+        if arc > STUB_ARC * chord + FOLLOW_SLACK * cell {
+            return false;
+        }
+        let h = fa.at.distance(ma).max(fb.at.distance(mb));
+        let far = self
+            .between(fa, fb)
+            .iter()
+            .map(|v| v.distance_to_segment(ma, mb))
+            .fold(0.0, f64::max);
+        let near =
+            |arc_max: f64, near_max: f64| arc <= arc_max * chord + FOLLOW_SLACK * cell && far <= near_max * h + cell;
+        near(FOLLOW_ARC, FOLLOW_NEAR) || near(STUB_ARC, STUB_NEAR)
+    }
+
+    /// The points of the outline between two rail points next to each
+    /// other (`p` and `q`, of the pairs with the middles `mp` and `mq`),
+    /// if both are on the outline and the rail follows it there: fewer of
+    /// them where the outline is almost straight.
+    fn along(&self, p: Point, q: Point, mp: Point, mq: Point, cell: f64) -> Vec<Point> {
+        let tol = 0.02 * cell;
+        let (Some(fa), Some(fb)) = (self.nearest(p, Point::ZERO, tol), self.nearest(q, Point::ZERO, tol)) else {
+            return Vec::new();
+        };
+        if !self.follows(&fa, &fb, mp, mq, cell) {
+            return Vec::new();
+        }
+        thin_line(p, &self.between(&fa, &fb), q, FOLLOW_THIN * cell)
+    }
+}
+
+/// The points of `mid` (a line from `a` to `b`) that stay when the points
+/// nearer than `tol` to the line through the others go (Douglas and
+/// Peucker).
+fn thin_line(a: Point, mid: &[Point], b: Point, tol: f64) -> Vec<Point> {
+    let Some((k, d)) = mid
+        .iter()
+        .enumerate()
+        .map(|(k, p)| (k, p.distance_to_segment(a, b)))
+        .max_by(|x, y| x.1.total_cmp(&y.1))
+    else {
+        return Vec::new();
+    };
+    if d <= tol {
+        return Vec::new();
+    }
+    let mut out = thin_line(a, &mid[..k], mid[k], tol);
+    out.push(mid[k]);
+    out.extend(thin_line(mid[k], &mid[k + 1..], b, tol));
+    out
+}
+
+/// The middle line of a piece, for its rails.
+struct Middle<'a> {
+    pts: &'a [Point],
+    /// The normal at each point (to the side of rail A).
+    nrm: &'a [Point],
+    /// The points that get no foot (extensions and held points).
+    skip: &'a [bool],
+    /// The length along the line at each point.
+    along: &'a [f64],
+    closed: bool,
+}
+
+/// The rail of one side of a piece (`sign` 1: rail A, -1: rail B; P21
+/// Milestone 1). Each point of the middle line that is not skipped takes
+/// the nearest point of the outline on that side (its foot), in the angle
+/// [`FOOT_CONE_DEG`] of its normal, at most [`FOOT_REACH`] half-widths
+/// away. The rail follows the outline from foot to foot (`Rails::geometry`
+/// adds the points of the outline).
+///
+/// - Where a side passes an opening (a place where another stroke meets or
+///   crosses: no foot near enough, or two feet with an outline between
+///   them that goes away into the other stroke), the rail goes straight
+///   across it, from the foot before to the foot after. A foot that stays
+///   at the corner of an opening (as the middle line goes on past it) is
+///   in the opening too.
+/// - The feet go along the outline one way only: a foot that would go back
+///   stays at the foot before it (the inside of a tight curve), so the
+///   stitches do not cross.
+///
+/// `None` for the points that are skipped.
+fn side_rail(
+    line: &Middle,
+    sign: f64,
+    outline: &Rings,
+    segs: &[(Point, Point)],
+    radius_at: &dyn Fn(Point) -> f64,
+    cell: f64,
+) -> Vec<Option<Point>> {
+    let (pts, n) = (line.pts, line.pts.len());
+    let mut out: Vec<Option<Point>> = vec![None; n];
+    let body: Vec<usize> = (0..n).filter(|&i| !line.skip[i]).collect();
+    if body.is_empty() {
+        return out;
+    }
+    let dir = |i: usize| line.nrm[i] * sign;
+    let mut feet: Vec<Option<Foot>> = vec![None; n];
+    for &i in &body {
+        let reach = FOOT_REACH * radius_at(pts[i]) + FOOT_SLACK * cell;
+        feet[i] = outline.nearest(pts[i], dir(i), reach);
+    }
+    // The body points next to each other (positions in `body`), and the
+    // last with the first in a ring.
+    let count = body.len();
+    let mut pairs: Vec<(usize, usize)> = (1..count).map(|q| (q - 1, q)).collect();
+    if line.closed && count > 2 {
+        pairs.push((count - 1, 0));
+    }
+    let same = |a: &Option<Foot>, b: &Foot| a.is_some_and(|a| a.at.distance(b.at) <= 1e-3 * cell);
+    let mut open: Vec<bool> = body.iter().map(|&i| feet[i].is_none()).collect();
+    for &(qa, qb) in &pairs {
+        let (i, j) = (body[qa], body[qb]);
+        let (Some(fa), Some(fb)) = (feet[i], feet[j]) else {
+            continue;
+        };
+        if same(&feet[i], &fb) || outline.follows(&fa, &fb, pts[i], pts[j], cell) {
+            continue;
+        }
+        // A jump of the foot: the feet that stayed at its two ends (but the
+        // first and the last of them) are in the opening.
+        let mut q = qa;
+        while q > 0 && same(&feet[body[q - 1]], &fa) {
+            open[q] = true;
+            q -= 1;
+        }
+        let mut q = qb;
+        while q + 1 < count && same(&feet[body[q + 1]], &fb) {
+            open[q] = true;
+            q += 1;
+        }
+    }
+    // One way: the direction in which the feet go along their rings.
+    let mut way = 0.0;
+    for &(qa, qb) in &pairs {
+        let (i, j) = (body[qa], body[qb]);
+        if let (false, false, Some(fa), Some(fb)) = (open[qa], open[qb], feet[i], feet[j])
+            && outline.follows(&fa, &fb, pts[i], pts[j], cell)
+        {
+            way += outline.delta(&fa, &fb);
+        }
+    }
+    if way != 0.0 {
+        let mut last: Option<(usize, Foot)> = None;
+        // The positions of the feet that stay at `last`.
+        let mut stays: Vec<usize> = Vec::new();
+        let end_stays = |stays: &mut Vec<usize>, last: Option<(usize, Foot)>, open: &mut Vec<bool>| {
+            if let (Some(&q_end), Some((l, lf))) = (stays.last(), last) {
+                let h = lf.at.distance(pts[l]).max(cell);
+                if (line.along[body[q_end]] - line.along[l]).abs() > STAY_MAX * h {
+                    for &q in stays.iter() {
+                        open[q] = true;
+                    }
+                }
+            }
+            stays.clear();
+        };
+        for (q, &i) in body.iter().enumerate() {
+            let Some(f) = feet[i].filter(|_| !open[q]) else {
+                end_stays(&mut stays, last, &mut open);
+                last = None;
+                continue;
+            };
+            if let Some((l, lf)) = last
+                && lf.ring == f.ring
+                && outline.delta(&lf, &f) * way.signum() < -0.25 * cell
+                && outline.follows(&lf, &f, pts[l], pts[i], cell)
+            {
+                feet[i] = Some(lf);
+                stays.push(q);
+                continue;
+            }
+            end_stays(&mut stays, last, &mut open);
+            last = Some((i, f));
+        }
+        end_stays(&mut stays, last, &mut open);
+    }
+    // The feet, and straight lines across the openings.
+    let closed_at = |q: usize| !open[q] && feet[body[q]].is_some();
+    // The body point nearest to position `q` (before it with `back`) that
+    // has a foot.
+    let find = |q: usize, back: bool| -> Option<usize> {
+        (1..count)
+            .map(|k| {
+                if line.closed {
+                    Some(if back { (q + count - k) % count } else { (q + k) % count })
+                } else if back {
+                    q.checked_sub(k)
+                } else {
+                    Some(q + k).filter(|&x| x < count)
+                }
+            })
+            .take_while(Option::is_some)
+            .flatten()
+            .find(|&k| closed_at(k))
+    };
+    for q in 0..count {
+        let i = body[q];
+        if closed_at(q) {
+            out[i] = feet[i].map(|f| f.at);
+            continue;
+        }
+        let d = dir(i);
+        // The width of the side along the normal at a foot.
+        let width = |k: usize| {
+            let j = body[k];
+            feet[j].map_or(0.0, |f| (f.at - pts[j]).dot(dir(j))).max(0.25 * cell)
+        };
+        let far = 4.0 * radius_at(pts[i]) + 2.0 * cell;
+        let mut p = match (find(q, true), find(q, false)) {
+            (Some(ka), Some(kb)) => {
+                let fa = feet[body[ka]].map_or(pts[i], |f| f.at);
+                let fb = feet[body[kb]].map_or(pts[i], |f| f.at);
+                match Point::crossing(pts[i], pts[i] + d * far, fa, fb) {
+                    Some((u, _)) if u > 0.0 => pts[i] + d * (u * far),
+                    _ => {
+                        let (la, lb) = (line.along[body[ka]], line.along[body[kb]]);
+                        let t = if (lb - la).abs() > 1e-12 {
+                            ((line.along[i] - la) / (lb - la)).clamp(0.0, 1.0)
+                        } else {
+                            0.5
+                        };
+                        fa.lerp(fb, t)
+                    }
+                }
+            }
+            (Some(k), None) | (None, Some(k)) => pts[i] + d * width(k),
+            (None, None) => pts[i] + d * radius_at(pts[i]),
+        };
+        // Not past the outline.
+        let len = (p - pts[i]).length();
+        if let Some(t) = ray(pts[i], d, len, segs).filter(|t| *t < len) {
+            p = pts[i] + d * t;
+        }
+        out[i] = Some(p);
+    }
+    out
+}
+
 /// The satin column of a piece, its widest width and the quads it covers.
 fn rails(
     piece: &Piece,
     r_med: f64,
     radius_at: &dyn Fn(Point) -> f64,
     segs: &[(Point, Point)],
-    rings: &[Vec<Point>],
+    outline: &Rings,
     cell: f64,
-    others: &[(&[Point], f64)],
 ) -> Option<(Vec<Point>, Vec<Point>, bool, f64)> {
     // A short stroke (a dot) gets more points, so that its round sides
     // are round.
@@ -1495,63 +1883,28 @@ fn rails(
         (b - a).normalized().unwrap_or(Point::new(1.0, 0.0))
     };
     let cap = 1.3 * r_med;
+    let nrm: Vec<Point> = (0..n).map(|i| tangent(i).perp()).collect();
+    // The rails of the middle points are the outline (P21 Milestone 1).
+    let line = Middle {
+        pts: &pts,
+        nrm: &nrm,
+        skip: &is_ext,
+        along: &along,
+        closed,
+    };
+    let capped = |p: Point| radius_at(p).min(cap);
+    let (rail_a, rail_b) = (
+        side_rail(&line, 1.0, outline, segs, &capped, cell),
+        side_rail(&line, -1.0, outline, segs, &capped, cell),
+    );
+    // The width of each middle point on each side, along its normal.
     let mut half: Vec<(f64, f64)> = vec![(0.0, 0.0); n];
     for i in 0..n {
-        if is_ext[i] {
-            continue;
-        }
-        let nrm = tangent(i).perp();
-        let r = radius_at(pts[i]).min(cap);
-        let reach = MAX_REACH * r + cell;
-        let hp = ray(pts[i], nrm, reach, segs).unwrap_or(r);
-        let hm = ray(pts[i], -nrm, reach, segs).unwrap_or(r);
-        half[i] = (hp.max(0.25 * cell), hm.max(0.25 * cell));
-    }
-    // A side of a line across the stroke that goes into another stroke (a
-    // crossing, a junction) takes the width of that side before and after
-    // it, along the stroke: the column has the width of its stroke there.
-    for side in 0..2 {
-        let get = |h: &(f64, f64)| if side == 0 { h.0 } else { h.1 };
-        let sign = if side == 0 { 1.0 } else { -1.0 };
-        let into: Vec<bool> = (0..n)
-            .map(|i| {
-                if is_ext[i] {
-                    return false;
-                }
-                let end = pts[i] + tangent(i).perp() * (sign * get(&half[i]));
-                others.iter().any(|(l, r)| nearest(l, end).1 < INTO_OTHER * r)
-            })
-            .collect();
-        let mut i = 0;
-        while i < n {
-            if !into[i] {
-                i += 1;
-                continue;
-            }
-            let start = i;
-            while i < n && into[i] {
-                i += 1;
-            }
-            let before = (0..start).rev().find(|&j| !is_ext[j] && !into[j]);
-            let after = (i..n).find(|&j| !is_ext[j] && !into[j]);
-            for j in start..i {
-                let v = match (before, after) {
-                    (Some(a), Some(b)) => {
-                        let t = (along[j] - along[a]) / (along[b] - along[a]).max(1e-9);
-                        get(&half[a]) + (get(&half[b]) - get(&half[a])) * t
-                    }
-                    (Some(a), None) => get(&half[a]),
-                    (None, Some(b)) => get(&half[b]),
-                    (None, None) => continue,
-                };
-                // Not wider than the outline there.
-                let h = &mut half[j];
-                if side == 0 {
-                    h.0 = h.0.min(v);
-                } else {
-                    h.1 = h.1.min(v);
-                }
-            }
+        if let (Some(pa), Some(pb)) = (rail_a[i], rail_b[i]) {
+            half[i] = (
+                (pa - pts[i]).dot(nrm[i]).max(0.25 * cell),
+                (pts[i] - pb).dot(nrm[i]).max(0.25 * cell),
+            );
         }
     }
     // Extensions take the width of the nearest middle point.
@@ -1561,15 +1914,18 @@ fn rails(
         if is_ext[i] {
             // The held width, but not past the outline (a pointed end narrows).
             let (hp, hm) = if i < first { half[first] } else { half[last] };
-            let nrm = tangent(i).perp();
-            let hp = ray(pts[i], nrm, hp, segs).unwrap_or(hp);
-            let hm = ray(pts[i], -nrm, hm, segs).unwrap_or(hm);
+            let hp = ray(pts[i], nrm[i], hp, segs).unwrap_or(hp);
+            let hm = ray(pts[i], -nrm[i], hm, segs).unwrap_or(hm);
             half[i] = (hp.max(0.25 * cell), hm.max(0.25 * cell));
         }
     }
-    let mut a: Vec<Point> = (0..n).map(|i| pts[i] + tangent(i).perp() * half[i].0).collect();
-    let mut b: Vec<Point> = (0..n).map(|i| pts[i] - tangent(i).perp() * half[i].1).collect();
-    let width = half.iter().map(|h| h.0 + h.1).fold(0.0, f64::max);
+    let mut a: Vec<Point> = (0..n)
+        .map(|i| rail_a[i].unwrap_or(pts[i] + nrm[i] * half[i].0))
+        .collect();
+    let mut b: Vec<Point> = (0..n)
+        .map(|i| rail_b[i].unwrap_or(pts[i] - nrm[i] * half[i].1))
+        .collect();
+    let width = (0..n).map(|i| a[i].distance(b[i])).fold(0.0, f64::max);
     // At a free end, each rail follows its side of the outline to the
     // corner of the end: an end that the font cuts at a slant (or gives a
     // shape) is covered to its corners. The middle line bends to the sharp
@@ -1595,11 +1951,21 @@ fn rails(
             };
             let reach = 1.5 * (from_tip(k) + w);
             let (Some(path_a), Some(path_b)) = (
-                trace_side(rings, a[k], dir, reach, w),
-                trace_side(rings, b[k], dir, reach, w),
+                trace_side(outline.rings, a[k], dir, reach, w),
+                trace_side(outline.rings, b[k], dir, reach, w),
             ) else {
                 continue;
             };
+            // The corners of an end are near the place where the middle
+            // line meets the outline (P21 Milestone 1). A side that goes
+            // farther goes along another stroke.
+            if path_a
+                .iter()
+                .chain(&path_b)
+                .any(|p| p.distance(pts[tip]) > END_NEAR_TIP * w)
+            {
+                continue;
+            }
             // Pairs along the two paths, at the same parts of their lengths.
             let (la, lb) = (length(&path_a), length(&path_b));
             let m = ((la.max(lb) / step).ceil() as usize).max(1);
@@ -1640,8 +2006,10 @@ fn rails(
 /// outline) in the direction `dir` (along the stroke, to its end), to the
 /// corner where the outline turns from the side of the stroke: the first
 /// place where it goes more than `END_TURN_DEG` off the direction of the
-/// side, at most `reach` long. `None` if `from` is not on the outline or the
-/// outline there does not go along the stroke.
+/// side, at most `reach` long.
+/// `None` if `from` is not on the outline or the outline there does not go
+/// along the stroke, or if the side goes on along the stroke for `reach`
+/// with no corner (it goes into another stroke).
 fn trace_side(rings: &[Vec<Point>], from: Point, dir: Point, reach: f64, w: f64) -> Option<Vec<Point>> {
     // The nearest segment of the outline.
     let mut best: Option<(usize, usize, Point, f64)> = None;
@@ -1685,8 +2053,9 @@ fn trace_side(rings: &[Vec<Point>], from: Point, dir: Point, reach: f64, w: f64)
         }
         let step = c.distance(next);
         if walked + step > reach {
-            path.push(c + s * (reach - walked));
-            break;
+            // The outline goes on along the stroke past its end: into
+            // another stroke, not to a corner of the end (P21 Milestone 1).
+            return None;
         }
         walked += step;
         path.push(next);
@@ -1711,8 +2080,10 @@ fn point_at(line: &[Point], at: f64) -> Point {
 /// Cuts back the ends of columns that lie in other columns again
 /// ([`trim_ends`]), after a step that makes ends longer (the ends that go
 /// on to the outline, `glyph::tune_ends`) or adds columns (the second pass
-/// of the stroke finder). A closed column stays as it is.
-pub fn trim_column_ends(satins: &mut Vec<SatinGeometry>) {
+/// of the stroke finder). A closed column stays as it is. `rings`: the
+/// outline of the glyph, so that the rails of a column that changes follow
+/// it again; `cell`: the cell of the grid of the stroke finder.
+pub fn trim_column_ends(satins: &mut Vec<SatinGeometry>, rings: &[Vec<Point>], cell: f64) {
     let mut columns: Vec<Rails> = satins
         .iter()
         .map(|g| {
@@ -1743,13 +2114,14 @@ pub fn trim_column_ends(satins: &mut Vec<SatinGeometry>) {
     }
     let before: Vec<(Vec<Point>, Vec<Point>)> = columns.iter().map(|c| (c.a.clone(), c.b.clone())).collect();
     trim_ends(&mut columns);
+    let outline = Rings::new(rings);
     let mut out = Vec::new();
     for ((c, g), (a, b)) in columns.iter().zip(satins.iter()).zip(before) {
         // A column that did not change keeps its rails and rungs.
         if c.closed || (c.a == a && c.b == b) {
             out.push(g.clone());
         } else if c.a.len() >= 2 {
-            out.push(c.geometry().0);
+            out.push(c.geometry(Some((&outline, cell))).0);
         }
     }
     *satins = out;
@@ -1764,16 +2136,46 @@ struct Rails {
 }
 
 impl Rails {
-    /// The satin column and the quads that it covers.
-    fn geometry(&self) -> (SatinGeometry, Vec<Vec<Point>>) {
-        let (a, b, closed) = (&self.a, &self.b, self.closed);
-        let n = a.len();
-        let mut quads = Vec::new();
+    /// The satin column and the quads that it covers. With `outline` (the
+    /// rings and the cell of the grid), each rail follows the outline
+    /// between two of its points that are on it (P21 Milestone 1).
+    fn geometry(&self, outline: Option<(&Rings, f64)>) -> (SatinGeometry, Vec<Vec<Point>>) {
+        let (pa, pb, closed) = (&self.a, &self.b, self.closed);
+        let n = pa.len();
         let m = if closed { n } else { n - 1 };
+        // The points of the outline after each point of a rail.
+        let extra = |side: &[Point]| -> Vec<Vec<Point>> {
+            (0..m)
+                .map(|i| {
+                    let j = (i + 1) % n;
+                    outline.map_or(Vec::new(), |(o, cell)| {
+                        o.along(side[i], side[j], pa[i].midpoint(pb[i]), pa[j].midpoint(pb[j]), cell)
+                    })
+                })
+                .collect()
+        };
+        let (ea, eb) = (extra(pa), extra(pb));
+        let mut quads = Vec::new();
         for i in 0..m {
             let j = (i + 1) % n;
-            quads.push(vec![a[i], a[j], b[j], b[i]]);
+            let mut q = vec![pa[i]];
+            q.extend(&ea[i]);
+            q.extend([pa[j], pb[j]]);
+            q.extend(eb[i].iter().rev());
+            q.push(pb[i]);
+            quads.push(q);
         }
+        let full = |side: &[Point], e: &[Vec<Point>]| -> Vec<Point> {
+            let mut v = Vec::new();
+            for (i, &p) in side.iter().enumerate() {
+                v.push(p);
+                if let Some(x) = e.get(i) {
+                    v.extend(x);
+                }
+            }
+            v
+        };
+        let (a, b) = (full(pa, &ea), full(pb, &eb));
         let path = |p: &[Point]| {
             if closed {
                 Path::polygon(p)
@@ -1786,15 +2188,42 @@ impl Rails {
             }
         };
         // A rung at every second point keeps the stitches across the stroke.
-        let rungs = (1..n.saturating_sub(1)).step_by(2).map(|i| (a[i], b[i])).collect();
+        let rungs = (1..n.saturating_sub(1)).step_by(2).map(|i| (pa[i], pb[i])).collect();
         (
             SatinGeometry {
-                rail_a: path(a),
-                rail_b: path(b),
+                rail_a: path(&a),
+                rail_b: path(&b),
                 rungs,
             },
             quads,
         )
+    }
+
+    /// The part of an open column from [`SELF_GAP`] times its middle width
+    /// from its start (along its middle) to its end. `None` if it has fewer
+    /// than two pairs.
+    fn far_part(&self) -> Option<Rails> {
+        let n = self.a.len();
+        if self.closed || n < 2 {
+            return None;
+        }
+        let mut widths: Vec<f64> = (0..n).map(|i| self.a[i].distance(self.b[i])).collect();
+        widths.sort_by(f64::total_cmp);
+        let width = widths[n / 2];
+        let mut along = 0.0;
+        for i in 1..n {
+            along += self.a[i - 1]
+                .midpoint(self.b[i - 1])
+                .distance(self.a[i].midpoint(self.b[i]));
+            if along >= SELF_GAP * width {
+                return (n - i >= 2).then(|| Rails {
+                    a: self.a[i..].to_vec(),
+                    b: self.b[i..].to_vec(),
+                    closed: false,
+                });
+            }
+        }
+        None
     }
 
     /// The pair of points at `u` along the column (a pair index and a part
@@ -1856,34 +2285,45 @@ fn trim_ends(columns: &mut [Rails]) {
         let (before, rest) = columns.split_at_mut(k);
         let (this, after) = rest.split_first_mut().expect("column k");
         let others: Vec<&Rails> = before.iter().chain(after.iter()).filter(|c| c.a.len() >= 2).collect();
-        if others.is_empty() {
-            continue;
-        }
-        // Points a little in from the sides: at a corner, the sides of the
-        // two columns are the same edge of the letter.
-        let in_others = |p: Point, depth: f64| others.iter().any(|o| o.holds(p, depth));
-        let covered = |pa: Point, pb: Point| {
-            let depth = END_OVERLAP * pa.distance(pb);
-            [pa.lerp(pb, SIDE_IN), pa.lerp(pb, 0.5), pa.lerp(pb, 1.0 - SIDE_IN)]
-                .iter()
-                .all(|&p| in_others(p, depth))
-        };
-        // One side (0: rail A, 1: rail B) of the pair at `u` is in the others.
-        let side_in = |r: &Rails, u: f64, side: usize| {
-            let (pa, pb) = r.at(u);
-            let t = if side == 0 { SIDE_IN } else { 1.0 - SIDE_IN };
-            in_others(pa.lerp(pb, t), END_OVERLAP * pa.distance(pb))
-        };
         for end in 0..2 {
             if end == 1 {
                 this.a.reverse();
                 this.b.reverse();
             }
+            // The part of this column far from the end is an other column
+            // too: a stroke that goes round and ends on itself (the bowl of
+            // a script "P"; P21 Milestone 1).
+            let far = this.far_part();
+            if others.is_empty() && far.is_none() {
+                if end == 1 {
+                    this.a.reverse();
+                    this.b.reverse();
+                }
+                continue;
+            }
+            // Points a little in from the sides: at a corner, the sides of the
+            // two columns are the same edge of the letter.
+            let in_others = |p: Point, depth: f64| {
+                others.iter().any(|o| o.holds(p, depth)) || far.as_ref().is_some_and(|f| f.holds(p, depth))
+            };
+            let covered = |pa: Point, pb: Point| {
+                let depth = END_OVERLAP * pa.distance(pb);
+                [pa.lerp(pb, SIDE_IN), pa.lerp(pb, 0.5), pa.lerp(pb, 1.0 - SIDE_IN)]
+                    .iter()
+                    .all(|&p| in_others(p, depth))
+            };
+            // One side (0: rail A, 1: rail B) of the pair at `u` is in the others.
+            let side_in = |r: &Rails, u: f64, side: usize| {
+                let (pa, pb) = r.at(u);
+                let t = if side == 0 { SIDE_IN } else { 1.0 - SIDE_IN };
+                in_others(pa.lerp(pb, t), END_OVERLAP * pa.distance(pb))
+            };
             let n = this.a.len();
             // The pairs near the end can be out of the others: at a corner
             // the end of a column is on the side of the other column.
             let mut along = 0.0;
             let mut any = false;
+            let mut first_in = 0;
             let mut s = n;
             for i in 0..n {
                 if i > 0 {
@@ -1892,13 +2332,20 @@ fn trim_ends(columns: &mut [Rails]) {
                         .distance(this.a[i].lerp(this.b[i], 0.5));
                 }
                 if covered(this.a[i], this.b[i]) {
+                    if !any {
+                        first_in = i;
+                    }
                     any = true;
                 } else if any || along >= END_LEAD * this.a[i].distance(this.b[i]) {
                     s = i;
                     break;
                 }
             }
-            if !any {
+            // A column in the others from the first pair to the last goes.
+            // A short column that goes into the others only at its far end
+            // (the end of a short stroke that a crossing cut, the strokes
+            // of 草) stays: its pairs before are not a lead into them (P21).
+            if !any || (s == n && first_in > 0) {
                 if end == 1 {
                     this.a.reverse();
                     this.b.reverse();

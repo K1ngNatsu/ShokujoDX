@@ -910,74 +910,6 @@ const SPLIT_FROM_END: f64 = 0.9;
 /// At most this many cuts in one letter.
 const MAX_SPLITS: usize = 2;
 
-/// The index of the point of `pts` nearest `p`, and the point of the line
-/// nearest `p` on the segment after it or before it.
-fn nearest_at(pts: &[Point], p: Point) -> (usize, Point) {
-    let mut best = (f64::MAX, 0, pts[0]);
-    for i in 0..pts.len() - 1 {
-        let (a, b) = (pts[i], pts[i + 1]);
-        let ab = b - a;
-        let t = if ab.length_sq() > 0.0 {
-            ((p - a).dot(ab) / ab.length_sq()).clamp(0.0, 1.0)
-        } else {
-            0.0
-        };
-        let q = a + ab * t;
-        if q.distance(p) < best.0 {
-            best = (q.distance(p), i, q);
-        }
-    }
-    (best.1, best.2)
-}
-
-fn line_path(pts: &[Point]) -> Path {
-    let mut path = Path::new().move_to(pts[0]);
-    for p in &pts[1..] {
-        path = path.line_to(*p);
-    }
-    path
-}
-
-/// The column `g` as two columns that meet at the place nearest `at`: the
-/// first one from the start of `g`, the second one to its end. Each goes
-/// `overlap` past the cut.
-fn split_satin(g: &SatinGeometry, at: Point, overlap: f64) -> Option<(SatinGeometry, SatinGeometry)> {
-    let flat = |p: &Path| -> Vec<Point> { p.flatten(0.02).into_iter().flat_map(|pl| pl.points).collect() };
-    let (ra, rb) = (flat(&g.rail_a), flat(&g.rail_b));
-    if ra.len() < 2 || rb.len() < 2 {
-        return None;
-    }
-    let cut = |pts: &[Point]| -> Option<(Vec<Point>, Vec<Point>)> {
-        let (i, q) = nearest_at(pts, at);
-        let d = (pts[i + 1] - pts[i]).normalized()?;
-        let mut first: Vec<Point> = pts[..=i].iter().copied().filter(|p| p.distance(q) > 1e-6).collect();
-        first.push(q + d * overlap);
-        let mut second = vec![q - d * overlap];
-        second.extend(pts[i + 1..].iter().copied().filter(|p| p.distance(q) > 1e-6));
-        (first.len() >= 2 && second.len() >= 2).then_some((first, second))
-    };
-    let ((a1, a2), (b1, b2)) = (cut(&ra)?, cut(&rb)?);
-    // Each rung goes to the half that its point on the first rail is in.
-    let (ia, qa) = nearest_at(&ra, at);
-    let before = |p: Point| {
-        let (i, q) = nearest_at(&ra, p);
-        i < ia || (i == ia && q.distance(ra[i]) < qa.distance(ra[i]))
-    };
-    let (r1, r2): (Vec<Edge>, Vec<Edge>) = g.rungs.iter().partition(|(p, _)| before(*p));
-    Some((
-        SatinGeometry {
-            rail_a: line_path(&a1),
-            rail_b: line_path(&b1),
-            rungs: r1,
-        },
-        SatinGeometry {
-            rail_a: line_path(&a2),
-            rail_b: line_path(&b2),
-            rungs: r2,
-        },
-    ))
-}
-
 /// The places where a column of `letter` can be cut: (part, point). A
 /// column can be cut where another part lies on it, away from its ends: a
 /// junction (the bar of "H" on its stem) or a crossing ("X").
@@ -1020,7 +952,7 @@ fn with_split(letter: &EmbLetter, part: usize, at: Point, cap: f64) -> Option<Em
     let ObjectKind::Satin { geometry, params } = &letter.parts[part] else {
         return None;
     };
-    let (first, second) = split_satin(geometry, at, SEAM_OVERLAP * cap)?;
+    let (first, second) = crate::quality::cut_column(geometry, at, SEAM_OVERLAP * cap)?;
     let mut out = letter.clone();
     let half = |geometry: SatinGeometry| ObjectKind::Satin {
         geometry,

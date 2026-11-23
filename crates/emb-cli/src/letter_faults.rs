@@ -345,6 +345,17 @@ pub fn measure(name: &str, parts: &[ObjectKind], o: &Outline) -> Letter {
             "spikes": spikes,
             "open": open,
             "corners": corners.iter().map(|p| [p.x, p.y]).collect::<Vec<_>>(),
+            "faults": {
+                "spikes": f.spike_end + f.spike_mid,
+                "bare": f.bare_out,
+                "cross": f.cross,
+                "back_mm": f.back_mm,
+                "bulge_mm": f.bulge_mm,
+                "notch": f.notch,
+                "open_corner": f.open_corner,
+                "open_other": f.open_other,
+                "corners_open": f.corners_open,
+            },
         }),
         faults: f,
     }

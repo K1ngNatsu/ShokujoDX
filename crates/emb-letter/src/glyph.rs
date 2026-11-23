@@ -46,6 +46,9 @@ const LEFT_MIN_SHARE: f64 = 0.15;
 /// little narrower than the outline there) if at least this part of its
 /// edge touches the strokes. Else it is a thin stroke on its own.
 const SLIVER_TOUCH: f64 = 0.3;
+/// A sliver is at most this thick on average (a factor of the widest
+/// stroke).
+const SLIVER_THICK: f64 = 0.16;
 /// The strokes of a part go this far (a factor of the widest stroke) into
 /// the strokes around it, so that there is no gap at the join.
 const LEFT_OVERLAP: f64 = 0.05;
@@ -306,9 +309,16 @@ fn tune_ends(fills: &[(Vec<Point>, Vec<Vec<Point>>)], s: &mut Strokes, cap_heigh
             params: SatinParams::default(),
         })
         .collect();
+    // The rings of the outline and the cell of the stroke finder, for the
+    // rails of the columns that change.
+    let rings: Vec<Vec<Point>> = fills
+        .iter()
+        .flat_map(|(o, h)| std::iter::once(o.clone()).chain(h.iter().cloned()))
+        .collect();
+    let cell = cap_height / crate::stroke::GRID_CELLS;
     if crate::tune::round_parts(&mut parts, fills, cap_height) == 0 {
         // The second pass of the stroke finder can add columns.
-        crate::stroke::trim_column_ends(&mut s.satins);
+        crate::stroke::trim_column_ends(&mut s.satins, &rings, cell);
         return;
     }
     for (g, p) in s.satins.iter_mut().zip(parts) {
@@ -317,7 +327,7 @@ fn tune_ends(fills: &[(Vec<Point>, Vec<Vec<Point>>)], s: &mut Strokes, cap_heigh
         }
     }
     // The ends that went on into other columns stop at them again.
-    crate::stroke::trim_column_ends(&mut s.satins);
+    crate::stroke::trim_column_ends(&mut s.satins, &rings, cell);
 }
 
 /// The area of a satin: its two rails as one ring.
@@ -403,7 +413,12 @@ fn add_missed_strokes(fills: &[(Vec<Point>, Vec<Vec<Point>>)], s: &mut Strokes, 
         if !broad {
             let edge = edges(&part);
             let touch = length(&region::clip_lines(&near, &edge)) / length(&edge).max(1e-9);
-            if touch >= SLIVER_TOUCH {
+            // The mean thickness of the part: a sliver is a thin band
+            // along the edge of a stroke, not the narrow tail of a comma
+            // (P21: with the rails on the outline, the tail of the comma
+            // of Lato was not broad, and it counted as covered).
+            let thick = 2.0 * part.area() / length(&edge).max(1e-9);
+            if touch >= SLIVER_TOUCH && thick <= SLIVER_THICK * w {
                 slivers += part.area();
                 continue;
             }

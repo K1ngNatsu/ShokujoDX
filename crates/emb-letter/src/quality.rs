@@ -236,23 +236,46 @@ impl Rail {
         self.pts[i - 1] + (self.pts[i] - self.pts[i - 1]) * f
     }
 
-    /// The length along the rail of the point of it nearest to `p`.
-    fn project(&self, p: Point) -> f64 {
-        let mut best = (f64::MAX, 0.0);
-        for (i, w) in self.pts.windows(2).enumerate() {
-            let d = w[1] - w[0];
-            let n = d.x * d.x + d.y * d.y;
-            let f = if n > 0.0 {
-                (((p.x - w[0].x) * d.x + (p.y - w[0].y) * d.y) / n).clamp(0.0, 1.0)
-            } else {
-                0.0
-            };
-            let dist = (w[0] + d * f).distance(p);
-            if dist < best.0 {
-                best = (dist, self.at[i] + f * (self.at[i + 1] - self.at[i]));
-            }
-        }
-        best.1
+    /// The length along the rail of the point of it nearest to `p`; where
+    /// the rail passes `p` more than one time, the place nearest to the
+    /// part `near` (0 to 1) of its length (as the stitch engine does).
+    fn project(&self, p: Point, near: Option<f64>) -> f64 {
+        let places: Vec<(f64, f64)> = self
+            .pts
+            .windows(2)
+            .enumerate()
+            .map(|(i, w)| {
+                let d = w[1] - w[0];
+                let n = d.x * d.x + d.y * d.y;
+                let f = if n > 0.0 {
+                    (((p.x - w[0].x) * d.x + (p.y - w[0].y) * d.y) / n).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+                (
+                    (w[0] + d * f).distance(p),
+                    self.at[i] + f * (self.at[i + 1] - self.at[i]),
+                )
+            })
+            .collect();
+        let best = places.iter().map(|x| x.0).fold(f64::INFINITY, f64::min);
+        let tie = best + 1e-9 * self.len().max(1.0);
+        let len = self.len().max(1e-12);
+        places
+            .iter()
+            .filter(|x| x.0 <= tie)
+            .min_by(|x, y| match near {
+                Some(f) => (x.1 / len - f).abs().total_cmp(&(y.1 / len - f).abs()),
+                None => x.1.total_cmp(&y.1),
+            })
+            .map_or(0.0, |x| x.1)
+    }
+
+    /// The places of the two points of a rung on rails `a` and `b`.
+    fn rung(a: &Rail, b: &Rail, pa: Point, pb: Point) -> (f64, f64) {
+        let sa = a.project(pa, None);
+        let sb = b.project(pb, Some(sa / a.len().max(1e-12)));
+        (a.project(pa, Some(sb / b.len().max(1e-12))), sb)
     }
 }
 
@@ -273,11 +296,17 @@ pub fn column_pairs(g: &SatinGeometry, step: f64) -> Vec<(Point, Point, f64)> {
     let (Some(a), Some(b)) = (Rail::new(&g.rail_a), Rail::new(&g.rail_b)) else {
         return Vec::new();
     };
-    let mut inner: Vec<(f64, f64)> = g
-        .rungs
-        .iter()
-        .map(|(pa, pb)| (a.project(*pa), b.project(*pb)))
-        .collect();
+    pair_places(g, &a, &b, step)
+        .into_iter()
+        .map(|(sa, sb, len)| (a.point(sa), b.point(sb), len))
+        .collect()
+}
+
+/// The places of the pairs of [`column_pairs`] along the rails `a` and `b`
+/// of `g` (lengths from their starts), with the length of the piece of the
+/// column at each pair.
+fn pair_places(g: &SatinGeometry, a: &Rail, b: &Rail, step: f64) -> Vec<(f64, f64, f64)> {
+    let mut inner: Vec<(f64, f64)> = g.rungs.iter().map(|(pa, pb)| Rail::rung(a, b, *pa, *pb)).collect();
     inner.sort_by(|x, y| x.0.total_cmp(&y.0));
     let mut rungs = vec![(0.0, 0.0)];
     for r in inner {
@@ -295,10 +324,70 @@ pub fn column_pairs(g: &SatinGeometry, step: f64) -> Vec<(Point, Point, f64)> {
         let n = (mid / step.max(1e-6)).ceil().max(1.0) as usize;
         for q in 0..n {
             let f = (q as f64 + 0.5) / n as f64;
-            out.push((a.point(w[0].0 + f * la), b.point(w[0].1 + f * lb), mid / n as f64));
+            out.push((w[0].0 + f * la, w[0].1 + f * lb, mid / n as f64));
         }
     }
     out
+}
+
+/// The column `g` as two columns that meet at the pair of its stitches
+/// whose middle is nearest `at`: the first one from the start of `g`, the
+/// second one to its end, each `overlap` past the cut. Both rails are cut
+/// at the same pair (P21: each rail was cut at its own point nearest `at`,
+/// so a column whose rail comes near `at` two times, a stroke that goes
+/// round and ends at itself, was cut at two places). A rung goes to the
+/// half that both its points are in.
+pub fn cut_column(g: &SatinGeometry, at: Point, overlap: f64) -> Option<(SatinGeometry, SatinGeometry)> {
+    let (a, b) = (Rail::new(&g.rail_a)?, Rail::new(&g.rail_b)?);
+    let step = overlap.max(1e-6);
+    let (sa, sb, _) = pair_places(g, &a, &b, step).into_iter().min_by(|x, y| {
+        let d = |p: &(f64, f64, f64)| a.point(p.0).midpoint(b.point(p.1)).distance(at);
+        d(x).total_cmp(&d(y))
+    })?;
+    // The points of a rail up to `s` and from `s`, each `overlap` past it.
+    let cut = |r: &Rail, s: f64| -> (Vec<Point>, Vec<Point>) {
+        let (s1, s2) = ((s + overlap).min(r.len()), (s - overlap).max(0.0));
+        let mut first: Vec<Point> = (0..r.pts.len())
+            .filter(|&i| r.at[i] < s1 - 1e-9)
+            .map(|i| r.pts[i])
+            .collect();
+        first.push(r.point(s1));
+        let mut second = vec![r.point(s2)];
+        second.extend((0..r.pts.len()).filter(|&i| r.at[i] > s2 + 1e-9).map(|i| r.pts[i]));
+        (first, second)
+    };
+    let ((a1, a2), (b1, b2)) = (cut(&a, sa), cut(&b, sb));
+    if a1.len() < 2 || a2.len() < 2 || b1.len() < 2 || b2.len() < 2 {
+        return None;
+    }
+    let (mut r1, mut r2) = (Vec::new(), Vec::new());
+    for &(pa, pb) in &g.rungs {
+        let (ta, tb) = Rail::rung(&a, &b, pa, pb);
+        if ta < sa && tb < sb {
+            r1.push((pa, pb));
+        } else if ta > sa && tb > sb {
+            r2.push((pa, pb));
+        }
+    }
+    let line = |pts: &[Point]| {
+        let mut path = Path::new().move_to(pts[0]);
+        for p in &pts[1..] {
+            path = path.line_to(*p);
+        }
+        path
+    };
+    Some((
+        SatinGeometry {
+            rail_a: line(&a1),
+            rail_b: line(&b1),
+            rungs: r1,
+        },
+        SatinGeometry {
+            rail_a: line(&a2),
+            rail_b: line(&b2),
+            rungs: r2,
+        },
+    ))
 }
 
 /// The local width of each inside cell of `g`, in cells: the diameter of

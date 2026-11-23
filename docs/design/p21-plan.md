@@ -1,7 +1,8 @@
 # Plan: Letter shapes (phase P21)
 
 Date: 2026-11-23 · Status: Accepted (owner, 2026-11-23: the six fixes of
-the review of the font pipeline, in this order).
+the review of the font pipeline, in this order). Milestone 1 is made
+(ADR 0147); its faults at the ends of columns go to Milestone 2.
 
 ## Goal
 
@@ -115,6 +116,45 @@ Anton and Pacifico; less open area than today; not more spikes or open
 corners than today. The tests and the golden snapshots pass (a change of
 a snapshot has a note).
 
+**Made (2026-11-23, ADR 0147).** The rails are the feet of the middle
+line on the outline (`stroke::side_rail`: in 55° of the normal, on a
+segment in 40° of the stroke, at most 1.6 half-widths away) and follow the
+outline between them (`Rails::geometry`, `Rings::along`), also round a
+short arm that is not a stroke of its own; openings go straight across;
+the feet go one way (a foot stays at most 3.5 times its distance). The
+steps of the ends that met the new rails changed a little: `trace_side` is
+not used where a side goes on into another stroke, an end that lies in its
+own column is cut back, a short column that goes into others only at its
+far end stays, and only a thin band counts as a sliver. The stitch engine
+places a rung point on a rail that passes it two times near the other
+point (Pacifico "P"), and the route cuts a column at one pair (Milestone
+5, step 3).
+
+| Bench, ttf (before → after) | Block Sans | Anton | Pacifico | Varsity |
+| --- | --- | --- | --- | --- |
+| Rail points out in the middle | 36 → 0 | 96 → 1 | 87 → 1 | 63 → 0 |
+| Spikes (ends / middle) | 59 / 2 → 33 / 0 | 113 / 10 → 90 / 0 | 97 / 4 → 73 / 0 | 17 / 1 → 15 / 0 |
+| Out with no pull compensation | 98 → 55 | 194 → 128 | 148 → 132 | 27 → 16 |
+| Open area (%) | 1.47 → 1.34 | 2.84 → 2.49 | 2.01 → 1.54 | 0.93 → 0.89 |
+| Corners open | 48 → 44 | 75 → 50 | (none) | 59 → 35 |
+| Notches | 24 → 0 | 11 → 2 | 0 → 5 | 0 → 0 |
+| Crossing pairs | 10 → 25 | 94 → 106 | 66 → 73 | 23 → 47 |
+| Sides that go back (mm) | 0.5 → 0.9 | 7.4 → 6.9 | 5.3 → 5.5 | 2.0 → 3.2 |
+| Bulges (mm) | 0.4 → 2.2 | 9.1 → 6.1 | 13.7 → 17.1 | 0.2 → 0.0 |
+
+The middle of each column is on the outline, and curves are covered to
+their edge (the open area of Anton "G", "t", "9", "6", "e", "f", "0" and
+"C" went down by 70 % to 98 %). The exit test is met for the rail points
+(one point is left in Anton and in Pacifico), the open area, the spikes
+and the open corners. It is not met for the crossing pairs, the sides
+that go back and the bulges: the pictures show them at the ends of
+columns and where strokes meet (the tops of "M" and "n", the bar of "e",
+the top end of "S", the joints of "V" and "w"), which the steps of before
+still make, and the bulges of Pacifico and Block Sans are short arms that
+a column covers. These targets go to Milestones 2 and 3. The lettering
+bench of P20 keeps its exit tests (its snapshot changed: less outside the
+shape and fewer two layers).
+
 ## Milestone 2: one way to end a column (L)
 
 Each end of a column is a line, and the rails end at its two points:
@@ -139,7 +179,10 @@ ends as long pieces.
 **Exit test:** the bench, ttf, in each font: at most a tenth of the
 spikes and of the needle points out with no pull compensation of today;
 at most 5 % of the convex corners open; no stitch across a notch; open
-area at corners at most a quarter of today.
+area at corners at most a quarter of today. And the targets of
+Milestone 1 that the ends make: at most a quarter of the crossing pairs
+of today, at most 0.5 mm of sides that go back, at most half the bulges
+of today in Anton and Pacifico.
 
 ## Milestone 3: the middle line (M)
 
@@ -155,6 +198,9 @@ The faults of the middle line that Milestones 1 and 2 do not remove:
    is cut, so each piece is straight up to the corner.
 4. The ends of smoothing: the first and the last points are smoothed too
    (with the points of the line only).
+5. The short arms that a column covers today (Milestone 1, `STUB_ARC`
+   and `STUB_NEAR`: the rail goes round an arm that the graph took as a
+   side branch) are strokes, and the rails no longer go round them.
 
 **Exit test:** the bench, ttf: no open corner in Anton "t", Block Sans
 "E", "F", "k" and Varsity "X", "x"; at most 1 mm of bulges and at most
@@ -186,7 +232,8 @@ the score limit.
    no run (`NO_RUN`) and the distance of a run from the edge (`EDGE`) are
    checked at the largest size of the font, in mm.
 3. **Seams.** A column that the route cuts at a junction is cut at one
-   pair across it, not at the nearest point of each rail.
+   pair across it, not at the nearest point of each rail. (Done in
+   Milestone 1: `quality::cut_column`, ADR 0147.)
 
 **Exit test:** the bench: at most 5 % of the joints have the column that
 ends on top, with no more trims than today; no travel run out of the
