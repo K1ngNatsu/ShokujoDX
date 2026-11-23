@@ -102,6 +102,21 @@ pub const DRAFT_PX_PER_MM: f64 = 8.0;
 /// The most threads that make tiles.
 const MAX_WORKERS: usize = 12;
 
+/// In the browser (no threads, a budget for each frame), a tile whose work
+/// is more than half of the budget is made in parts, some in each frame,
+/// and shows when all its parts are there (`Assembly`). The work of a
+/// million pixels of the surface (with its apron) before the first
+/// measure, ms: about three times the work on a fast computer (290 ms with
+/// WebGPU in Edge on the development computer), so the first tiles of a
+/// slower device (a phone) do not stop a frame long. Then the measure of
+/// the jobs sizes the parts.
+const FIRST_MS_PER_MPX: f64 = 800.0;
+/// The smallest side of a part of a tile: pixels of the detail, and pixels
+/// of the texture (each part has its apron, so smaller parts take more
+/// work in all).
+const MIN_PART_DETAIL: f64 = 32.0;
+const MIN_PART: f64 = 16.0;
+
 /// The pixels of a level for each mm.
 pub fn level_ppm(level: i32) -> f64 {
     2f64.powi(level)
@@ -207,18 +222,7 @@ fn patch_parts(level: i32, p: [u32; 4]) -> Vec<[u32; 4]> {
     // The detail of the level (as `Laid::block`): 16 pixels for each mm or
     // more, at most 16 times the level.
     let f = 1u32 << (4 - level).clamp(0, 4);
-    let side = (PART_DETAIL / f).max(8);
-    let mut out = Vec::new();
-    let mut y = p[1];
-    while y < p[3] {
-        let mut x = p[0];
-        while x < p[2] {
-            out.push([x, y, (x + side).min(p[2]), (y + side).min(p[3])]);
-            x += side;
-        }
-        y += side;
-    }
-    out
+    parts_of(p, (PART_DETAIL / f).max(8))
 }
 
 /// The pixels of the texture of the tile (`x`, `y`) of `level` that the
@@ -437,6 +441,12 @@ struct Job {
     relight: Option<Neighbors>,
     /// A draft with less detail ([`DRAFT_PX_PER_MM`]).
     draft: bool,
+    /// A part of a tile that is made in parts (`patch`; `Assembly`).
+    assemble: bool,
+    /// The tile (not a quick picture) with the detail of a draft: in the
+    /// browser, a level of 4 pixels for each mm or less
+    /// (`TileCache::coarse`).
+    coarse: bool,
     laid: Arc<Laid>,
     shown: Shown,
     light: Lighting,
@@ -447,6 +457,40 @@ impl Job {
     /// A quick picture (in a new light, or a draft): the tile is made again.
     fn quick(&self) -> bool {
         self.relight.is_some() || self.draft
+    }
+
+    /// The work of the job: millions of pixels of the surface, with the
+    /// apron round them (no surface for a picture in a new light).
+    /// The pixels of the surface for each mm.
+    fn detail(&self) -> f64 {
+        if self.draft || self.coarse {
+            DRAFT_PX_PER_MM
+        } else {
+            surface::DETAIL_PX_PER_MM
+        }
+    }
+
+    fn mpx(&self) -> f64 {
+        if self.relight.is_some() {
+            return 0.0;
+        }
+        let detail = self.detail();
+        let f = (detail / level_ppm(self.level)).max(1.0);
+        let apron = 2.0
+            * apron_px(
+                &self.light,
+                &self.laid,
+                self.ground.as_ref(),
+                detail.max(level_ppm(self.level)),
+            );
+        let (w, h) = match self.patch {
+            Some(p) => (f64::from(p[2] - p[0]), f64::from(p[3] - p[1])),
+            None => {
+                let s = (self.n * SIDE + 2) as f64;
+                (s, s)
+            }
+        };
+        (w * f + apron) * (h * f + apron) / 1e6
     }
 
     fn keys(&self) -> Vec<Key> {
@@ -477,7 +521,61 @@ struct Done {
     /// A quick picture (in a new light, or a draft).
     quick: bool,
     ms: f64,
+    /// The work of the job (`Job::mpx`).
+    mpx: f64,
+    /// A part of a tile that is made in parts.
+    assemble: bool,
 }
+
+/// The parts of the pixels `p` of a texture: squares of `side` pixels (less
+/// at the right and the bottom edge).
+fn parts_of(p: [u32; 4], side: u32) -> Vec<[u32; 4]> {
+    let mut out = Vec::new();
+    let mut y = p[1];
+    while y < p[3] {
+        let mut x = p[0];
+        while x < p[2] {
+            out.push([x, y, (x + side).min(p[2]), (y + side).min(p[3])]);
+            x += side;
+        }
+        y += side;
+    }
+    out
+}
+
+/// A finished tile `key` made in one job: its picture (`None`: an empty
+/// tile), or `None` if the work stopped with an error.
+fn done_of(key: Key, image: Option<Option<ColorImage>>) -> Done {
+    Done {
+        keys: vec![key],
+        patch: None,
+        images: image.map(|i| vec![i]),
+        surfaces: vec![None],
+        quick: false,
+        ms: 0.0,
+        mpx: 0.0,
+        assemble: false,
+    }
+}
+
+/// The apron round a block of the surface, pixels of the detail
+/// `detail_ppm` (pixels for each mm).
+fn apron_px(light: &Lighting, laid: &Laid, ground: Option<&Ground>, detail_ppm: f64) -> f64 {
+    surface::apron_for(light, laid.top(), ground) * detail_ppm
+}
+
+/// A tile that is made in parts in the browser: its picture until now, and
+/// the parts that are not made yet.
+struct Assembly {
+    image: ColorImage,
+    parts: Vec<[u32; 4]>,
+    /// The last frame that asked for the tile.
+    wanted: u64,
+}
+
+/// A tile in parts that no view asked for in this many frames goes (a
+/// level that was made in advance, a view that moved on).
+const ASSEMBLY_KEEP_FRAMES: u64 = 120;
 
 /// The surfaces of a tile and of the eight tiles round it (the tile in the
 /// middle, row by row).
@@ -537,6 +635,14 @@ pub struct Stats {
     pub patches: usize,
     /// The quick pictures of tiles: in a new light, and drafts.
     pub quick: usize,
+    /// The longest job, ms.
+    pub slowest_ms: f64,
+    /// The work of a million pixels of the surface (`Job::mpx`), ms: the
+    /// most of the jobs until now, which gets smaller slowly.
+    pub ms_per_mpx: Option<f64>,
+    /// The tiles that the browser made in parts, and their parts.
+    pub assembled: usize,
+    pub assembly_parts: usize,
 }
 
 /// What a view shows (see [`TileCache::draw`]).
@@ -601,6 +707,8 @@ pub struct TileCache {
     queued: HashSet<Key>,
     queued_parts: HashSet<(Key, [u32; 4])>,
     queued_relights: HashSet<Key>,
+    /// The tiles that the browser makes in parts (`TileCache::assembly_side`).
+    assemblies: HashMap<Key, Assembly>,
     /// Make the lays and the tiles in the frame that asks for them, with no
     /// threads (the tests, the browser).
     pub sync: bool,
@@ -632,6 +740,7 @@ impl Default for TileCache {
             queued: HashSet::new(),
             queued_parts: HashSet::new(),
             queued_relights: HashSet::new(),
+            assemblies: HashMap::new(),
             sync: false,
             frame_budget: None,
             budget_frame: u64::MAX,
@@ -662,6 +771,43 @@ impl TileCache {
             return true;
         }
         self.budget_start.is_some_and(|t| t.elapsed() < budget)
+    }
+
+    /// In the browser, the tiles of a level of 4 pixels for each mm or less
+    /// have the detail of a draft (8 pixels for each mm, halved one time or
+    /// more): a quarter of the work of a tile far out, where a pixel shows
+    /// many threads. The desktop makes them with all the detail.
+    fn coarse(&self, level: i32) -> bool {
+        self.sync && self.frame_budget.is_some() && level_ppm(level) <= 4.0 + 1e-9
+    }
+
+    /// The pixels of the surface for each mm of the tiles of `level`.
+    fn detail_of(&self, level: i32) -> f64 {
+        if self.coarse(level) {
+            DRAFT_PX_PER_MM
+        } else {
+            surface::DETAIL_PX_PER_MM
+        }
+    }
+
+    /// In the browser: the side of the parts (pixels of the texture) of a
+    /// tile of `level` whose work is more than half the budget of a frame,
+    /// from the work of the jobs until now. `None`: the tile is made in one
+    /// job.
+    fn assembly_side(&self, level: i32, light: &Lighting, laid: &Laid, ground: Option<&Ground>) -> Option<u32> {
+        let budget = self.frame_budget.filter(|_| self.sync)?;
+        let target = budget.as_secs_f64() * 1000.0 / 2.0;
+        let rate = self.stats.ms_per_mpx.unwrap_or(FIRST_MS_PER_MPX);
+        let detail = self.detail_of(level).max(level_ppm(level));
+        let f = detail / level_ppm(level);
+        let apron = 2.0 * apron_px(light, laid, ground, detail);
+        let whole = TEXTURE as f64 * f + apron;
+        if whole * whole * rate / 1e6 <= target {
+            return None;
+        }
+        // The largest part in the target, at least the smallest part.
+        let side = (((target * 1e6 / rate).sqrt() - apron).max(MIN_PART_DETAIL) / f).max(MIN_PART);
+        Some((side.floor() as u32).min(TEXTURE as u32))
     }
 
     /// The memory of the tiles now, bytes.
@@ -945,8 +1091,15 @@ impl TileCache {
             if !self.stand_in(&mut out.shapes, variant.id, before_light, level, x, y, at, frame) {
                 out.missing.push(at);
                 // Nothing shows there: a draft first, where it takes less
-                // work than the tile.
-                if !quick && level_ppm(level) < DRAFT_PX_PER_MM * 2.0 - 1e-9 {
+                // work than the tile (not in the browser for a tile that is
+                // made in parts: the draft is a quarter of its work in one
+                // frame).
+                if !quick
+                    && level_ppm(level) < DRAFT_PX_PER_MM * 2.0 - 1e-9
+                    && self
+                        .assembly_side(level, &variant.light, &laid, variant.ground.as_ref())
+                        .is_none()
+                {
                     relights.push((x, y, None));
                 }
             }
@@ -1145,6 +1298,8 @@ impl TileCache {
                     patch: None,
                     relight: tiles.clone(),
                     draft: tiles.is_none(),
+                    assemble: false,
+                    coarse: false,
                     laid: laid.clone(),
                     shown: v.shown.clone(),
                     light: v.light,
@@ -1178,6 +1333,8 @@ impl TileCache {
                 quick: true,
                 patch: None,
                 ms: t0.elapsed().as_secs_f64() * 1000.0,
+                mpx: job.mpx(),
+                assemble: false,
             };
             self.take(ctx, done, frame);
         }
@@ -1233,6 +1390,8 @@ impl TileCache {
                             patch: Some(part),
                             relight: None,
                             draft: false,
+                            assemble: false,
+                            coarse: self.coarse(level),
                             laid: laid.clone(),
                             shown: v.shown.clone(),
                             light: v.light,
@@ -1243,6 +1402,47 @@ impl TileCache {
                         } else {
                             q.jobs.push_back(job);
                         }
+                    }
+                    continue;
+                }
+                // In the browser, a tile of much work: in parts.
+                if let Some(side) = self.assembly_side(level, &v.light, laid, v.ground.as_ref()) {
+                    let key = Key {
+                        variant: v.id,
+                        level: level as i8,
+                        x: x as i32,
+                        y: y as i32,
+                    };
+                    if self.tiles.get(&key).is_some_and(|e| !e.provisional) {
+                        continue;
+                    }
+                    let coarse = self.coarse(level);
+                    let a = self.assemblies.entry(key).or_insert_with(|| Assembly {
+                        image: ColorImage::new([TEXTURE, TEXTURE], vec![Color32::TRANSPARENT; TEXTURE * TEXTURE]),
+                        parts: parts_of([0, 0, TEXTURE as u32, TEXTURE as u32], side),
+                        wanted: frame,
+                    });
+                    a.wanted = frame;
+                    for &part in &a.parts {
+                        if !self.queued_parts.insert((key, part)) {
+                            continue;
+                        }
+                        jobs.push(Job {
+                            variant: v.id,
+                            level,
+                            gx: x,
+                            gy: y,
+                            n: 1,
+                            patch: Some(part),
+                            relight: None,
+                            draft: false,
+                            assemble: true,
+                            coarse,
+                            laid: laid.clone(),
+                            shown: v.shown.clone(),
+                            light: v.light,
+                            ground: v.ground.clone(),
+                        });
                     }
                     continue;
                 }
@@ -1258,6 +1458,8 @@ impl TileCache {
                     patch,
                     relight: None,
                     draft: false,
+                    assemble: false,
+                    coarse: self.coarse(level),
                     laid: laid.clone(),
                     shown: v.shown.clone(),
                     light: v.light,
@@ -1292,6 +1494,8 @@ impl TileCache {
                 quick: false,
                 patch: job.patch,
                 ms: t0.elapsed().as_secs_f64() * 1000.0,
+                mpx: job.mpx(),
+                assemble: job.assemble,
             };
             self.take(ctx, done, frame);
         }
@@ -1356,9 +1560,20 @@ impl TileCache {
     /// are not kept: their pictures would only cost uploads and memory.
     fn take(&mut self, ctx: &egui::Context, done: Done, frame: u64) -> bool {
         self.stats.tile_ms += done.ms;
+        self.stats.slowest_ms = self.stats.slowest_ms.max(done.ms);
+        if done.mpx > 0.0 && done.images.is_some() {
+            // The work of the dense parts sizes the parts: a maximum that
+            // gets smaller slowly (the parts with no stitches take little
+            // work and must not make the parts larger).
+            let rate = done.ms / done.mpx;
+            self.stats.ms_per_mpx = Some(self.stats.ms_per_mpx.map_or(rate, |r| rate.max(0.98 * r)));
+        }
         if done.keys.first().is_some_and(|k| !self.alive(k.variant)) {
             self.stats.discarded += done.keys.len();
             return false;
+        }
+        if done.assemble {
+            return self.take_part(ctx, done, frame);
         }
         if let Some(part) = done.patch {
             self.stats.patches += 1;
@@ -1431,6 +1646,41 @@ impl TileCache {
         uploaded
     }
 
+    /// Puts a part of a tile that is made in parts in its picture; when all
+    /// parts are there, the tile goes in the cache as a tile made in one job.
+    fn take_part(&mut self, ctx: &egui::Context, done: Done, frame: u64) -> bool {
+        let (Some(&key), Some(part)) = (done.keys.first(), done.patch) else {
+            return false;
+        };
+        self.stats.assembly_parts += 1;
+        let Some(a) = self.assemblies.get_mut(&key) else {
+            return false;
+        };
+        let image = match done.images.and_then(|mut i| i.pop()).flatten() {
+            Some(image) => image,
+            None => {
+                // The work stopped with an error: the look of today there.
+                self.assemblies.remove(&key);
+                return self.take(ctx, done_of(key, None), frame);
+            }
+        };
+        let w = image.size[0];
+        for (row, line) in image.pixels.chunks(w).enumerate() {
+            let at = (part[1] as usize + row) * TEXTURE + part[0] as usize;
+            a.image.pixels[at..at + w].copy_from_slice(line);
+        }
+        a.parts.retain(|p| *p != part);
+        if !a.parts.is_empty() {
+            return false;
+        }
+        let Some(a) = self.assemblies.remove(&key) else {
+            return false;
+        };
+        self.stats.assembled += 1;
+        let seen = a.image.pixels.iter().any(|p| p.a() > 0);
+        self.take(ctx, done_of(key, Some(seen.then_some(a.image))), frame)
+    }
+
     /// Takes the memory of an entry that goes out of the counts.
     fn remove_bytes(&mut self, e: &Entry) {
         let extra = e.surface_bytes();
@@ -1442,6 +1692,17 @@ impl TileCache {
     /// the cache is in its budget (not the tiles of this frame and the frame
     /// before).
     fn trim(&mut self, frame: u64) {
+        // The tiles in parts of a variant that no view shows any more, or
+        // that no view asked for in a while.
+        let dead: Vec<Key> = self
+            .assemblies
+            .iter()
+            .filter(|(k, a)| !self.alive(k.variant) || a.wanted + ASSEMBLY_KEEP_FRAMES < frame)
+            .map(|(k, _)| *k)
+            .collect();
+        for k in dead {
+            self.assemblies.remove(&k);
+        }
         if self.surface_bytes > SURFACE_BUDGET {
             // The surfaces of the tiles that showed longest ago go first.
             let mut kept: Vec<(u64, Key)> = self
@@ -2063,6 +2324,8 @@ fn work(shared: &Shared, tx: &mpsc::Sender<Done>) {
             quick: job.quick(),
             patch: job.patch,
             ms: t0.elapsed().as_secs_f64() * 1000.0,
+            mpx: job.mpx(),
+            assemble: false,
         };
         if tx.send(done).is_err() {
             return;
@@ -2083,11 +2346,17 @@ fn make(job: &Job) -> Made {
         // A part of a tile: its pixels, transparent where nothing is.
         let (w, h) = (p[2] - p[0], p[3] - p[1]);
         let (x0, y0) = (job.gx * SIDE - 1 + i64::from(p[0]), job.gy * SIDE - 1 + i64::from(p[1]));
-        let image = match job
-            .laid
-            .block(ppm, x0, y0, w, h, &job.light, job.ground.as_ref(), &|r| {
-                job.shown.shows(r)
-            }) {
+        let image = match job.laid.block_with(
+            ppm,
+            x0,
+            y0,
+            w,
+            h,
+            &job.light,
+            job.ground.as_ref(),
+            &|r| job.shown.shows(r),
+            job.detail(),
+        ) {
             Some(s) => {
                 let picture = emb_render::sheen::overlay(&s, &job.light);
                 ColorImage::from_rgba_premultiplied([w as usize, h as usize], &picture.rgba)
@@ -2101,11 +2370,7 @@ fn make(job: &Job) -> Made {
     }
     let count = (job.n * job.n) as usize;
     let side = (job.n * SIDE + 2) as u32;
-    let detail = if job.draft {
-        DRAFT_PX_PER_MM
-    } else {
-        surface::DETAIL_PX_PER_MM
-    };
+    let detail = job.detail();
     let block = job.laid.block_with(
         ppm,
         job.gx * SIDE - 1,
@@ -2262,13 +2527,46 @@ mod tests {
         }
         assert!(frames > 2, "the lay took {frames} frames");
         assert_eq!(h.st.stitch_tiles.stats.lays, 1);
-        for _ in 0..200 {
+        // The tiles come in parts (a budget of zero: one part in a frame).
+        for _ in 0..20_000 {
             h.frame(vec![]);
             if frame(&mut h).complete {
                 return;
             }
         }
         panic!("the tiles do not come");
+    }
+
+    #[test]
+    fn the_browser_makes_tiles_of_much_work_in_parts() {
+        // With a budget for each frame, a tile whose work is more than half
+        // of it comes in parts, some in each frame, and shows when all its
+        // parts are there; then the view has all its tiles.
+        let mut h = harness(1.0);
+        h.st.stitch_tiles.frame_budget = Some(Duration::from_millis(4));
+        let mut frames = 0;
+        loop {
+            h.frame(vec![]);
+            frames += 1;
+            if frame_or_none(&mut h).is_some_and(|f| f.complete) {
+                break;
+            }
+            assert!(frames < 5000, "the tiles do not come");
+        }
+        let s = &h.st.stitch_tiles.stats;
+        assert!(s.assembled > 0, "{s:?}");
+        assert!(s.assembly_parts > s.assembled, "{s:?}");
+        assert!(s.ms_per_mpx.is_some());
+        // Then the levels under and over the screen come, in parts too; no
+        // tile waits for its parts for ever.
+        for _ in 0..20_000 {
+            if h.st.stitch_tiles.assemblies.is_empty() {
+                return;
+            }
+            h.frame(vec![]);
+            frame_or_none(&mut h);
+        }
+        panic!("a tile in parts does not end");
     }
 
     #[test]
@@ -2463,6 +2761,83 @@ mod tests {
     }
 
     #[test]
+    fn the_parts_of_a_tile_are_the_tile() {
+        // The browser makes a tile of much work in parts (`Assembly`): its
+        // parts together are the tile made in one job, pixel for pixel
+        // (each part has its apron). The puff letters: high, long shadows.
+        let design = emb_cli::corpus::build("view-puff").expect("corpus design");
+        let opts = emb_cli::plan_options(&design, None).expect("a machine");
+        let plan = emb_cli::plan(&design, &opts);
+        let back = design.from_hoop_transform();
+        let strands: Vec<Strand> = emb_render::strand::strands(&plan.stitches, &Default::default())
+            .into_iter()
+            .map(|s| Strand {
+                a: back.apply(s.a),
+                b: back.apply(s.b),
+                ..s
+            })
+            .collect();
+        let laid = Arc::new(surface::lay(&strands, &[]));
+        for (level, side, coarse) in [
+            (1, 97, false),
+            (2, 64, false),
+            (3, 130, false),
+            (1, 40, true),
+            (2, 50, true),
+        ] {
+            let c = laid.bounds().center();
+            let at = |v: f64| (v * level_ppm(level) / SIDE as f64).floor() as i64;
+            let job = Job {
+                variant: 0,
+                level,
+                gx: at(c.x),
+                gy: at(c.y),
+                n: 1,
+                patch: None,
+                relight: None,
+                draft: false,
+                assemble: false,
+                coarse,
+                laid: laid.clone(),
+                shown: Shown::default(),
+                light: Lighting::default(),
+                ground: None,
+            };
+            let whole = make(&job).images.pop().flatten().expect("stitches");
+            let mut parts = ColorImage::new([TEXTURE, TEXTURE], vec![Color32::TRANSPARENT; TEXTURE * TEXTURE]);
+            for part in parts_of([0, 0, TEXTURE as u32, TEXTURE as u32], side) {
+                let image = make(&Job {
+                    variant: 0,
+                    level,
+                    gx: job.gx,
+                    gy: job.gy,
+                    n: 1,
+                    patch: Some(part),
+                    relight: None,
+                    draft: false,
+                    assemble: true,
+                    coarse,
+                    laid: laid.clone(),
+                    shown: Shown::default(),
+                    light: Lighting::default(),
+                    ground: None,
+                })
+                .images
+                .pop()
+                .flatten()
+                .expect("a part");
+                let w = image.size[0];
+                for (row, line) in image.pixels.chunks(w).enumerate() {
+                    let i = (part[1] as usize + row) * TEXTURE + part[0] as usize;
+                    parts.pixels[i..i + w].copy_from_slice(line);
+                }
+            }
+            let differ = whole.pixels.iter().zip(&parts.pixels).filter(|(a, b)| a != b).count();
+            assert_eq!(differ, 0, "level {level}: {differ} pixels differ");
+        }
+    }
+
+    #[test]
     fn a_quick_picture_in_a_new_light_is_near_the_tile() {
         // The puff letters (high, with long shadows) at 8 pixels for each mm.
         let design = emb_cli::corpus::build("view-puff").expect("corpus design");
@@ -2493,6 +2868,8 @@ mod tests {
             patch: None,
             relight: None,
             draft: false,
+            assemble: false,
+            coarse: false,
             laid: laid.clone(),
             shown: Shown::default(),
             light,
@@ -2534,6 +2911,8 @@ mod tests {
             let draft = make(&Job {
                 level,
                 draft: true,
+                assemble: false,
+                coarse: false,
                 ..job(x, y, a)
             })
             .images
@@ -2830,6 +3209,8 @@ mod tests {
                         patch: None,
                         relight: None,
                         draft,
+                        assemble: false,
+                        coarse: false,
                         laid: laid.clone(),
                         shown: Shown::default(),
                         light: Lighting::default(),
@@ -3295,6 +3676,8 @@ mod tests {
             surfaces: vec![None],
             quick: false,
             ms: 0.0,
+            mpx: 0.0,
+            assemble: false,
         };
         let (entries, bytes) = (c.tiles.len(), c.bytes());
         assert!(!c.take(&ctx, done(live.wrapping_add(1)), 0), "not given to the screen");

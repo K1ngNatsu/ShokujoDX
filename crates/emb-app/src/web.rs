@@ -359,14 +359,22 @@ fn bench_frame(st: &mut AppState, ctx: &eframe::egui::Context) {
         _ => {}
     }
     if b.frames % 30 == 0 && b.frames > 0 {
-        let stats = format!(
-            "{{\"mode\":\"{}\",\"frames\":{},\"mean_ms\":{:.2},\"slowest_ms\":{:.2},\"load_ms\":{:.1}}}",
-            b.mode,
-            b.frames,
-            b.total_ms / f64::from(b.frames),
-            b.slowest_ms,
-            b.load_ms
-        );
+        let tiles = &st.stitch_tiles.stats;
+        let stats = serde_json::json!({
+            "mode": b.mode,
+            "frames": b.frames,
+            "mean_ms": b.total_ms / f64::from(b.frames),
+            "slowest_ms": b.slowest_ms,
+            "load_ms": b.load_ms,
+            // The tiles: the longest job, the work of a million pixels of
+            // the surface, and the tiles made in parts.
+            "tile_ms": tiles.tile_ms,
+            "tile_slowest_ms": tiles.slowest_ms,
+            "tile_ms_per_mpx": tiles.ms_per_mpx,
+            "tiles_in_parts": tiles.assembled,
+            "tile_parts": tiles.assembly_parts,
+        })
+        .to_string();
         if let Some(w) = web_sys::window() {
             let _ = js_sys::Reflect::set(&w, &"shokujodxStats".into(), &stats.into());
         }

@@ -350,9 +350,26 @@ a download of 6 MB a second; not on a phone yet.
   longest frame is still about 0.95 s (Best) and 0.51 s (Good): a profile
   shows that it is one tile of the surface far out (`Laid::tile`,
   `Surface::finish` and `half_with`: a tile at a small scale is made at 16
-  pixels for each mm and then made smaller). The next step is tiles in
-  parts in the browser (the parts of a tile that a change makes again
-  exist: `patch`).
+  pixels for each mm and then made smaller).
+- **Tiles in parts** (owner, 2026-11-22). In the browser, a tile whose
+  work is more than half of the budget of a frame is made in parts, some
+  in each frame, and shows when all its parts are there
+  (`TileCache::assembly_side`, `Assembly`, `take_part`; the look of today
+  shows until then). The parts come from the jobs of the parts of a tile
+  that a change makes again (`patch`); each part has its apron, so the
+  parts together are the tile, pixel for pixel (a test). The size of the
+  parts comes from a measure of the work of a million pixels of the
+  surface, with the apron (`Stats::ms_per_mpx`: the most of the jobs,
+  which gets smaller slowly; 800 ms before the first measure). The tiles
+  of a level of 4 pixels for each mm or less have the detail of a draft
+  in the browser (8 pixels for each mm, halved one time or more;
+  `TileCache::coarse`): a quarter of the work far out. A tile in parts
+  that no view asked for in 120 frames goes. With 200,000 stitches (the
+  same computer): the longest job of a tile 18 ms (950 ms before), the
+  longest frame 150 ms with Best and with Good (as the flat look: the
+  plan and the meshes of the first frames); while the tiles come, a frame
+  uses its budget of 30 ms for them. `tools/web-bench.mjs` prints the
+  numbers of the tiles.
 
 ## The audit of the work of 2026-11-22
 
