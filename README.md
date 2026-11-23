@@ -15,6 +15,7 @@ ShokujoDX makes the stitches and writes the file for your machine.
 ![Windows | macOS | Linux](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
 
 [**Download**](https://github.com/K1ngNatsu/ShokujoDX/releases/latest) ·
+[**Try it in your browser**](https://k1ngnatsu.github.io/ShokujoDX/) ·
 [Features](#features) ·
 [Get started](#get-started) ·
 [Help](docs/help/) ·
@@ -122,6 +123,16 @@ your own machine and share it.
 The full list is in [the file formats help](docs/help/file-formats.md).
 
 ## Get started
+
+### Try it in your browser
+
+No install: open [ShokujoDX in your browser](https://k1ngnatsu.github.io/ShokujoDX/) on a
+computer, a tablet or a phone. It is a trial of the browser version:
+**File > Open** uploads a design and **Save** and **Export** download a
+file, your designs stay on your device, and some commands need the
+desktop program. The first visit downloads about 35 MB, then the browser
+keeps it. On a phone or a tablet, **Add to Home Screen** makes it an app
+that also works offline.
 
 ### Install
 
