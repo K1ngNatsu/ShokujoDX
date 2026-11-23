@@ -588,6 +588,13 @@ pub fn truetype_letter(src: &Font, c: char) -> Option<EmbLetter> {
     for p in &mut parts {
         p.transform(&Transform::scale(s, s));
     }
+    // The steps of the program (`Font::route`, P21 Milestone 6): round
+    // dots, and ends on to the corners of the outline.
+    if shapes.columns_cover() && !emb_letter::layout::is_cjk(c) {
+        let o = outline(src, c);
+        emb_letter::tune::round_parts(&mut parts, &o, CAP_MM);
+        emb_letter::tune::extend_ends(&mut parts, &o, CAP_MM);
+    }
     let letter = EmbLetter {
         advance_mm: src.advance(g) * s,
         parts,

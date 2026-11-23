@@ -11,7 +11,9 @@ was added by the owner on 2026-11-23; it is made, and the grid stays (ADR
 corners, a trial) was added by the owner on 2026-11-23; the trial is
 made, and the owner chose the split for Latin letters and for kana and
 kanji (2026-11-23, ADR 0152). Milestones 5 and 6 are updated for it.
-Milestone 5 is made (ADR 0153); its exit test is met in part.
+Milestone 5 is made (ADR 0153); its exit test is met in part. Milestone 6
+is made (ADR 0154): all phase work is done in the software; the sew-out
+of the kit (`tools/make-sewout-kit-p21.py`) is open.
 
 ## Goal
 
@@ -441,6 +443,58 @@ Updated on 2026-11-23 for the split of Milestone 8.
 in their source fonts or better; each font has a score of
 `quality::LIMIT` or more; the owner sews the kit and sees no spikes,
 bulges or open corners.
+
+**Made (2026-11-23, ADR 0154).**
+
+1. Lettering in TrueType fonts gets the steps of the converter: round
+   dots and ends of columns on to the corners of the outline
+   (`tune::round_parts`, `tune::extend_ends` in `Font::route`), not for
+   kana and kanji. The converter does not extend kana and kanji either
+   (`EmbFont::extend_ends`), and the Japanese fonts get `--extend` for
+   their Latin letters. The converter routes with the outline of each
+   letter of the source font (`EmbFont::route_from`), and rounds the
+   coordinates of the file when the font is done (`EmbFont::round_letters`,
+   before the score): rounded before the tuning, the ends went on less far
+   than in lettering (Anton "S").
+2. The tuning of the ends keeps a change only if the changed columns have
+   no more needle points out of the outline (`quality::spike_points`): with
+   no such check, it took the open corners from 27 to 7 in Block Sans but
+   the spikes from 2 to 8 (Anton 23 to 35, Pacifico 25 to 35). A new piece
+   of a rail stops where it meets the outline (`tune::clip_at_outline`).
+   A small round part with two or more columns (the stroke finder cut the
+   short middle line of a dot at a corner: the colon of Pacifico, 87.5 %
+   covered) gets one column along its long axis.
+3. The corrections of the bundled fonts: there are none in the
+   repository, so nothing was to check.
+4. All the bundled fonts and the font packages are made again. The scores,
+   all measured with the score of today (the files of before measured
+   again): 78.9 to 85.5 for the 55 fonts of the program;
+   46 higher, 1 the same, 8 lower by 1 or 2 (Varsity 96 to 94, Plain Sans 93 to 91, Sturdy Sans 94 to 93, Chakra Petch 89 to 87, Soft Slab 87 to 85, Poppins 89 to 88, Indie Flower 86 to 84, Wide Sans 89 to 88).
+   The fonts of before that are below the limit with the score of today
+   (Round Heavy and Balsamiq Sans, 61) are at 80 and 83. No font is below
+   the limit. The fonts in packages that now have `quality::BUNDLE` or
+   more (Comic Narrow, Compact Heavy, Jazz Hand, Fat Face Serif, Neucha, Noto Sans JP, Angular Sans, Barlow Semi Condensed, Barlow, Cabin Condensed, Classic Sans, Game Sans, Kanit, Khand, Machine Sans, Rubik Mono One, Wide Heavy, Bookish Slab, Sturdy Serif) are candidates for the program: the owner decides
+   (ADR 0116).
+5. The sew-out kit is `tools/make-sewout-kit-p21.py` (`out/p21-sewout`, 36
+   designs: the ten tuned fonts at three sizes, joints and the letters
+   with the most faults in the four fonts of the bench, kanji in Noto Sans
+   JP, the Arabic word).
+
+The bench, the embroidery fonts made before P21 and now (25 mm):
+
+| Font | Spikes | Crossing pairs | Bulges mm | Open area | Open corners |
+| --- | --- | --- | --- | --- | --- |
+| Block Sans | 153 to 2 | 5 to 15 | 0.6 to 0.0 | 0.96 % to 0.17 % | 35 to 14 |
+| Anton | 223 to 25 | 232 to 23 | 15.3 to 2.9 | 2.71 % to 1.14 % | 113 to 26 |
+| Pacifico | 575 to 27 | 153 to 15 | 16.4 to 14.4 | 1.67 % to 0.34 % | - |
+| Varsity | 55 to 0 | 76 to 7 | 0.2 to 0.0 | 0.76 % to 0.06 % | 58 to 0 |
+
+The embroidery fonts and lettering in their source fonts now have the
+same letters (the same steps), and the bench gives them the same numbers
+but for the rounding of the file. The exit test is met in the software:
+the embroidery fonts are as good as lettering, and each font has
+`quality::LIMIT` or more. The sew-out of the kit is the owner's part of
+it.
 
 ## Milestone 7: a middle line from a Voronoi diagram (trial) (M)
 

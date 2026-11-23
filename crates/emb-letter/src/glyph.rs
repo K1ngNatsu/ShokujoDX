@@ -327,11 +327,15 @@ fn tune_ends(fills: &[(Vec<Point>, Vec<Vec<Point>>)], s: &mut Strokes, cap_heigh
         crate::stroke::trim_column_ends(&mut s.satins, &rings, cell);
         return;
     }
-    for (g, p) in s.satins.iter_mut().zip(parts) {
-        if let ObjectKind::Satin { geometry, .. } = p {
-            *g = geometry;
-        }
-    }
+    // The parts are the columns again (a round part can have one column
+    // in place of more).
+    s.satins = parts
+        .into_iter()
+        .filter_map(|p| match p {
+            ObjectKind::Satin { geometry, .. } => Some(geometry),
+            _ => None,
+        })
+        .collect();
     // The ends that went on into other columns stop at them again.
     crate::stroke::trim_column_ends(&mut s.satins, &rings, cell);
 }

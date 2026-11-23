@@ -243,6 +243,48 @@ fn outside_by(outline: &Outline, p: Point) -> f64 {
 
 /// The needle faults of the columns of `parts` (sewn with the default
 /// satin settings and no pull compensation) against `outline`, both in mm.
+/// The needle points of the columns of `parts` more than [`SPIKE_MM`] out
+/// of the outline, sewn with no pull compensation (P21 Milestone 6: the
+/// tuning of the ends keeps no change that adds one).
+pub fn spike_points(parts: &[ObjectKind], outline: &Outline) -> usize {
+    let params = emb_model::SatinParams {
+        pull_compensation_mm: 0.0,
+        ..emb_model::SatinParams::default()
+    };
+    parts
+        .iter()
+        .filter_map(|part| {
+            let ObjectKind::Satin { geometry, .. } = part else {
+                return None;
+            };
+            let (s, _) = emb_stitch::satin::Column::new(geometry)?.start();
+            let pts = emb_stitch::satin::satin(geometry, &params, s, None)?;
+            Some(pts.iter().filter(|p| outside_by(outline, **p) > SPIKE_MM).count())
+        })
+        .sum()
+}
+
+/// The shortest stitch of the columns of `parts` (sewn with the default
+/// satin settings); `f64::MAX` with no columns (P21 Milestone 6: the tuning
+/// of the ends keeps no change that makes a stitch too short to sew).
+pub fn shortest_stitch(parts: &[ObjectKind]) -> f64 {
+    let params = emb_model::SatinParams::default();
+    parts
+        .iter()
+        .filter_map(|part| {
+            let ObjectKind::Satin { geometry, .. } = part else {
+                return None;
+            };
+            let (s, _) = emb_stitch::satin::Column::new(geometry)?.start();
+            let pts = emb_stitch::satin::satin(geometry, &params, s, None)?;
+            pts.windows(2)
+                .map(|w| w[0].distance(w[1]))
+                .filter(|&d| d > 1e-6)
+                .reduce(f64::min)
+        })
+        .fold(f64::MAX, f64::min)
+}
+
 pub fn needle_faults(parts: &[ObjectKind], outline: &Outline) -> NeedleFaults {
     let params = emb_model::SatinParams {
         pull_compensation_mm: 0.0,

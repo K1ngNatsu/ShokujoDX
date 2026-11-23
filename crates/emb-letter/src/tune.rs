@@ -310,6 +310,10 @@ fn longer(
     let m = Masks::new(parts, outline, cap)?;
     let (a, b) = (ra[ra.len() - 1], rb[rb.len() - 1]);
     let (a2, b2) = reach(&m, a, b, d)?;
+    // The grid lets a rail along the edge of the outline go on past a
+    // corner: each new piece stops where it meets the outline (P21
+    // Milestone 6).
+    let (a2, b2) = (clip_at_outline(a, a2, outline), clip_at_outline(b, b2, outline));
     let (mut na, mut nb) = (ra.to_vec(), rb.to_vec());
     if a2.distance(a) > 1e-9 {
         na.push(a2);
@@ -318,6 +322,53 @@ fn longer(
         nb.push(b2);
     }
     Some(with_rails(&parts[i], na, nb, at_end, 0.0))
+}
+
+/// A stitch shorter than this (a part of the capital height; 0.5 mm at 25
+/// mm, 0.3 mm at 15 mm) that the tuning makes is too short.
+const SHORT_STITCH: f64 = 0.02;
+
+/// The line from `from` to `to`, up to where it crosses the outline (the
+/// first crossing past `from`).
+fn clip_at_outline(from: Point, to: Point, outline: &Outline) -> Point {
+    let len = from.distance(to);
+    if len < 1e-9 {
+        return to;
+    }
+    let mut best = 1.0f64;
+    for (outer, holes) in outline {
+        for ring in std::iter::once(outer).chain(holes) {
+            let n = ring.len();
+            for k in 0..n {
+                if let Some((u, _)) = Point::crossing(from, to, ring[k], ring[(k + 1) % n])
+                    && u * len > 1e-6
+                {
+                    best = best.min(u);
+                }
+            }
+        }
+    }
+    from.lerp(to, best)
+}
+
+/// The parts of `trial` that are not the same as in `parts` have no more
+/// needle points out of the outline than they had (P21 Milestone 6: an end
+/// that goes on to a corner of the outline must not go out of it).
+fn no_new_spikes(parts: &[ObjectKind], trial: &[ObjectKind], outline: &Outline, cap: f64) -> bool {
+    let changed: Vec<usize> = (0..parts.len()).filter(|&k| trial[k] != parts[k]).collect();
+    let of = |v: &[ObjectKind]| -> Vec<ObjectKind> { changed.iter().map(|&k| v[k].clone()).collect() };
+    let (old, new) = (of(parts), of(trial));
+    crate::quality::spike_points(&new, outline) <= crate::quality::spike_points(&old, outline)
+        && no_short_stitches(&old, &new, cap)
+}
+
+/// The columns `new` have no stitch shorter than [`SHORT_STITCH`] (a part of
+/// the capital height) that is shorter than the shortest one of `old`: a
+/// needle cannot sew it at the smaller sizes (P21 Milestone 6: the
+/// shoulder of "n" in Lato Bold, 0.27 mm at 20 mm).
+fn no_short_stitches(old: &[ObjectKind], new: &[ObjectKind], cap: f64) -> bool {
+    let after = crate::quality::shortest_stitch(new);
+    after >= SHORT_STITCH * cap || after >= crate::quality::shortest_stitch(old) - 1e-9
 }
 
 /// `after` is better than `before` (the cells from [`faults`]): the
@@ -370,6 +421,9 @@ fn lengthen(parts: &mut [ObjectKind], outline: &Outline, cap: f64, skip: Option<
                 if let Some(after) = faults(parts, outline, cap)
                     && better(before, after, min_gain)
                     && best.as_ref().is_none_or(|(b, _)| after.0 < b.0)
+                    && crate::quality::spike_points(std::slice::from_ref(&parts[i]), outline)
+                        <= crate::quality::spike_points(std::slice::from_ref(&old), outline)
+                    && no_short_stitches(std::slice::from_ref(&old), std::slice::from_ref(&parts[i]), cap)
                 {
                     best = Some((after, parts[i].clone()));
                 }
@@ -436,7 +490,9 @@ pub fn extend_ends(parts: &mut [ObjectKind], outline: &Outline, cap: f64) -> usi
             trial[i] = straight;
             let others = lengthen(&mut trial, outline, cap, Some(i));
             let min_gain = (MIN_GAIN * width * width / (cell * cell)).max(2.0);
-            if faults(&trial, outline, cap).is_some_and(|after| better(before, after, min_gain)) {
+            if faults(&trial, outline, cap).is_some_and(|after| better(before, after, min_gain))
+                && no_new_spikes(parts, &trial, outline, cap)
+            {
                 parts.clone_from_slice(&trial);
                 changed += 1 + others;
             }
@@ -509,11 +565,13 @@ fn sides(ring: &[Point], c: Point, u: Point, lo: f64, hi: f64) -> Option<(Vec<Po
     Some((clip(chain(true))?, clip(chain(false))?))
 }
 
-/// A small round part of the outline (a dot, a comma) with one column that
-/// does not cover it gets a column whose rails are the two sides of the
-/// part, so the stitches go to its edge. Returns the number of columns
-/// that changed.
-pub fn round_parts(parts: &mut [ObjectKind], outline: &Outline, cap: f64) -> usize {
+/// A small round part of the outline (a dot, a comma) whose column does not
+/// cover it gets a column whose rails are the two sides of the part, so the
+/// stitches go to its edge. A part with two or more columns (the stroke
+/// finder cut its short middle line at a corner: the dots of a colon, P21
+/// Milestone 6) gets one column along its long axis in place of them.
+/// Returns the number of columns that changed.
+pub fn round_parts(parts: &mut Vec<ObjectKind>, outline: &Outline, cap: f64) -> usize {
     let mut changed = 0;
     for (ring, holes) in outline {
         let Some(bb) = BBox::from_points(ring.iter().copied()) else {
@@ -539,22 +597,32 @@ pub fn round_parts(parts: &mut [ObjectKind], outline: &Outline, cap: f64) -> usi
                 parts[*i].control_bbox().is_some_and(|b| in_ring(b.center())) || middle(&parts[*i]).is_some_and(in_ring)
             })
             .collect();
-        let [i] = inside[..] else { continue };
+        if inside.is_empty() || !inside.iter().all(|&i| matches!(parts[i], ObjectKind::Satin { .. })) {
+            continue;
+        }
+        let i = inside[0];
         let Some((ra, rb)) = rails_to(&parts[i], true) else {
             continue;
         };
         let one = [(ring.clone(), Vec::new())];
-        let Some(before) = faults(std::slice::from_ref(&parts[i]), &one, cap) else {
+        let old: Vec<ObjectKind> = inside.iter().map(|&k| parts[k].clone()).collect();
+        let Some(before) = faults(&old, &one, cap) else {
             continue;
         };
         let cells = ring_area(ring) / ((cap / CELLS) * (cap / CELLS));
-        if (before.0 as f64) < (1.0 - BLOB_COVER) * cells {
+        if inside.len() == 1 && (before.0 as f64) < (1.0 - BLOB_COVER) * cells {
             continue;
         }
-        // The column goes the way of the old one.
-        let start = ra[0].midpoint(rb[0]);
-        let end = ra[ra.len() - 1].midpoint(rb[rb.len() - 1]);
-        let Some(u) = (end - start).normalized() else { continue };
+        // The column goes the way of the old one; for more columns, along
+        // the long axis of the part.
+        let u = if inside.len() == 1 {
+            let start = ra[0].midpoint(rb[0]);
+            let end = ra[ra.len() - 1].midpoint(rb[rb.len() - 1]);
+            (end - start).normalized()
+        } else {
+            long_axis(ring)
+        };
+        let Some(u) = u else { continue };
         let c = bb.center();
         let s = |p: Point| (p - c).dot(u);
         let (lo, hi) = ring
@@ -570,12 +638,40 @@ pub fn round_parts(parts: &mut [ObjectKind], outline: &Outline, cap: f64) -> usi
             geometry.rail_b = polyline(&b);
             geometry.rungs.clear();
         }
-        if faults(std::slice::from_ref(&candidate), &one, cap).is_some_and(|after| better(before, after, 2.0)) {
+        let after = faults(std::slice::from_ref(&candidate), &one, cap);
+        // One column in place of more: as good as they are, or better.
+        let good = if inside.len() == 1 {
+            after.is_some_and(|after| better(before, after, 2.0))
+        } else {
+            after.is_some_and(|after| after.0 <= before.0 && after.1 <= before.1 + 3)
+        };
+        if good {
             parts[i] = candidate;
+            for &k in inside[1..].iter().rev() {
+                parts.remove(k);
+            }
             changed += 1;
         }
     }
     changed
+}
+
+/// The direction of the long axis of a ring (of its points).
+fn long_axis(ring: &[Point]) -> Option<Point> {
+    let n = ring.len() as f64;
+    if n < 3.0 {
+        return None;
+    }
+    let c = ring.iter().fold(Point::new(0.0, 0.0), |a, &p| a + p) * (1.0 / n);
+    let (mut sxx, mut syy, mut sxy) = (0.0, 0.0, 0.0);
+    for p in ring {
+        let d = *p - c;
+        sxx += d.x * d.x;
+        syy += d.y * d.y;
+        sxy += d.x * d.y;
+    }
+    let angle = 0.5 * emb_geom::math::atan2(2.0 * sxy, sxx - syy);
+    Some(Point::new(emb_geom::math::cos(angle), emb_geom::math::sin(angle)))
 }
 
 #[cfg(test)]
@@ -647,6 +743,49 @@ mod tests {
         let ((_, a1), (_, b1)) = rail_ends(&parts[0]);
         assert!((b1.x - 14.0).abs() < 1.1, "the short side: {b1:?}");
         assert!(a1.x > 18.0 && a1.x < 20.5, "the long side: {a1:?}");
+    }
+
+    #[test]
+    fn a_dot_with_two_columns_gets_one() {
+        // P21 Milestone 6: the stroke finder cut the short middle line of a
+        // dot at a corner (the colon of Pacifico); the two columns left
+        // parts of the dot with no stitches.
+        let ring: Vec<Point> = (0..48)
+            .map(|i| {
+                let a = f64::from(i) * std::f64::consts::TAU / 48.0;
+                Point::new(10.0 + 2.5 * a.cos(), -20.0 + 2.0 * a.sin())
+            })
+            .collect();
+        let outline = vec![(ring, Vec::new())];
+        let mut parts = vec![
+            column((8.0, -19.0), (10.0, -19.0), (8.0, -21.0), (10.0, -21.0)),
+            column((10.0, -19.0), (11.5, -18.5), (10.0, -21.0), (11.5, -20.5)),
+        ];
+        let before = faults(&parts, &outline, 25.0).unwrap();
+        assert_eq!(round_parts(&mut parts, &outline, 25.0), 1);
+        assert_eq!(parts.len(), 1);
+        let after = faults(&parts, &outline, 25.0).unwrap();
+        assert!(after.0 < before.0, "{before:?} {after:?}");
+    }
+
+    #[test]
+    fn an_end_does_not_go_on_out_of_the_outline() {
+        // P21 Milestone 6: a change of an end that adds needle points out of
+        // the outline does not stay.
+        let outline = vec![(
+            vec![
+                Point::new(0.0, -2.0),
+                Point::new(10.0, -2.0),
+                Point::new(10.0, 2.0),
+                Point::new(0.0, 2.0),
+            ],
+            Vec::new(),
+        )];
+        let parts = vec![column((0.0, -2.0), (8.0, -2.0), (0.0, 2.0), (8.0, 2.0))];
+        let longer = vec![column((0.0, -2.0), (11.0, -2.0), (0.0, 2.0), (11.0, 2.0))];
+        let shorter = vec![column((0.0, -2.0), (10.0, -2.0), (0.0, 2.0), (10.0, 2.0))];
+        assert!(!no_new_spikes(&parts, &longer, &outline, 25.0));
+        assert!(no_new_spikes(&parts, &shorter, &outline, 25.0));
     }
 
     #[test]

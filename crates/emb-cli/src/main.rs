@@ -780,7 +780,7 @@ fn run(args: &[String]) -> Result<(), String> {
                     .collect();
             }
             if route_letters {
-                let found = f.route();
+                let found = f.route_from(source_font.as_ref());
                 println!(
                     "routed: {} trims in the letters, {} travel runs, {} columns cut at a junction",
                     found.trims, found.runs, found.splits
@@ -799,7 +799,9 @@ fn run(args: &[String]) -> Result<(), String> {
                     println!("fill letters for large sizes: {large}, above {} mm", f.column_max_mm());
                 }
             }
-            // The quality of the letters as they are now (ADR 0115).
+            // The quality of the letters as they are now (ADR 0115), with
+            // the coordinates of the file.
+            f.round_letters();
             if let Some(font) = &source_font {
                 f.measure_quality(font);
             }
@@ -950,7 +952,7 @@ fn run(args: &[String]) -> Result<(), String> {
                 println!("extended: {} ends of columns", f.extend_ends(source));
             }
             if route_letters {
-                let found = f.route();
+                let found = f.route_from(source.as_ref());
                 println!(
                     "routed: {} trims in the letters, {} travel runs, {} columns cut at a junction",
                     found.trims, found.runs, found.splits

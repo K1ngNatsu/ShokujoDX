@@ -147,6 +147,21 @@ impl Shared {
         for p in &mut parts {
             p.transform(&Transform::scale(s, s));
         }
+        // The steps of the converter (`EmbFont::extend_ends`, P21 Milestone
+        // 6): round dots, and ends of columns on to the corners of the
+        // outline where that adds no needle point out of it. Not for kana
+        // and kanji: the Japanese fonts are made with no `--extend` (it
+        // makes the ends that stop at a crossing long again).
+        if !self.char_of(glyph).is_some_and(crate::layout::is_cjk) {
+            let scale = |r: &Vec<Point>| -> Vec<Point> { r.iter().map(|p| Point::new(p.x * s, p.y * s)).collect() };
+            let fills: Vec<(Vec<Point>, Vec<Vec<Point>>)> = shapes
+                .fills
+                .iter()
+                .map(|(outer, holes)| (scale(outer), holes.iter().map(scale).collect()))
+                .collect();
+            crate::tune::round_parts(&mut parts, &fills, crate::embfont::DESIGN_CAP_MM);
+            crate::tune::extend_ends(&mut parts, &fills, crate::embfont::DESIGN_CAP_MM);
+        }
         let advance = f64::from(self.face().glyph_hor_advance(GlyphId(glyph)).unwrap_or(0));
         let letter = crate::embfont::EmbLetter {
             advance_mm: advance * s,
