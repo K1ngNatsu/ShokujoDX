@@ -6,28 +6,20 @@
 // (a reload) is the new version; a page that is open keeps the program that
 // it loaded.
 const CACHE = "shokujodx-@VERSION@";
-const FILES = [
-  "./",
-  "./index.html",
-  "./emb-app.js",
-  "./emb-app_bg.wasm",
-  "./manifest.webmanifest",
-  "./logo.svg",
-  "./logo-hoop.svg",
-  "./logo-needle.svg",
-  "./logo-star.svg",
-  "./icon-180.png",
-  "./icon-192.png",
-  "./icon-512.png",
-];
+// The files of the page (tools/build-web.py writes the list).
+const FILES = @FILES@;
 
 self.addEventListener("install", (event) => {
-  // From the network, not from the cache of the browser (it can keep the
-  // files of the version before for some minutes).
+  // The program and its glue have the version in their address: the cache
+  // of the browser can give them (the page has just downloaded them, so a
+  // first visit downloads them one time). The other files come from the
+  // network (the cache of the browser can keep the files of the version
+  // before for some minutes).
+  const request = (f) => new Request(f, { cache: f.includes("?v=") ? "default" : "reload" });
   event.waitUntil(
     caches
       .open(CACHE)
-      .then((cache) => cache.addAll(FILES.map((f) => new Request(f, { cache: "reload" }))))
+      .then((cache) => cache.addAll(FILES.map(request)))
       .then(() => self.skipWaiting()),
   );
 });

@@ -8,20 +8,15 @@
 //       node tools/web-bench.mjs [<browser> [<out folder>]]
 //       (Node 22 or later; the browser: Edge on Windows if not given)
 
-import { spawn, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { copyFileSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
-const BROWSER =
-  process.argv[2] ??
-  (process.platform === "win32"
-    ? "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
-    : "google-chrome");
+import { DEFAULT_BROWSER, openBrowser, sleep } from "./web-cdp.mjs";
+
+const BROWSER = process.argv[2] ?? DEFAULT_BROWSER;
 const OUT = process.argv[3] ?? "target/web-bench";
 // BASE=<address>: another copy of the page (the test page on GitHub Pages).
 const BASE = process.env.BASE ?? "http://localhost:8765/";
-const PORT = 9333;
 // [name, query, seconds]
 const CASES = [
   ["open a project", "?open=two-color-patch.embproj&bench=still", 10],
@@ -47,98 +42,33 @@ const CASES = [
 // text in their name.
 const NO_WEBGPU = process.env.WEBGPU === "off";
 const ONLY = process.env.ONLY;
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const profile = mkdtempSync(join(tmpdir(), "emb-web-bench-"));
 mkdirSync(OUT, { recursive: true });
 
-// Closes the browser through its own connection (the connection of a page
-// does not close all its processes), then stops each process that still has
-// the profile of this run (by its id), and removes the profile.
-async function closeBrowser(port, profile) {
-  try {
-    const v = await (await fetch(`http://127.0.0.1:${port}/json/version`)).json();
-    const b = new WebSocket(v.webSocketDebuggerUrl);
-    await new Promise((r) => b.addEventListener("open", r, { once: true }));
-    b.send(JSON.stringify({ id: 1, method: "Browser.close" }));
-    await sleep(1500);
-    b.close();
-  } catch {
-    // The browser is closed already.
-  }
-  if (process.platform === "win32") {
-    const name = basename(profile);
-    spawnSync("powershell", [
-      "-NoProfile",
-      "-Command",
-      `Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" | Where-Object { $_.CommandLine -like '*${name}*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`,
-    ]);
-  }
-  for (let i = 0; i < 20; i++) {
-    try {
-      rmSync(profile, { recursive: true, force: true });
-      return;
-    } catch {
-      await sleep(500);
-    }
-  }
-}
-const browser = spawn(
-  BROWSER,
-  [
-    "--headless=new",
-    `--remote-debugging-port=${PORT}`,
-    `--user-data-dir=${profile}`,
+const { send, evaluate, close, onEvent } = await openBrowser({
+  browser: BROWSER,
+  port: 9333,
+  args: [
     "--window-size=1600,1000",
-    "--no-first-run",
     ...(NO_WEBGPU ? ["--disable-features=WebGPU,Vulkan", "--disable-webgpu"] : ["--enable-unsafe-webgpu"]),
     // No frame cap of the headless browser: the frame times are the times
     // of the program.
     "--disable-gpu-vsync",
     "--disable-frame-rate-limit",
-    "about:blank",
   ],
-  { stdio: "ignore" },
-);
-
-async function json(path) {
-  for (let i = 0; i < 100; i++) {
-    try {
-      return await (await fetch(`http://127.0.0.1:${PORT}${path}`)).json();
-    } catch {
-      await sleep(200);
-    }
-  }
-  throw new Error("the browser did not start");
-}
-
-const page = (await json("/json/list")).find((t) => t.type === "page");
-const ws = new WebSocket(page.webSocketDebuggerUrl);
-await new Promise((r) => ws.addEventListener("open", r, { once: true }));
-let next = 0;
-const waiting = new Map();
+  name: "bench",
+});
 const logs = [];
-ws.addEventListener("message", (e) => {
-  const m = JSON.parse(e.data);
-  if (m.id && waiting.has(m.id)) {
-    waiting.get(m.id)(m);
-    waiting.delete(m.id);
-  } else if (m.method === "Runtime.consoleAPICalled" || m.method === "Runtime.exceptionThrown") {
+onEvent((m) => {
+  if (m.method === "Runtime.consoleAPICalled" || m.method === "Runtime.exceptionThrown") {
     const p = m.params;
-    const text = p.args ? p.args.map((a) => a.value ?? a.description ?? "").join(" ") : JSON.stringify(p.exceptionDetails?.exception?.description ?? p.exceptionDetails?.text);
+    const text = p.args
+      ? p.args.map((a) => a.value ?? a.description ?? "").join(" ")
+      : JSON.stringify(p.exceptionDetails?.exception?.description ?? p.exceptionDetails?.text);
     logs.push(`${p.type ?? "exception"}: ${String(text).split("\n")[0].slice(0, 200)}`);
   }
 });
-const send = (method, params = {}) =>
-  new Promise((r) => {
-    const id = ++next;
-    waiting.set(id, r);
-    ws.send(JSON.stringify({ id, method, params }));
-  });
-const evaluate = async (expression) =>
-  (await send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true })).result?.result?.value;
 
 // The test project next to the page, and the downloads in the out folder.
-import { copyFileSync, readdirSync } from "node:fs";
 copyFileSync("packaging/test/two-color-patch.embproj", "target/web/two-color-patch.embproj");
 await send("Browser.setDownloadBehavior", { behavior: "allow", downloadPath: join(process.cwd(), OUT) });
 await send("Page.enable");
@@ -165,5 +95,4 @@ for (const [name, query, seconds] of CASES.filter(([n]) => !ONLY || n.includes(O
 }
 writeFileSync(join(OUT, "results.json"), JSON.stringify(results, null, 2));
 console.log("downloads:", readdirSync(OUT).filter((f) => !f.endsWith(".png") && f !== "results.json").join(", "));
-ws.close();
-await closeBrowser(PORT, profile);
+await close();

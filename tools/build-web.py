@@ -13,6 +13,7 @@
 #       target/tools). --serve starts a local web server on the folder (port
 #       8765 if not given) for a test in a browser.
 
+import copy
 import datetime
 import hashlib
 import json
@@ -21,6 +22,7 @@ import re
 import shutil
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "target", "web")
@@ -50,33 +52,35 @@ def lock_version():
     return m.group(1) if m else "?"
 
 
-# The white shapes of the mask of data/icon/icon.svg (tools/make-icon.py
-# writes them in this order) that make each part of the logo.
-LOGO_PARTS = {
-    "logo-hoop.svg": [0, 2, 3, 4],  # the ring, the clasp, the screw
-    "logo-needle.svg": [6, 7, 9],  # the thread, its end, the needle
-    "logo-star.svg": [12],
-}
+SVG = "http://www.w3.org/2000/svg"
+NS = "{%s}" % SVG
+# The parts of the logo: the white shapes of the mask of data/icon/icon.svg
+# have the class of their part (tools/make-icon.py reads only their fill
+# and their path).
+LOGO_PARTS = ("hoop", "needle", "star")
 
 
 def logo_parts():
-    """The logo with no tile (logo.svg) and one file for each part. A part
-    keeps all the black shapes of the mask (the gaps), so the parts
-    together are the logo."""
-    icon = open(os.path.join(ROOT, "data", "icon", "icon.svg"), encoding="utf-8").read()
-    tile = '<rect width="1200" height="1200" fill="rgb(43,42,51)"/>'
-    shapes = re.findall(r'      <path fill="(white|black)" d="[^"]+"/>\n', icon)
-    lines = re.findall(r'      <path fill="(?:white|black)" d="[^"]+"/>\n', icon)
-    if tile not in icon or len(lines) != 13:
-        sys.exit("data/icon/icon.svg is not the logo that tools/build-web.py splits (LOGO_PARTS)")
-    logo = icon.replace(tile, "")
-    files = {"logo.svg": logo}
-    for name, whites in LOGO_PARTS.items():
-        part = logo
-        for i, (fill, line) in enumerate(zip(shapes, lines)):
-            if fill == "white" and i not in whites:
-                part = part.replace(line, "", 1)
-        files[name] = part
+    """The logo with no tile (logo.svg) and one file for each part
+    (logo-hoop.svg and so on). A part keeps all the black shapes of the
+    mask (the gaps), so the parts together are the logo."""
+    ET.register_namespace("", SVG)
+    root = ET.parse(os.path.join(ROOT, "data", "icon", "icon.svg")).getroot()
+    group = root.find(NS + "g")
+    mask = root.find(NS + "defs/" + NS + "mask")
+    tiles = [r for r in group.findall(NS + "rect") if r.get("mask") is None]
+    whites = [p for p in mask.findall(NS + "path") if p.get("fill") == "white"]
+    if len(tiles) != 1 or any(p.get("class") not in LOGO_PARTS for p in whites):
+        sys.exit("data/icon/icon.svg: each white shape of the mask needs a class of LOGO_PARTS in tools/build-web.py")
+    group.remove(tiles[0])
+    files = {"logo.svg": ET.tostring(root, encoding="unicode")}
+    for part in LOGO_PARTS:
+        one = copy.deepcopy(root)
+        one_mask = one.find(NS + "defs/" + NS + "mask")
+        for p in one_mask.findall(NS + "path"):
+            if p.get("fill") == "white" and p.get("class") != part:
+                one_mask.remove(p)
+        files["logo-%s.svg" % part] = ET.tostring(one, encoding="unicode")
     return files
 
 
@@ -116,8 +120,25 @@ def main():
     # The size of the program after the browser unpacks it: the loader of
     # the page counts the download against it.
     wasm_bytes = os.path.getsize(os.path.join(OUT, "emb-app_bg.wasm"))
-    stamps = {"@VERSION@": version, "@BUILT@": built, "@COMMIT@": commit, "@WASM_BYTES@": str(wasm_bytes)}
-    for name in os.listdir(os.path.join(ROOT, "web")):
+    # The logo of the loader: the logo of the program with no tile behind
+    # it, and its parts (the hoop, the needle with its thread, the star).
+    logos = logo_parts()
+    for name, text in logos.items():
+        open(os.path.join(OUT, name), "w", encoding="utf-8", newline="\n").write(text)
+    # The files that the service worker keeps. The program and its glue
+    # have the version in their address, so a cache of the browser cannot
+    # give the files of another version.
+    web = sorted(os.listdir(os.path.join(ROOT, "web")))
+    files = ["./", "./index.html", "./emb-app.js?v=" + version, "./emb-app_bg.wasm?v=" + version]
+    files += ["./" + n for n in web if n not in ("index.html", "sw.js")] + ["./" + n for n in sorted(logos)]
+    stamps = {
+        "@VERSION@": version,
+        "@BUILT@": built,
+        "@COMMIT@": commit,
+        "@WASM_BYTES@": str(wasm_bytes),
+        "@FILES@": json.dumps(files, indent=2),
+    }
+    for name in web:
         src = os.path.join(ROOT, "web", name)
         if name in ("sw.js", "index.html"):
             text = open(src, encoding="utf-8").read()
@@ -126,10 +147,6 @@ def main():
             open(os.path.join(OUT, name), "w", encoding="utf-8", newline="\n").write(text)
         else:
             shutil.copyfile(src, os.path.join(OUT, name))
-    # The logo of the loader: the logo of the program with no tile behind
-    # it, and its parts (the hoop, the needle with its thread, the star).
-    for name, text in logo_parts().items():
-        open(os.path.join(OUT, name), "w", encoding="utf-8", newline="\n").write(text)
     with open(os.path.join(OUT, "version.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump({"version": version, "built": built, "commit": commit}, f)
     stale = os.path.join(OUT, "icon.png")

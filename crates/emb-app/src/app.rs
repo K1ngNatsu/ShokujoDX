@@ -153,10 +153,9 @@ pub struct AppState {
     /// The Measure tool line, in design coordinates.
     pub measure: Option<(Point, Point)>,
     /// The guide or construction mark whose menu is open (ADR 0089).
-    pub guide_menu: Option<crate::guides::MarkRef>,
-    /// The menu of a place on a ruler (a right click or a long press on a
-    /// ruler, not on a marker).
-    pub ruler_menu: Option<crate::guides::RulerPick>,
+    /// The menu of a guide, a construction mark (ADR 0089) or a place on a
+    /// ruler that a right click (a long press on a touch screen) opened.
+    pub guide_menu: Option<crate::guides::CanvasMenu>,
     /// The edit window of a guide or a construction mark.
     pub guide_edit: Option<crate::guides::GuideEdit>,
     /// Keyboard modifiers of the current frame on the canvas.
@@ -223,9 +222,6 @@ pub struct AppState {
     /// Options > Reset the Panels: the next frame puts the dock back to
     /// `default_dock` and opens the closed panels.
     pub reset_panels: bool,
-    /// The side panels are hidden now: by the user, or while the Start page
-    /// shows. `viewtools::sync_panels` reads it.
-    pub side_panels_hidden: bool,
     /// On a short screen the ribbon shows only its tabs; a tap on a tab
     /// shows its panels over the canvas until a command runs.
     pub ribbon_peek: Option<crate::ribbon::RibbonTab>,
@@ -762,7 +758,6 @@ impl AppState {
             show_options: false,
             measure: None,
             guide_menu: None,
-            ruler_menu: None,
             guide_edit: None,
             mods: Modifiers::NONE,
             arrange_values: (15.0, 0.0, 45.0),
@@ -795,7 +790,6 @@ impl AppState {
             touch_seen: false,
             side_hidden: false,
             reset_panels: false,
-            side_panels_hidden: false,
             ribbon_peek: None,
             focus_library: false,
             focus_clipart: false,
@@ -1591,7 +1585,6 @@ impl AppState {
         egui::ScrollArea::horizontal()
             .id_salt("status_bar")
             .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
-            .scroll_source(egui::scroll_area::ScrollSource::ALL)
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
                     let d = self.doc.design();
@@ -1767,6 +1760,13 @@ impl TabViewer for AppState {
 }
 
 impl eframe::App for EmbApp {
+    /// On a touch screen in the browser, egui knows the touch screen from
+    /// the first frame (`web::touch_hint`).
+    #[cfg(target_arch = "wasm32")]
+    fn raw_input_hook(&mut self, _ctx: &egui::Context, raw_input: &mut egui::RawInput) {
+        crate::web::touch_hint(raw_input);
+    }
+
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         if self.frames < 2 {
@@ -1979,8 +1979,7 @@ impl EmbApp {
             }
             _ => {}
         }
-        st.side_panels_hidden = hide;
-        crate::viewtools::sync_panels(&mut self.dock, st);
+        crate::viewtools::sync_panels(&mut self.dock, st, hide);
         crate::views::sync_views(&mut self.dock, st);
         // The start page is a tab before the design.
         match (st.show_start, self.dock.find_tab(&Tab::Start)) {
@@ -2062,14 +2061,6 @@ mod dock_tests {
         out.textures_delta.clear();
     }
 
-    fn one_group(dock: &DockState<Tab>) -> bool {
-        let side: Vec<_> = SIDE_PANELS.iter().filter_map(|t| dock.find_tab(t)).collect();
-        side.len() == SIDE_PANELS.len()
-            && side
-                .iter()
-                .all(|p| (p.surface, p.node) == (side[0].surface, side[0].node))
-    }
-
     #[test]
     fn reset_the_panels_puts_all_side_panels_back_in_one_group() {
         let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
@@ -2079,7 +2070,7 @@ mod dock_tests {
         let mut app = EmbApp::for_test(st);
         let ctx = crate::test_util::ready_context();
         frame(&ctx, &mut app);
-        assert!(one_group(&app.dock), "one group at the start");
+        assert!(crate::test_util::one_side_group(&app.dock), "one group at the start");
         // The user closes a panel and moves another one under the group.
         app.state().set_panel_shown(Tab::Styles, false);
         let p = app.dock.find_tab(&Tab::Threads).unwrap();
@@ -2087,10 +2078,13 @@ mod dock_tests {
         let q = app.dock.find_tab(&Tab::Properties).unwrap();
         app.dock[q.surface].split_below(q.node, 0.5, vec![Tab::Threads]);
         frame(&ctx, &mut app);
-        assert!(!one_group(&app.dock));
+        assert!(!crate::test_util::one_side_group(&app.dock));
         app.state().reset_panels = true;
         frame(&ctx, &mut app);
-        assert!(one_group(&app.dock), "all side panels back in one group");
+        assert!(
+            crate::test_util::one_side_group(&app.dock),
+            "all side panels back in one group"
+        );
         assert!(app.state().panel_shown(Tab::Styles), "the closed panel opens");
     }
 }

@@ -244,7 +244,6 @@ const ARROW_W: f32 = 30.0;
 fn panels_row(ui: &mut egui::Ui, st: &mut AppState, s: &SelInfo, tab: RibbonTab, simple: bool, width: f32) {
     egui::ScrollArea::horizontal()
         .id_salt("ribbon_panels")
-        .scroll_source(egui::scroll_area::ScrollSource::ALL)
         .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::VisibleWhenNeeded)
         .show(ui, |ui| {
             let folded = folded_panels(st, tab, width);
@@ -295,9 +294,6 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
             egui::ScrollArea::horizontal()
                 .id_salt("ribbon_tabs")
                 .max_width(width)
-                // A finger drags the tabs also before egui knows that the
-                // screen is a touch screen (its first touch).
-                .scroll_source(egui::scroll_area::ScrollSource::ALL)
                 .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
@@ -395,9 +391,13 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
                 });
             });
         // A tap outside the panels, their lists and the tabs closes the
-        // panels.
-        let on_tabs = ctx.input(|i| i.pointer.interact_pos().is_some_and(|p| row.contains(p)));
-        if widgets::click_below_popups(&ctx) && !on_tabs {
+        // panels: a tap whose place is under the layers of the popups (the
+        // panels, their folded panels and lists are popups).
+        let tap = ctx.input(|i| i.pointer.any_click().then(|| i.pointer.interact_pos()).flatten());
+        if let Some(p) = tap
+            && !row.contains(p)
+            && ctx.layer_id_at(p).is_none_or(|l| l.order < egui::Order::Foreground)
+        {
             st.ribbon_peek = None;
         }
     }

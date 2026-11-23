@@ -441,14 +441,15 @@ impl Tool {
         matches!(self, Tool::Freehand | Tool::FreeShape | Tool::Lasso | Tool::SmartDraw)
     }
 
-    /// Enter (Finish) ends a part, and the tool goes on to the next part
-    /// (see `finish_drawing`): side A of a column, the outline of a turning
-    /// fill, an outline or a hole of a complex fill. The touch bar then
-    /// shows Next, not Finish.
+    /// Enter ends a part with these points, and the tool goes on to the
+    /// next part (`finish_drawing`): side A of a column, the outline of a
+    /// turning fill, an outline or a hole of a complex fill. The touch bar
+    /// then shows Next, not Finish.
     pub fn enter_goes_on(self, points: usize, stages: usize) -> bool {
         match self {
-            Tool::ComplexFill | Tool::Applique => points > 0,
-            Tool::Column | Tool::Turning => stages == 0,
+            Tool::ComplexFill | Tool::Applique => points >= 3,
+            Tool::Column => points >= 2 && stages == 0,
+            Tool::Turning => points >= 3 && stages == 0,
             _ => false,
         }
     }
@@ -908,20 +909,14 @@ impl AppState {
     pub fn finish_drawing(&mut self) -> bool {
         let pts = self.draw.points.clone();
         match self.tool {
-            Tool::ComplexFill | Tool::Applique | Tool::Column | Tool::Turning => {
-                let stage_done = match self.tool {
-                    Tool::ComplexFill | Tool::Applique => pts.len() >= 3,
-                    Tool::Column => pts.len() >= 2 && self.draw.stages.is_empty(),
-                    _ => pts.len() >= 3 && self.draw.stages.is_empty(),
-                };
-                if stage_done {
-                    self.draw.stages.push(pts);
-                    self.draw.points.clear();
-                    // A column finishes after side B.
-                    if !(self.tool == Tool::Column && self.draw.stages.len() == 2) {
-                        return true;
-                    }
-                }
+            // A part ends, and the tool goes on (side B of a column finishes
+            // it below).
+            Tool::ComplexFill | Tool::Applique | Tool::Column | Tool::Turning
+                if self.tool.enter_goes_on(pts.len(), self.draw.stages.len()) =>
+            {
+                self.draw.stages.push(pts);
+                self.draw.points.clear();
+                return true;
             }
             Tool::Knife => return self.finish_action(|st, p| st.knife(p[0], p[1])),
             Tool::StitchAngle => return self.finish_action(|st, p| st.stitch_angle(p[0], p[1])),
@@ -1979,14 +1974,7 @@ mod tests {
     fn the_touch_bar_says_next_until_the_last_part() {
         let mut h = Harness::empty();
         // A touch screen: the touch bar shows while a shape has points.
-        let touch = |phase| egui::Event::Touch {
-            device_id: egui::TouchDeviceId(1),
-            id: egui::TouchId(0),
-            phase,
-            pos: Pos2::new(5.0, 5.0),
-            force: None,
-        };
-        h.frame(vec![touch(egui::TouchPhase::Start), touch(egui::TouchPhase::End)]);
+        h.frame(crate::test_util::touch_screen());
         h.st.set_tool(Tool::Column);
         for (x, y) in [(-20.0, -10.0), (20.0, -10.0)] {
             h.click(PointerButton::Primary, at(&h, x, y));
@@ -1997,15 +1985,16 @@ mod tests {
         for (x, y) in [(-20.0, 10.0), (20.0, 10.0)] {
             h.click(PointerButton::Primary, at(&h, x, y));
         }
-        assert!(h.widget("Finish").is_some(), "side B: Finish");
-        let next = h.widget("Finish").unwrap();
-        h.click(PointerButton::Primary, next.center());
+        let finish = h.widget("Finish").expect("side B: Finish");
+        h.click(PointerButton::Primary, finish.center());
         assert_eq!(h.st.doc.design().objects().len(), 1, "the column is made");
         // A complex fill: Next after the outline and each hole, Finish
         // when no hole is started.
         h.st.set_tool(Tool::ComplexFill);
         assert!(Tool::ComplexFill.enter_goes_on(4, 0));
         assert!(Tool::ComplexFill.enter_goes_on(3, 1));
+        // Two points of a hole are not a part: Enter finishes the fill.
+        assert!(!Tool::ComplexFill.enter_goes_on(2, 1));
         assert!(!Tool::ComplexFill.enter_goes_on(0, 1));
         assert!(!Tool::Line.enter_goes_on(5, 0));
     }

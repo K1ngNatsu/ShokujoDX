@@ -179,8 +179,11 @@ screens (step 3 of the roadmap; "only if users ask").
   test build is not kept. A new version takes the place of the old one
   when the page opens, and the next reload shows it (before 2026-11-22,
   only after all pages of the old version were closed, which a reload in
-  Safari does not do). It gets its files from the network, not from the
-  cache of the browser.
+  Safari does not do). The program and its glue have the version in
+  their address (`emb-app_bg.wasm?v=…`): the service worker takes them
+  from the cache of the browser (a first visit downloads them one time),
+  and the other files from the network. `tools/build-web.py` writes the
+  list of the files into `sw.js`.
 - **Tests:** `canvas::tests::two_fingers_zoom_about_their_middle_pan_and_move_nothing`
   (the harness sends the touch events of eframe on the web,
   `Harness::pinch`), and `tools/web-touch.mjs` in a headless browser with
@@ -209,10 +212,11 @@ changes:
    open wider than the phone.
 2. **The ribbon tabs did not scroll.** The File button, the quick buttons
    and the tabs are in a row that scrolls to the side; the arrow that folds
-   the ribbon stays at the right. The panels of a tab also scroll. These
-   rows and the status bar scroll with a drag of the finger also before
-   egui knows that the screen is a touch screen (in egui, a drag scrolls
-   only after the first touch).
+   the ribbon stays at the right. The panels of a tab also scroll. In
+   egui, a drag scrolls only on a known touch screen (after a first
+   touch); on a touch device the first frame gets a touch that stops at
+   once (`web::touch_hint`, `EmbApp::raw_input_hook`), so each scroll area
+   takes a finger from the start.
 3. **Side panels and ribbon: size, and open and close.** A button at the
    right edge of the canvas hides the side panels and shows them again
    (`canvas::side_handle`, `AppState::side_hidden`; larger on a touch
@@ -267,11 +271,12 @@ Not tested on a real phone yet.
    Design > Machine and Hoop when that panel folds on a narrow screen;
    also on the desktop).
    egui keeps one open popup in its memory, so the list closed the folded
-   panel, and the list did not show. The folded panels and the dropdowns of
-   the ribbon are now `widgets::holding_popup`: they keep their own open
-   state, and a click in any popup (the panel or a list in it) keeps them
-   open. The panels of a tab over the canvas (a phone held across) stay
-   open in the same way.
+   panel, and the list did not show. The popup of a folded panel is now
+   `widgets::holding_popup`: it keeps its own open state, and closes on a
+   click outside it but not on a click in a list that was open in it. The
+   other ribbon dropdowns stay egui menus (they close after a pick). The
+   panels of a tab over the canvas (a phone held across) close on a tap
+   that is not on a popup.
 5. **The ruler menu.** A right click on a ruler (a long press on a touch
    screen) that is not on a marker opens the menu of that place: Add Guide
    at (X or Y from the hoop center; the top ruler gives a vertical guide),
@@ -317,6 +322,37 @@ breathes), and the loader fades out when the program runs
 (`web::start` calls `window.shokujodxStarted`, which waits until the star
 is lit, 1 s after Starting). Checked in a headless browser with
 a download of 6 MB a second; not on a phone yet.
+
+## The audit of the work of 2026-11-22
+
+Four reviews (reuse, simpler code, wasted work, the depth of each fix)
+of the day's work gave these changes:
+
+- The ribbon dropdowns are egui menus again (with the holding popup they
+  did not close after a pick); only folded panels hold their state.
+- One canvas menu field (`guides::CanvasMenu`: a guide or mark, or a
+  place on a ruler); `Cmd::ResetPanels` for Reset the Panels; one rule for
+  the parts of a tool (`Tool::enter_goes_on`, so Next and Enter agree);
+  one centered touch bar (`canvas::touch_buttons`, also for the sketch
+  bar, whose Done and Cancel use `end_chain` and `sketch_clear_work`).
+- One touch signal (`AppState::touch_seen`, set from egui), the touch
+  hint of the first frame in place of three special scroll areas, the
+  hidden side panels as an argument of `sync_panels`, one check of the
+  browser for updates (`update::CHECK_AT_START`), `CanvasView::pan_by`.
+- The page: the program is counted only when it comes from the network
+  (a response that the page makes has no compiled code in the cache of
+  the browser), the status changes only when the percent changes, the
+  loader goes after it fades, the update check of the page keeps the
+  build of the page and asks for a frame when its answer comes.
+- The tools: `tools/web-cdp.mjs` starts, drives and closes the headless
+  browser for web-bench, web-touch and web-shots, which wait for the
+  program in place of fixed times (web-touch 20 s in place of 40 s,
+  web-shots 39 s in place of 70 s). The logo parts come from the classes
+  of the white shapes of `data/icon/icon.svg` (read with ElementTree).
+- Not changed: the browser update window stays apart from the window of
+  the desktop (`update::window`): it has other actions (Reload Now, no
+  download page). The pictures of web-shots tap at fixed places.
+  `?loader=up` stays as the other look of the loader.
 
 ## Faults that the trial found (fixed in the branch)
 

@@ -1403,7 +1403,8 @@ fn on_a_touch_screen_the_bar_makes_a_dimension_and_picks_are_wider() {
     let (a, b) = (h.screen(Point::new(-30.0, -20.0)), h.screen(Point::new(30.0, 20.0)));
     h.click(PointerButton::Primary, a);
     h.click(PointerButton::Primary, b);
-    h.st.touch_seen = true;
+    h.frame(crate::test_util::touch_screen());
+    assert!(h.st.touch_seen);
     h.st.set_sketch_tool(SketchTool::Dimension);
     // A finger 12 points away from the bottom line still picks it (a mouse
     // must be within 7 points).

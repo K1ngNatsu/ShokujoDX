@@ -560,7 +560,9 @@ impl DisplayColors {
 /// Takes the closed panels out of the dock and puts the panels that open
 /// again next to a panel of their group. A command that shows a closed
 /// panel (Stitch list, Styles, …) opens it again.
-pub fn sync_panels(dock: &mut egui_dock::DockState<Tab>, st: &mut AppState) {
+/// `side_hidden`: the side panels are hidden (the user hid them, or the
+/// Start page shows; P15 step 3).
+pub fn sync_panels(dock: &mut egui_dock::DockState<Tab>, st: &mut AppState, side_hidden: bool) {
     for (flag, tab) in [
         (st.focus_properties, Tab::Properties),
         (st.focus_threads, Tab::Threads),
@@ -574,16 +576,15 @@ pub fn sync_panels(dock: &mut egui_dock::DockState<Tab>, st: &mut AppState) {
             st.set_panel_shown(tab, true);
         }
         // A command that shows a side panel shows the side panels.
-        if flag && tab != Tab::Library {
+        if flag && crate::app::SIDE_PANELS.contains(&tab) {
             st.side_hidden = false;
         }
     }
     for (tab, _) in PANELS {
         // Simple mode shows the panels of the simple tasks only.
         let simple_hides = st.settings.simple_mode && !SIMPLE_PANELS.contains(&tab);
-        // The side panels are hidden (P15 step 3); the Library is a tab
-        // next to the design.
-        let side_hides = st.side_panels_hidden && tab != Tab::Library;
+        // The Library is a tab next to the design, not a side panel.
+        let side_hides = side_hidden && crate::app::SIDE_PANELS.contains(&tab);
         match (st.panel_shown(tab) && !simple_hides && !side_hides, dock.find_tab(&tab)) {
             (false, Some(p)) => {
                 dock.remove_tab(p);
@@ -976,22 +977,19 @@ mod tests {
         let mut h = Harness::empty();
         h.st.save_settings = false;
         let mut dock = crate::app::default_dock();
-        // The side panels are one group at the start.
-        let side: Vec<_> = crate::app::SIDE_PANELS
-            .iter()
-            .map(|t| dock.find_tab(t).unwrap())
-            .collect();
-        assert!(
-            side.iter()
-                .all(|p| (p.surface, p.node) == (side[0].surface, side[0].node))
-        );
+        // The side panels are one group at the start, and they are the
+        // panels of View > Panels with no Library (it is next to the design).
+        assert!(crate::test_util::one_side_group(&dock));
+        let mut side = crate::app::SIDE_PANELS.to_vec();
+        side.push(Tab::Library);
+        assert!(PANELS.iter().all(|(t, _)| side.contains(t)) && side.len() == PANELS.len());
         h.st.set_panel_shown(Tab::Threads, false);
         assert!(!h.st.panel_shown(Tab::Threads));
-        sync_panels(&mut dock, &mut h.st);
+        sync_panels(&mut dock, &mut h.st, false);
         assert!(dock.find_tab(&Tab::Threads).is_none());
         h.st.set_panel_shown(Tab::Threads, true);
         assert_eq!(h.st.focus_tab, Some(Tab::Threads));
-        sync_panels(&mut dock, &mut h.st);
+        sync_panels(&mut dock, &mut h.st, false);
         // Back with its group, next to the Sequence panel.
         let (t, s) = (
             dock.find_tab(&Tab::Threads).unwrap(),
@@ -1002,22 +1000,22 @@ mod tests {
         for tab in panel_group(Tab::Properties) {
             h.st.set_panel_shown(*tab, false);
         }
-        sync_panels(&mut dock, &mut h.st);
+        sync_panels(&mut dock, &mut h.st, false);
         assert!(dock.find_tab(&Tab::Properties).is_none());
         // A command that shows a closed panel opens it.
         h.st.focus_styles = true;
-        sync_panels(&mut dock, &mut h.st);
+        sync_panels(&mut dock, &mut h.st, false);
         assert!(dock.find_tab(&Tab::Styles).is_some());
         assert!(h.st.panel_shown(Tab::Styles));
         h.st.set_panel_shown(Tab::Threads, true);
-        sync_panels(&mut dock, &mut h.st);
+        sync_panels(&mut dock, &mut h.st, false);
         // Simple mode hides the panels that it does not need, and shows them again after.
         h.st.settings.simple_mode = true;
-        sync_panels(&mut dock, &mut h.st);
+        sync_panels(&mut dock, &mut h.st, false);
         assert!(dock.find_tab(&Tab::Styles).is_none());
         assert!(dock.find_tab(&Tab::Threads).is_some());
         h.st.settings.simple_mode = false;
-        sync_panels(&mut dock, &mut h.st);
+        sync_panels(&mut dock, &mut h.st, false);
         assert!(dock.find_tab(&Tab::Styles).is_some());
     }
 

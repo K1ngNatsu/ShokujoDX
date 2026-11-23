@@ -295,7 +295,7 @@ pub(super) fn views_column(ui: &mut egui::Ui, st: &mut AppState, s: &SelInfo) {
 }
 
 /// View > Panels: open and close each panel.
-pub(super) fn panels_menu(ui: &mut egui::Ui, st: &mut AppState, _s: &SelInfo) {
+pub(super) fn panels_menu(ui: &mut egui::Ui, st: &mut AppState, s: &SelInfo) {
     dropdown(
         ui,
         ph::SIDEBAR_SIMPLE,
@@ -310,16 +310,7 @@ pub(super) fn panels_menu(ui: &mut egui::Ui, st: &mut AppState, _s: &SelInfo) {
                 }
             }
             ui.separator();
-            if ui
-                .button(tr("Reset the Panels"))
-                .on_hover_text(tr(
-                    "Put all the panels back in their places, in one group at the right, and open the closed panels.",
-                ))
-                .clicked()
-            {
-                st.reset_panels = true;
-                ui.close();
-            }
+            cmd_button(ui, st, s, Cmd::ResetPanels, false);
         },
     );
 }

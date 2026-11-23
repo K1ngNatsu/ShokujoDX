@@ -243,9 +243,7 @@ pub fn other_design(ui: &mut egui::Ui, st: &mut AppState) {
             }
         }
         if response.dragged() {
-            let d = response.drag_delta();
-            let s = o.view.scale();
-            o.view.center -= emb_geom::Point::new(f64::from(d.x) / s, f64::from(d.y) / s);
+            o.view.pan_by(response.drag_delta());
         }
         let look = if st.settings.look.three_d {
             crate::canvas::MeshLook::Thread3d

@@ -515,6 +515,8 @@ pub enum Cmd {
     ShowAll,
     RemoveGuides,
     Options,
+    /// Puts the dock back to its default and opens the closed panels.
+    ResetPanels,
     RotateDesign,
     /// The smallest hoop that the design fits.
     AutoHoop,
@@ -1666,6 +1668,11 @@ impl Cmd {
                 g(ph::GEAR),
                 tr("Options"),
                 tr("Units, grid, snap, nudge steps and hoop margin."),
+            ),
+            Cmd::ResetPanels => (
+                g(ph::SIDEBAR),
+                tr("Reset the Panels"),
+                tr("Put all the panels back in their places, in one group at the right, and open the closed panels."),
             ),
             Cmd::RotateDesign => (
                 g(ph::ARROW_ARC_RIGHT),

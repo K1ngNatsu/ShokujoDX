@@ -67,7 +67,7 @@ that also works offline.</div>
 </div>
 <noscript>ShokujoDX needs JavaScript and WebAssembly.</noscript>
 <script type="module">
-  import init from "./emb-app.js";
+  import init from "./emb-app.js?v=@VERSION@";
   // File > Check for Updates: the build of this page (tools/build-web.py
   // writes it), the newest build on the server (version.json, never from a
   // cache), and a reload that takes the newest.
@@ -99,10 +99,15 @@ that also works offline.</div>
   const logo = document.getElementById("logo");
   const status = document.getElementById("status");
   if (new URLSearchParams(location.search).get("loader") === "up") logo.classList.add("up");
-  // The part of the program that came (0 to 1): the logo and the status.
+  // The part of the program that came (0 to 1): the logo and the status,
+  // only when the percent changes.
+  let shown = -1;
   const show = (part) => {
-    logo.style.setProperty("--p", (part >= 1 ? 102 : part * 100).toFixed(1) + "%");
-    status.textContent = "Downloading ShokujoDX… " + Math.floor(part * 100) + " %";
+    const percent = Math.floor(part * 100);
+    if (percent === shown) return;
+    shown = percent;
+    logo.style.setProperty("--p", (part >= 1 ? 102 : percent) + "%");
+    status.textContent = "Downloading ShokujoDX… " + percent + " %";
   };
   // The program as a response that counts its bytes as they come, so the
   // browser still compiles it during the download. The size is the size of
@@ -128,6 +133,12 @@ that also works offline.</div>
     });
     return new Response(body, { headers: { "Content-Type": "application/wasm" } });
   };
+  // The program, with the version in its address (web/sw.js). From the
+  // service worker (a visit after the first) it comes at once, and the
+  // browser keeps its compiled code only for a response that it fetched:
+  // so it is counted only when it comes from the network.
+  const program = "./emb-app_bg.wasm?v=@VERSION@";
+  const fromNetwork = !navigator.serviceWorker?.controller;
   const t0 = performance.now();
   let startingAt = null;
   const ready = (wasm) => {
@@ -142,15 +153,18 @@ that also works offline.</div>
   // fades out, after the needle and the star are lit (1 s after Starting).
   window.shokujodxStarted = () => {
     const wait = startingAt === null ? 0 : Math.max(0, startingAt + 1000 - performance.now());
-    setTimeout(() => document.getElementById("loading").classList.add("done"), wait);
+    const loading = document.getElementById("loading");
+    setTimeout(() => loading.classList.add("done"), wait);
+    // After the fade (0.5 s), the loader goes, with its animation.
+    setTimeout(() => loading.remove(), wait + 600);
   };
   try {
-    ready(await init({ module_or_path: await counted("./emb-app_bg.wasm") }));
+    ready(await init({ module_or_path: fromNetwork ? await counted(program) : program }));
   } catch (first) {
     // A browser that does not compile a counted response: the file again
     // (from its cache).
     try {
-      ready(await init({ module_or_path: "./emb-app_bg.wasm" }));
+      ready(await init({ module_or_path: program }));
     } catch (e) {
       logo.classList.remove("starting");
       status.textContent = "ShokujoDX did not start in this browser: " + e;

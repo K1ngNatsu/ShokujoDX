@@ -1132,20 +1132,19 @@ pub fn guide_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState) 
         && let Some(p) = response.interact_pointer_pos()
         && on_ruler(p)
     {
-        let marker = crate::guides::marker_at(st, rect, p);
-        st.guide_menu = marker.map(crate::guides::MarkRef::Guide);
-        st.ruler_menu = match marker {
-            Some(_) => None,
+        use crate::guides::{CanvasMenu, MarkRef, RulerPick};
+        st.guide_menu = Some(match crate::guides::marker_at(st, rect, p) {
+            Some(i) => CanvasMenu::Mark(MarkRef::Guide(i)),
             None => {
                 let mm = view.to_mm(rect, p);
                 // The top ruler measures X: a guide there is vertical.
                 let vertical = in_top_ruler(rect, p);
-                Some(crate::guides::RulerPick {
+                CanvasMenu::Ruler(RulerPick {
                     vertical,
                     pos: if vertical { mm.x } else { mm.y },
                 })
             }
-        };
+        });
         return true;
     }
     // A double click on a marker: type the place of the guide.
@@ -1414,14 +1413,9 @@ pub fn options_window(ctx: &egui::Context, st: &mut AppState) {
                     });
                     ui.end_row();
                     ui.label(tr("Panels"));
-                    if ui
-                        .button(tr("Reset the Panels"))
-                        .on_hover_text(tr(
-                    "Put all the panels back in their places, in one group at the right, and open the closed panels.",
-                ))
-                        .clicked()
-                    {
-                        st.reset_panels = true;
+                    let (_, label, tip) = crate::ribbon::Cmd::ResetPanels.meta();
+                    if ui.button(label).on_hover_text(tip).clicked() {
+                        st.run(crate::ribbon::Cmd::ResetPanels, ctx);
                     }
                     ui.end_row();
                     ui.label(tr("Machine files"));
@@ -1439,8 +1433,7 @@ pub fn options_window(ctx: &egui::Context, st: &mut AppState) {
                     ui.label(tr("New versions"));
                     ui.horizontal(|ui| {
                         let mut auto = s.updates.auto == Some(true);
-                        // The browser version has no check at the start.
-                        if !cfg!(target_arch = "wasm32")
+                        if crate::update::CHECK_AT_START
                             && ui
                             .checkbox(&mut auto, tr("Check at the start"))
                             .on_hover_text(crate::update::what_it_does())

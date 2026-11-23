@@ -317,14 +317,27 @@ impl Updates {
     }
 }
 
+/// The program checks for new versions at the start and asks about it.
+/// The browser version (P15 trial) does not: it is always the newest build
+/// of its page, and it cannot start `curl`.
+pub const CHECK_AT_START: bool = !cfg!(target_arch = "wasm32");
+
+/// The check of the browser version: the build of the page against the
+/// newest build on the server (`web::check_for_update`).
+#[cfg(target_arch = "wasm32")]
+fn page_check(ctx: &egui::Context) {
+    crate::web::check_for_update(ctx);
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn page_check(_ctx: &egui::Context) {}
+
 impl AppState {
     /// The work of the start: the choice of the installer, the first start
     /// of a new version, the question for a user who did not answer yet,
     /// and the automatic check if it is on and a day went by.
     pub fn start_updates(&mut self, ctx: &egui::Context) {
-        // The browser version is always the newest (the page loads it), and
-        // it cannot start `curl`: no check and no question.
-        if cfg!(target_arch = "wasm32") {
+        if !CHECK_AT_START {
             return;
         }
         self.start_updates_with(ctx, installer_choice(), crate::backup::unix_now(), fetch);
@@ -358,12 +371,8 @@ impl AppState {
 
     /// Help > Check for Updates: opens the window and checks now.
     pub fn check_updates_now(&mut self, ctx: &egui::Context) {
-        // The browser version cannot start `curl` (see `start_updates`).
-        // In the browser, the check compares the build of the page with the
-        // newest build on the server.
-        if cfg!(target_arch = "wasm32") {
-            #[cfg(target_arch = "wasm32")]
-            crate::web::check_for_update();
+        if !CHECK_AT_START {
+            page_check(ctx);
             return;
         }
         self.updates.window = true;

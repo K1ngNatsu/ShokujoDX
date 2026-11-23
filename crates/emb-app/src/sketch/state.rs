@@ -216,6 +216,19 @@ impl AppState {
     /// Esc in sketch mode: ends the command and goes back to Select; in
     /// Select, clears the selection.
     pub fn sketch_escape(&mut self) {
+        self.sketch_clear_work();
+        let Some(e) = &mut self.sketch else { return };
+        if e.tool != SketchTool::Select {
+            e.tool = SketchTool::Select;
+        } else {
+            e.selection.clear();
+            e.picked.clear();
+        }
+    }
+
+    /// Stops the work in progress of the tool (clicks, picks, a chain, a
+    /// box, a dimension that waits for its place); the tool stays.
+    pub fn sketch_clear_work(&mut self) {
         let Some(e) = &mut self.sketch else { return };
         e.clicks.clear();
         e.picks.clear();
@@ -226,12 +239,6 @@ impl AppState {
         e.pending_locked = false;
         e.arc_drag = None;
         e.source_points.clear();
-        if e.tool != SketchTool::Select {
-            e.tool = SketchTool::Select;
-        } else {
-            e.selection.clear();
-            e.picked.clear();
-        }
     }
 
     /// Vector to Sketch (ADR 0079): the selected vector objects become one

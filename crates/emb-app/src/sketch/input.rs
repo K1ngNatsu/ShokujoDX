@@ -113,6 +113,17 @@ pub(super) fn snap_at(st: &AppState, map: &ViewMap, pos: Pos2, alt: bool) -> Opt
     Some(infer::snap(obj.sketch(), at, pick_mm(st, map), &[]))
 }
 
+/// Enter, a right click or Done: ends a spline (it is made) or a chain of
+/// lines.
+fn end_chain(st: &mut AppState) {
+    if st.sketch.as_ref().is_some_and(|e| e.tool == SketchTool::Spline) {
+        finish_spline(st, false);
+    } else if let Some(e) = &mut st.sketch {
+        e.clicks.clear();
+        e.chain_start = None;
+    }
+}
+
 /// The keys of sketch mode (before the keys of the program): Esc ends the
 /// command and goes back to Select, Delete and Backspace delete the
 /// selection, Enter ends a chain of lines, Ctrl+A selects all. While the
@@ -159,11 +170,8 @@ pub fn handle_keys(ctx: &egui::Context, st: &mut AppState) -> bool {
     if del {
         st.delete_sketch_selection();
     }
-    if enter && st.sketch.as_ref().is_some_and(|e| e.tool == SketchTool::Spline) {
-        finish_spline(st, false);
-    } else if enter && let Some(e) = &mut st.sketch {
-        e.clicks.clear();
-        e.chain_start = None;
+    if enter {
+        end_chain(st);
     }
     if all {
         st.sketch_select_all();
@@ -483,13 +491,8 @@ pub fn handle_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState,
         }
         _ => {
             // Right click ends a chain of lines, or a spline.
-            if response.secondary_clicked() && tool == SketchTool::Spline {
-                finish_spline(st, false);
-            } else if response.secondary_clicked()
-                && let Some(e) = &mut st.sketch
-            {
-                e.clicks.clear();
-                e.chain_start = None;
+            if response.secondary_clicked() {
+                end_chain(st);
             }
             // The Line tool: a drag from the end of a line makes a tangent arc.
             if tool == SketchTool::Line
@@ -703,10 +706,11 @@ pub(super) fn line_click(st: &mut AppState, to: Snap, no_help: bool) {
 /// Cancel. While a chain of lines or a spline has points: Done (Enter) and
 /// Cancel (Esc).
 pub fn touch_bar(ui: &egui::Ui, rect: Rect, st: &mut AppState) {
-    if !st.touch_seen || st.sketch_obj().is_none() {
+    if !st.touch_seen {
         return;
     }
     let Some(e) = st.sketch.as_ref() else { return };
+    let Some(obj) = st.sketch_obj() else { return };
     if e.value_edit.is_some() {
         return;
     }
@@ -719,10 +723,9 @@ pub fn touch_bar(ui: &egui::Ui, rect: Rect, st: &mut AppState) {
     }
     let mut buttons: Vec<(Do, &str)> = Vec::new();
     if e.tool == SketchTool::Dimension {
-        let line = st
-            .sketch_obj()
-            .is_some_and(|o| matches!(dimension_of(o.sketch(), &e.picks, false), Build::More))
-            && matches!(e.picks.as_slice(), [Pick::Curve(_)]);
+        // One line, which waits for the place of its label.
+        let line = matches!(e.picks.as_slice(), [Pick::Curve(_)])
+            && matches!(dimension_of(obj.sketch(), &e.picks, false), Build::More);
         if e.pending_dim.is_some() {
             buttons.push((Do::Add, tr("Add Dimension")));
         } else if line {
@@ -738,33 +741,18 @@ pub fn touch_bar(ui: &egui::Ui, rect: Rect, st: &mut AppState) {
     if buttons.is_empty() {
         return;
     }
-    let mut chosen = None;
-    egui::Area::new(egui::Id::new("sketch_touch_bar"))
-        .order(egui::Order::Foreground)
-        .fixed_pos(rect.center_bottom() - Vec2::new(110.0, 64.0))
-        .show(ui.ctx(), |ui| {
-            egui::Frame::popup(ui.style()).show(ui, |ui| {
-                ui.spacing_mut().button_padding = Vec2::new(14.0, 10.0);
-                ui.horizontal(|ui| {
-                    for (what, label) in &buttons {
-                        if ui.button(*label).clicked() {
-                            chosen = Some(*what);
-                        }
-                    }
-                });
-            });
-        });
-    match chosen {
-        Some(Do::Length) => {
-            let c = st.sketch_obj().and_then(|o| {
-                let picks = st.sketch.as_ref()?.picks.clone();
-                dimension_of(o.sketch(), &picks, true).done()
-            });
+    let labels: Vec<&str> = buttons.iter().map(|(_, l)| *l).collect();
+    let Some(i) = crate::canvas::touch_buttons(ui, "sketch_touch_bar", rect, &labels) else {
+        return;
+    };
+    match buttons[i].0 {
+        Do::Length => {
+            let c = dimension_of(obj.sketch(), &e.picks, true).done();
             if let Some(c) = c {
                 st.add_sketch_dimension(c, None);
             }
         }
-        Some(Do::Add) => {
+        Do::Add => {
             if let Some(c) = st.sketch.as_mut().and_then(|e| {
                 e.pending_locked = false;
                 e.pending_dim.take()
@@ -772,23 +760,7 @@ pub fn touch_bar(ui: &egui::Ui, rect: Rect, st: &mut AppState) {
                 st.add_sketch_dimension(c, None);
             }
         }
-        Some(Do::Done) => {
-            if st.sketch.as_ref().is_some_and(|e| e.tool == SketchTool::Spline) {
-                finish_spline(st, false);
-            } else if let Some(e) = &mut st.sketch {
-                e.clicks.clear();
-                e.chain_start = None;
-            }
-        }
-        Some(Do::Cancel) => {
-            if let Some(e) = &mut st.sketch {
-                e.picks.clear();
-                e.pending_dim = None;
-                e.pending_locked = false;
-                e.clicks.clear();
-                e.chain_start = None;
-            }
-        }
-        None => {}
+        Do::Done => end_chain(st),
+        Do::Cancel => st.sketch_clear_work(),
     }
 }

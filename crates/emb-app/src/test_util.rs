@@ -15,6 +15,53 @@ pub fn screen_rect() -> Rect {
     Rect::from_min_size(Pos2::ZERO, SCREEN)
 }
 
+/// A touch of finger `id` (as eframe sends on a touch screen).
+pub fn touch(id: u64, phase: egui::TouchPhase, pos: Pos2) -> Event {
+    Event::Touch {
+        device_id: egui::TouchDeviceId(1),
+        id: egui::TouchId(id),
+        phase,
+        pos,
+        force: None,
+    }
+}
+
+/// The events of a frame that tell egui that the screen is a touch screen
+/// (a touch that stops at once, as `web::touch_hint` sends).
+pub fn touch_screen() -> Vec<Event> {
+    vec![touch(0, egui::TouchPhase::Cancel, Pos2::ZERO)]
+}
+
+/// The names (or values) and places of the widgets for a screen reader in
+/// the output of a frame (menus included). The context must have the
+/// screen reader tree on (`Context::enable_accesskit`).
+pub fn reader_nodes(out: &egui::FullOutput) -> Vec<(String, Rect)> {
+    let Some(update) = &out.platform_output.accesskit_update else {
+        return Vec::new();
+    };
+    update
+        .nodes
+        .iter()
+        .filter_map(|(_, n)| {
+            let b = n.bounds()?;
+            let rect = Rect::from_min_max(Pos2::new(b.x0 as f32, b.y0 as f32), Pos2::new(b.x1 as f32, b.y1 as f32));
+            Some((n.label().or(n.value())?.to_string(), rect))
+        })
+        .collect()
+}
+
+/// All the side panels are in one group of the dock (`app::SIDE_PANELS`).
+pub fn one_side_group(dock: &egui_dock::DockState<crate::app::Tab>) -> bool {
+    let side: Vec<_> = crate::app::SIDE_PANELS
+        .iter()
+        .filter_map(|t| dock.find_tab(t))
+        .collect();
+    side.len() == crate::app::SIDE_PANELS.len()
+        && side
+            .iter()
+            .all(|p| (p.surface, p.node) == (side[0].surface, side[0].node))
+}
+
 /// A context after one empty frame, so it has its fonts. On macOS,
 /// `Context::format_shortcut` reads the fonts (to show ⌘ and ⌥), and a new
 /// context has none until its first frame.
@@ -46,6 +93,11 @@ impl Harness {
     }
 
     pub fn frame(&mut self, events: Vec<Event>) {
+        self.run(events);
+    }
+
+    /// One frame with `events`, and what it gives out.
+    fn run(&mut self, events: Vec<Event>) -> egui::FullOutput {
         let input = RawInput {
             screen_rect: Some(Rect::from_min_size(Pos2::ZERO, SCREEN)),
             events,
@@ -59,6 +111,7 @@ impl Harness {
             crate::palette::window(&ui.ctx().clone(), st);
         });
         out.textures_delta.clear();
+        out
     }
 
     pub fn map(&self) -> ViewMap {
@@ -95,14 +148,7 @@ impl Harness {
     /// `b.1` in steps, then up. As in eframe on the web, the first finger
     /// also moves and presses the pointer.
     pub fn pinch(&mut self, a: (Pos2, Pos2), b: (Pos2, Pos2)) {
-        use egui::{TouchDeviceId, TouchId, TouchPhase};
-        let touch = |id: u64, phase, pos| Event::Touch {
-            device_id: TouchDeviceId(1),
-            id: TouchId(id),
-            phase,
-            pos,
-            force: None,
-        };
+        use egui::TouchPhase;
         let button = |pos, pressed| Event::PointerButton {
             pos,
             button: PointerButton::Primary,
@@ -158,33 +204,11 @@ impl Harness {
 }
 
 impl Harness {
-    /// A harness with an empty design (no sample objects).
-    /// One frame with no input; the names (or values) and places of the
-    /// widgets for a screen reader (menus included).
+    /// One frame with no input; the widgets for a screen reader (see
+    /// `reader_nodes`).
     pub fn reader_nodes(&mut self) -> Vec<(String, Rect)> {
         self.ctx.enable_accesskit();
-        let input = RawInput {
-            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, SCREEN)),
-            ..Default::default()
-        };
-        let st = &mut self.st;
-        let mut out = self.ctx.run_ui(input, |ui| {
-            st.handle_shortcuts(&ui.ctx().clone());
-            egui::CentralPanel::no_frame().show(ui, |ui| canvas::show(ui, st));
-        });
-        out.textures_delta.clear();
-        let Some(update) = out.platform_output.accesskit_update else {
-            return Vec::new();
-        };
-        update
-            .nodes
-            .iter()
-            .filter_map(|(_, n)| {
-                let b = n.bounds()?;
-                let rect = Rect::from_min_max(Pos2::new(b.x0 as f32, b.y0 as f32), Pos2::new(b.x1 as f32, b.y1 as f32));
-                Some((n.label().or(n.value())?.to_string(), rect))
-            })
-            .collect()
+        reader_nodes(&self.run(vec![]))
     }
 
     /// The place of the widget with the name `start…` (see `reader_nodes`).
@@ -195,6 +219,7 @@ impl Harness {
             .map(|(_, r)| r)
     }
 
+    /// A harness with an empty design (no sample objects).
     pub fn empty() -> Self {
         let mut h = Self::new();
         h.st.new_design();

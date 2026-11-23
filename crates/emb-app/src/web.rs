@@ -54,18 +54,12 @@ pub fn start() {
         // start.
         if let Some(loading) = document.get_element_by_id("loading") {
             match started {
-                Ok(()) => {
-                    let page = web_sys::window().and_then(|w| {
-                        let f = js_sys::Reflect::get(&w, &"shokujodxStarted".into()).ok()?;
-                        f.dyn_into::<js_sys::Function>().ok().map(|f| (w, f))
-                    });
-                    match page {
-                        Some((w, f)) => {
-                            let _ = f.call0(&w);
-                        }
-                        None => loading.set_class_name("done"),
+                Ok(()) => match page_function("shokujodxStarted") {
+                    Some((w, f)) => {
+                        let _ = f.call0(&w);
                     }
-                }
+                    None => loading.set_class_name("done"),
+                },
                 Err(e) => {
                     if let Some(status) = document.get_element_by_id("status") {
                         status.set_text_content(Some(&format!("The program did not start: {e:?}")));
@@ -211,6 +205,24 @@ fn touch_device() -> bool {
     web_sys::window()
         .and_then(|w| w.match_media("(pointer: coarse)").ok().flatten())
         .is_some_and(|m| m.matches())
+}
+
+/// On a touch device, the first frame gets a touch that stops at once:
+/// egui then knows the touch screen before the first real touch, so a
+/// finger drags each scroll area from the start (egui scrolls with a drag
+/// only on a touch screen), and the sizes for fingers apply.
+pub fn touch_hint(raw: &mut eframe::egui::RawInput) {
+    use eframe::egui::{Event, Pos2, TouchDeviceId, TouchId, TouchPhase};
+    static DONE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    if !DONE.swap(true, std::sync::atomic::Ordering::Relaxed) && touch_device() {
+        raw.events.push(Event::Touch {
+            device_id: TouchDeviceId(0),
+            id: TouchId(0),
+            phase: TouchPhase::Cancel,
+            pos: Pos2::ZERO,
+            force: None,
+        });
+    }
 }
 
 /// The width of the page in CSS pixels.
@@ -368,26 +380,22 @@ fn probe(st: &AppState, ctx: &eframe::egui::Context) {
         return;
     }
     let (touching, middle) = ctx.input(|i| (i.any_touches(), i.multi_touch().map(|t| t.center_pos)));
-    let middle = middle.map_or("null".to_string(), |p| format!("[{:.0},{:.0}]", p.x, p.y));
-    let canvas = st.canvas_rect.map_or("null".to_string(), |r| {
-        format!("[{:.0},{:.0},{:.0},{:.0}]", r.min.x, r.min.y, r.max.x, r.max.y)
+    let rect = ctx.content_rect();
+    let state = serde_json::json!({
+        "zoom": st.view.zoom,
+        "cx": st.view.center.x,
+        "cy": st.view.center.y,
+        "gesture": st.touch_gesture,
+        "simple": st.settings.simple_mode,
+        "text_scale": st.settings.text_scale,
+        "undo": st.doc.undo_len(),
+        "touching": touching,
+        "middle": middle.map(|p| [p.x, p.y]),
+        "canvas": st.canvas_rect.map(|r| [r.min.x, r.min.y, r.max.x, r.max.y]),
+        "egui": [ctx.zoom_factor(), ctx.pixels_per_point(), rect.width(), rect.height()],
     });
-    let state = format!(
-        "{{\"zoom\":{:.4},\"cx\":{:.3},\"cy\":{:.3},\"gesture\":{},\"simple\":{},\"text_scale\":{},\"undo\":{},\"touching\":{touching},\"middle\":{middle},\"canvas\":{canvas},\"egui\":[{:.2},{:.2},{:.0},{:.0}]}}",
-        st.view.zoom,
-        st.view.center.x,
-        st.view.center.y,
-        st.touch_gesture,
-        st.settings.simple_mode,
-        st.settings.text_scale,
-        st.doc.undo_len(),
-        ctx.zoom_factor(),
-        ctx.pixels_per_point(),
-        ctx.content_rect().width(),
-        ctx.content_rect().height()
-    );
     if let Some(w) = web_sys::window() {
-        let _ = js_sys::Reflect::set(&w, &"shokujodxView".into(), &state.into());
+        let _ = js_sys::Reflect::set(&w, &"shokujodxView".into(), &state.to_string().into());
     }
 }
 
@@ -395,15 +403,15 @@ fn probe(st: &AppState, ctx: &eframe::egui::Context) {
 /// the build and the commit (`tools/build-web.py` writes them).
 #[derive(Clone, Debug, Default, PartialEq, serde::Deserialize)]
 #[serde(default)]
-pub struct Build {
-    pub version: String,
-    pub built: String,
-    pub commit: String,
+struct Build {
+    version: String,
+    built: String,
+    commit: String,
 }
 
 /// The state of File > Check for Updates.
 #[derive(Clone, Debug, PartialEq)]
-pub enum PageCheck {
+enum PageCheck {
     Checking,
     /// The page is the newest build.
     Newest,
@@ -414,28 +422,31 @@ pub enum PageCheck {
 
 static PAGE_CHECK: Mutex<Option<PageCheck>> = Mutex::new(None);
 
-/// The build of this page (`window.shokujodxBuild`).
-fn this_build() -> Build {
-    let field = |o: &wasm_bindgen::JsValue, k: &str| {
-        js_sys::Reflect::get(o, &k.into())
-            .ok()
-            .and_then(|v| v.as_string())
+/// The build of this page (`window.shokujodxBuild`; it does not change).
+fn this_build() -> &'static Build {
+    static BUILD: std::sync::OnceLock<Build> = std::sync::OnceLock::new();
+    BUILD.get_or_init(|| {
+        let field = |o: &wasm_bindgen::JsValue, k: &str| {
+            js_sys::Reflect::get(o, &k.into())
+                .ok()
+                .and_then(|v| v.as_string())
+                .unwrap_or_default()
+        };
+        web_sys::window()
+            .and_then(|w| js_sys::Reflect::get(&w, &"shokujodxBuild".into()).ok())
+            .filter(|o| o.is_object())
+            .map(|o| Build {
+                version: field(&o, "version"),
+                built: field(&o, "built"),
+                commit: field(&o, "commit"),
+            })
             .unwrap_or_default()
-    };
-    web_sys::window()
-        .and_then(|w| js_sys::Reflect::get(&w, &"shokujodxBuild".into()).ok())
-        .filter(|o| o.is_object())
-        .map(|o| Build {
-            version: field(&o, "version"),
-            built: field(&o, "built"),
-            commit: field(&o, "commit"),
-        })
-        .unwrap_or_default()
+    })
 }
 
 /// The result of the check: the newest build (the text of version.json)
 /// against the build of this page.
-pub fn compare(this: &Build, newest: &str) -> PageCheck {
+fn compare(this: &Build, newest: &str) -> PageCheck {
     match serde_json::from_str::<Build>(newest) {
         Ok(n) if n.version.is_empty() => PageCheck::Failed("version.json has no version".into()),
         Ok(n) if n.version == this.version => PageCheck::Newest,
@@ -444,14 +455,17 @@ pub fn compare(this: &Build, newest: &str) -> PageCheck {
     }
 }
 
+/// The function `name` of the page (`window.name`), if the page has it.
+fn page_function(name: &str) -> Option<(web_sys::Window, js_sys::Function)> {
+    let w = web_sys::window()?;
+    let f = js_sys::Reflect::get(&w, &name.into()).ok()?.dyn_into().ok()?;
+    Some((w, f))
+}
+
 /// Calls the function `name` of the page (no arguments) and waits for its
 /// promise: the text that it gives.
 async fn call_page(name: &str) -> Result<String, String> {
-    let w = web_sys::window().ok_or("no window")?;
-    let f: js_sys::Function = js_sys::Reflect::get(&w, &name.into())
-        .ok()
-        .and_then(|f| f.dyn_into().ok())
-        .ok_or("the page is older than the program")?;
+    let (w, f) = page_function(name).ok_or("the page is older than the program")?;
     let promise: js_sys::Promise = f
         .call0(&w)
         .map_err(|e| format!("{e:?}"))?
@@ -464,16 +478,18 @@ async fn call_page(name: &str) -> Result<String, String> {
 }
 
 /// File > Check for Updates in the browser: asks the server for the newest
-/// build; the window shows the result.
-pub fn check_for_update() {
+/// build; the window shows the result (a new frame when it comes).
+pub fn check_for_update(ctx: &eframe::egui::Context) {
     if let Ok(mut c) = PAGE_CHECK.lock() {
         *c = Some(PageCheck::Checking);
     }
-    wasm_bindgen_futures::spawn_local(async {
+    let ctx = ctx.clone();
+    wasm_bindgen_futures::spawn_local(async move {
         let result = match call_page("shokujodxNewest").await {
-            Ok(text) => compare(&this_build(), &text),
+            Ok(text) => compare(this_build(), &text),
             Err(e) => PageCheck::Failed(e),
         };
+        ctx.request_repaint();
         if let Ok(mut c) = PAGE_CHECK.lock() {
             // The user can close the window before the answer comes.
             if c.is_some() {
@@ -548,9 +564,6 @@ fn update_window(ctx: &eframe::egui::Context) {
         && let Ok(mut c) = PAGE_CHECK.lock()
     {
         *c = None;
-    }
-    if state == PageCheck::Checking {
-        ctx.request_repaint_after(std::time::Duration::from_millis(100));
     }
 }
 

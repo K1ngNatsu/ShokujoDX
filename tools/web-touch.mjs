@@ -7,110 +7,39 @@
 //       node tools/web-touch.mjs [<browser> [<out folder>]]
 //       (BASE=<address>: another copy of the page)
 
-import { spawn, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
-const BROWSER =
-  process.argv[2] ??
-  (process.platform === "win32"
-    ? "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
-    : "google-chrome");
+import { DEFAULT_BROWSER, STARTED, openBrowser, sleep } from "./web-cdp.mjs";
+
+const BROWSER = process.argv[2] ?? DEFAULT_BROWSER;
 const OUT = process.argv[3] ?? "target/web-touch";
 const BASE = process.env.BASE ?? "http://localhost:8765/";
-const PORT = 9336;
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 mkdirSync(OUT, { recursive: true });
-
-// Closes the browser through its own connection (the connection of a page
-// does not close all its processes), then stops each process that still has
-// the profile of this run (by its id), and removes the profile.
-async function closeBrowser(port, profile) {
-  try {
-    const v = await (await fetch(`http://127.0.0.1:${port}/json/version`)).json();
-    const b = new WebSocket(v.webSocketDebuggerUrl);
-    await new Promise((r) => b.addEventListener("open", r, { once: true }));
-    b.send(JSON.stringify({ id: 1, method: "Browser.close" }));
-    await sleep(1500);
-    b.close();
-  } catch {
-    // The browser is closed already.
-  }
-  if (process.platform === "win32") {
-    const name = basename(profile);
-    spawnSync("powershell", [
-      "-NoProfile",
-      "-Command",
-      `Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" | Where-Object { $_.CommandLine -like '*${name}*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`,
-    ]);
-  }
-  for (let i = 0; i < 20; i++) {
-    try {
-      rmSync(profile, { recursive: true, force: true });
-      return;
-    } catch {
-      await sleep(500);
-    }
-  }
-}
 
 // One browser with a new profile for each device, so each is a first visit.
 async function device(name, width, height, scale, check) {
-  const profile = mkdtempSync(join(tmpdir(), "emb-web-bench-touch-"));
-  const browser = spawn(
-    BROWSER,
-    [
-      "--headless=new",
-      `--remote-debugging-port=${PORT}`,
-      `--user-data-dir=${profile}`,
-      `--window-size=${width},${height}`,
-      "--no-first-run",
-      "about:blank",
-    ],
-    { stdio: "ignore" },
-  );
-  let list;
-  for (let i = 0; i < 100 && !list; i++) {
-    try {
-      list = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json();
-    } catch {
-      await sleep(200);
-    }
-  }
-  const ws = new WebSocket(list.find((t) => t.type === "page").webSocketDebuggerUrl);
-  await new Promise((r) => ws.addEventListener("open", r, { once: true }));
-  let next = 0;
-  const waiting = new Map();
-  ws.addEventListener("message", (e) => {
-    const m = JSON.parse(e.data);
-    if (m.id && waiting.has(m.id)) {
-      waiting.get(m.id)(m);
-      waiting.delete(m.id);
-    }
+  const { send, evaluate, waitFor, close } = await openBrowser({
+    browser: BROWSER,
+    port: 9336,
+    args: [`--window-size=${width},${height}`],
+    name: "touch",
   });
-  const send = (method, params = {}) =>
-    new Promise((r) => {
-      const id = ++next;
-      waiting.set(id, r);
-      ws.send(JSON.stringify({ id, method, params }));
-    });
-  const evaluate = async (expression) =>
-    (await send("Runtime.evaluate", { expression, returnByValue: true })).result?.result?.value;
   const view = async () => JSON.parse((await evaluate("window.shokujodxView ?? 'null'")) ?? "null");
   await send("Page.enable");
   await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: scale, mobile: true });
   await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
   await send("Page.navigate", { url: BASE + "?stress=20000&probe=1" });
-  await sleep(9000);
+  // The program runs and the design fits the view.
+  await waitFor(STARTED);
+  await sleep(1500);
   const coarse = await evaluate("matchMedia('(pointer: coarse)').matches");
   const result = { name, coarse, first: await view() };
   await check(send, view, result);
   const shot = await send("Page.captureScreenshot", { format: "png" });
   if (shot.result?.data) writeFileSync(join(OUT, `${name}.png`), Buffer.from(shot.result.data, "base64"));
   console.log(JSON.stringify(result));
-  ws.close();
-  await closeBrowser(PORT, profile);
+  await close();
   return result;
 }
 
