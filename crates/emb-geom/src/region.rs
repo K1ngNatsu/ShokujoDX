@@ -285,6 +285,36 @@ fn line_join(join: Join, distance: f64) -> LineJoin<f64> {
 /// nesting makes a hole of a part where two strokes overlap. If the rings
 /// do not overlap, they come back as they are (the same points), so a font
 /// with clean outlines gives the same shapes as before.
+/// The area that the rings `rings` cover with the nonzero rule, as valid
+/// regions: rings that cross themselves (the outline of a satin column
+/// whose rails cross) or each other become simple outer rings and holes.
+/// The boolean operations need valid regions: with a ring that crosses
+/// itself, a difference did not end (P21 Milestone 12).
+pub fn fill_nonzero(rings: &[Vec<Point>]) -> Vec<Region> {
+    use i_overlay::core::fill_rule::FillRule;
+    use i_overlay::float::simplify::SimplifyShape;
+    let paths: Vec<Vec<[f64; 2]>> = rings
+        .iter()
+        .filter(|r| r.len() >= 3 && r.iter().all(|p| p.x.is_finite() && p.y.is_finite()))
+        .map(|r| r.iter().map(|p| [p.x, p.y]).collect())
+        .collect();
+    if paths.is_empty() {
+        return Vec::new();
+    }
+    paths
+        .simplify_shape(FillRule::NonZero)
+        .into_iter()
+        .filter_map(|shape| {
+            let mut contours = shape
+                .into_iter()
+                .map(|c| c.into_iter().map(|q| Point::new(q[0], q[1])).collect::<Vec<Point>>())
+                .filter(|r| r.len() >= 3);
+            let outer = contours.next()?;
+            Some(Region::new(outer, contours.collect()))
+        })
+        .collect()
+}
+
 pub fn without_overlaps(rings: &[Vec<Point>]) -> Vec<Vec<Point>> {
     use i_overlay::core::fill_rule::FillRule;
     use i_overlay::float::simplify::SimplifyShape;
@@ -407,6 +437,22 @@ mod tests {
         assert!(r.contains(Point::new(1.0, 1.0)));
         assert!(!r.contains(Point::new(3.0, 3.0)));
         assert!(!r.contains(Point::new(11.0, 1.0)));
+    }
+
+    /// A ring that crosses itself (a bow tie) becomes two valid regions.
+    #[test]
+    fn fill_nonzero_makes_a_bow_tie_valid() {
+        let tie = vec![
+            Point::new(0.0, 0.0),
+            Point::new(10.0, 10.0),
+            Point::new(10.0, 0.0),
+            Point::new(0.0, 10.0),
+        ];
+        let r = fill_nonzero(&[tie]);
+        assert_eq!(r.len(), 2, "{r:?}");
+        let area: f64 = r.iter().map(Region::area).sum();
+        assert!((area - 50.0).abs() < 1e-3, "{area}");
+        assert!(fill_nonzero(&[]).is_empty());
     }
 
     #[test]

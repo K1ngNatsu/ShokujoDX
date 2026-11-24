@@ -63,7 +63,14 @@ machines and systems.
 | Clipart sets with more detail, by theme, as asset packages | Shelved (owner, 2026-11-19) | Lane 8 of the review of P17 |
 | A bundled Ink/Stitch font | Needs a font with a license that permits it (the owner chose a test only) | P18 Milestone 6 |
 
-### Letter shapes (after P21 Milestone 11)
+### Letter shapes (after P21 Milestone 12)
+
+- The foot of a stem past a junction (Anton "a"): the middle line prunes
+  it as a side branch; a second pass for lost strokes in all letters
+  cost more than it gave (ADR 0158).
+- Needle points in counters narrower than a thread in very heavy fonts
+  (Shrikhand "p", Poster Heavy "n", Giant Round "m"): a pull compensation
+  for each part near such a counter.
 
 - A dot with the shape of a "D" (the colon of Jazz Hand): the middle line
   goes to a corner, and the column skips a corner of the dot. The colon

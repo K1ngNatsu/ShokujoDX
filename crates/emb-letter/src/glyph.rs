@@ -78,6 +78,7 @@ impl GlyphShapes {
             let (mut strokes, used) = crate::stroke::strokes_split_soft(rings, cap_height, split, soft);
             add_missed_strokes(&fills, &mut strokes, cap_height);
             tune_ends(&fills, &mut strokes, cap_height);
+            untangle(&mut strokes, cap_height);
             (strokes, used)
         };
         let (mut strokes, used) = make(true);
@@ -356,10 +357,12 @@ fn tune_ends(fills: &[(Vec<Point>, Vec<Vec<Point>>)], s: &mut Strokes, cap_heigh
 }
 
 /// The area of a satin: its two rails as one ring.
-fn satin_region(g: &emb_model::SatinGeometry) -> Region {
+/// The outline of a satin column: rail A, then rail B back. It crosses
+/// itself where the rails cross.
+fn satin_ring(g: &emb_model::SatinGeometry) -> Vec<Point> {
     let a: Vec<Point> = g.rail_a.flatten(0.5).into_iter().flat_map(|p| p.points).collect();
     let b: Vec<Point> = g.rail_b.flatten(0.5).into_iter().flat_map(|p| p.points).collect();
-    Region::new(a.into_iter().chain(b.into_iter().rev()).collect(), Vec::new())
+    a.into_iter().chain(b.into_iter().rev()).collect()
 }
 
 /// The edges of a region as closed lines.
@@ -422,7 +425,7 @@ fn add_missed_strokes(fills: &[(Vec<Point>, Vec<Vec<Point>>)], s: &mut Strokes, 
         return;
     }
     let w = s.max_width;
-    let covered = region::union(&s.satins.iter().map(satin_region).collect::<Vec<_>>(), &[]);
+    let covered = region::fill_nonzero(&s.satins.iter().map(satin_ring).collect::<Vec<_>>());
     // The edges of the satins, a little wide, to find the edges of a part
     // that touch them.
     let near = region::offset(&covered, 0.01 * w, Join::Miter);
@@ -458,7 +461,11 @@ fn add_missed_strokes(fills: &[(Vec<Point>, Vec<Vec<Point>>)], s: &mut Strokes, 
             if more.coverage >= 0.5 {
                 let min_area = LEFT_MIN_SHARE * g_area(&rings);
                 for satin in more.satins {
-                    if satin_region(&satin).area() >= min_area {
+                    let area: f64 = region::fill_nonzero(&[satin_ring(&satin)])
+                        .iter()
+                        .map(Region::area)
+                        .sum();
+                    if area >= min_area {
                         s.max_width = s.max_width.max(more.max_width);
                         added.push(satin);
                     }
@@ -467,13 +474,41 @@ fn add_missed_strokes(fills: &[(Vec<Point>, Vec<Vec<Point>>)], s: &mut Strokes, 
         }
     }
     s.satins.extend(added);
-    let areas: Vec<Region> = s.satins.iter().map(satin_region).collect();
-    let on_glyph: f64 = region::intersection(&glyph, &region::union(&areas, &[]))
-        .iter()
-        .map(Region::area)
-        .sum();
+    let areas = region::fill_nonzero(&s.satins.iter().map(satin_ring).collect::<Vec<_>>());
+    let on_glyph: f64 = region::intersection(&glyph, &areas).iter().map(Region::area).sum();
     s.coverage = ((on_glyph + slivers) / glyph_area).clamp(0.0, 1.0);
 }
+
+/// No pair across a column crosses the pair before it (P21 Milestone 12):
+/// where it would (a fast turn, a slanted end, the joint of a crossbar),
+/// the column gets rungs on which one side stays
+/// (`emb_stitch::satin::Column::untangled_rungs`).
+fn untangle(strokes: &mut Strokes, cap_height: f64) {
+    for g in &mut strokes.satins {
+        untangle_column(g, cap_height);
+    }
+}
+
+fn untangle_column(g: &mut emb_model::SatinGeometry, cap_height: f64) {
+    if let Some(rungs) = emb_stitch::satin::Column::new(g).and_then(|c| c.untangled_rungs(UNTANGLE_STEP * cap_height)) {
+        g.rungs = rungs;
+    }
+}
+
+/// [`untangle`] for the parts of a letter with the capital height
+/// `cap_height`: the layout does it last, as the pivots of the rungs do not
+/// stay when the points are rounded (an embroidery font file).
+pub fn untangle_parts(parts: &mut [ObjectKind], cap_height: f64) {
+    for p in parts {
+        if let ObjectKind::Satin { geometry, .. } = p {
+            untangle_column(geometry, cap_height);
+        }
+    }
+}
+
+/// The pairs that [`untangle`] checks are this part of the capital height
+/// apart (0.2 mm at 25 mm, as the letter fault bench).
+const UNTANGLE_STEP: f64 = 0.008;
 
 /// The capital height (mm) at which [`split_faults`] measures.
 const SPLIT_CAP_MM: f64 = 25.0;
@@ -589,22 +624,25 @@ mod tests {
         // the comma, a stem of the pilcrow); Auto made them fill letters in
         // satin fonts. It finds the stems of "p", "q" and "u" now (the
         // stroke finder goes on along the pen stroke at a junction).
+        // Since P21 Milestone 12 the first pass covers the comma of Lato (a
+        // rail follows the side of the tail that swells).
+        let mut second = 0;
         for (family, c) in [("Lato", ','), ("Lato", '\u{b6}'), ("Pacifico", '\u{b6}')] {
             let (first, shapes) = passes(family, c);
-            assert!(
-                first.coverage < AUTO_MIN_COVERAGE,
-                "{family} {c}: the first pass covers it now"
-            );
-            assert!(
-                shapes.strokes.satins.len() > first.satins.len(),
-                "{family} {c}: no satin for the lost stroke"
-            );
+            if first.coverage < AUTO_MIN_COVERAGE {
+                second += 1;
+                assert!(
+                    shapes.strokes.satins.len() > first.satins.len(),
+                    "{family} {c}: no satin for the lost stroke"
+                );
+            }
             assert!(
                 shapes.strokes.coverage >= AUTO_MIN_COVERAGE,
                 "{family} {c}: coverage {:.2}",
                 shapes.strokes.coverage
             );
         }
+        assert!(second > 0, "no character needs the second pass");
     }
 
     #[test]
@@ -620,7 +658,14 @@ mod tests {
                 "{family} {c}: coverage {:.2}",
                 first.coverage
             );
-            assert_eq!(shapes.strokes.satins, first.satins, "{family} {c}");
+            // The same columns (the rungs can change: `untangle`).
+            let rails = |s: &Strokes| {
+                s.satins
+                    .iter()
+                    .map(|g| (g.rail_a.clone(), g.rail_b.clone()))
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(rails(&shapes.strokes), rails(&first), "{family} {c}");
         }
     }
 

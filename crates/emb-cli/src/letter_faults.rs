@@ -653,7 +653,12 @@ pub fn run_on(truetype_only: bool, chars: &[char]) -> Vec<FontFaults> {
                     continue;
                 }
                 let letter = match way {
-                    "embroidery" => font.as_ref().and_then(|f| f.letters.get(&c).cloned()),
+                    // As the layout sews it (P21 Milestone 12: the columns
+                    // untangled).
+                    "embroidery" => font.as_ref().and_then(|f| f.letters.get(&c).cloned()).map(|mut l| {
+                        emb_letter::glyph::untangle_parts(&mut l.parts, CAP_MM);
+                        l
+                    }),
                     _ => truetype_letter(&src, c),
                 };
                 let Some(letter) = letter else { continue };

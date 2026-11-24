@@ -117,6 +117,12 @@ type Corner = (Point, Point, Point);
 /// cells more. Farther, the side is in an opening: a place where another
 /// stroke meets or crosses (P21 Milestone 1).
 const FOOT_REACH: f64 = 1.6;
+/// Where no foot is within [`FOOT_REACH`], a foot as far as this many
+/// times the half-width (the side of a stroke that swells, the outer side
+/// of a heavy bowl: it had a straight rail across it, P21 Milestone 12).
+/// Measured on the letters of 127 fonts: 2.5 left 38 % less open area; 3
+/// and 4 more crossing stitches.
+const FOOT_FAR: f64 = 2.5;
 const FOOT_SLACK: f64 = 1.5;
 /// A foot is in this angle (degrees) of the normal of the middle line,
 /// on a segment of the outline in [`FOOT_ALONG_DEG`] of the direction of
@@ -2002,6 +2008,7 @@ fn side_rail(
     segs: &[(Point, Point)],
     radius_at: &dyn Fn(Point) -> f64,
     cell: f64,
+    far: bool,
 ) -> Vec<Option<Point>> {
     let (pts, n) = (line.pts, line.pts.len());
     let mut out: Vec<Option<Point>> = vec![None; n];
@@ -2014,6 +2021,19 @@ fn side_rail(
     for &i in &body {
         let reach = FOOT_REACH * radius_at(pts[i]) + FOOT_SLACK * cell;
         feet[i] = outline.nearest(pts[i], dir(i), reach);
+        // A side that swells (the outer side of a heavy bowl) is farther:
+        // the outline there is a foot if the line to it stays in the letter
+        // (not across the eye of an "e") and it follows on from the feet
+        // next to it (an opening into another stroke does not; see below).
+        if feet[i].is_none() && far {
+            feet[i] = outline
+                .nearest(pts[i], dir(i), FOOT_FAR * radius_at(pts[i]) + FOOT_SLACK * cell)
+                .filter(|f| {
+                    !segs
+                        .iter()
+                        .any(|&(a, b)| Point::crossing(pts[i], f.at, a, b).is_some_and(|(u, _)| u < 1.0 - 1e-6))
+                });
+        }
     }
     // The body points next to each other (positions in `body`), and the
     // last with the first in a ring.
@@ -2421,6 +2441,27 @@ fn in_outline(ext: &[Point], outline: &Rings, segs: &[(Point, Point)]) -> Vec<Po
     out
 }
 
+/// The number of places where the outline of a column (side `a`, then
+/// side `b` back: the points that each has) crosses itself.
+fn sides_cross(a: &[Option<Point>], b: &[Option<Point>]) -> usize {
+    let ring: Vec<Point> = a.iter().flatten().chain(b.iter().rev().flatten()).copied().collect();
+    let n = ring.len();
+    let mut count = 0;
+    for i in 0..n {
+        for j in i + 2..n {
+            if i == 0 && j == n - 1 {
+                continue;
+            }
+            if Point::crossing(ring[i], ring[(i + 1) % n], ring[j], ring[(j + 1) % n])
+                .is_some_and(|(u, v)| (1e-6..=1.0 - 1e-6).contains(&u) && (1e-6..=1.0 - 1e-6).contains(&v))
+            {
+                count += 1;
+            }
+        }
+    }
+    count
+}
+
 /// How far a side of a column can go from the point `p` in the direction
 /// `d`, at most `h`: to the outline, and 0 if the side goes out of the
 /// outline at once (`p` on the outline: an end at a corner). A ray from a
@@ -2577,10 +2618,24 @@ fn rails(
         closed,
     };
     let capped = |p: Point| radius_at(p).min(cap);
-    let (rail_a, rail_b) = (
-        side_rail(&line, 1.0, outline, segs, &capped, cell),
-        side_rail(&line, -1.0, outline, segs, &capped, cell),
-    );
+    let sides = |far: bool| {
+        (
+            side_rail(&line, 1.0, outline, segs, &capped, cell, far),
+            side_rail(&line, -1.0, outline, segs, &capped, cell, far),
+        )
+    };
+    // With the far feet, the outline of the column must not cross itself
+    // more than with the near feet only (in a script glyph that loops, a
+    // far foot can be paired with the wrong part of the outline; a column
+    // of the pilcrow of Great Vibes crossed itself 40 times).
+    let (mut rail_a, mut rail_b) = sides(true);
+    let crossed = sides_cross(&rail_a, &rail_b);
+    if crossed > 0 {
+        let (near_a, near_b) = sides(false);
+        if sides_cross(&near_a, &near_b) < crossed {
+            (rail_a, rail_b) = (near_a, near_b);
+        }
+    }
     // The width of each middle point on each side, along its normal.
     let mut half: Vec<(f64, f64)> = vec![(0.0, 0.0); n];
     for i in 0..n {
@@ -3164,6 +3219,48 @@ fn trim_ends(columns: &mut [Rails]) {
 
 #[cfg(test)]
 mod tests {
+    /// The outline of a column made of its two sides crosses itself where
+    /// a side folds back.
+    #[test]
+    fn the_crossings_of_the_outline_of_a_column() {
+        let p = |x: f64, y: f64| Some(Point::new(x, y));
+        let a = [p(0.0, 0.0), p(10.0, 0.0), p(20.0, 0.0)];
+        let b = [p(0.0, 5.0), p(10.0, 5.0), p(20.0, 5.0)];
+        assert_eq!(sides_cross(&a, &b), 0);
+        // Side B goes under side A in its middle.
+        let folded = [p(0.0, 5.0), p(10.0, -3.0), p(20.0, 5.0)];
+        assert_eq!(sides_cross(&a, &folded), 2);
+        // Points with no foot do not count.
+        assert_eq!(
+            sides_cross(&[None, p(0.0, 0.0), p(5.0, 0.0)], &[p(0.0, 2.0), None, p(5.0, 2.0)]),
+            0
+        );
+    }
+
+    /// A stroke that swells on one side (the outer side of a heavy bowl):
+    /// the side there is farther than `FOOT_REACH` half-widths from the
+    /// middle line. The rail follows the swell, not a straight line across
+    /// it (P21 Milestone 12).
+    #[test]
+    fn a_rail_follows_a_side_that_swells() {
+        // A bar 200 long and 40 high, with a bump of 40 under its middle.
+        let mut ring: Vec<Point> = vec![Point::new(0.0, 0.0), Point::new(200.0, 0.0), Point::new(200.0, 40.0)];
+        for k in 0..=16 {
+            let t = std::f64::consts::PI * f64::from(k) / 16.0;
+            ring.push(Point::new(140.0 - 40.0 * (1.0 - t.cos()), 40.0 + 40.0 * t.sin()));
+        }
+        ring.push(Point::new(0.0, 40.0));
+        let s = strokes(std::slice::from_ref(&ring), 400.0);
+        let deepest = s
+            .satins
+            .iter()
+            .flat_map(|g| [&g.rail_a, &g.rail_b])
+            .flat_map(|r| r.flatten(0.5).into_iter().flat_map(|l| l.points))
+            .map(|p| p.y)
+            .fold(f64::MIN, f64::max);
+        assert!(deepest > 70.0, "the rail stays at {deepest}");
+    }
+
     /// A square dot (Jazz Hand "i"): its middle line is a diagonal that
     /// ends at two corners. No rail point is out of the dot (P21
     /// Milestone 11: the ends went 2.6 mm out of it).

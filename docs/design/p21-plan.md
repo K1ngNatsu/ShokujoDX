@@ -968,6 +968,62 @@ column fonts of the program 94.3 on mean (94.2). The exit test is met;
 the lettering bench of P20 has fewer stitches out of the outline and 1
 more trim in 刺繍 at 10, 15 and 25 mm and in 龍 at 10 mm.
 
+## Milestone 12: the largest faults of Latin letters (M)
+
+**Why.** The owner asked to work through the largest measured faults of
+Latin letters, from the most improvement to the least (2026-11-23): open
+areas, bulges, crossing stitches at junctions, sharp corners, columns on
+top, needle points out of the outline (ADR 0158).
+
+**Steps.**
+
+1. A survey of the faults of A-Z, a-z and 0-9 in the 127 column fonts of
+   the program and of the packages (lettering in the source fonts at
+   25 mm), to rank them.
+2. The faults in that order, each kept only if the survey is better.
+3. All fonts made again.
+
+**Exit test.** Less open area and fewer crossing pairs in the survey; no
+measure of the survey worse by more than a few percent; the letter fault
+bench and the lettering bench of P20 no worse.
+
+**Made (2026-11-24, ADR 0158).** The survey ranked the faults: open
+area (1,770 letters of all 127 fonts), crossing pairs (928 letters), open
+corners (1,409 letters, 0.5 mm2 each), bulges (59 % in ten script fonts),
+needle points out of the outline (46 % in a few heavy fonts), columns on
+top (951 letters).
+
+1. Open area: a side that swells gets a foot as far as 2.5 half-widths
+   (the line to it in the letter); a column whose outline crosses itself
+   more with far feet keeps the near feet. A second pass for lost
+   strokes in all letters was tried and left out (more two layers,
+   crossing pairs and trims).
+2. Crossing stitches: the columns get untangled rungs (pivots), in the
+   stroke finder and last in the layout (the grid of a font file takes
+   the pivots away).
+3. Not changed, with the reasons in ADR 0158: open corners (the tips of
+   acute corners), bulges (the swell of calligraphic strokes), needle
+   points in counters narrower than a thread, columns on top (the route
+   takes fewer trims first).
+4. The second pass for lost strokes makes valid areas first: a column
+   that crossed itself stopped a boolean operation (the conversion of
+   Great Vibes did not end).
+
+| Measure (survey of 7,874 letters) | Before | After |
+| --- | --- | --- |
+| Open area, mm2 | 5,837 | 3,581 |
+| Crossing pairs | 4,507 | 806 |
+| Open corners, mm2 | 748 | 684 |
+| Two layers, mm2 | 56,343 | 54,792 |
+| Needle points out of the outline | 1,102 | 1,107 |
+| Trims | 787 | 783 |
+
+The letter fault bench (embroidery font / lettering): crossing pairs
+Block Sans 11 / 12 to 3 / 4, Anton 19 / 14 to 8 / 13, Pacifico 12 / 10 to
+3 / 0, Varsity 7 / 6 to 1 / 1; open area of Anton 1.09 % / 1.07 % to
+0.31 % / 0.28 %. The fonts: 33,949 trims (34,070); the column fonts of
+the program 94.2 on mean (94.3). The exit test is met.
+
 ## Exit test of the phase
 
 The exit tests of the six milestones, and the sew-out of Milestone 6
@@ -984,8 +1040,8 @@ comes first, as the measure of each milestone. The bundled fonts are made
 again only in Milestone 6, so the sew-outs of the older milestones use
 lettering in the TrueType fonts. Milestone 9 (the owner's request of
 2026-11-23, after Milestone 6) makes the fonts again before the
-sew-out, and Milestones 10 and 11 (the owner's requests after Milestone
-9) too.
+sew-out, and Milestones 10, 11 and 12 (the owner's requests after
+Milestone 9) too.
 
 ## Not in this phase
 

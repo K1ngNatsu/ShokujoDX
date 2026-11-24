@@ -327,6 +327,8 @@ fn letter_parts(
             q.transform(&t);
         }
     }
+    // No stitches across a column cross (P21 Milestone 12).
+    crate::glyph::untangle_parts(&mut parts, l.height_mm);
     (parts, fixed, tuning)
 }
 
