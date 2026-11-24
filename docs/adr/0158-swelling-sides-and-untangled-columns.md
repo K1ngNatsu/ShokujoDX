@@ -74,7 +74,9 @@ the outline 46 % in a few heavy fonts; columns on top in 951 letters.
      narrower than a thread in very heavy fonts (Shrikhand "p", Poster
      Heavy "n", Giant Round "m"), where pull compensation pushes the
      points into the counter; a pull compensation for each part near
-     such a counter is a feature of its own.
+     such a counter is a feature of its own. (Corrected in ADR 0160: the
+     cause was the split of the outline, a cut along the stem and the
+     moved end of a piece, not pull compensation.)
    - Columns on top: the route takes fewer trims first (ADR 0153).
 
 ## Consequences

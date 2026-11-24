@@ -22,7 +22,8 @@ const MIN_LOCK_MM: f64 = 0.1;
 /// A run that starts nearer than this to the needle starts where the
 /// needle is, in mm: a travel stitch to it is not made. The unit of the
 /// machine files is 0.1 mm, so such a stitch can have no length in a file,
-/// and the machine then makes a stitch in place.
+/// and the machine then makes a stitch in place. A travel stitch shorter
+/// than the shortest stitch of the machine is not made either.
 const SAME_PLACE_MM: f64 = 0.1;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -589,8 +590,11 @@ impl<'a> Builder<'a> {
             Join::Jump | Join::Travel => TrimMode::Never,
         };
         // A travel stitch to a run that starts where the needle is: no
-        // stitch (see [`SAME_PLACE_MM`]).
-        let apart = exact || self.needle.distance(first) >= SAME_PLACE_MM;
+        // stitch (see [`SAME_PLACE_MM`]); nor one shorter than the shortest
+        // stitch of the machine (it breaks the thread; P21 Milestone 14: the
+        // travel run of a letter ended 0.23 mm from the first needle point
+        // of the column after it).
+        let apart = exact || self.needle.distance(first) >= SAME_PLACE_MM.max(self.opts.min_stitch_mm);
         if self.sewing && join == Join::Travel {
             self.stop_here();
             self.stitch(first, apart);
@@ -670,7 +674,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_run_that_starts_at_the_needle_gets_no_travel_stitch() {
+    fn a_run_that_starts_near_the_needle_gets_no_travel_stitch() {
         let opts = PlanOptions::default();
         let stitches = |start: Point, exact: bool| {
             let mut b = Builder::new(&opts);
@@ -695,8 +699,11 @@ mod tests {
         );
         // A run of exact stitches (from a machine file) keeps each point.
         assert_eq!(stitches(near, true).len(), 4);
-        // A short travel stitch is a stitch.
-        assert_eq!(stitches(Point::new(3.2, 0.0), false).len(), 4);
+        // A travel stitch shorter than the shortest stitch of the machine
+        // (0.3 mm) is not made either: it breaks the thread (P21 Milestone
+        // 14). A longer one is a stitch.
+        assert_eq!(stitches(Point::new(3.2, 0.0), false).len(), 3);
+        assert_eq!(stitches(Point::new(3.35, 0.0), false).len(), 4);
     }
 
     fn kinds(p: &StitchPlan) -> Vec<StitchKind> {

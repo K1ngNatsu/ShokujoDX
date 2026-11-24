@@ -68,12 +68,13 @@ impl GlyphShapes {
     /// [`GlyphShapes::new`] with the outline split into strokes first
     /// (`stroke::Split::for_char` of the character of the glyph, ADR 0152).
     ///
-    /// The cuts of elbows (ADR 0159), and then the bridges to curves (the
-    /// brackets of serifs, the shoulder of an "n") and the cuts of balls,
-    /// are kept only if the columns have no more faults than the split
-    /// without them ([`split_faults`]): in some shapes (the bowls of a
-    /// condensed font, a short hook at the end of a stroke) the pieces sew
-    /// worse.
+    /// The cuts of elbows (ADR 0159), the cuts from notches that go along a
+    /// stroke (ADR 0160), and then the bridges to curves (the brackets of
+    /// serifs, the shoulder of an "n") and the cuts of balls, are kept only
+    /// if the columns have no more faults than the split without them
+    /// ([`split_faults`]): in some shapes (the bowls of a condensed font, a
+    /// short hook at the end of a stroke, the stem of a heavy "n" beside its
+    /// narrow counter) the pieces sew worse.
     pub fn with_split(rings: &[Vec<Point>], cap_height: f64, split: crate::stroke::Split) -> GlyphShapes {
         use crate::stroke::Optional;
         let fills = regions(rings);
@@ -84,10 +85,7 @@ impl GlyphShapes {
             untangle(&mut strokes, cap_height);
             (strokes, used)
         };
-        let mut with = Optional {
-            soft: true,
-            elbows: true,
-        };
+        let mut with = Optional::ALL;
         let (mut strokes, used) = make(with);
         let faults = |s: &Strokes| split_faults(s, &fills, cap_height);
         if used.elbows {
@@ -95,6 +93,13 @@ impl GlyphShapes {
             if faults(&without) < faults(&strokes) {
                 strokes = without;
                 with.elbows = false;
+            }
+        }
+        if used.along {
+            let (without, _) = make(Optional { along: false, ..with });
+            if faults(&without) < faults(&strokes) {
+                strokes = without;
+                with.along = false;
             }
         }
         if used.soft {

@@ -1312,21 +1312,27 @@ pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
 /// [`strokes`] after the split `split` of the outline: the columns of each
 /// piece, as one.
 pub fn strokes_split(rings: &[Vec<Point>], cap_height: f64, split: Split) -> Strokes {
-    let all = Optional {
-        soft: true,
-        elbows: true,
-    };
-    strokes_split_soft(rings, cap_height, split, all).0
+    strokes_split_soft(rings, cap_height, split, Optional::ALL).0
 }
 
 /// The optional links of a split that a glyph keeps only if its columns
 /// sew no worse: the bridges to curves and the cuts of balls (`soft`),
-/// and the cuts of elbows (`elbows`). In a result: the links that the
-/// split has.
+/// the cuts of elbows (`elbows`), and the cuts from notches that go along
+/// a stroke (`along`). In a result: the links that the split has.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Optional {
     pub soft: bool,
     pub elbows: bool,
+    pub along: bool,
+}
+
+impl Optional {
+    /// All the optional links.
+    pub(crate) const ALL: Optional = Optional {
+        soft: true,
+        elbows: true,
+        along: true,
+    };
 }
 
 /// [`strokes_split`], with or without the optional links (for the scripts
@@ -1338,7 +1344,7 @@ pub(crate) fn strokes_split_soft(
     with: Optional,
 ) -> (Strokes, Optional) {
     if split != Split::Off
-        && let Some(s) = crate::split::split(rings, cap_height, split == Split::Notches, with.soft, with.elbows)
+        && let Some(s) = crate::split::split(rings, cap_height, split == Split::Notches, with)
     {
         let parts: Vec<(Strokes, f64)> = s
             .pieces
@@ -1350,6 +1356,7 @@ pub(crate) fn strokes_split_soft(
             Optional {
                 soft: s.soft,
                 elbows: s.elbows,
+                along: s.along,
             },
         );
     }
@@ -1358,6 +1365,7 @@ pub(crate) fn strokes_split_soft(
         Optional {
             soft: false,
             elbows: false,
+            along: false,
         },
     )
 }

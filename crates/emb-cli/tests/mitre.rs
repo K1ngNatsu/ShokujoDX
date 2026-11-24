@@ -186,7 +186,13 @@ fn mitred_letters_of_a_routed_font_keep_their_route() {
             d
         };
         let (lapped, mitred) = (of(false), of(true));
-        assert!(part_count(&mitred) < part_count(&lapped), "{name}");
+        // Corners join in the fonts with corners; the script (Pacifico) has
+        // almost none (one in its "f" before P21 Milestone 14, none since).
+        if name == "Pacifico" {
+            assert!(part_count(&mitred) <= part_count(&lapped), "{name}");
+        } else {
+            assert!(part_count(&mitred) < part_count(&lapped), "{name}");
+        }
         assert!(trims(mitred) <= trims(lapped), "{name}");
     }
 }

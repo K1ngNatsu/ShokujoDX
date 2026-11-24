@@ -12,6 +12,8 @@
 
 use emb_geom::Point;
 
+use crate::stroke::Optional;
+
 /// A corner is concave if the outline turns into the shape at least this
 /// much (degrees) over [`CORNER_SPAN`] of the capital height before and
 /// after it.
@@ -63,6 +65,17 @@ const ELBOW_SPAN: f64 = 0.5;
 /// The outer corner is at the width of each stroke from the side of the
 /// other stroke, within this part of the width.
 const ELBOW_FIT: f64 = 0.25;
+/// A cut from a notch goes across the place where strokes
+/// meet: some point of it (at a quarter, the middle or three quarters) is
+/// at least this part of its length from the outline. A cut nearer the
+/// outline all along goes along a stroke (P21 Milestone 14: in a heavy
+/// "n" the cut from the notch on top of the stem went down the stem beside
+/// the narrow counter, and the piece of the stem went into the counter).
+/// The cuts across strokes are 0.23 or more; along strokes 0.14 or less.
+/// Such a cut is optional. (The cut of an elbow along the hairline serif
+/// of a fat face font goes along a stroke too, and the serif sews well as
+/// a piece of its own; the cuts of elbows are optional already.)
+const CUT_CLEAR: f64 = 0.15;
 /// A ball at the end of a stroke (the terminals of "S", "9" and "r" in a
 /// serif font, P21 Milestone 11) meets the stroke at a concave corner that
 /// turns at least this much (degrees), less than a notch.
@@ -124,6 +137,8 @@ pub(crate) struct Split {
     pub soft: bool,
     /// Some cuts are at elbows.
     pub elbows: bool,
+    /// Some cuts from notches go along a stroke.
+    pub along: bool,
 }
 
 /// A concave corner: the vertex (ring, index), and the directions of the
@@ -421,6 +436,21 @@ fn bracket_start(ring: &[Point], k: usize, forward: bool, width: f64) -> Option<
     None
 }
 
+/// The cut from `a` to `b` goes along a stroke: each of its points at a
+/// quarter, the middle and three quarters is nearer the outline than
+/// [`CUT_CLEAR`] of its length.
+fn along_a_stroke(a: Point, b: Point, rings: &[Vec<Point>]) -> bool {
+    let len = a.distance(b);
+    [0.25, 0.5, 0.75].iter().all(|&t| {
+        let q = a.lerp(b, t);
+        rings
+            .iter()
+            .flat_map(|r| (0..r.len()).map(move |k| q.distance_to_segment(r[k], r[(k + 1) % r.len()])))
+            .fold(f64::MAX, f64::min)
+            < CUT_CLEAR * len
+    })
+}
+
 /// The line from `a` to `b` is in the shape and clear of the outline (but
 /// at its ends).
 fn clear_inside(a: Point, b: Point, rings: &[Vec<Point>], width: f64) -> bool {
@@ -442,9 +472,11 @@ fn clear_inside(a: Point, b: Point, rings: &[Vec<Point>], width: f64) -> bool {
 
 /// The split of the shape in `rings` (nonzero winding), or `None` if it has
 /// no bridges. With `notches`, a sharp concave corner with no bridge gets
-/// a cut too, with `elbows` also the corner of an elbow, and with `soft`
-/// also a bridge to a curve.
-pub(crate) fn split(rings: &[Vec<Point>], cap_height: f64, notches: bool, soft: bool, elbows: bool) -> Option<Split> {
+/// a cut too (with `with.along` also a cut that goes along a stroke), with
+/// `with.elbows` also the corner of an elbow, and with `with.soft` also a
+/// bridge to a curve.
+pub(crate) fn split(rings: &[Vec<Point>], cap_height: f64, notches: bool, with: Optional) -> Option<Split> {
+    let Optional { soft, elbows, along } = with;
     let rings = inside_left(rings, 1e-4 * cap_height.max(1e-9));
     let area: f64 = rings
         .iter()
@@ -499,6 +531,7 @@ pub(crate) fn split(rings: &[Vec<Point>], cap_height: f64, notches: bool, soft: 
             cut: false,
             soft: false,
             elbow: false,
+            along: false,
             axis: None,
         })
         .collect();
@@ -517,7 +550,7 @@ pub(crate) fn split(rings: &[Vec<Point>], cap_height: f64, notches: bool, soft: 
         }
         let sharp = c.d_in.dot(c.d_out) <= cos_notch;
         let Some(link) = sharp
-            .then(|| notch_cut(c, &rings, width))
+            .then(|| notch_cut(c, &rings, width).filter(|l| along || !l.along))
             .flatten()
             .or_else(|| elbows.then(|| elbow_cut(c, &rings, width, span)).flatten())
         else {
@@ -576,6 +609,7 @@ pub(crate) fn split(rings: &[Vec<Point>], cap_height: f64, notches: bool, soft: 
                 cut: false,
                 soft: true,
                 elbow: false,
+                along: false,
                 axis: None,
             });
         }
@@ -626,6 +660,7 @@ pub(crate) fn split(rings: &[Vec<Point>], cap_height: f64, notches: bool, soft: 
                     bridges: links.iter().map(|l| (l.pa, l.pb)).collect(),
                     soft: links.iter().any(|l| l.soft),
                     elbows: links.iter().any(|l| l.elbow),
+                    along: links.iter().any(|l| l.along),
                 });
             }
             Err(slits) => {
@@ -686,6 +721,7 @@ fn notch_cut(c: &Concave, rings: &[Vec<Point>], width: f64) -> Option<Link> {
         Spot::Vertex(q) => rings[r][q],
         Spot::On(..) => h,
     };
+    let along = along_a_stroke(c.p, end, rings);
     Some(Link {
         a: (c.ring, Spot::Vertex(c.at)),
         b: (r, spot),
@@ -694,6 +730,7 @@ fn notch_cut(c: &Concave, rings: &[Vec<Point>], width: f64) -> Option<Link> {
         cut: true,
         soft: false,
         elbow: false,
+        along,
         axis: None,
     })
 }
@@ -818,6 +855,7 @@ fn elbow_cut(c: &Concave, rings: &[Vec<Point>], width: f64, span: f64) -> Option
                     cut: true,
                     soft: false,
                     elbow: true,
+                    along: false,
                     axis: None,
                 },
             ));
@@ -929,6 +967,7 @@ fn ball_cut(c: &Concave, rings: &[Vec<Point>], width: f64, area: f64, links: &[L
                         cut: true,
                         soft: true,
                         elbow: false,
+                        along: false,
                         axis: Some(into),
                     },
                 ));
@@ -957,6 +996,8 @@ struct Link {
     soft: bool,
     /// The cut of an elbow.
     elbow: bool,
+    /// A cut from a notch that goes along a stroke ([`CUT_CLEAR`]).
+    along: bool,
     /// The cut of a ball: the direction from the cut into the ball.
     axis: Option<Point>,
 }
@@ -1109,7 +1150,7 @@ fn faces(
     let mut pieces: Vec<Piece> = outers
         .iter()
         .map(|(r, vs, bs, a)| Piece {
-            rings: vec![moved_ends(r, vs, bs, &at, cuts)],
+            rings: vec![moved_ends(r, vs, bs, &at, cuts, rings)],
             area: *a,
             axis: None,
         })
@@ -1127,7 +1168,7 @@ fn faces(
             .min_by(|x, y| x.1.3.total_cmp(&y.1.3))
             .map(|(i, _)| i);
         if let Some(i) = owner {
-            pieces[i].rings.push(moved_ends(r, vs, bs, &at, cuts));
+            pieces[i].rings.push(moved_ends(r, vs, bs, &at, cuts, rings));
         }
     }
     Some(Ok(pieces))
@@ -1135,8 +1176,16 @@ fn faces(
 
 /// The ring of a face with each bridge that is an end of the piece (and
 /// each cut from a notch) moved out of it by [`BRIDGE_OVERLAP`] of its
-/// length (into the piece on the other side).
-fn moved_ends(r: &[Point], vs: &[usize], bs: &[usize], at: &[Point], cuts: &[bool]) -> Vec<Point> {
+/// length (into the piece on the other side); an end that would go out of
+/// the shape in `rings` stays.
+fn moved_ends(
+    r: &[Point],
+    vs: &[usize],
+    bs: &[usize],
+    at: &[Point],
+    cuts: &[bool],
+    rings: &[Vec<Point>],
+) -> Vec<Point> {
     let n = vs.len();
     let cos_turn = emb_geom::math::cos(emb_geom::math::to_radians(END_TURN_DEG));
     let mut out = Vec::with_capacity(n + 4);
@@ -1155,8 +1204,14 @@ fn moved_ends(r: &[Point], vs: &[usize], bs: &[usize], at: &[Point], cuts: &[boo
             continue;
         }
         let shift = Point::new(u.y, -u.x) * (BRIDGE_OVERLAP * p.distance(q));
-        out.push(p + shift);
-        out.push(q + shift);
+        // An end that would go out of the shape stays. Where a cut meets
+        // the outline at a slant, the moved end went out of the letter, and
+        // the column of the piece with it (P21 Milestone 14: the top of the
+        // diagonal of an "N" went 1.6 mm out of the stem). Measured: also
+        // less area with two layers than an end taken back to the outline.
+        let moved = |e: Point| if winding(rings, e + shift) != 0 { e + shift } else { e };
+        out.push(moved(p));
+        out.push(moved(q));
     }
     out
 }
@@ -1190,7 +1245,17 @@ mod tests {
             .collect();
         let shape = union(&[bar], &[Region::new(circle, Vec::new())]);
         assert_eq!(shape.len(), 1);
-        let s = split(std::slice::from_ref(&shape[0].outer), 1000.0, true, true, true).expect("a split");
+        let s = split(
+            std::slice::from_ref(&shape[0].outer),
+            1000.0,
+            true,
+            Optional {
+                soft: true,
+                elbows: true,
+                along: true,
+            },
+        )
+        .expect("a split");
         assert!(s.soft, "{s:?}");
         assert_eq!(s.pieces.len(), 2, "{s:?}");
         let ball = s.pieces.iter().find(|p| {
@@ -1210,7 +1275,17 @@ mod tests {
         assert!(u.x > 0.99, "{u:?}");
         // With no soft links, the stroke and the ball are one piece.
         assert!(
-            split(std::slice::from_ref(&shape[0].outer), 1000.0, true, false, true).is_none_or(|p| p.pieces.len() == 1)
+            split(
+                std::slice::from_ref(&shape[0].outer),
+                1000.0,
+                true,
+                Optional {
+                    soft: false,
+                    elbows: true,
+                    along: true
+                }
+            )
+            .is_none_or(|p| p.pieces.len() == 1)
         );
     }
 
@@ -1227,7 +1302,17 @@ mod tests {
             (0.0, 500.0),
             (250.0, 500.0),
         ]);
-        let s = split(&[t], 600.0, true, true, true).expect("a split");
+        let s = split(
+            &[t],
+            600.0,
+            true,
+            Optional {
+                soft: true,
+                elbows: true,
+                along: true,
+            },
+        )
+        .expect("a split");
         assert_eq!(s.bridges.len(), 1, "{s:?}");
         let (a, b) = s.bridges[0];
         assert!((a.y - 500.0).abs() < 1e-9 && (b.y - 500.0).abs() < 1e-9, "{a:?} {b:?}");
@@ -1263,7 +1348,17 @@ mod tests {
             (0.0, 450.0),
             (450.0, 450.0),
         ]);
-        let s = split(&[plus], 1000.0, true, true, true).expect("a split");
+        let s = split(
+            &[plus],
+            1000.0,
+            true,
+            Optional {
+                soft: true,
+                elbows: true,
+                along: true,
+            },
+        )
+        .expect("a split");
         assert_eq!(s.bridges.len(), 2, "{s:?}");
         assert_eq!(s.pieces.len(), 3, "{s:?}");
         // The cut is across the thinner stroke (the shorter bridges): the
@@ -1286,7 +1381,19 @@ mod tests {
             (0.0, 700.0),
         ]);
         let hole = poly(&[(100.0, 400.0), (100.0, 600.0), (300.0, 600.0), (300.0, 400.0)]);
-        assert!(split(&[outer, hole], 700.0, true, true, false).is_none());
+        assert!(
+            split(
+                &[outer, hole],
+                700.0,
+                true,
+                Optional {
+                    soft: true,
+                    elbows: false,
+                    along: true
+                }
+            )
+            .is_none()
+        );
     }
 
     #[test]
@@ -1300,7 +1407,17 @@ mod tests {
             (300.0, 0.0),
             (200.0, 0.0),
         ]);
-        let s = split(&[v], 600.0, true, true, true).expect("a split");
+        let s = split(
+            &[v],
+            600.0,
+            true,
+            Optional {
+                soft: true,
+                elbows: true,
+                along: true,
+            },
+        )
+        .expect("a split");
         assert_eq!(s.bridges.len(), 1, "{s:?}");
         let (a, b) = s.bridges[0];
         assert!(
@@ -1334,7 +1451,17 @@ mod tests {
 
     #[test]
     fn a_stem_with_a_bracket_gets_a_bridge_to_the_curve() {
-        let s = split(&[stem_with_bracket()], 600.0, true, true, true).expect("a split");
+        let s = split(
+            &[stem_with_bracket()],
+            600.0,
+            true,
+            Optional {
+                soft: true,
+                elbows: true,
+                along: true,
+            },
+        )
+        .expect("a split");
         assert!(s.soft, "{s:?}");
         assert_eq!(s.pieces.len(), 2, "{s:?}");
         // The stem is square to the serif: the bracket goes with the serif,
@@ -1350,7 +1477,19 @@ mod tests {
             "{ends:?}"
         );
         // With no bridges to curves, the shape has no split.
-        assert!(split(&[stem_with_bracket()], 600.0, true, false, true).is_none());
+        assert!(
+            split(
+                &[stem_with_bracket()],
+                600.0,
+                true,
+                Optional {
+                    soft: false,
+                    elbows: true,
+                    along: true
+                }
+            )
+            .is_none()
+        );
     }
 
     #[test]
@@ -1368,7 +1507,17 @@ mod tests {
             (80.0, 600.0),
             (250.0, 300.0),
         ]);
-        let s = split(&[y], 600.0, true, true, true).expect("a split");
+        let s = split(
+            &[y],
+            600.0,
+            true,
+            Optional {
+                soft: true,
+                elbows: true,
+                along: true,
+            },
+        )
+        .expect("a split");
         let notch = Point::new(300.0, 390.0);
         let at_notch = s
             .bridges
@@ -1389,10 +1538,34 @@ mod tests {
             (100.0, 600.0),
             (0.0, 600.0),
         ]);
-        assert!(split(&[l], 600.0, true, true, false).is_none());
+        assert!(
+            split(
+                &[l],
+                600.0,
+                true,
+                Optional {
+                    soft: true,
+                    elbows: false,
+                    along: true
+                }
+            )
+            .is_none()
+        );
         let outer = poly(&[(0.0, 0.0), (600.0, 0.0), (600.0, 600.0), (0.0, 600.0)]);
         let hole = poly(&[(100.0, 100.0), (100.0, 500.0), (500.0, 500.0), (500.0, 100.0)]);
-        assert!(split(&[outer, hole], 600.0, true, true, false).is_none());
+        assert!(
+            split(
+                &[outer, hole],
+                600.0,
+                true,
+                Optional {
+                    soft: true,
+                    elbows: false,
+                    along: true
+                }
+            )
+            .is_none()
+        );
     }
 
     /// An "L": the stem and the bar meet at a corner and both end there (an
@@ -1409,7 +1582,17 @@ mod tests {
             (100.0, 600.0),
             (0.0, 600.0),
         ]);
-        let s = split(&[l], 600.0, true, true, true).expect("a split");
+        let s = split(
+            &[l],
+            600.0,
+            true,
+            Optional {
+                soft: true,
+                elbows: true,
+                along: true,
+            },
+        )
+        .expect("a split");
         assert!(s.elbows, "{s:?}");
         assert_eq!(s.pieces.len(), 2, "{s:?}");
         let (a, b) = s.bridges[0];
@@ -1450,7 +1633,19 @@ mod tests {
             (0.0, 600.0),
             (0.0, 40.0),
         ]);
-        assert!(split(&[chamfered], 600.0, true, true, true).is_none());
+        assert!(
+            split(
+                &[chamfered],
+                600.0,
+                true,
+                Optional {
+                    soft: true,
+                    elbows: true,
+                    along: true
+                }
+            )
+            .is_none()
+        );
         // A stem on a long foot that goes 150 past it on the left (a
         // serif): the corner of the foot is not at the width of the stem
         // from its side.
@@ -1464,8 +1659,90 @@ mod tests {
             (150.0, 100.0),
             (0.0, 100.0),
         ]);
-        let s = split(&[foot], 600.0, true, true, true);
+        let s = split(
+            &[foot],
+            600.0,
+            true,
+            Optional {
+                soft: true,
+                elbows: true,
+                along: true,
+            },
+        );
         assert!(s.as_ref().is_none_or(|s| !s.elbows), "{s:?}");
+    }
+
+    /// A heavy "n" (font units, Y down): the notch on top of the stem, and a
+    /// narrow counter open at the bottom. The line that halves the notch
+    /// goes down the stem beside the counter, along the stroke: that cut is
+    /// optional (P21 Milestone 14).
+    #[test]
+    fn a_cut_along_a_stroke_is_optional() {
+        let n = poly(&[
+            (50.0, 0.0),
+            (50.0, -1200.0),
+            (600.0, -1200.0),
+            (640.0, -960.0),
+            (690.0, -1100.0),
+            (1000.0, -1240.0),
+            (1400.0, -1000.0),
+            (1400.0, 0.0),
+            (812.0, 0.0),
+            (812.0, -600.0),
+            (730.0, -754.0),
+            (648.0, -600.0),
+            (648.0, 0.0),
+        ]);
+        let notch = Point::new(640.0, -960.0);
+        let from_notch = |s: &Option<Split>| {
+            s.as_ref().is_some_and(|s| {
+                s.bridges
+                    .iter()
+                    .any(|(a, b)| a.distance(notch) < 1e-6 || b.distance(notch) < 1e-6)
+            })
+        };
+        let all = Optional {
+            soft: true,
+            elbows: true,
+            along: true,
+        };
+        let with = split(std::slice::from_ref(&n), 1240.0, true, all);
+        assert!(from_notch(&with), "{with:?}");
+        assert!(with.as_ref().is_some_and(|s| s.along), "{with:?}");
+        let without = split(&[n], 1240.0, true, Optional { along: false, ..all });
+        assert!(!from_notch(&without), "{without:?}");
+    }
+
+    /// The pieces of an "N" (the outline of Funky Slab, Y down): the end of
+    /// each piece at a cut goes a little into the piece on the other side,
+    /// but not out of the letter. The cut from the notch at the foot of the
+    /// stem meets the left side at a slant, and the top of the diagonal went
+    /// 1.6 mm out of the stem (P21 Milestone 14).
+    #[test]
+    fn the_pieces_stay_in_the_letter() {
+        let n = poly(&[
+            (123.0, -1597.0),
+            (285.0, -1597.0),
+            (1157.0, -975.0),
+            (1157.0, -1597.0),
+            (1720.0, -1597.0),
+            (1720.0, 0.0),
+            (1505.0, 0.0),
+            (684.0, -549.0),
+            (684.0, 0.0),
+            (123.0, 0.0),
+        ]);
+        let s = split(std::slice::from_ref(&n), 1597.0, true, Optional::ALL).expect("a split");
+        assert!(s.pieces.len() >= 2, "{s:?}");
+        let near_outline = |p: Point| (0..n.len()).any(|k| p.distance_to_segment(n[k], n[(k + 1) % n.len()]) < 1e-6);
+        for piece in &s.pieces {
+            for &p in piece.rings.iter().flatten() {
+                assert!(
+                    winding(std::slice::from_ref(&n), p) != 0 || near_outline(p),
+                    "{p:?} in {s:?}"
+                );
+            }
+        }
     }
 
     #[test]
@@ -1474,7 +1751,17 @@ mod tests {
         let outer = poly(&[(0.0, 0.0), (500.0, 0.0), (500.0, 900.0), (0.0, 900.0)]);
         let low = poly(&[(100.0, 100.0), (100.0, 400.0), (400.0, 400.0), (400.0, 100.0)]);
         let high = poly(&[(100.0, 500.0), (100.0, 800.0), (400.0, 800.0), (400.0, 500.0)]);
-        let s = split(&[outer, low, high], 900.0, true, true, false).expect("a split");
+        let s = split(
+            &[outer, low, high],
+            900.0,
+            true,
+            Optional {
+                soft: true,
+                elbows: false,
+                along: true,
+            },
+        )
+        .expect("a split");
         assert_eq!(s.bridges.len(), 2, "{s:?}");
         assert_eq!(s.pieces.len(), 2, "{s:?}");
         // The frame has one hole (the two holes and the bar).

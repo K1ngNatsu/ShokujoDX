@@ -63,14 +63,14 @@ machines and systems.
 | Clipart sets with more detail, by theme, as asset packages | Shelved (owner, 2026-11-19) | Lane 8 of the review of P17 |
 | A bundled Ink/Stitch font | Needs a font with a license that permits it (the owner chose a test only) | P18 Milestone 6 |
 
-### Letter shapes (after P21 Milestone 13)
+### Letter shapes (after P21 Milestone 14)
 
 - The foot of a stem past a junction (Anton "a"): the middle line prunes
   it as a side branch; a second pass for lost strokes in all letters
   cost more than it gave (ADR 0158).
-- Needle points in counters narrower than a thread in very heavy fonts
-  (Shrikhand "p", Poster Heavy "n", Giant Round "m"): a pull compensation
-  for each part near such a counter.
+- The serifs at the top of the stems of Geo Slab "M" (15.6 mm2 more open
+  in P21 Milestone 14, ADR 0160): the cut beside each stem meets the top
+  edge at a small slant, and its moved end stays.
 - Elbows that the cut of ADR 0159 does not find: an outer corner cut by a
   short edge that is not a side of a stroke (Fat Face Serif "7"), and an
   elbow that turns less than 80 degrees (the flag of Candy Sans "F").
@@ -81,7 +81,8 @@ machines and systems.
 - The size range of a converted font and the narrow measure of the score
   do not agree: the range allows 10 % of the length of the columns too
   narrow at its smallest size, and the score takes points for each part
-  (Fat Face Serif 90 to 79 in Milestone 13, ADR 0159).
+  (Fat Face Serif 90 to 79 in Milestone 13, ADR 0159; 91 again in
+  Milestone 14, with a size range from 42.5 mm).
 
 - A dot with the shape of a "D" (the colon of Jazz Hand): the middle line
   goes to a corner, and the column skips a corner of the dot. The colon

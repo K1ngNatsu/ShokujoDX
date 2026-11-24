@@ -1083,6 +1083,48 @@ tests of the parts are as before or better, but the measured columns with
 the width and the spacing of their source (95.7 % to 93.5 %; the limit is
 90 %).
 
+## Milestone 14: cuts that stay in the letter (M)
+
+**Why.** The owner asked to go on with the letter shapes (2026-11-24). The
+next items of the open work: the needle points in narrow counters of very
+heavy fonts (Shrikhand "p", Poster Heavy "n", Giant Round "m") and the
+spikes at sharp tips (Funky Slab "N", "V", "W", Suez One "X", "x"). Both
+came from the split, not from pull compensation (ADR 0160).
+
+**Steps.**
+
+1. A cut from a notch that goes along a stroke (beside a narrow counter)
+   is optional: a glyph keeps it only if its columns sew no worse.
+2. The end of a piece at a cut does not go out of the letter.
+3. All fonts made again.
+
+**Exit test.** Fewer needle points out of the outline in the survey; no
+measure of the survey worse by more than a few percent; the letter fault
+bench and the lettering bench of P20 no worse.
+
+**Made (2026-11-24, ADR 0160).** A cut whose points at a quarter, the
+middle and three quarters are all nearer the outline than 0.15 of its
+length goes along a stroke. Three ways for an end that would go out of the
+letter were measured; the end that stays where it is was the best.
+
+| Measure (survey of 7,874 letters) | Before | After |
+| --- | --- | --- |
+| Needle points out of the outline | 1,114 | 220 |
+| Needle points out, no pull compensation | 2,414 | 368 |
+| Area out of the outline, mm2 | 990 | 596 |
+| Two layers, mm2 | 50,609 | 44,685 |
+| Open area, mm2 | 3,158 | 3,040 |
+| Crossing pairs | 750 | 657 |
+| Columns on top | 1,175 | 1,130 |
+| Trims | 780 | 775 |
+| Bulges, mm | 6,874 | 7,048 |
+
+The plan makes no travel stitch shorter than the shortest stitch of the
+machine (0.3 mm; one in the "A" of Lato Bold, ADR 0160). The letter fault
+bench: needle points out of the outline 0 or 1 in each font and way; rail
+points out Pacifico 32 to 8, Varsity 18 to 7; trims the same. The fonts: 33,935 trims (33,937); the column fonts of the
+program 94.4 on mean (94.5).
+
 ## Exit test of the phase
 
 The exit tests of the six milestones, and the sew-out of Milestone 6
@@ -1099,7 +1141,7 @@ comes first, as the measure of each milestone. The bundled fonts are made
 again only in Milestone 6, so the sew-outs of the older milestones use
 lettering in the TrueType fonts. Milestone 9 (the owner's request of
 2026-11-23, after Milestone 6) makes the fonts again before the
-sew-out, and Milestones 10 to 13 (the owner's requests after
+sew-out, and Milestones 10 to 14 (the owner's requests after
 Milestone 9) too.
 
 ## Not in this phase
