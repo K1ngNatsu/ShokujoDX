@@ -1024,6 +1024,65 @@ Block Sans 11 / 12 to 3 / 4, Anton 19 / 14 to 8 / 13, Pacifico 12 / 10 to
 0.31 % / 0.28 %. The fonts: 33,949 trims (34,070); the column fonts of
 the program 94.2 on mean (94.3). The exit test is met.
 
+## Milestone 13: cuts at elbows (M)
+
+**Why.** The owner asked to go on with the letter shapes (2026-11-24). In
+the survey of Milestone 12, the letters with diagonal strokes are 27 % of
+the letters, but they have 50 % to 63 % of the needle points out of the
+outline, of the area with two layers and of the open corners. Many of the
+letters with the most open area have an elbow: two strokes meet at a
+corner and both end there (the corners of "Z", "z", "4" and "7"), and the
+split did not cut it (ADR 0159).
+
+**Steps.**
+
+1. A cut at an elbow in the split of Latin letters: one side at the
+   concave corner goes on to the outline across (a butt joint), where the
+   outline has a convex corner at the width of each stroke from the other.
+2. The cut is optional: a glyph keeps it only if its columns sew no worse.
+3. All fonts made again.
+
+**Exit test.** Less open area in the survey; no measure of the survey
+worse by more than a few percent but the fans; the letter fault bench and
+the lettering bench of P20 no worse.
+
+**Made (2026-11-24, ADR 0159).** A mitre (a cut to the outer corner) was
+tried first: its pointed ends had four times the needle points out of the
+outline. The butt joint has the angle of the corner at its ends. Without
+the check of step 2, a short hook at the end of a stroke (Black Ops One
+"C") became a near-square piece with an open corner. A notch from 100
+degrees was tried and left out (more needle points out of the outline and
+trims).
+
+| Measure (survey of 7,874 letters) | Before | After |
+| --- | --- | --- |
+| Open area, mm2 | 3,581 | 3,158 |
+| Two layers, mm2 | 54,792 | 50,609 |
+| Crossing pairs | 806 | 750 |
+| Columns on top | 1,238 | 1,175 |
+| Open corners | 1,951 | 1,882 |
+| Needle points out of the outline | 1,107 | 1,114 |
+| Fans, mm | 391 | 449 |
+| Trims | 783 | 780 |
+
+The letter fault bench (embroidery font / lettering): crossing pairs
+Block Sans 3 / 4 to 1 / 1, Anton 8 / 13 to 7 / 10; columns on top Anton
+10 / 8 to 6 / 5, Varsity 63 / 59 to 52 / 52; fans 0.3 to 0.5 mm more in
+each font; the open area of Varsity 0.06 % / 0.03 % to 0.07 % / 0.04 %;
+Pacifico the same. The fonts: 33,937 trims (33,949); the column fonts of
+the program 94.5 on mean (94.2). Fat Face Serif (a package) 90 to 79: its
+typical stroke is wider, so its size range starts at 29.5 mm (36.5 mm),
+where 6.4 % of its columns are too narrow (the size range allows 10 %).
+
+The exit test of the outlines of P18 (the corpus as outlines and DST, made
+into objects again) fell from 90.4 % to 89.0 %: the arms of small letters
+are columns of their own, and the parts of the stitch file found their
+dense stitches (with short stitches) as a bean stitch. A bean stitch now
+goes back into its needle holes; the test is at 92.6 %, and the other
+tests of the parts are as before or better, but the measured columns with
+the width and the spacing of their source (95.7 % to 93.5 %; the limit is
+90 %).
+
 ## Exit test of the phase
 
 The exit tests of the six milestones, and the sew-out of Milestone 6
@@ -1040,7 +1099,7 @@ comes first, as the measure of each milestone. The bundled fonts are made
 again only in Milestone 6, so the sew-outs of the older milestones use
 lettering in the TrueType fonts. Milestone 9 (the owner's request of
 2026-11-23, after Milestone 6) makes the fonts again before the
-sew-out, and Milestones 10, 11 and 12 (the owner's requests after
+sew-out, and Milestones 10 to 13 (the owner's requests after
 Milestone 9) too.
 
 ## Not in this phase

@@ -68,23 +68,38 @@ impl GlyphShapes {
     /// [`GlyphShapes::new`] with the outline split into strokes first
     /// (`stroke::Split::for_char` of the character of the glyph, ADR 0152).
     ///
-    /// A split with bridges to curves (the brackets of serifs, the shoulder
-    /// of an "n") is kept only if its columns have no more faults than the
-    /// split without them ([`split_faults`]): in some shapes (the bowls of a
-    /// condensed font) the pieces sew worse.
+    /// The cuts of elbows (ADR 0159), and then the bridges to curves (the
+    /// brackets of serifs, the shoulder of an "n") and the cuts of balls,
+    /// are kept only if the columns have no more faults than the split
+    /// without them ([`split_faults`]): in some shapes (the bowls of a
+    /// condensed font, a short hook at the end of a stroke) the pieces sew
+    /// worse.
     pub fn with_split(rings: &[Vec<Point>], cap_height: f64, split: crate::stroke::Split) -> GlyphShapes {
+        use crate::stroke::Optional;
         let fills = regions(rings);
-        let make = |soft: bool| {
-            let (mut strokes, used) = crate::stroke::strokes_split_soft(rings, cap_height, split, soft);
+        let make = |with: Optional| {
+            let (mut strokes, used) = crate::stroke::strokes_split_soft(rings, cap_height, split, with);
             add_missed_strokes(&fills, &mut strokes, cap_height);
             tune_ends(&fills, &mut strokes, cap_height);
             untangle(&mut strokes, cap_height);
             (strokes, used)
         };
-        let (mut strokes, used) = make(true);
-        if used {
-            let (without, _) = make(false);
-            if split_faults(&without, &fills, cap_height) < split_faults(&strokes, &fills, cap_height) {
+        let mut with = Optional {
+            soft: true,
+            elbows: true,
+        };
+        let (mut strokes, used) = make(with);
+        let faults = |s: &Strokes| split_faults(s, &fills, cap_height);
+        if used.elbows {
+            let (without, _) = make(Optional { elbows: false, ..with });
+            if faults(&without) < faults(&strokes) {
+                strokes = without;
+                with.elbows = false;
+            }
+        }
+        if used.soft {
+            let (without, _) = make(Optional { soft: false, ..with });
+            if faults(&without) < faults(&strokes) {
                 strokes = without;
             }
         }

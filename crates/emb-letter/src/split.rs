@@ -48,6 +48,21 @@ const NOTCH_MAX: f64 = 2.5;
 /// The cut from a notch meets the outline across at this angle (degrees)
 /// or more.
 const CUT_END_MIN_DEG: f64 = 45.0;
+/// A concave corner with no bridge where two strokes meet at a corner and
+/// both end (an elbow) turns at least this much (degrees), less than a
+/// notch.
+const ELBOW_DEG: f64 = 80.0;
+/// The outer corner of an elbow is at most this many times the typical
+/// width from the concave corner, and the cut is at most as long.
+const ELBOW_MAX: f64 = 2.5;
+/// The outer corner turns at least this much (degrees).
+const ELBOW_CONVEX_DEG: f64 = 30.0;
+/// The width of each stroke is measured this part of the typical width
+/// from the concave corner along its side.
+const ELBOW_SPAN: f64 = 0.5;
+/// The outer corner is at the width of each stroke from the side of the
+/// other stroke, within this part of the width.
+const ELBOW_FIT: f64 = 0.25;
 /// A ball at the end of a stroke (the terminals of "S", "9" and "r" in a
 /// serif font, P21 Milestone 11) meets the stroke at a concave corner that
 /// turns at least this much (degrees), less than a notch.
@@ -105,8 +120,10 @@ pub(crate) struct Split {
     /// The bridges and the cuts.
     #[cfg_attr(not(test), allow(dead_code))]
     pub bridges: Vec<(Point, Point)>,
-    /// Some bridges go to a curve (soft bridges).
+    /// Some bridges go to a curve (soft bridges), or cut a ball.
     pub soft: bool,
+    /// Some cuts are at elbows.
+    pub elbows: bool,
 }
 
 /// A concave corner: the vertex (ring, index), and the directions of the
@@ -425,8 +442,9 @@ fn clear_inside(a: Point, b: Point, rings: &[Vec<Point>], width: f64) -> bool {
 
 /// The split of the shape in `rings` (nonzero winding), or `None` if it has
 /// no bridges. With `notches`, a sharp concave corner with no bridge gets
-/// a cut too, and with `soft` also a bridge to a curve.
-pub(crate) fn split(rings: &[Vec<Point>], cap_height: f64, notches: bool, soft: bool) -> Option<Split> {
+/// a cut too, with `elbows` also the corner of an elbow, and with `soft`
+/// also a bridge to a curve.
+pub(crate) fn split(rings: &[Vec<Point>], cap_height: f64, notches: bool, soft: bool, elbows: bool) -> Option<Split> {
     let rings = inside_left(rings, 1e-4 * cap_height.max(1e-9));
     let area: f64 = rings
         .iter()
@@ -480,79 +498,40 @@ pub(crate) fn split(rings: &[Vec<Point>], cap_height: f64, notches: bool, soft: 
             pb: corners[j].p,
             cut: false,
             soft: false,
+            elbow: false,
             axis: None,
         })
         .collect();
     // A sharp concave corner with no bridge (the notch of a "V", the inner
     // corners of an "N" or a "Z") gets a cut along the line that halves
-    // it, to the outline across: two strokes meet there at a point.
+    // it, to the outline across: two strokes meet there at a point. Where
+    // two strokes meet at a corner and both end there (an elbow: the
+    // corners of a "Z", "7" or "4"), one side goes on to the outline
+    // across (a butt joint).
     let cos_notch = emb_geom::math::cos(emb_geom::math::to_radians(NOTCH_DEG));
+    let cos_elbow = emb_geom::math::cos(emb_geom::math::to_radians(ELBOW_DEG));
+    let span = CORNER_SPAN * cap_height;
     for (i, c) in corners.iter().enumerate() {
-        if !notches || used[i] || c.d_in.dot(c.d_out) > cos_notch {
+        if !notches || used[i] || c.d_in.dot(c.d_out) > cos_elbow {
             continue;
         }
-        let Some(dir) = (c.d_in - c.d_out).normalized() else {
+        let sharp = c.d_in.dot(c.d_out) <= cos_notch;
+        let Some(link) = sharp
+            .then(|| notch_cut(c, &rings, width))
+            .flatten()
+            .or_else(|| elbows.then(|| elbow_cut(c, &rings, width, span)).flatten())
+        else {
             continue;
         };
-        let reach = NOTCH_MAX * width;
-        let far = c.p + dir * reach;
-        let mut best: Option<(f64, usize, usize, f64)> = None;
-        for (r, ring) in rings.iter().enumerate() {
-            let n = ring.len();
-            for k in 0..n {
-                if r == c.ring && (k == c.at || (k + 1) % n == c.at) {
-                    continue;
-                }
-                if let Some((u, v)) = Point::crossing(c.p, far, ring[k], ring[(k + 1) % n])
-                    && u * reach > 1e-9
-                    && best.is_none_or(|b| u < b.0)
-                {
-                    best = Some((u, r, k, v));
-                }
-            }
-        }
-        let Some((u, r, k, v)) = best else { continue };
-        let h = c.p.lerp(far, u);
-        let n = rings[r].len();
-        let seg = rings[r][k].distance(rings[r][(k + 1) % n]);
-        // A cut that meets the outline across at a small angle goes along
-        // a stroke, not across the place where two strokes meet (the
-        // shoulder of an "n": the stroke under the notch goes on).
-        let along = (rings[r][(k + 1) % n] - rings[r][k])
-            .normalized()
-            .map_or(0.0, |d| angle(dir, d));
-        if along.min(180.0 - along) < CUT_END_MIN_DEG {
-            continue;
-        }
-        let tol = BRIDGE_CLEAR * width;
-        let spot = if v * seg < tol {
-            Spot::Vertex(k)
-        } else if (1.0 - v) * seg < tol {
-            Spot::Vertex((k + 1) % n)
-        } else {
-            Spot::On(k, v)
-        };
-        let end = match spot {
-            Spot::Vertex(q) => rings[r][q],
-            Spot::On(..) => h,
-        };
-        if winding(&rings, c.p.midpoint(end)) == 0
+        if winding(&rings, link.pa.midpoint(link.pb)) == 0
             || links
                 .iter()
-                .any(|l| crosses(c.p, end, l.pa, l.pb, 1e-9) || crosses(l.pa, l.pb, c.p, end, 1e-9))
+                .any(|l| crosses(link.pa, link.pb, l.pa, l.pb, 1e-9) || crosses(l.pa, l.pb, link.pa, link.pb, 1e-9))
         {
             continue;
         }
         used[i] = true;
-        links.push(Link {
-            a: (c.ring, Spot::Vertex(c.at)),
-            b: (r, spot),
-            pa: c.p,
-            pb: end,
-            cut: true,
-            soft: false,
-            axis: None,
-        });
+        links.push(link);
     }
     // In a font with serifs, a stroke often meets another at a sharp corner
     // on one side and over a curve on the other (a bracket of a serif, the
@@ -596,6 +575,7 @@ pub(crate) fn split(rings: &[Vec<Point>], cap_height: f64, notches: bool, soft: 
                 pb: b.p,
                 cut: false,
                 soft: true,
+                elbow: false,
                 axis: None,
             });
         }
@@ -645,6 +625,7 @@ pub(crate) fn split(rings: &[Vec<Point>], cap_height: f64, notches: bool, soft: 
                     pieces,
                     bridges: links.iter().map(|l| (l.pa, l.pb)).collect(),
                     soft: links.iter().any(|l| l.soft),
+                    elbows: links.iter().any(|l| l.elbow),
                 });
             }
             Err(slits) => {
@@ -656,6 +637,193 @@ pub(crate) fn split(rings: &[Vec<Point>], cap_height: f64, notches: bool, soft: 
             }
         }
     }
+}
+
+/// The cut from the notch `c` along the line that halves it, to the
+/// outline across, if it meets the outline across the stroke (not along
+/// it).
+fn notch_cut(c: &Concave, rings: &[Vec<Point>], width: f64) -> Option<Link> {
+    let dir = (c.d_in - c.d_out).normalized()?;
+    let reach = NOTCH_MAX * width;
+    let far = c.p + dir * reach;
+    let mut best: Option<(f64, usize, usize, f64)> = None;
+    for (r, ring) in rings.iter().enumerate() {
+        let n = ring.len();
+        for k in 0..n {
+            if r == c.ring && (k == c.at || (k + 1) % n == c.at) {
+                continue;
+            }
+            if let Some((u, v)) = Point::crossing(c.p, far, ring[k], ring[(k + 1) % n])
+                && u * reach > 1e-9
+                && best.is_none_or(|b| u < b.0)
+            {
+                best = Some((u, r, k, v));
+            }
+        }
+    }
+    let (u, r, k, v) = best?;
+    let h = c.p.lerp(far, u);
+    let n = rings[r].len();
+    let seg = rings[r][k].distance(rings[r][(k + 1) % n]);
+    // A cut that meets the outline across at a small angle goes along a
+    // stroke, not across the place where two strokes meet (the shoulder
+    // of an "n": the stroke under the notch goes on).
+    let along = (rings[r][(k + 1) % n] - rings[r][k])
+        .normalized()
+        .map_or(0.0, |d| angle(dir, d));
+    if along.min(180.0 - along) < CUT_END_MIN_DEG {
+        return None;
+    }
+    let tol = BRIDGE_CLEAR * width;
+    let spot = if v * seg < tol {
+        Spot::Vertex(k)
+    } else if (1.0 - v) * seg < tol {
+        Spot::Vertex((k + 1) % n)
+    } else {
+        Spot::On(k, v)
+    };
+    let end = match spot {
+        Spot::Vertex(q) => rings[r][q],
+        Spot::On(..) => h,
+    };
+    Some(Link {
+        a: (c.ring, Spot::Vertex(c.at)),
+        b: (r, spot),
+        pa: c.p,
+        pb: end,
+        cut: true,
+        soft: false,
+        elbow: false,
+        axis: None,
+    })
+}
+
+/// The width of the stroke whose side goes through `from` in the
+/// direction `side`: from `from`, square to the side into the shape, to
+/// the outline across.
+fn width_across(from: Point, side: Point, rings: &[Vec<Point>], reach: f64) -> Option<f64> {
+    let normal = [side.perp(), side.perp() * -1.0]
+        .into_iter()
+        .find(|n| winding(rings, from + *n * (1e-3 * reach)) != 0)?;
+    let far = from + normal * reach;
+    let mut best: Option<f64> = None;
+    for ring in rings {
+        let n = ring.len();
+        for k in 0..n {
+            if let Some((u, _)) = Point::crossing(from, far, ring[k], ring[(k + 1) % n])
+                && u * reach > 1e-6 * reach
+                && best.is_none_or(|b| u < b)
+            {
+                best = Some(u);
+            }
+        }
+    }
+    best.map(|u| u * reach)
+}
+
+/// The cut of an elbow at the concave corner `c` (two strokes meet at a
+/// corner and both end there: the corners of a "Z", "7" or "4"). The
+/// outline has a convex corner across (the outer corner) at the width of
+/// each stroke from the side of the other stroke at `c`. The cut goes on
+/// along one side at `c` to the outline across (a butt joint: one stroke
+/// goes on to the outer corner, and the other ends square to its side):
+/// the shorter of the two. Not a mitre: the ends of a mitre are pointed
+/// (half the angle of the corner), and satin stitches go out of them.
+/// `span`: the span of the directions at the corners.
+fn elbow_cut(c: &Concave, rings: &[Vec<Point>], width: f64, span: f64) -> Option<Link> {
+    let dir = (c.d_in - c.d_out).normalized()?;
+    let reach = ELBOW_MAX * width;
+    // The width of each stroke near the corner.
+    let w_in = width_across(
+        away(&rings[c.ring], c.at, ELBOW_SPAN * width, false),
+        c.d_in,
+        rings,
+        reach,
+    )?;
+    let w_out = width_across(
+        away(&rings[c.ring], c.at, ELBOW_SPAN * width, true),
+        c.d_out,
+        rings,
+        reach,
+    )?;
+    let off = |p: Point, side: Point| side.cross(p - c.p).abs();
+    let cos_convex = emb_geom::math::cos(emb_geom::math::to_radians(ELBOW_CONVEX_DEG));
+    let outer = rings.iter().enumerate().any(|(r, ring)| {
+        ring.iter().enumerate().any(|(k, &p)| {
+            let l = p.distance(c.p);
+            if l <= span || l > reach {
+                return false;
+            }
+            let near = |d: f64, w: f64| (d - w).abs() <= ELBOW_FIT * w;
+            if (p - c.p).dot(dir) <= 0.0 || !near(off(p, c.d_in), w_in) || !near(off(p, c.d_out), w_out) {
+                return false;
+            }
+            // A turn to the left goes out of the shape.
+            directions(&rings[r], k, span, span).is_some_and(|(a, b)| a.cross(b) > 0.0 && a.dot(b) <= cos_convex)
+        })
+    });
+    if !outer {
+        return None;
+    }
+    let tol = BRIDGE_CLEAR * width;
+    let mut best: Option<(f64, Link)> = None;
+    for d in [c.d_in, c.d_out * -1.0] {
+        let far = c.p + d * reach;
+        let mut hit: Option<(f64, usize, usize, f64)> = None;
+        for (r, ring) in rings.iter().enumerate() {
+            let n = ring.len();
+            for k in 0..n {
+                if r == c.ring && (k == c.at || (k + 1) % n == c.at) {
+                    continue;
+                }
+                if let Some((u, v)) = Point::crossing(c.p, far, ring[k], ring[(k + 1) % n])
+                    && u * reach > tol
+                    && hit.is_none_or(|h| u < h.0)
+                {
+                    hit = Some((u, r, k, v));
+                }
+            }
+        }
+        let Some((u, r, k, v)) = hit else { continue };
+        let n = rings[r].len();
+        let (p0, p1) = (rings[r][k], rings[r][(k + 1) % n]);
+        let along = (p1 - p0).normalized().map_or(0.0, |e| angle(d, e));
+        if along.min(180.0 - along) < CUT_END_MIN_DEG {
+            continue;
+        }
+        let seg = p0.distance(p1);
+        let spot = if v * seg < tol {
+            Spot::Vertex(k)
+        } else if (1.0 - v) * seg < tol {
+            Spot::Vertex((k + 1) % n)
+        } else {
+            Spot::On(k, v)
+        };
+        let end = match spot {
+            Spot::Vertex(q) => rings[r][q],
+            Spot::On(..) => c.p.lerp(far, u),
+        };
+        if !clear_inside(c.p, end, rings, width) {
+            continue;
+        }
+        let l = c.p.distance(end);
+        if best.as_ref().is_none_or(|b| l < b.0) {
+            best = Some((
+                l,
+                Link {
+                    a: (c.ring, Spot::Vertex(c.at)),
+                    b: (r, spot),
+                    pa: c.p,
+                    pb: end,
+                    cut: true,
+                    soft: false,
+                    elbow: true,
+                    axis: None,
+                },
+            ));
+        }
+    }
+    best.map(|b| b.1)
 }
 
 /// The cut of a ball at the concave corner `c` (see [`BALL_MIN_DEG`]): from
@@ -760,6 +928,7 @@ fn ball_cut(c: &Concave, rings: &[Vec<Point>], width: f64, area: f64, links: &[L
                         pb,
                         cut: true,
                         soft: true,
+                        elbow: false,
                         axis: Some(into),
                     },
                 ));
@@ -786,6 +955,8 @@ struct Link {
     pb: Point,
     cut: bool,
     soft: bool,
+    /// The cut of an elbow.
+    elbow: bool,
     /// The cut of a ball: the direction from the cut into the ball.
     axis: Option<Point>,
 }
@@ -1019,7 +1190,7 @@ mod tests {
             .collect();
         let shape = union(&[bar], &[Region::new(circle, Vec::new())]);
         assert_eq!(shape.len(), 1);
-        let s = split(std::slice::from_ref(&shape[0].outer), 1000.0, true, true).expect("a split");
+        let s = split(std::slice::from_ref(&shape[0].outer), 1000.0, true, true, true).expect("a split");
         assert!(s.soft, "{s:?}");
         assert_eq!(s.pieces.len(), 2, "{s:?}");
         let ball = s.pieces.iter().find(|p| {
@@ -1038,7 +1209,9 @@ mod tests {
         let u = ball.axis.expect("the direction of the ball");
         assert!(u.x > 0.99, "{u:?}");
         // With no soft links, the stroke and the ball are one piece.
-        assert!(split(std::slice::from_ref(&shape[0].outer), 1000.0, true, false).is_none_or(|p| p.pieces.len() == 1));
+        assert!(
+            split(std::slice::from_ref(&shape[0].outer), 1000.0, true, false, true).is_none_or(|p| p.pieces.len() == 1)
+        );
     }
 
     #[test]
@@ -1054,7 +1227,7 @@ mod tests {
             (0.0, 500.0),
             (250.0, 500.0),
         ]);
-        let s = split(&[t], 600.0, true, true).expect("a split");
+        let s = split(&[t], 600.0, true, true, true).expect("a split");
         assert_eq!(s.bridges.len(), 1, "{s:?}");
         let (a, b) = s.bridges[0];
         assert!((a.y - 500.0).abs() < 1e-9 && (b.y - 500.0).abs() < 1e-9, "{a:?} {b:?}");
@@ -1090,7 +1263,7 @@ mod tests {
             (0.0, 450.0),
             (450.0, 450.0),
         ]);
-        let s = split(&[plus], 1000.0, true, true).expect("a split");
+        let s = split(&[plus], 1000.0, true, true, true).expect("a split");
         assert_eq!(s.bridges.len(), 2, "{s:?}");
         assert_eq!(s.pieces.len(), 3, "{s:?}");
         // The cut is across the thinner stroke (the shorter bridges): the
@@ -1113,7 +1286,7 @@ mod tests {
             (0.0, 700.0),
         ]);
         let hole = poly(&[(100.0, 400.0), (100.0, 600.0), (300.0, 600.0), (300.0, 400.0)]);
-        assert!(split(&[outer, hole], 700.0, true, true).is_none());
+        assert!(split(&[outer, hole], 700.0, true, true, false).is_none());
     }
 
     #[test]
@@ -1127,7 +1300,7 @@ mod tests {
             (300.0, 0.0),
             (200.0, 0.0),
         ]);
-        let s = split(&[v], 600.0, true, true).expect("a split");
+        let s = split(&[v], 600.0, true, true, true).expect("a split");
         assert_eq!(s.bridges.len(), 1, "{s:?}");
         let (a, b) = s.bridges[0];
         assert!(
@@ -1161,7 +1334,7 @@ mod tests {
 
     #[test]
     fn a_stem_with_a_bracket_gets_a_bridge_to_the_curve() {
-        let s = split(&[stem_with_bracket()], 600.0, true, true).expect("a split");
+        let s = split(&[stem_with_bracket()], 600.0, true, true, true).expect("a split");
         assert!(s.soft, "{s:?}");
         assert_eq!(s.pieces.len(), 2, "{s:?}");
         // The stem is square to the serif: the bracket goes with the serif,
@@ -1177,7 +1350,7 @@ mod tests {
             "{ends:?}"
         );
         // With no bridges to curves, the shape has no split.
-        assert!(split(&[stem_with_bracket()], 600.0, true, false).is_none());
+        assert!(split(&[stem_with_bracket()], 600.0, true, false, true).is_none());
     }
 
     #[test]
@@ -1195,7 +1368,7 @@ mod tests {
             (80.0, 600.0),
             (250.0, 300.0),
         ]);
-        let s = split(&[y], 600.0, true, true).expect("a split");
+        let s = split(&[y], 600.0, true, true, true).expect("a split");
         let notch = Point::new(300.0, 390.0);
         let at_notch = s
             .bridges
@@ -1216,10 +1389,83 @@ mod tests {
             (100.0, 600.0),
             (0.0, 600.0),
         ]);
-        assert!(split(&[l], 600.0, true, true).is_none());
+        assert!(split(&[l], 600.0, true, true, false).is_none());
         let outer = poly(&[(0.0, 0.0), (600.0, 0.0), (600.0, 600.0), (0.0, 600.0)]);
         let hole = poly(&[(100.0, 100.0), (100.0, 500.0), (500.0, 500.0), (500.0, 100.0)]);
-        assert!(split(&[outer, hole], 600.0, true, true).is_none());
+        assert!(split(&[outer, hole], 600.0, true, true, false).is_none());
+    }
+
+    /// An "L": the stem and the bar meet at a corner and both end there (an
+    /// elbow). One side at the concave corner goes on to the outline across
+    /// (a butt joint), square to it, so each piece is a rectangle (P21
+    /// Milestone 13).
+    #[test]
+    fn an_elbow_gets_a_butt_joint() {
+        let l = poly(&[
+            (0.0, 0.0),
+            (500.0, 0.0),
+            (500.0, 100.0),
+            (100.0, 100.0),
+            (100.0, 600.0),
+            (0.0, 600.0),
+        ]);
+        let s = split(&[l], 600.0, true, true, true).expect("a split");
+        assert!(s.elbows, "{s:?}");
+        assert_eq!(s.pieces.len(), 2, "{s:?}");
+        let (a, b) = s.bridges[0];
+        let inner = Point::new(100.0, 100.0);
+        let (from, to) = if a.distance(inner) < b.distance(inner) {
+            (a, b)
+        } else {
+            (b, a)
+        };
+        assert!(from.distance(inner) < 1e-6, "{s:?}");
+        let butt = [Point::new(100.0, 0.0), Point::new(0.0, 100.0)];
+        assert!(butt.iter().any(|p| p.distance(to) < 1e-6), "{s:?}");
+        // The pieces are the stem (100 x 600) and the rest of the bar (400
+        // x 100), or the bar (500 x 100) and the rest of the stem (100 x
+        // 500).
+        let mut areas: Vec<f64> = s.pieces.iter().map(|p| p.area).collect();
+        areas.sort_by(f64::total_cmp);
+        let rects = [[40_000.0, 60_000.0], [50_000.0, 50_000.0]];
+        assert!(
+            rects
+                .iter()
+                .any(|r| (areas[0] - r[0]).abs() < 1.0 && (areas[1] - r[1]).abs() < 1.0),
+            "{s:?}"
+        );
+    }
+
+    /// The outer corner of an elbow is at the width of each stroke from the
+    /// other stroke: with the corner cut off (a chamfer), the shape has no
+    /// elbow; and the corner of a serif is not an elbow of the stem.
+    #[test]
+    fn an_elbow_needs_its_outer_corner() {
+        let chamfered = poly(&[
+            (40.0, 0.0),
+            (500.0, 0.0),
+            (500.0, 100.0),
+            (100.0, 100.0),
+            (100.0, 600.0),
+            (0.0, 600.0),
+            (0.0, 40.0),
+        ]);
+        assert!(split(&[chamfered], 600.0, true, true, true).is_none());
+        // A stem on a long foot that goes 150 past it on the left (a
+        // serif): the corner of the foot is not at the width of the stem
+        // from its side.
+        let foot = poly(&[
+            (0.0, 0.0),
+            (650.0, 0.0),
+            (650.0, 100.0),
+            (250.0, 100.0),
+            (250.0, 600.0),
+            (150.0, 600.0),
+            (150.0, 100.0),
+            (0.0, 100.0),
+        ]);
+        let s = split(&[foot], 600.0, true, true, true);
+        assert!(s.as_ref().is_none_or(|s| !s.elbows), "{s:?}");
     }
 
     #[test]
@@ -1228,7 +1474,7 @@ mod tests {
         let outer = poly(&[(0.0, 0.0), (500.0, 0.0), (500.0, 900.0), (0.0, 900.0)]);
         let low = poly(&[(100.0, 100.0), (100.0, 400.0), (400.0, 400.0), (400.0, 100.0)]);
         let high = poly(&[(100.0, 500.0), (100.0, 800.0), (400.0, 800.0), (400.0, 500.0)]);
-        let s = split(&[outer, low, high], 900.0, true, true).expect("a split");
+        let s = split(&[outer, low, high], 900.0, true, true, false).expect("a split");
         assert_eq!(s.bridges.len(), 2, "{s:?}");
         assert_eq!(s.pieces.len(), 2, "{s:?}");
         // The frame has one hole (the two holes and the bar).

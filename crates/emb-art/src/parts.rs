@@ -13,8 +13,8 @@
 //!    along the one before it (a short turn leg between them can be there)
 //!    is a **column** (stitches from side to side: one stitch, or a few, to
 //!    cross) or **rows** (long parallel lines of several stitches each, at
-//!    one angle). Legs that go back on the same line (a bean stitch) are a
-//!    run. The other legs are a **run** (stitches along a line). A short
+//!    one angle). Legs that go back on the same line into their needle
+//!    holes (a bean stitch) are a run. The other legs are a **run** (stitches along a line). A short
 //!    piece of a chain that is none of these is **other**.
 //! 4. **Underlay**: a part that a later part of the same color covers (the
 //!    area of its stitches, [`COVER_CELL_MM`] cells) goes with that part:
@@ -72,6 +72,14 @@ const ROW_OFF: f64 = 0.15;
 /// Two legs that go back on the same line (a bean stitch) are at most this
 /// far from each other, mm.
 const SAME_LINE_MM: f64 = 0.12;
+/// A bean stitch goes back into its needle holes: at least this part of
+/// its legs (after the first two) end at most [`SAME_HOLE_MM`] from a
+/// needle point of an earlier leg. A dense column (needle points 0.2 mm
+/// apart on a side, or short stitches) has legs back on nearly the same
+/// line too, but each needle point is a new one (P21 Milestone 13: the
+/// arms of letters at 10 mm were runs).
+const BEAN_HOLES: f64 = 0.3;
+const SAME_HOLE_MM: f64 = 0.06;
 
 /// The kind of a part.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -360,14 +368,8 @@ fn back_and_forth(legs: &[Leg], seq: &[usize], turned: usize) -> PartKind {
         })
         .collect();
     across.sort_by(f64::total_cmp);
-    if across[across.len() / 2] < SAME_LINE_MM {
-        return PartKind::Run;
-    }
-    let mut stitches: Vec<f64> = seq.iter().map(|&k| legs[k].stitches() as f64).collect();
-    stitches.sort_by(f64::total_cmp);
-    let per_leg = stitches[stitches.len() / 2];
-    // The spread of the angle of the legs (as lines: a leg and the leg back
-    // have one angle).
+    // The mean angle of the legs (as lines: a leg and the leg back have one
+    // angle).
     let (mut c, mut s) = (0.0, 0.0);
     for &k in seq {
         let d = legs[k].dir();
@@ -376,6 +378,24 @@ fn back_and_forth(legs: &[Leg], seq: &[usize], turned: usize) -> PartKind {
         s += emb_geom::math::sin(a2);
     }
     let mean = emb_geom::math::atan2(s, c) / 2.0;
+    if across[across.len() / 2] < SAME_LINE_MM {
+        // The legs that end in a needle hole of an earlier leg.
+        let again = (2..seq.len())
+            .filter(|&i| {
+                let end = legs[seq[i]].b;
+                seq[..i - 1].iter().any(|&k| {
+                    let l = &legs[k];
+                    l.a.distance(end) <= SAME_HOLE_MM || l.b.distance(end) <= SAME_HOLE_MM
+                })
+            })
+            .count();
+        if again as f64 >= BEAN_HOLES * seq.len().saturating_sub(2) as f64 {
+            return PartKind::Run;
+        }
+    }
+    let mut stitches: Vec<f64> = seq.iter().map(|&k| legs[k].stitches() as f64).collect();
+    stitches.sort_by(f64::total_cmp);
+    let per_leg = stitches[stitches.len() / 2];
     // The part of the length of the legs that is at an angle to the mean
     // (short rows at a curved edge can turn a little).
     let (mut off, mut all) = (0.0, 0.0);
@@ -644,6 +664,38 @@ mod tests {
         }
         let p = parts(&design(&bean));
         assert!(p.iter().all(|p| p.kind == PartKind::Run), "{p:?}");
+        // A bean stitch along a curve (a circle of 15 mm): the middles of
+        // its legs are not on one line, but it goes back into its holes.
+        let at = |k: usize| {
+            let a = 2.5 * k as f64 / 15.0;
+            (15.0 * emb_geom::math::cos(a), 15.0 * emb_geom::math::sin(a))
+        };
+        let mut curve = vec![at(0)];
+        for k in 1..20 {
+            curve.extend([at(k), at(k - 1), at(k)]);
+        }
+        let p = parts(&design(&curve));
+        assert!(p.iter().all(|p| p.kind == PartKind::Run), "{p:?}");
+    }
+
+    /// A narrow column of a small letter (1.6 mm wide, needle points 0.18 mm
+    /// apart on a side) with short stitches (every second stitch on each
+    /// side 0.4 mm short of the edge): two stitches back and forth are on
+    /// nearly the same line, but the column goes to the side; it is a
+    /// column, not a bean stitch (P21 Milestone 13).
+    #[test]
+    fn a_dense_column_with_short_stitches_is_a_column() {
+        let mut pts = Vec::new();
+        for j in 0..40 {
+            let x = 0.09 * j as f64;
+            let short = (j / 2) % 2 == 1;
+            let inset = if short { 0.4 } else { 0.0 };
+            let y = if j % 2 == 0 { inset } else { 1.6 - inset };
+            pts.push((x, y));
+        }
+        let p = parts(&design(&pts));
+        assert_eq!(p.len(), 1, "{p:?}");
+        assert_eq!(p[0].kind, PartKind::Column, "{p:?}");
     }
 
     #[test]

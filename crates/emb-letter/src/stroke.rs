@@ -1312,23 +1312,54 @@ pub fn strokes(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
 /// [`strokes`] after the split `split` of the outline: the columns of each
 /// piece, as one.
 pub fn strokes_split(rings: &[Vec<Point>], cap_height: f64, split: Split) -> Strokes {
-    strokes_split_soft(rings, cap_height, split, true).0
+    let all = Optional {
+        soft: true,
+        elbows: true,
+    };
+    strokes_split_soft(rings, cap_height, split, all).0
 }
 
-/// [`strokes_split`], with or without the bridges to curves (`soft`; for
-/// the scripts with notches), and `true` if the split has such a bridge.
-pub(crate) fn strokes_split_soft(rings: &[Vec<Point>], cap_height: f64, split: Split, soft: bool) -> (Strokes, bool) {
+/// The optional links of a split that a glyph keeps only if its columns
+/// sew no worse: the bridges to curves and the cuts of balls (`soft`),
+/// and the cuts of elbows (`elbows`). In a result: the links that the
+/// split has.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Optional {
+    pub soft: bool,
+    pub elbows: bool,
+}
+
+/// [`strokes_split`], with or without the optional links (for the scripts
+/// with notches), and the optional links that the split has.
+pub(crate) fn strokes_split_soft(
+    rings: &[Vec<Point>],
+    cap_height: f64,
+    split: Split,
+    with: Optional,
+) -> (Strokes, Optional) {
     if split != Split::Off
-        && let Some(s) = crate::split::split(rings, cap_height, split == Split::Notches, soft)
+        && let Some(s) = crate::split::split(rings, cap_height, split == Split::Notches, with.soft, with.elbows)
     {
         let parts: Vec<(Strokes, f64)> = s
             .pieces
             .iter()
             .map(|p| (piece(&p.rings, cap_height, p.axis), p.area))
             .collect();
-        return (merged(parts), s.soft);
+        return (
+            merged(parts),
+            Optional {
+                soft: s.soft,
+                elbows: s.elbows,
+            },
+        );
     }
-    (whole(rings, cap_height), false)
+    (
+        whole(rings, cap_height),
+        Optional {
+            soft: false,
+            elbows: false,
+        },
+    )
 }
 
 /// The columns of the pieces of a shape as one, with the coverage of each
