@@ -1,9 +1,9 @@
-# Makes the sew-out kit of phase P21 (letter shapes, Milestone 6,
+# Makes the sew-out kit of phase P21 (letter shapes,
 # docs/design/p21-plan.md): the letters of the fonts made again with the
 # stroke finder of P21 (the outline is the edge of each column, one way to
 # end a column, the split of the outline into strokes, the sew order at
-# joints), with the files for the machine, a worksheet and a picture of
-# each one, and a checklist.
+# joints, and the work of Milestones 9 to 14), with the files for the
+# machine, a worksheet and a picture of each one, and a checklist.
 #
 # Make the fonts first (python tools/make-embroidery-fonts.py
 # <google-fonts-folder>): the kit uses the fonts of data/fonts/embroidery
@@ -19,6 +19,10 @@
 #             embroidery font Noto Sans JP
 #   shaped/   the corpus design shaped-text (its Arabic word is routed from
 #             the right now)
+#   late/     the work of Milestones 11 to 14 at 25 mm: elbows ("Z", "z",
+#             "4", "7"), balls (Bookish Slab), and the narrow counters and
+#             sharp tips of heavy fonts (Shrikhand, Poster Heavy, Giant
+#             Round); fonts of the packages from target/font-packages
 #   CHECKLIST.md
 #
 # Use:  python tools/make-sewout-kit-p21.py [<folder>]
@@ -53,6 +57,31 @@ JOINTS = [
     ("varsity", "Varsity", ["NMWZkx XIH", "NMWZkx X", "NMWZkx"]),
 ]
 KANJI = "十木林東龍本中日"
+# The work of Milestones 11 to 14 (ADR 0157 to 0160), at 25 mm (the size of
+# the survey): the font (a font of the program, or of a package), the text,
+# and what to look at.
+LATE = [
+    ("block-sans", "Block Sans", "Zz47 LEFP", "elbows (Milestone 13)"),
+    ("anton", "Anton", "Zz47 auna", "elbows and swelling sides (Milestones 12, 13)"),
+    ("bookish-slab", "Bookish Slab", "S9r6 jf", "balls (Milestone 11)"),
+    ("shrikhand", "Shrikhand", "pdbq nmh", "narrow counters (Milestone 14)"),
+    ("poster-heavy", "Poster Heavy", "nmhu NWK", "narrow counters and tips (Milestone 14)"),
+    ("giant-round", "Giant Round", "mnh MW", "narrow counters (Milestone 14)"),
+    ("funky-slab", "Funky Slab", "NVW Mm", "sharp tips (Milestone 14)"),
+]
+
+
+def font_file(slug):
+    """The file of a font of the program, or of a font package."""
+    path = os.path.join(kit17.FONTS, slug + ".embfont")
+    if os.path.isfile(path):
+        return path
+    packages = os.path.join(ROOT, "target", "font-packages")
+    for package in sorted(os.listdir(packages)) if os.path.isdir(packages) else []:
+        path = os.path.join(packages, package, slug + ".embfont")
+        if os.path.isfile(path):
+            return path
+    return None
 
 
 def main():
@@ -60,7 +89,7 @@ def main():
     if not os.path.isfile(kit17.EXE):
         sys.exit("build emb-cli first: cargo build --release -p emb-cli")
     work = tempfile.mkdtemp(prefix="emb-kit-")
-    rows = {"tuned": [], "joints": [], "kanji": [], "shaped": []}
+    rows = {"tuned": [], "joints": [], "kanji": [], "shaped": [], "late": []}
 
     def make(group, name, what, project):
         folder = os.path.join(kit, group)
@@ -93,6 +122,14 @@ def main():
     os.makedirs(corpus)
     kit17.run(["corpus", corpus])
     make("shaped", "shaped-text", "Arabic, Devanagari and a script font, 20 mm", os.path.join(corpus, "shaped-text.embproj"))
+    for slug, family, text, what in LATE:
+        path = font_file(slug)
+        if path is None:
+            print("no font %s: make the fonts first (tools/make-embroidery-fonts.py)" % slug)
+            continue
+        project = os.path.join(work, "%s late.embproj" % slug)
+        kit17.run(["font-sheet", path, project, "--sizes", "25", "--text", text])
+        make("late", "%s late" % slug, '%s at 25 mm: "%s", %s' % (family, text, what), project)
     shutil.rmtree(work, ignore_errors=True)
 
     lines = CHECKLIST.replace("{date}", datetime.date.today().isoformat())
@@ -106,7 +143,7 @@ def main():
 CHECKLIST = """# P21 sew-out kit: checklist
 
 Made on {date} by `tools/make-sewout-kit-p21.py`, with the fonts made
-again in P21 Milestones 6 and 9. Machine: Husqvarna Viking Topaz 20 (the `.vp3`
+again in P21 Milestone 14. Machine: Husqvarna Viking Topaz 20 (the `.vp3`
 files; DST files too), hoop 260 x 200 mm. Sew each design on a medium
 woven fabric with a tear-away stabilizer, as a normal job.
 
@@ -127,6 +164,10 @@ The exit test of P21: no spikes, bulges or open corners.
 ## Text from right to left
 
 {shaped}
+
+## Milestones 11 to 14 (25 mm)
+
+{late}
 
 ## What to look at
 
@@ -155,6 +196,15 @@ The exit test of P21: no spikes, bulges or open corners.
 8. **Arabic**: each letter starts on its right and ends on its left,
    where the next one starts. Is there a long stitch between letters?
 9. **Trims and travel**: does a travel stitch show anywhere?
+10. **Elbows** ("Z", "z", "4", "7", "L", "E", "F", "P"): at a corner where
+    two strokes end, one stroke goes on to the outer corner and the other
+    ends square on its side. Is the corner full, with no lump?
+11. **Balls** (Bookish Slab "S", "9", "r"): do the stitches of the ball
+    lie as the last stitches of its stroke? Is the ball round?
+12. **Heavy fonts**: do the narrow counters (Shrikhand "p", Poster Heavy
+    "n", Giant Round "m") stay open, with no stitches across them? Do the
+    tips of "N", "V", "W" and "M" (Funky Slab, Poster Heavy) end in the
+    letter, with no spike?
 
 Write the answers in the session or in a file next to this one, with
 photos if you can.

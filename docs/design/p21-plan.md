@@ -1130,6 +1130,14 @@ program 94.4 on mean (94.5).
 The exit tests of the six milestones, and the sew-out of Milestone 6
 (with the serif joints of Milestone 9).
 
+**State (2026-11-24).** The phase is made: fourteen milestones. The exit
+tests of the milestones are met, or met in part as each section says. The
+sew-out kit was made again with the fonts of Milestone 14
+(`tools/make-sewout-kit-p21.py`, `out/p21-sewout`, 44 designs), with a
+group `late/` for Milestones 11 to 14 (elbows, balls, the narrow counters
+and sharp tips of heavy fonts); its sew-out is open (the owner's list in
+`docs/design/open-work.md`).
+
 ## Order
 
 The owner's order: Milestones 1 to 6. Milestone 7 (the trial) comes
