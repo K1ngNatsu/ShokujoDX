@@ -913,17 +913,17 @@ mod tests {
             assert!(score >= emb_letter::quality::LIMIT, "{}: {score}", f.label());
         }
         assert_eq!(st.fonts.score(&FontRef::new("Lato", "Bold")), None);
-        assert_eq!(st.fonts.score(&FontRef::embroidery("Varsity", "")), Some(94));
+        assert_eq!(st.fonts.score(&FontRef::embroidery("Varsity", "")), Some(97));
         // By quality: the best first, the fonts with no score last.
         let mut all = embroidery.clone();
         all.insert(3, FontRef::new("Lato", "Bold"));
         by_quality(&mut all, &st.fonts);
         let scores: Vec<Option<u8>> = all.iter().map(|f| st.fonts.score(f)).collect();
-        assert_eq!(all[0].family, "Varsity");
         assert!(scores.last().unwrap().is_none());
         // The fill fonts are a group of their own after the fonts with
         // satin letters, the best first in each group.
         let first_fill = all.iter().position(|f| st.fonts.is_fill(f)).unwrap();
+        assert_eq!(scores[0], scores[..first_fill].iter().flatten().max().copied());
         assert_eq!(first_fill, emb_letter::bundled::P17_EMBROIDERY);
         assert!(all[first_fill..all.len() - 1].iter().all(|f| st.fonts.is_fill(f)));
         for group in [&scores[..first_fill], &scores[first_fill..]] {

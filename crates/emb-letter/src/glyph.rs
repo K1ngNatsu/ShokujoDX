@@ -475,9 +475,6 @@ fn add_missed_strokes(fills: &[(Vec<Point>, Vec<Vec<Point>>)], s: &mut Strokes, 
     s.coverage = ((on_glyph + slivers) / glyph_area).clamp(0.0, 1.0);
 }
 
-/// Outer rings and their holes: a ring inside an even number of other
-/// rings is an outer ring; a ring inside an odd number is a hole of the
-/// smallest outer ring around it.
 /// The capital height (mm) at which [`split_faults`] measures.
 const SPLIT_CAP_MM: f64 = 25.0;
 /// The pairs across a column for [`split_faults`] are this far apart (mm),
@@ -539,6 +536,9 @@ fn split_faults(strokes: &Strokes, fills: &[(Vec<Point>, Vec<Vec<Point>>)], cap_
         + (1.0 - strokes.coverage).max(0.0) * area
 }
 
+/// Outer rings and their holes: a ring inside an even number of other
+/// rings is an outer ring; a ring inside an odd number is a hole of the
+/// smallest outer ring around it.
 fn regions(rings: &[Vec<Point>]) -> Vec<(Vec<Point>, Vec<Vec<Point>>)> {
     let area = |r: &[Point]| emb_geom::region::ring_signed_area(r).abs();
     let inside =

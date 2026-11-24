@@ -89,7 +89,7 @@ una fuente para ver su puntuación y estas medidas:
 
 - qué parte de las formas de las letras cubren las puntadas,
 - qué parte de las columnas de satén es demasiado estrecha en el tamaño más
-  pequeño de la fuente,
+  pequeño de la fuente (el extremo en punta de una columna no cuenta),
 - qué parte de las columnas de satén tiene puntadas demasiado largas en el
   tamaño más grande de la fuente,
 - qué parte de las puntadas queda fuera de las formas de las letras,

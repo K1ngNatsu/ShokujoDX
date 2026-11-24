@@ -837,6 +837,76 @@ words fewer (東京 8, 8, 8, 8, 8 to 7, 7, 8, 8, 8; 龍 9, 8, 9, 9, 9 to 6,
 at 15 mm, 5 to 6 at 25 mm, the same at 50 and 80 mm (the flag rule and
 the end branches in the pieces of kanji). The fonts: the 55 fonts of the program have a mean score of 84.8 (85.5 before; 5 higher, 19 the same, 31 lower by 1 to 4): the point of the stem at a fork is narrow at the smallest size (Bebas Neue "Y" 74 to 55), and a slanted end has longer stitches at the largest size; no font is below the limit. The golden designs with lettering: -1.8 % to +7.1 % stitches, 1 fewer trim in all (embroidery-fonts-4 48 to 50, keyboard-designs 12 to 10).
 
+## Milestone 10: the work areas of the font packages (M)
+
+**Why.** The owner asked which fonts of the packages are ready to go in
+the program (2026-11-23). Of the eighteen fonts with a score of 85 or
+more, eight had faults in a few letters, of four kinds (ADR 0156): the
+crossing of a narrow "X", balls at the ends of strokes, single letters
+and square dots, and a score that counted the pointed ends of columns
+as too narrow. The owner asked to fix the four work areas in sequence.
+
+**Steps.**
+
+1. Crossings: longer bridges between corners in Latin letters (a
+   trial; kept only if no font gets more trims), and a run of the route
+   across two columns that touch.
+2. Balls: a step of the tuning that gives a ball a column of its own (a
+   trial); if it does not find the balls well, letter corrections.
+3. Single letters and square dots: letter corrections, also for the
+   fonts of the packages (a test reads the packages).
+4. The score: the pointed ends of the columns are not too narrow.
+5. All fonts made again.
+
+**Exit test.** The letters of the four work areas: no needle point out
+of the outline, open area under 3 mm2 at 25 mm, no more crossing pairs
+than before. The letter fault bench and the lettering bench of P20: no
+font worse. No font below the limit.
+
+**Made (2026-11-23, ADR 0156).**
+
+1. Crossings: the longer bridges gave Khand "X" and "x" one whole
+   stroke, but 15 more trims in the fonts (Zilla Slab "X" 0 to 2 at each
+   size), so they are not in the program. The trial found that a run of
+   the route could not go across two columns that only touch; now it
+   can, and the fonts have 266 fewer trims (34,232 to 33,966).
+2. Balls: the step of the tuning did not find the balls well (a column
+   at the joint of the bowl and the stem of "9"), so it is not in the
+   program; the balls have corrections.
+3. Corrections (as routed letters) for 16 letters of seven fonts of the
+   packages: Sturdy Serif "k", "3"; Rubik Mono One "A", "3"; Fat Face
+   Serif "u", "y"; Compact Heavy "X"; Bookish Slab "S", "9", "r"; Jazz
+   Hand "i", "j", "t", "w", ":"; Angular Sans "r", "k". At 25 mm:
+
+| Letter | Spikes | Crossing pairs | Open area mm2 |
+| --- | --- | --- | --- |
+| Sturdy Serif k | 0 to 0 | 0 to 0 | 31.2 to 2.9 |
+| Sturdy Serif 3 | 0 to 0 | 0 to 0 | 24.8 to 1.3 |
+| Rubik Mono One A | 2 to 0 | 11 to 0 | 11.4 to 0.2 |
+| Rubik Mono One 3 | 25 to 0 | 8 to 0 | 2.9 to 0.4 |
+| Fat Face Serif u | 0 to 0 | 7 to 1 | 18.8 to 0.3 |
+| Fat Face Serif y | 0 to 0 | 16 to 6 | 12.2 to 0.1 |
+| Compact Heavy X | 0 to 0 | 0 to 0 | 2.6 to 1.5 |
+| Bookish Slab S | 4 to 0 | 15 to 0 | 4.0 to 0.2 |
+| Bookish Slab 9 | 4 to 0 | 17 to 2 | 5.0 to 0.3 |
+| Bookish Slab r | 0 to 0 | 0 to 0 | 6.6 to 0.4 |
+| Jazz Hand i | 16 to 0 | 0 to 0 | 0.1 to 0.0 |
+| Jazz Hand j | 16 to 0 | 0 to 0 | 0.1 to 0.1 |
+| Jazz Hand t | 2 to 0 | 10 to 0 | 3.9 to 0.1 |
+| Jazz Hand w | 0 to 0 | 0 to 0 | 1.3 to 0.2 |
+| Jazz Hand : | 5 to 0 | 14 to 0 | 7.4 to 0.1 |
+| Angular Sans r | 6 to 0 | 6 to 0 | 2.4 to 0.0 |
+| Angular Sans k | 0 to 0 | 0 to 0 | 5.7 to 0.1 |
+
+4. The score: the 55 column fonts of the program 84.8 to 94.2 on mean,
+   the fonts of the packages 80.0 to 90.0; 58 fonts of the packages have
+   85 or more (18 before). No score is lower.
+
+The letter fault bench: the same, but Anton 3 to 2 trims and 22 to 20
+crossing pairs, Varsity 18 to 15 trims with 55 to 63 column ends on top.
+The exit test is met for the corrected letters (Fat Face Serif "y" keeps
+6 crossing pairs at the curl of its tail, fewer than before).
+
 ## Exit test of the phase
 
 The exit tests of the six milestones, and the sew-out of Milestone 6
@@ -853,11 +923,12 @@ comes first, as the measure of each milestone. The bundled fonts are made
 again only in Milestone 6, so the sew-outs of the older milestones use
 lettering in the TrueType fonts. Milestone 9 (the owner's request of
 2026-11-23, after Milestone 6) makes the fonts again before the
-sew-out.
+sew-out, and Milestone 10 (the owner's request after Milestone 9) too.
 
 ## Not in this phase
 
-- New fonts, and letter corrections by hand.
+- New fonts, and letter corrections by hand (apart from the letters of
+  Milestone 10, the owner's request).
 - The fill letters, and the stitch engine of fills.
 - Japanese characters as a target: the lettering bench of P20 shows the
   changes there, and they are checked with it. Milestone 8 is the one

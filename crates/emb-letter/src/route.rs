@@ -511,12 +511,43 @@ impl Router {
         if !self.in_letter(idx) {
             return None;
         }
-        self.pieces
+        let inside = self
+            .pieces
             .iter()
             .enumerate()
             .filter(|(i, p)| unsewn & (1 << i) != 0 && p.dist[idx] >= p.edge)
             .map(|(_, p)| (p.dist[idx] / (0.8 * p.half).max(1e-9)).min(1.0))
-            .reduce(f64::max)
+            .reduce(f64::max);
+        if inside.is_some() {
+            return inside;
+        }
+        // Where two parts that are not sewn touch (the two sides of a
+        // bridge of the split, ADR 0156), the cell is near the edge of
+        // each, but the parts cover all round it: the run can go across.
+        let edge = self
+            .pieces
+            .iter()
+            .enumerate()
+            .filter(|(i, p)| unsewn & (1 << i) != 0 && p.mask[idx])
+            .map(|(_, p)| p.edge)
+            .reduce(f64::max)?;
+        let n = (edge / self.grid.cell).ceil() as isize;
+        let (ci, cj) = (idx % self.grid.w, idx / self.grid.w);
+        for dj in -n..=n {
+            for di in -n..=n {
+                let (i, j) = (ci as isize + di, cj as isize + dj);
+                if i < 0 || j < 0 || i as usize >= self.grid.w || j as usize >= self.grid.h {
+                    return None;
+                }
+                let k = self.grid.idx(i as usize, j as usize);
+                if self.grid.center_of(k).distance(self.grid.center_of(idx)) <= edge
+                    && !(self.covered(k, unsewn) && self.in_letter(k))
+                {
+                    return None;
+                }
+            }
+        }
+        Some(0.0)
     }
 
     /// The straight line from `a` to `b` is under the parts of `unsewn`
@@ -1485,6 +1516,30 @@ mod tests {
         assert!(start.x < end.x, "{start:?} {end:?}");
         // No parts.
         assert_eq!(route(&letter(Vec::new()), 25.0).1, Routed::default());
+    }
+
+    /// Two columns that are not sewn yet and touch end to end (the two
+    /// sides of a bridge of the split): a run goes from one into the other
+    /// (P21 Milestone 10). Each cell near the joint is near the edge of its
+    /// column, so the run had no way and the letter got a trim.
+    #[test]
+    fn a_run_goes_across_two_columns_that_touch() {
+        // Columns 6 mm wide: a run keeps 0.3 mm from the edge of a column,
+        // more than a cell of the grid.
+        let parts = vec![
+            column((3.0, 0.0), (3.0, -20.0), 6.0),
+            column((6.0, -17.0), (16.0, -17.0), 6.0),
+            column((16.0, -17.0), (26.0, -17.0), 6.0),
+        ];
+        let r = Router::new(&parts, 25.0, None).unwrap();
+        let unsewn = 0b110;
+        // From the top of the stem to the far end of the second bar.
+        let from = r.end_edge((0, false), r.start((0, false), Point::ZERO));
+        let to = r.start_edge((2, true), Point::ZERO);
+        let link = r.link(from, to, unsewn);
+        assert!(!link.trim, "a trim of {} mm", link.length);
+        let run = link.run.expect("a run");
+        assert!(run.iter().any(|p| p.x > 18.0), "{run:?}");
     }
 
     #[test]

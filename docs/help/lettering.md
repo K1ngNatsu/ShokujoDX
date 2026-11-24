@@ -85,7 +85,7 @@ measures:
 
 - how much of the shapes of the letters the stitches cover,
 - how much of the satin columns is too narrow at the smallest size of the
-  font,
+  font (the pointed end of a column does not count),
 - how much of the satin columns has stitches that are too long at the
   largest size of the font,
 - how much of the stitches is outside the shapes of the letters,

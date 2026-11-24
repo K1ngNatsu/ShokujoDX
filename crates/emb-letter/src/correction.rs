@@ -287,6 +287,45 @@ impl Corrections {
         std::fs::write(path, self.to_json()).map_err(|e| format!("{}: {e}", path.display()))
     }
 
+    /// The letters of `font` that do not have their corrections, with the
+    /// reason: the font was not made again after the last change of the
+    /// corrections (`tools/make-embroidery-fonts.py`, ADR 0112). Empty if
+    /// the font has all of them.
+    pub fn missing_in(&self, font: &EmbFont) -> Vec<String> {
+        let mut out = Vec::new();
+        for (ch, fix) in &self.letters {
+            let Some(letter) = font.letters.get(ch) else {
+                out.push(format!("the font has no {ch:?}"));
+                continue;
+            };
+            if letter.fixed != fix.fixed.unwrap_or(fix.parts.is_some() || fix.has_steps()) {
+                out.push(format!("{ch:?} is not corrected in the font"));
+            }
+            if let Some(of) = fix.of.filter(|_| fix.parts.is_none())
+                && letter.parts.len() + fix.join.len() != of
+            {
+                out.push(format!("the parts of {ch:?}"));
+            }
+            if fix.parts.is_some() && !fix.has_steps() {
+                // A shape gives the letter that the font has.
+                let mut again = font.clone();
+                match fix.apply(Some(letter)) {
+                    Ok(l) => again.set_letter(*ch, l),
+                    Err(e) => out.push(format!("{ch:?}: {e}")),
+                }
+                if again.letters.get(ch) != Some(letter) {
+                    out.push(format!("{ch:?} is not the letter of its correction"));
+                }
+            }
+            for (i, tune) in &fix.tuning {
+                if letter.tuning.get(*i) != Some(tune) {
+                    out.push(format!("the settings of {ch:?}"));
+                }
+            }
+        }
+        out
+    }
+
     /// Changes the letters of `font`. Returns the corrections that did not
     /// apply; their letters stay as they are.
     pub fn apply(&self, font: &mut EmbFont) -> Vec<Problem> {

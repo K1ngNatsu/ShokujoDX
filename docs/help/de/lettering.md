@@ -92,7 +92,7 @@ sehen:
 
 - wie viel von den Formen der Buchstaben die Stiche decken,
 - wie viel von den Satinsäulen bei der kleinsten Größe der Schrift zu
-  schmal ist,
+  schmal ist (das spitze Ende einer Säule zählt nicht),
 - wie viel von den Satinsäulen bei der größten Größe der Schrift zu lange
   Stiche hat,
 - wie viel von den Stichen außerhalb der Formen der Buchstaben liegt,

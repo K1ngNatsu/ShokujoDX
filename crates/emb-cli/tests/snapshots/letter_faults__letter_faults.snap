@@ -7,6 +7,6 @@ At 25 mm, default satin settings. Spikes: needle points over 0.4 mm outside (at 
 | Font | Way | Spikes | Bare | Rail pts out (ends / middle) | Crossing | Back mm | Fans mm | Bulges mm | Notches | Runs out mm | Open % (corners / other mm2) | Corners open | Ends on top / under | Trims |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Block Sans | truetype | 0 / 2 | 7 | 30 / 4 | 9 | 1.4 | 0.0 | 0.0 | 0 | 0.1 | 0.13 (3.1 / 4.1) | 9 of 103 | 3 / 39 | 0 |
-| Anton | truetype | 11 / 0 | 14 | 44 / 0 | 11 | 0.8 | 0.0 | 0.0 | 2 | 0.0 | 1.02 (6.0 / 55.3) | 14 of 163 | 7 / 31 | 1 |
+| Anton | truetype | 11 / 0 | 14 | 44 / 0 | 9 | 0.8 | 0.0 | 0.0 | 2 | 0.0 | 1.02 (6.0 / 55.3) | 14 of 163 | 8 / 31 | 0 |
 | Pacifico | truetype | 10 / 1 | 19 | 31 / 3 | 3 | 5.4 | 0.4 | 5.0 | 0 | 0.2 | 0.22 (0.0 / 12.3) | 0 of 0 | 2 / 54 | 0 |
-| Varsity | truetype | 0 / 0 | 2 | 8 / 0 | 3 | 0.0 | 0.5 | 0.0 | 0 | 0.0 | 0.04 (0.7 / 1.7) | 0 of 277 | 19 / 81 | 14 |
+| Varsity | truetype | 0 / 0 | 2 | 8 / 0 | 3 | 0.0 | 0.5 | 0.0 | 0 | 0.0 | 0.04 (0.7 / 1.7) | 0 of 277 | 26 / 77 | 11 |
