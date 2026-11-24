@@ -27,6 +27,9 @@ pub const AUTO_RUN_STITCH_MM: f64 = 1.8;
 /// The step along a column for its middle width, in mm (as the lettering
 /// bench measures it).
 const THIN_STEP_MM: f64 = 0.25;
+/// [`thin_run`] measures a column at this many places at most (a column of
+/// 5 m at [`THIN_STEP_MM`]; a stitch object is at most 3 m).
+const THIN_MAX_PAIRS: f64 = 20_000.0;
 /// The stitch length of the rows of a tatami column of `Auto`, in mm.
 pub const AUTO_TATAMI_STITCH_MM: f64 = 3.5;
 /// A part of the glyph that the strokes do not cover is broad (a stroke
@@ -76,8 +79,20 @@ impl GlyphShapes {
     /// short hook at the end of a stroke, the stem of a heavy "n" beside its
     /// narrow counter) the pieces sew worse.
     pub fn with_split(rings: &[Vec<Point>], cap_height: f64, split: crate::stroke::Split) -> GlyphShapes {
-        use crate::stroke::Optional;
+        use crate::stroke::{Optional, Split};
         let fills = regions(rings);
+        // A glyph much larger than its capital height (a damaged font) is
+        // not a letter, and it is not split: each piece gets a grid of the
+        // largest size (`grid::MAX_SIDE`), and the measure of the faults
+        // sews the columns at 25 mm for each capital height, so such a
+        // glyph took ten times as long as with no split (the audit of P21).
+        let side =
+            emb_geom::BBox::from_points(rings.iter().flatten().copied()).map_or(0.0, |b| b.width().max(b.height()));
+        let split = if side > SPLIT_MAX_CAPS * cap_height {
+            Split::Off
+        } else {
+            split
+        };
         let make = |with: Optional| {
             let (mut strokes, used) = crate::stroke::strokes_split_soft(rings, cap_height, split, with);
             add_missed_strokes(&fills, &mut strokes, cap_height);
@@ -220,7 +235,13 @@ pub fn auto_stitches(parts: &mut [&mut ObjectKind], thin: bool) {
 /// is narrower than): its middle line, a bean stitch if it is at least
 /// [`AUTO_BEAN_MM`] long. `None` for a wider column.
 fn thin_run(g: &emb_model::SatinGeometry) -> Option<ObjectKind> {
-    let pairs = crate::quality::column_pairs(g, THIN_STEP_MM);
+    // At most `THIN_MAX_PAIRS` pairs: the time for lettering much larger
+    // than a design can be went up with its height (the audit of P21).
+    let long: f64 = crate::quality::column_widths(g, f64::INFINITY)
+        .iter()
+        .map(|(_, l)| l)
+        .sum();
+    let pairs = crate::quality::column_pairs(g, THIN_STEP_MM.max(long / THIN_MAX_PAIRS));
     let mut widths: Vec<(f64, f64)> = pairs
         .iter()
         .map(|(a, b, l)| (a.distance(*b), *l))
@@ -376,7 +397,6 @@ fn tune_ends(fills: &[(Vec<Point>, Vec<Vec<Point>>)], s: &mut Strokes, cap_heigh
     crate::stroke::trim_column_ends(&mut s.satins, &rings, cell);
 }
 
-/// The area of a satin: its two rails as one ring.
 /// The outline of a satin column: rail A, then rail B back. It crosses
 /// itself where the rails cross.
 fn satin_ring(g: &emb_model::SatinGeometry) -> Vec<Point> {
@@ -538,6 +558,9 @@ const SPLIT_STEP_MM: f64 = 0.2;
 /// A pair that crosses the next is a smaller fault than a needle point out
 /// of the letter: it counts as this much (with each 1 mm2 open as 1).
 const SPLIT_CROSS: f64 = 0.5;
+/// A glyph larger than this many capital heights is not split
+/// ([`GlyphShapes::with_split`]).
+const SPLIT_MAX_CAPS: f64 = 10.0;
 
 /// The faults of the columns of `strokes` in the outline `fills` (font
 /// units), for the choice of a split: the needle points out of the outline
@@ -579,10 +602,7 @@ fn split_faults(strokes: &Strokes, fills: &[(Vec<Point>, Vec<Vec<Point>>)], cap_
         .map(|c| {
             c.pairs(SPLIT_STEP_MM)
                 .windows(2)
-                .filter(|w| {
-                    Point::crossing(w[0].0, w[0].1, w[1].0, w[1].1)
-                        .is_some_and(|(u, v)| (1e-3..=1.0 - 1e-3).contains(&u) && (1e-3..=1.0 - 1e-3).contains(&v))
-                })
+                .filter(|w| emb_stitch::satin::pairs_cross(w[0], w[1]))
                 .count()
         })
         .sum::<usize>();
@@ -803,6 +823,48 @@ mod tests {
         ];
         run(&mut parts);
         assert_eq!(patterns(&parts), [satin, satin, tatami, ColumnPattern::Zigzag]);
+    }
+
+    /// A glyph much larger than its capital height is not split (the audit
+    /// of P21): a "T" 11 capital heights high has the columns of the stroke
+    /// finder with no split.
+    #[test]
+    fn a_glyph_much_larger_than_its_capital_height_is_not_split() {
+        let t: Vec<Point> = [
+            (-10.0, 0.0),
+            (10.0, 0.0),
+            (10.0, 1080.0),
+            (50.0, 1080.0),
+            (50.0, 1100.0),
+            (-50.0, 1100.0),
+            (-50.0, 1080.0),
+            (-10.0, 1080.0),
+        ]
+        .iter()
+        .map(|&(x, y)| Point::new(x, y))
+        .collect();
+        let rings = [t];
+        let split = GlyphShapes::with_split(&rings, 100.0, crate::stroke::Split::Notches);
+        let plain = GlyphShapes::new(&rings, 100.0);
+        assert!(!plain.strokes.satins.is_empty());
+        assert_eq!(split.strokes.satins, plain.strokes.satins);
+    }
+
+    /// A column is measured at a limited number of places (the audit of
+    /// P21: the time for lettering much higher than a design can be went up
+    /// with its height).
+    #[test]
+    fn a_very_long_column_is_measured_at_few_places() {
+        let rail = |y: f64| Path::new().move_to(Point::new(0.0, y)).line_to(Point::new(1e9, y));
+        let g = emb_model::SatinGeometry {
+            rail_a: rail(-0.25),
+            rail_b: rail(0.25),
+            rungs: Vec::new(),
+        };
+        let Some(ObjectKind::Running { path, .. }) = thin_run(&g) else {
+            panic!("a column of 0.5 mm is a run");
+        };
+        assert!(path.points().count() <= THIN_MAX_PAIRS as usize + 2);
     }
 
     #[test]

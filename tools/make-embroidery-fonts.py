@@ -232,9 +232,8 @@ PACKS = [
     (
         "earlier",
         "Fonts of earlier versions",
-        "Fonts that were in the program before version 0.4. Their quality score is below the limit "
-        "of the program: some letters have parts with no stitches. Use them to change a design "
-        "that has them.",
+        "Fonts that were in the program before version 0.4. Their quality score was below the limit "
+        "of the program when they left it. Use them to change a design that has them.",
     ),
 ]
 # The package whose fonts can be below the limit.

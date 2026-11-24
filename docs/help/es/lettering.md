@@ -109,10 +109,11 @@ jōyō). Descargue un paquete
 y añádalo con **Archivo > Mis recursos > Importar un paquete**. El programa
 no descarga nada por sí mismo.
 
-Cuatro fuentes de versiones anteriores tienen una puntuación inferior a 65:
-Slab Heavy, Fat Face Serif, Shrikhand y Great Vibes. Ya no están en el
-programa. Un diseño que tiene una de ellas se queda como está. Para cambiar
-su texto, añada el paquete de fuentes **Fonts of earlier versions**.
+Cuatro fuentes de versiones anteriores ya no están en el programa: Slab
+Heavy, Fat Face Serif, Shrikhand y Great Vibes. Su puntuación era inferior
+a 65 cuando salieron del programa. Un diseño que tiene una de ellas se
+queda como está. Para cambiar su texto, añada el paquete de fuentes
+**Fonts of earlier versions**.
 
 **Convertir en fuente de bordado** crea una fuente de bordado a partir de
 una fuente TrueType, con un nombre, un rango de tamaños y un tipo de

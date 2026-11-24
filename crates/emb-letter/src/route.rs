@@ -51,12 +51,6 @@ const _: () = assert!(MOST_PARTS <= 64);
 const BEAM: usize = 12;
 /// The number of steps along the end of a column where a run can start.
 const EDGE_POINTS: usize = 8;
-/// A letter goes on into the next letter if a stroke of it ends this near
-/// to the end of its place in the line, or after it (a part of the capital
-/// height). P21: 0 (it was 0.03): the end of a column reaches the corner of
-/// its stroke now, and the feet of an "A" at the edge of its place were
-/// taken as a tail (a run from the left foot, sewn as one long stitch).
-const TOUCH: f64 = 0.0;
 /// For a letter with a tail: a route that ends 1 mm nearer to the end of
 /// the tail is as good as a route with this much less travel, in mm.
 const TAIL_END: f64 = 12.0;
@@ -206,11 +200,6 @@ fn nearest_on(rings: &[Vec<Point>], p: Point) -> Point {
 /// [`area_of`]).
 type Area = (Vec<Vec<Point>>, Vec<Vec<Point>>);
 
-/// `p` is inside an odd number of `rings`.
-fn in_rings(rings: &[Vec<Point>], p: Point) -> bool {
-    rings.iter().filter(|r| emb_geom::region::ring_contains(r, p)).count() % 2 == 1
-}
-
 /// For each part, the columns that the middle of an end of it lies in, as
 /// bits; not where each of two columns ends in the other.
 fn joints(parts: &[ObjectKind]) -> Vec<u64> {
@@ -234,7 +223,7 @@ fn end_joints(parts: &[ObjectKind]) -> Vec<[u64; 2]> {
         .iter()
         .map(|k| matches!(k, ObjectKind::Satin { .. }).then(|| area_of(k)))
         .collect();
-    let inside = in_rings;
+    let inside = emb_geom::region::rings_contain;
     let mut out = vec![[0u64; 2]; n];
     for (j, part) in parts[..n].iter().enumerate() {
         let (ObjectKind::Satin { .. }, Some((s, e))) = (part, part_edges(part)) else {
@@ -921,7 +910,12 @@ pub fn route_in(letter: &EmbLetter, cap_mm: f64, outline: Option<&[Vec<Point>]>)
         .filter_map(|p| p.ends)
         .flat_map(|(a, b)| [a, b])
         .max_by(|a, b| a.x.total_cmp(&b.x))
-        .filter(|p| p.x >= letter.advance_mm - TOUCH * cap_mm);
+        // A letter goes on into the next letter if a stroke of it ends at
+        // the end of its place in the line, or after it (P21: not 0.03 of
+        // the capital height before it: the end of a column reaches the
+        // corner of its stroke now, and the feet of an "A" at the edge of
+        // its place were taken as a tail).
+        .filter(|p| p.x >= letter.advance_mm);
     let lead = tail.and_then(|p| r.nearest_covered(Point::new(p.x - letter.advance_mm, p.y), all));
     let (order, trims, on_top): (Vec<usize>, usize, usize) = if n > MAX_PARTS {
         // Too many parts for the search of all orders.

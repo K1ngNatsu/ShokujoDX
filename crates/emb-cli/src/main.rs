@@ -894,7 +894,7 @@ fn run(args: &[String]) -> Result<(), String> {
             Ok(())
         }
         ["letter-faults"] => {
-            let fonts = emb_cli::letter_faults::run(false);
+            let fonts = emb_cli::letter_faults::run();
             print!("{}", emb_cli::letter_faults::report(&fonts));
             if let Some(p) = &audit_proof {
                 std::fs::write(p, emb_cli::letter_faults::pictures(&fonts))

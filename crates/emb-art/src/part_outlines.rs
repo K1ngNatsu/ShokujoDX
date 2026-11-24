@@ -199,7 +199,7 @@ impl Shape {
         if !self.bbox.contains(p) {
             return false;
         }
-        if filled && self.rings.iter().filter(|r| region::ring_contains(r, p)).count() % 2 == 1 {
+        if filled && region::rings_contain(&self.rings, p) {
             return true;
         }
         self.edge_distance(p) <= self.near

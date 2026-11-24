@@ -130,8 +130,8 @@ pub(crate) struct Piece {
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Split {
     pub pieces: Vec<Piece>,
-    /// The bridges and the cuts.
-    #[cfg_attr(not(test), allow(dead_code))]
+    /// The bridges and the cuts (the tests read them).
+    #[cfg(test)]
     pub bridges: Vec<(Point, Point)>,
     /// Some bridges go to a curve (soft bridges), or cut a ball.
     pub soft: bool,
@@ -309,27 +309,8 @@ fn bridge_cost_max(a: &Concave, b: &Concave, rings: &[Vec<Point>], width: f64, m
         return None;
     }
     // In the shape, clear of the outline.
-    let tol = BRIDGE_CLEAR * width;
-    for r in rings {
-        for k in 0..r.len() {
-            let (c, d) = (r[k], r[(k + 1) % r.len()]);
-            if crosses(a.p, b.p, c, d, tol) {
-                return None;
-            }
-        }
-    }
-    for t in [0.25, 0.5, 0.75] {
-        let q = a.p.lerp(b.p, t);
-        if winding(rings, q) == 0 {
-            return None;
-        }
-        let near = rings
-            .iter()
-            .flat_map(|r| (0..r.len()).map(move |k| q.distance_to_segment(r[k], r[(k + 1) % r.len()])))
-            .fold(f64::MAX, f64::min);
-        if near < tol {
-            return None;
-        }
+    if !clear_inside(a.p, b.p, rings, width) {
+        return None;
     }
     Some(l / width + (align_a + align_b) / ALIGN_MAX_DEG)
 }
@@ -474,7 +455,7 @@ fn clear_inside(a: Point, b: Point, rings: &[Vec<Point>], width: f64) -> bool {
 /// no bridges. With `notches`, a sharp concave corner with no bridge gets
 /// a cut too (with `with.along` also a cut that goes along a stroke), with
 /// `with.elbows` also the corner of an elbow, and with `with.soft` also a
-/// bridge to a curve.
+/// bridge to a curve and the cut of a ball.
 pub(crate) fn split(rings: &[Vec<Point>], cap_height: f64, notches: bool, with: Optional) -> Option<Split> {
     let Optional { soft, elbows, along } = with;
     let rings = inside_left(rings, 1e-4 * cap_height.max(1e-9));
@@ -657,6 +638,7 @@ pub(crate) fn split(rings: &[Vec<Point>], cap_height: f64, notches: bool, with: 
                 }
                 return Some(Split {
                     pieces,
+                    #[cfg(test)]
                     bridges: links.iter().map(|l| (l.pa, l.pb)).collect(),
                     soft: links.iter().any(|l| l.soft),
                     elbows: links.iter().any(|l| l.elbow),
@@ -985,7 +967,8 @@ enum Spot {
     On(usize, f64),
 }
 
-/// A bridge, or a cut from a notch.
+/// A link between two places of the outline: a bridge, a cut from a notch
+/// or at an elbow, a bridge to a curve, or the cut of a ball.
 #[derive(Debug, Clone, Copy)]
 struct Link {
     a: (usize, Spot),

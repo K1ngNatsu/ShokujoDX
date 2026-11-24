@@ -1,7 +1,10 @@
 # ADR 0152: Split the outline of a letter into strokes at its concave corners
 
 Date: 2026-11-23 · Status: Accepted (P21 Milestone 8,
-`docs/design/p21-plan.md`).
+`docs/design/p21-plan.md`). Later ADRs change decision 1: a cut from a
+notch is at most 2.5 widths long and its end is checked (ADR 0155), an
+elbow gets a cut (ADR 0159), a cut along a stroke is optional, and the
+end of a piece that would go out of the letter stays (ADR 0160).
 
 ## Context
 
@@ -62,7 +65,7 @@ kanji.
   (18 to 19 before), each character 96.9 % covered or more at 15 mm and
   more (96.0 % before). The eight
   words have 1, 1 and 2 more trims at 10, 15 and 25 mm (49, 50 and 56):
-  P21 Milestone 5 takes them back.
+  P21 Milestone 5 removes these trims again.
 - Travel runs out of the outline in Block Sans: 0.4 mm to 2.3 mm (Milestone
   5).
 - The bench takes about 1.4 times as long for Latin letters; the
@@ -71,3 +74,7 @@ kanji.
   bundled fonts (ADR 0112) must be checked when the fonts are made again
   (Milestone 6). The bundled fonts do not change until then.
 - A new script gets the split only after a measure with the split.
+- The audit of P21 (2026-11-24): a glyph larger than ten capital heights
+  (a damaged font) is not split (`glyph::SPLIT_MAX_CAPS`). Each piece got
+  a grid of the largest size (`grid::MAX_SIDE`), and the split of a glyph
+  1,000 times its capital height took 24 s (1.8 s with no split).

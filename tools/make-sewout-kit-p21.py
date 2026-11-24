@@ -14,7 +14,8 @@
 #             middle and largest size (as the kit of P17)
 #   joints/   the letters whose joints the split changed most, and the
 #             letters with the most faults of the bench of 2026-11-23, in
-#             the four fonts of the letter fault bench, at their middle size
+#             the four fonts of the letter fault bench and in Friendly
+#             Serif, at their middle size
 #   kanji/    crossings and junctions of kanji at 25 mm, in the Japanese
 #             embroidery font Noto Sans JP
 #   shaped/   the corpus design shaped-text (its Arabic word is routed from
@@ -44,7 +45,8 @@ _spec.loader.exec_module(kit17)
 
 JP_FONT = os.path.join(ROOT, "target", "font-packages", "japanese", "noto-sans-jp.embfont")
 
-# The four fonts of the letter fault bench, and the texts of their sheets
+# The four fonts of the letter fault bench and Friendly Serif, and the
+# texts of their sheets
 # (the first that fits the hoop): the letters whose joints the split
 # changed most ("N", "M", "W", "Z", "k", "x"), then the letters with the
 # most faults of each font in the bench of 2026-11-23. Friendly Serif: the

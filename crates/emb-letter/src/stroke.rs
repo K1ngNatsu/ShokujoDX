@@ -36,7 +36,7 @@
 
 use std::collections::HashMap;
 
-use emb_geom::region::ring_contains;
+use emb_geom::region::{ring_contains, rings_contain};
 use emb_geom::{BBox, Path, Point};
 use emb_model::SatinGeometry;
 
@@ -148,8 +148,9 @@ const FOLLOW_NEAR: f64 = 1.6;
 /// top of the stroke of ぁ above its bar): an outline at most this many
 /// times as long as the line between the feet, at most [`STUB_NEAR`]
 /// half-widths from the middle line. The column covers the arm, as the
-/// lines square to the middle line did before. Milestone 3 makes such arms
-/// strokes.
+/// lines square to the middle line did before. Milestone 3 made the short
+/// arms of a crossing strokes (`Graph::side_radius`); the rule stays for
+/// the other short arms.
 const STUB_ARC: f64 = 3.5;
 const STUB_NEAR: f64 = 2.0;
 /// Points of the outline that a rail follows go if they are nearer than
@@ -230,7 +231,8 @@ pub enum Split {
     /// Bridges between pairs of concave corners (kana and kanji).
     Bridges,
     /// Bridges, and a cut at each sharp concave corner with no bridge (the
-    /// notch of a "V"; Latin letters and digits).
+    /// notch of a "V"; Latin letters and digits), with the optional links
+    /// ([`Optional`]: cuts at elbows, bridges to curves, cuts of balls).
     Notches,
 }
 
@@ -1133,7 +1135,6 @@ fn cut_corners(
     out
 }
 
-/// Extends free ends along their direction to the edge of the shape.
 /// One piece of a stroke: the stroke, its fixed half-width, its middle
 /// half-width and the piece.
 type Placed = (usize, Option<f64>, f64, Piece);
@@ -1250,6 +1251,7 @@ fn split_piece(p: &Piece, k: usize, x: Point, hold: f64) -> Option<(Piece, Piece
     ))
 }
 
+/// Extends free ends along their direction to the edge of the shape.
 fn extend(mut pts: Vec<Point>, free: [bool; 2], g: &Grid, reach: f64) -> Piece {
     let n0 = pts.len();
     let step = g.cell * 0.5;
@@ -1747,7 +1749,7 @@ fn whole_with(rings: &[Vec<Point>], cap_height: f64, prune: f64, axis: Option<Po
     }
     trim_ends(&mut columns);
     for c in columns.iter().filter(|c| c.sewable(cell)) {
-        let (satin, quads) = c.geometry(Some((&outline, cell)));
+        let (satin, quads) = c.geometry(&outline, cell);
         for q in &quads {
             fill_into(&g, std::slice::from_ref(q), &mut cover);
         }
@@ -2026,8 +2028,10 @@ struct Middle<'a> {
 /// Milestone 1). Each point of the middle line that is not skipped takes
 /// the nearest point of the outline on that side (its foot), in the angle
 /// [`FOOT_CONE_DEG`] of its normal, at most [`FOOT_REACH`] half-widths
-/// away. The rail follows the outline from foot to foot (`Rails::geometry`
-/// adds the points of the outline).
+/// away. With `far`, a side that swells gets a foot as far as [`FOOT_FAR`]
+/// half-widths, if the line to it stays in the letter (P21 Milestone 12).
+/// The rail follows the outline from foot to foot (`Rails::geometry` adds
+/// the points of the outline).
 ///
 /// - Where a side passes an opening (a place where another stroke meets or
 ///   crosses: no foot near enough, or two feet with an outline between
@@ -2449,14 +2453,13 @@ fn free_end(
     Some(pairs)
 }
 
-/// The satin column of a piece, its widest width and the quads it covers.
 /// The points of an extension `ext` (from its first point, on the middle
 /// line) up to where it leaves the outline. The walk on the grid can stop a
 /// part of a cell past the outline, and the width of a point out of the
 /// outline is not held at the outline: the column went out of the letter
 /// (P21: the flag of "l" in Bree Serif).
 fn in_outline(ext: &[Point], outline: &Rings, segs: &[(Point, Point)]) -> Vec<Point> {
-    let inside = |p: Point| outline.rings.iter().filter(|r| ring_contains(r, p)).count() % 2 == 1;
+    let inside = |p: Point| rings_contain(outline.rings, p);
     let mut out: Vec<Point> = Vec::with_capacity(ext.len());
     for &p in ext {
         let Some(&prev) = out.last() else {
@@ -2514,7 +2517,7 @@ fn room(p: Point, d: Point, h: f64, segs: &[(Point, Point)], outline: &Rings, ce
     let t = ray(p, d, h, segs).unwrap_or(h);
     // A ray from a point on the outline meets the next part of the letter
     // (the stem under a dot), or nothing.
-    if t > step && outline.rings.iter().filter(|r| ring_contains(r, p + d * step)).count() % 2 == 0 {
+    if t > step && !rings_contain(outline.rings, p + d * step) {
         0.0
     } else {
         t
@@ -2529,7 +2532,7 @@ fn room(p: Point, d: Point, h: f64, segs: &[(Point, Point)], outline: &Rings, ce
 /// outline is not stopped by the outline: it went out of the dot (P21
 /// Milestone 11).
 fn clip_ends(pts: &mut Vec<Point>, flags: &mut Vec<bool>, outline: &Rings, segs: &[(Point, Point)]) {
-    let inside = |p: Point| outline.rings.iter().filter(|r| ring_contains(r, p)).count() % 2 == 1;
+    let inside = |p: Point| rings_contain(outline.rings, p);
     // Where the line from the point `p` in the outline to `q` out of it
     // meets the outline.
     let exit = |p: Point, q: Point| {
@@ -2568,6 +2571,9 @@ fn clip_ends(pts: &mut Vec<Point>, flags: &mut Vec<bool>, outline: &Rings, segs:
     }
 }
 
+/// The two rails of a piece (pairs of points across its middle line, each
+/// on the outline of its side: [`side_rail`]), `true` for a closed piece,
+/// and its widest width. `None` for a piece with no column.
 fn rails(
     piece: &Piece,
     r_med: f64,
@@ -2951,7 +2957,7 @@ pub fn trim_column_ends(satins: &mut Vec<SatinGeometry>, rings: &[Vec<Point>], c
         if c.closed || (c.a == a && c.b == b) {
             out.push(g.clone());
         } else if c.sewable(cell) {
-            out.push(c.geometry(Some((&outline, cell))).0);
+            out.push(c.geometry(&outline, cell).0);
         }
     }
     *satins = out;
@@ -2975,10 +2981,10 @@ impl Rails {
         self.a.len() >= 2 && (self.closed || (len(&self.a) > 0.1 * cell && len(&self.b) > 0.1 * cell))
     }
 
-    /// The satin column and the quads that it covers. With `outline` (the
-    /// rings and the cell of the grid), each rail follows the outline
-    /// between two of its points that are on it (P21 Milestone 1).
-    fn geometry(&self, outline: Option<(&Rings, f64)>) -> (SatinGeometry, Vec<Vec<Point>>) {
+    /// The satin column and the quads that it covers. Each rail follows
+    /// the outline (`outline`, with the cell of the grid `cell`) between
+    /// two of its points that are on it (P21 Milestone 1).
+    fn geometry(&self, outline: &Rings, cell: f64) -> (SatinGeometry, Vec<Vec<Point>>) {
         let (pa, pb, closed) = (&self.a, &self.b, self.closed);
         let n = pa.len();
         let m = if closed { n } else { n - 1 };
@@ -2987,9 +2993,7 @@ impl Rails {
             (0..m)
                 .map(|i| {
                     let j = (i + 1) % n;
-                    outline.map_or(Vec::new(), |(o, cell)| {
-                        o.along(side[i], side[j], pa[i].midpoint(pb[i]), pa[j].midpoint(pb[j]), cell)
-                    })
+                    outline.along(side[i], side[j], pa[i].midpoint(pb[i]), pa[j].midpoint(pb[j]), cell)
                 })
                 .collect()
         };

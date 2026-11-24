@@ -112,11 +112,11 @@ Gothic, mit den Kana und den 2.136 Jōyō-Kanji). Laden Sie ein Paket herunter u
 Meine Ressourcen > Paket importieren** hinzu. Das Programm lädt selbst
 nichts herunter.
 
-Vier Schriften früherer Versionen haben eine Wertung unter 65: Slab Heavy,
-Fat Face Serif, Shrikhand und Great Vibes. Sie sind jetzt nicht mehr im
-Programm. Ein Design, das eine von ihnen hat, bleibt, wie es ist. Um seinen
-Text zu ändern, fügen Sie das Schriftpaket **Fonts of earlier versions**
-hinzu.
+Vier Schriften früherer Versionen sind jetzt nicht mehr im Programm: Slab
+Heavy, Fat Face Serif, Shrikhand und Great Vibes. Ihre Wertung lag unter
+65, als sie das Programm verließen. Ein Design, das eine von ihnen hat,
+bleibt, wie es ist. Um seinen Text zu ändern, fügen Sie das Schriftpaket
+**Fonts of earlier versions** hinzu.
 
 **In Stickschrift umwandeln** erstellt eine Stickschrift aus einer
 TrueType-Schrift, mit einem Namen, einem Größenbereich und einer Stichart.

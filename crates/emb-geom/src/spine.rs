@@ -22,7 +22,7 @@ use std::collections::BinaryHeap;
 
 use crate::Point;
 use crate::math::sin_cos_deg;
-use crate::region::ring_contains;
+use crate::region::rings_contain;
 
 /// Most grid cells on one side of the shape for [`spine`].
 pub const GRID: usize = 160;
@@ -107,7 +107,7 @@ pub fn cross_lines(rings: &[Vec<Point>], guide: &[Point], angle_deg: f64, step: 
     if g.len() < 2 || step <= 0.0 {
         return Vec::new();
     }
-    let inside = |p: Point| rings.iter().filter(|r| ring_contains(r, p)).count() % 2 == 1;
+    let inside = |p: Point| rings_contain(rings, p);
     // On to the outline at both ends.
     if inside(g[0])
         && let Some(d) = (g[0] - g[1]).normalized()

@@ -701,8 +701,9 @@ pub fn tool_input(response: &egui::Response, st: &mut AppState, map: &ViewMap) {
 }
 
 /// True for an embroidery font of an earlier version that is not in the
-/// program now: its quality score is below the limit (ADR 0115). It is in
-/// a font package.
+/// program now: its quality score was below the limit when it left the
+/// program (ADR 0115; a font keeps its place, ADR 0116). It is in a font
+/// package.
 pub fn is_earlier_font(font: &FontRef) -> bool {
     font.kind == FontKind::Embroidery
         && emb_letter::bundled::EARLIER

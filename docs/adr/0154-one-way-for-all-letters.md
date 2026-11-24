@@ -44,3 +44,7 @@ look at the needle points.
   owner decides if they come into the program (ADR 0116).
 - The sew-out of the kit is open; the engine view is the measure until
   then (the owner finds it true to the sew-outs).
+- The audit of P21 (2026-11-24): the app rounded the coordinates of a
+  converted font before the choice of the fill letters, and the font tool
+  rounds them after it. The app has the order of the tool now
+  (`fonts::convert_font`).

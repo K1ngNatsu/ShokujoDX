@@ -1,7 +1,9 @@
 # ADR 0156: The work areas of the font packages
 
 Date: 2026-11-23 · Status: Accepted (P21 Milestone 10,
-`docs/design/p21-plan.md`).
+`docs/design/p21-plan.md`). ADR 0157 found the cause of the faults at
+balls and at square dots in the stroke finder, and removed five of the
+corrections of decision 3.
 
 ## Context
 
@@ -73,7 +75,7 @@ kinds, and the owner asked to fix the four work areas in sequence:
    size at which the pointed ends are not too narrow.
 5. The limits of the score stay (`LIMIT` 65, `BUNDLE` 85), and each font
    keeps its place (ADR 0116). The scores of most fonts are higher, so a
-   score of 85 is a lower bar than before; a font goes from a package to
+   score of 85 is easier to get than before; a font goes from a package to
    the program only when the owner chooses it after a look at its proof
    pictures.
 

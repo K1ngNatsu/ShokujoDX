@@ -2,7 +2,7 @@
   "format": "embfont-corrections",
   "version": 1,
   "family": "Jazz Hand",
-  "notes": "P21 Milestone 10: the square dots of i, j and the colon stay in their outline; the left arm of t and the strokes of w are one column each.",
+  "notes": "P21 Milestone 10: the square dots of the colon stay in their outline; the left arm of t and the strokes of w are one column each. (P21 Milestone 11 removed the corrections of i and j: the stroke finder makes their dots well now.)",
   "letters": {
     ":": {
       "parts": [

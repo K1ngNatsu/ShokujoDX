@@ -405,9 +405,10 @@ pub mod bundled {
     pub const P17_EMBROIDERY: usize = 55;
 
     /// The embroidery fonts of earlier versions that are not in the program
-    /// now, because their quality score is below
-    /// [`crate::quality::LIMIT`]. They are in the font package
-    /// `shokujodx-fonts-earlier.zip`.
+    /// now: their quality score was below [`crate::quality::LIMIT`] when
+    /// they left it. They are in the font package
+    /// `shokujodx-fonts-earlier.zip`, and a font keeps its place when its
+    /// score changes (ADR 0116; after P21 they have 75 to 95).
     pub const EARLIER: [&str; 4] = ["Slab Heavy", "Fat Face Serif", "Shrikhand", "Great Vibes"];
 
     /// The quality scores of the fonts of [`EMBROIDERY`], from their files
@@ -544,7 +545,7 @@ mod tests {
         // The new fonts of P17 Milestone 7 came into the program with the
         // score of a font of the program; a font keeps its place while its
         // score is the limit or more (ADR 0116; P21 Milestone 6: the score
-        // of today counts the needle points, and Pangolin has 75).
+        // counts the needle points, and Pangolin had 75 then).
         for (family, _) in &bundled::EMBROIDERY[bundled::P11_EMBROIDERY..] {
             let q = bundled::quality(family).unwrap();
             assert!(q.score >= quality::LIMIT, "{family}: {q:?}");

@@ -1,6 +1,6 @@
 # ADR 0158: Sides that swell, and columns with no crossing stitches
 
-Date: 2026-11-23 · Status: Accepted (P21 Milestone 12,
+Date: 2026-11-24 · Status: Accepted (P21 Milestone 12,
 `docs/design/p21-plan.md`).
 
 ## Context
@@ -96,5 +96,22 @@ the outline 46 % in a few heavy fonts; columns on top in 951 letters.
   column fonts of the program 94.3 to 94.2 on mean (six fonts 1 or 2
   points lower).
 - The golden designs with lettering: stitches -2.3 % to +2.0 %, the same
-  trims. The lettering bench of P20: the same trims; stitches out of the
+  trims. The lettering bench of P20: one trim fewer in 刺繍 at 10, 15 and
+  25 mm, the other words the same; stitches out of the
   outline at the most 1.0 % (森; 0.2 % before).
+- The audit of P21 (2026-11-24): `Column::untangled_rungs` makes at most
+  20,000 pairs between two rungs (`UNTANGLE_MAX_PAIRS`). With a step of 0
+  it made a pair at each billionth of a mm and asked for 34 GB of memory,
+  and the program stopped. The step is a part of the height of the
+  lettering, so lettering with a height below 0 (a project file with a
+  wrong number) did that. The test for two pairs that cross is one
+  function (`emb_stitch::satin::pairs_cross`) for the score, the bench,
+  the choice of a split and the untangled rungs.
+- The audit of P21, the area of columns (`region::fill_nonzero`, decision
+  2): where the two rails of a column lie on each other, the overlay
+  gives rings with no area and rings with thousands of sides of almost
+  no length, and `region::offset` did not come back from such a region
+  (the picture at "K" of the font Webdings: the layout waits for this
+  step, so the program did not answer). The area has no ring with no
+  area now, and a ring with a side shorter than a millionth of the size
+  of the rings is thinned by that distance.

@@ -66,8 +66,9 @@ stitches (an open triangle), or the two columns lay on each other.
    mm) were a bean stitch. In a narrow column of a small letter (needle
    points 0.18 mm apart on a side, with short stitches) each stitch goes
    back on nearly the same line too. A bean stitch goes back into its
-   needle holes: now a sequence is a bean stitch only if at least a third
-   of its legs end in a needle hole of an earlier leg (`BEAN_HOLES`). A
+   needle holes: now a sequence is a bean stitch only if at least 0.3 of
+   its legs (after the first two) end in a needle hole of an earlier leg
+   (`BEAN_HOLES`). A
    first try (the middles of the legs on one line) made a bean stitch
    along a curve a column.
 
@@ -111,3 +112,7 @@ stitches (an open triangle), or the two columns lay on each other.
   not a side of a stroke (Fat Face Serif "7"), and an elbow that turns
   less than 80 degrees (the flag of Candy Sans "F"). The slab letters "L"
   and "I" keep the columns of before (the check of decision 3).
+- The audit of P21 (2026-11-24): the rule for a bean stitch finds the
+  needle holes in a grid with cells of 0.06 mm. It compared each leg with
+  all the legs before it: a bean stitch of 100,000 stitches took 7 s
+  (0.07 s now). The parts are the same.

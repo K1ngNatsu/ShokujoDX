@@ -90,7 +90,8 @@ split of the outline (ADR 0152).
   89 to 84 (more columns too narrow at its smallest size and too long at
   its largest).
 - The golden designs with lettering: stitches 0.1 % to 7.4 % fewer (less
-  area with two layers), Lettering Bridge 1.1 % more; the same trims but
+  area with two layers), Lettering Bridge 1.1 % and Lettering Circle
+  0.4 % more; the same trims but
   Embroidery Fonts 3 (2 more), Embroidery Fonts 7 and Lettering Circle
   (one more each), from the letters, not from decision 4.
 - The tests of the parts of P18 (the corpus as DST and back): the outlines

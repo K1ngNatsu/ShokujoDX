@@ -115,16 +115,21 @@ pub fn convert_font(
         f.route_until(&progress.routed, &progress.stop, Some(font));
         stopped()?;
     }
-    // The coordinates of the file (P21 Milestone 6: rounded when the font is
-    // done, not before the tuning of the ends).
-    f.round_letters();
-    if !f.fill && (route || stitch == LetterStitch::Auto) {
+    let scored = !f.fill && (route || stitch == LetterStitch::Auto);
+    if scored {
         progress.step.store(STEP_SCORE, Relaxed);
         if stitch == LetterStitch::Auto {
             f.choose_fills(font, &[]);
             // The fill letters for large lettering (ADR 0120).
             f.add_fill_letters(font);
         }
+    }
+    // The coordinates of the file (P21 Milestone 6: rounded when the font is
+    // done, not before the tuning of the ends). As the font tool: after the
+    // choice of the fill letters and before the score (the audit of P21:
+    // the app rounded before that choice).
+    f.round_letters();
+    if scored {
         f.measure_quality(font);
     }
     Ok(f)
@@ -968,7 +973,8 @@ mod tests {
     /// `tools/make-embroidery-fonts.py`): each font reads, has its license
     /// text and a quality score of the limit or more, and is not a font of
     /// the program. The package of the fonts of earlier versions has the
-    /// fonts below the limit.
+    /// fonts that were below the limit when they left the program
+    /// (`BELOW_LIMIT` of the tool: no limit for them).
     #[test]
     fn the_font_packages_have_fonts_above_the_limit() {
         use emb_letter::quality::LIMIT;

@@ -42,6 +42,9 @@ pub const AUTO_WIDE_MM: f64 = 2.0;
 /// `Auto` underlay: columns narrower than this get no underlay.
 pub const AUTO_MIN_MM: f64 = 1.0;
 const AUTO_INSET_MM: f64 = 0.4;
+/// [`Column::untangled_rungs`] makes at most this number of pairs between
+/// two rungs.
+const UNTANGLE_MAX_PAIRS: f64 = 20_000.0;
 const AUTO_ZIGZAG_SPACING_MM: f64 = 2.0;
 const HEAVY_ZIGZAG_SPACING_MM: f64 = 1.2;
 
@@ -229,7 +232,14 @@ impl Column {
     /// it). `None` if no pair crosses. The rungs are in the order of the
     /// column, with the rail points of each.
     pub fn untangled_rungs(&self, step: f64) -> Option<Vec<(Point, Point)>> {
-        let step = step.max(1e-9);
+        // At most [`UNTANGLE_MAX_PAIRS`] pairs between two rungs: a step
+        // of 0 (lettering with a height that is not more than 0) asked for
+        // more memory than a computer has (the audit of P21).
+        let longest = self.a.len().max(self.b.len());
+        if !longest.is_finite() {
+            return None;
+        }
+        let step = step.max(longest / UNTANGLE_MAX_PAIRS).max(1e-9);
         // The places of the pairs on the two rails.
         let mut target: Vec<(f64, f64)> = vec![(0.0, 0.0)];
         for w in self.rungs.windows(2) {
@@ -241,11 +251,7 @@ impl Column {
             }
         }
         let line = |r: (f64, f64)| (self.a.at(r.0), self.b.at(r.1));
-        let cross = |x: (f64, f64), y: (f64, f64)| {
-            let ((a0, b0), (a1, b1)) = (line(x), line(y));
-            Point::crossing(a0, b0, a1, b1)
-                .is_some_and(|(u, v)| (1e-3..=1.0 - 1e-3).contains(&u) && (1e-3..=1.0 - 1e-3).contains(&v))
-        };
+        let cross = |x: (f64, f64), y: (f64, f64)| pairs_cross(line(x), line(y));
         let tiny = 1e-6 * (self.a.len() + self.b.len()).max(1e-9);
         let mut out: Vec<(f64, f64)> = vec![target[0]];
         let mut changed = false;
@@ -699,6 +705,14 @@ fn puff_cap(col: &Column, start: bool) -> Vec<Point> {
         .collect()
 }
 
+/// `true` if two pairs across a column cross each other (not two pairs with
+/// one point on a side: a pivot). The letter score, the letter fault bench,
+/// the choice of a split and the untangled rungs use this one test.
+pub fn pairs_cross(a: (Point, Point), b: (Point, Point)) -> bool {
+    Point::crossing(a.0, a.1, b.0, b.1)
+        .is_some_and(|(u, v)| (1e-3..=1.0 - 1e-3).contains(&u) && (1e-3..=1.0 - 1e-3).contains(&v))
+}
+
 /// The path from its end to its start, flattened.
 fn reverse_path(path: &Path) -> Path {
     let mut pts: Vec<Point> = path
@@ -716,6 +730,34 @@ fn reverse_path(path: &Path) -> Path {
 mod tests {
     use super::*;
 
+    /// A step that is not more than 0 (lettering with such a height) gives
+    /// a limited number of pairs (the audit of P21: a step of 0 asked for a
+    /// pair at each billionth of a mm, more memory than a computer has).
+    #[test]
+    fn untangled_rungs_with_a_step_of_0_are_limited() {
+        let line = |pts: &[(f64, f64)]| {
+            let mut p = emb_geom::Path::new().move_to(Point::new(pts[0].0, pts[0].1));
+            for &(x, y) in &pts[1..] {
+                p = p.line_to(Point::new(x, y));
+            }
+            p
+        };
+        let g = SatinGeometry {
+            rail_a: line(&[(0.0, 0.0), (10.0, 0.0)]),
+            rail_b: line(&[(0.0, 2.0), (6.0, 2.0), (4.0, 3.0), (10.0, 3.0)]),
+            rungs: Vec::new(),
+        };
+        let c = Column::new(&g).unwrap();
+        for step in [0.0, -0.2, 1e-12, f64::NAN] {
+            let rungs = c.untangled_rungs(step).expect("pairs that cross");
+            assert!(
+                rungs.len() <= UNTANGLE_MAX_PAIRS as usize + 2,
+                "{step}: {}",
+                rungs.len()
+            );
+        }
+    }
+
     /// A rail that goes back for a bit (the inside of a fast turn): pairs
     /// across the column cross; with the untangled rungs, none does, and
     /// the column still goes from end to end.
@@ -730,13 +772,7 @@ mod tests {
         };
         let crossings = |c: &Column| {
             let pairs = c.pairs(0.2);
-            pairs
-                .windows(2)
-                .filter(|w| {
-                    Point::crossing(w[0].0, w[0].1, w[1].0, w[1].1)
-                        .is_some_and(|(u, v)| (1e-3..=1.0 - 1e-3).contains(&u) && (1e-3..=1.0 - 1e-3).contains(&v))
-                })
-                .count()
+            pairs.windows(2).filter(|w| pairs_cross(w[0], w[1])).count()
         };
         let mut g = SatinGeometry {
             rail_a: line(&[(0.0, 0.0), (10.0, 0.0)]),

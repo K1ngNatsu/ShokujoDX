@@ -30,6 +30,7 @@
 //! A part that the program does not recognize stays a stitch part; no
 //! stitch is lost (the plan of the phase).
 
+use std::collections::HashMap;
 use std::ops::Range;
 
 use emb_geom::Point;
@@ -379,16 +380,30 @@ fn back_and_forth(legs: &[Leg], seq: &[usize], turned: usize) -> PartKind {
     }
     let mean = emb_geom::math::atan2(s, c) / 2.0;
     if across[across.len() / 2] < SAME_LINE_MM {
-        // The legs that end in a needle hole of an earlier leg.
-        let again = (2..seq.len())
-            .filter(|&i| {
-                let end = legs[seq[i]].b;
-                seq[..i - 1].iter().any(|&k| {
-                    let l = &legs[k];
-                    l.a.distance(end) <= SAME_HOLE_MM || l.b.distance(end) <= SAME_HOLE_MM
-                })
-            })
-            .count();
+        // The legs that end in a needle hole of an earlier leg (not the leg
+        // just before: a leg starts in its hole). The holes are in cells of
+        // the size of a hole, so a long line is not compared with all the
+        // legs before each leg (the audit of P21: a bean stitch of 100,000
+        // stitches took 7 s).
+        let cell = |p: Point| ((p.x / SAME_HOLE_MM).floor() as i64, (p.y / SAME_HOLE_MM).floor() as i64);
+        let mut holes: HashMap<(i64, i64), Vec<Point>> = HashMap::new();
+        let mut again = 0;
+        for i in 2..seq.len() {
+            let earlier = &legs[seq[i - 2]];
+            for p in [earlier.a, earlier.b] {
+                holes.entry(cell(p)).or_default().push(p);
+            }
+            let end = legs[seq[i]].b;
+            let (x, y) = cell(end);
+            let near = |dx: i64, dy: i64| {
+                holes
+                    .get(&(x.saturating_add(dx), y.saturating_add(dy)))
+                    .is_some_and(|ps| ps.iter().any(|p| p.distance(end) <= SAME_HOLE_MM))
+            };
+            if (-1..=1).any(|dx| (-1..=1).any(|dy| near(dx, dy))) {
+                again += 1;
+            }
+        }
         if again as f64 >= BEAN_HOLES * seq.len().saturating_sub(2) as f64 {
             return PartKind::Run;
         }
@@ -676,6 +691,20 @@ mod tests {
         }
         let p = parts(&design(&curve));
         assert!(p.iter().all(|p| p.kind == PartKind::Run), "{p:?}");
+    }
+
+    /// A long bean stitch (10,000 stitches) is a run: its legs find their
+    /// needle holes in a grid, not in a pass over all the legs before them
+    /// (the audit of P21).
+    #[test]
+    fn a_long_bean_stitch_is_a_run() {
+        let mut bean = vec![(0.0, 0.0)];
+        for k in 1..10_000 {
+            let (a, b) = (2.5 * (k - 1) as f64, 2.5 * k as f64);
+            bean.extend([(b, 0.0), (a, 0.0), (b, 0.0)]);
+        }
+        let p = parts(&design(&bean));
+        assert!(p.iter().all(|p| p.kind == PartKind::Run), "{} parts", p.len());
     }
 
     /// A narrow column of a small letter (1.6 mm wide, needle points 0.18 mm

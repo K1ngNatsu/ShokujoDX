@@ -68,3 +68,7 @@ font comes from Latin letters ("IlHnoiu").
 - Lettering of a saved design keeps its size until a person changes it
   in a new lettering object. A new lettering object with Japanese text in
   a font of the program is a quarter smaller than before at the same height.
+- The audit of P21 (2026-11-24): `glyph::thin_run` measures a column at
+  20,000 places at most (`THIN_MAX_PAIRS`; a column of 5 m at the step of
+  0.25 mm). The time of the layout went up with the height of the
+  lettering: lettering 1,000 km high did not end in two minutes.

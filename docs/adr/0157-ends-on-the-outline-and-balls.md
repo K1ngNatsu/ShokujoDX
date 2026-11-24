@@ -38,7 +38,7 @@ the needle points out of the outline in the letter fault bench (Pacifico
    under a dot) is not used.
 2. A ball is cut from its stroke in the split of a Latin letter
    (`split::ball_cut`): at a concave corner that turns `BALL_MIN_DEG`
-   (70) degrees or more but is not a notch, a cut square to the side of
+   (70) degrees or more and has no other link, a cut square to the side of
    the stroke, across it, at most `BALL_CUT_MAX` (1.6) widths long, if
    the outline the other way round the corner to the cut is round
    (`BALL_ROUND`: 4 pi area over the square of its outline at least

@@ -12,8 +12,11 @@ corners, a trial) was added by the owner on 2026-11-23; the trial is
 made, and the owner chose the split for Latin letters and for kana and
 kanji (2026-11-23, ADR 0152). Milestones 5 and 6 are updated for it.
 Milestone 5 is made (ADR 0153); its exit test is met in part. Milestone 6
-is made (ADR 0154): all phase work is done in the software; the sew-out
-of the kit (`tools/make-sewout-kit-p21.py`) is open.
+is made (ADR 0154). Milestones 9 to 14 are the owner's later requests
+(2026-11-23 and 24), and they are made (ADR 0155 to 0160). All phase work
+is done in the software: fourteen milestones. The sew-out of the kit
+(`tools/make-sewout-kit-p21.py`) is open. The audit of the phase is in
+the roadmap ("Audit of P21").
 
 ## Goal
 
@@ -139,7 +142,7 @@ own column is cut back, a short column that goes into others only at its
 far end stays, and only a thin band counts as a sliver. The stitch engine
 places a rung point on a rail that passes it two times near the other
 point (Pacifico "P"), and the route cuts a column at one pair (Milestone
-5, step 3).
+5, step 4).
 
 | Bench, ttf (before → after) | Block Sans | Anton | Pacifico | Varsity |
 | --- | --- | --- | --- | --- |
@@ -206,7 +209,8 @@ both pieces, in the letter); other corners and the junctions are made as
 before. The tails of the route must reach the end of the place of the
 letter (`route::TOUCH` 0), so the feet of an "A" are not a tail.
 `trace_side` stays for ends with no outline round them, and
-`tune::extend_ends` stays until the fonts are made again (Milestone 6).
+`tune::extend_ends` stays until the fonts are made again (Milestone 6;
+it stays after that too, with a check on the needle points).
 
 | Bench, ttf (before P21 → after M1 → after M2) | Block Sans | Anton | Pacifico | Varsity |
 | --- | --- | --- | --- | --- |
@@ -222,7 +226,7 @@ letter (`route::TOUCH` 0), so the feet of an "A" are not a tail.
 
 The exit test is met for Anton's bulges (half of before P21) and nearly
 for the notches (2 and 5 are left). It is not met for the rest: the
-spikes are a third to a fifth of before P21 (the target is a tenth), the
+spikes are 33 % to 83 % of before P21 (the target is a tenth), the
 open corners are 8 % to 17 % (the target is 5 %), and the crossing pairs,
 the sides that go back and the bulges of Pacifico are not down enough.
 The pictures show what is left: the tips of very sharp ends, the joints
@@ -359,7 +363,7 @@ no more trims than before the split (48, 49, 54, 56 and 56 at 10, 15,
    and fewer columns on top, and also tries a cut in the middle of a
    column whose two ends lie in other columns (a stem between two
    serifs).
-2. The trims of the split are back: the order that sees the joints keeps
+2. The split adds no trims now: the order that sees the joints keeps
    other runs, and the eight words have 48, 49, 54, 54 and 54 trims (49,
    50, 56, 56 and 56 with the split, 48, 49, 54, 56 and 56 before it).
 3. Travel runs stay in the outline of the letter when the route knows it
@@ -387,7 +391,8 @@ The bench (lettering in the source fonts at 25 mm), before and after:
 | Pacifico | 19 to 10 of 104 (10 %) | 2 to 2 | 0.7 mm to 0.2 mm |
 | Varsity | 85 to 51 of 196 (26 %) | 19 to 20 | 0.2 mm to 0.0 mm |
 
-The exit test is met in part. The trims of the words are back, and the
+The exit test is met in part. The words have the trims of before the
+split again, and the
 runs out of the outline are 0.2 mm or less in each font (short ends at
 the corners of columns). The columns on top are not at 5 %: most of the
 ones that stay are where the needle goes from one column into the next
@@ -873,7 +878,8 @@ font worse. No font below the limit.
 2. Balls: the step of the tuning did not find the balls well (a column
    at the joint of the bowl and the stem of "9"), so it is not in the
    program; the balls have corrections.
-3. Corrections (as routed letters) for 16 letters of seven fonts of the
+3. Corrections (as routed letters) for 17 characters (16 letters and a
+   colon) of seven fonts of the
    packages: Sturdy Serif "k", "3"; Rubik Mono One "A", "3"; Fat Face
    Serif "u", "y"; Compact Heavy "X"; Bookish Slab "S", "9", "r"; Jazz
    Hand "i", "j", "t", "w", ":"; Angular Sans "r", "k". At 25 mm:
@@ -1127,8 +1133,8 @@ program 94.4 on mean (94.5).
 
 ## Exit test of the phase
 
-The exit tests of the six milestones, and the sew-out of Milestone 6
-(with the serif joints of Milestone 9).
+The exit tests of the milestones, and the sew-out of Milestone 6 (with
+the serif joints of Milestone 9).
 
 **State (2026-11-24).** The phase is made: fourteen milestones. The exit
 tests of the milestones are met, or met in part as each section says. The

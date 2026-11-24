@@ -60,7 +60,9 @@ round ends.
 
 `tune::extend_ends` (the ends of the embroidery fonts made longer) and
 `trace_side` stay: the first for Milestone 6 (the fonts are made again),
-the second where a free end has no outline round it.
+the second where a free end has no outline round it. (Milestone 6 kept
+`tune::extend_ends`, with a check on the needle points, and lettering in
+TrueType fonts uses it too: ADR 0154.)
 
 ## Consequences
 

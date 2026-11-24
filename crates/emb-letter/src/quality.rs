@@ -238,7 +238,7 @@ pub struct NeedleFaults {
 }
 
 /// How far `p` is out of `outline` (0 in it).
-fn outside_by(outline: &Outline, p: Point) -> f64 {
+pub fn outside_by(outline: &Outline, p: Point) -> f64 {
     let ring_in = |r: &[Point]| emb_geom::region::ring_contains(r, p);
     if outline.iter().any(|(o, h)| ring_in(o) && !h.iter().any(|h| ring_in(h))) {
         return 0.0;
@@ -250,8 +250,6 @@ fn outside_by(outline: &Outline, p: Point) -> f64 {
         .fold(f64::MAX, f64::min)
 }
 
-/// The needle faults of the columns of `parts` (sewn with the default
-/// satin settings and no pull compensation) against `outline`, both in mm.
 /// The needle points of the columns of `parts` more than [`SPIKE_MM`] out
 /// of the outline, sewn with no pull compensation (P21 Milestone 6: the
 /// tuning of the ends keeps no change that adds one).
@@ -294,6 +292,8 @@ pub fn shortest_stitch(parts: &[ObjectKind]) -> f64 {
         .fold(f64::MAX, f64::min)
 }
 
+/// The needle faults of the columns of `parts` (sewn with the default
+/// satin settings and no pull compensation) against `outline`, both in mm.
 pub fn needle_faults(parts: &[ObjectKind], outline: &Outline) -> NeedleFaults {
     let params = emb_model::SatinParams {
         pull_compensation_mm: 0.0,
@@ -315,10 +315,7 @@ pub fn needle_faults(parts: &[ObjectKind], outline: &Outline) -> NeedleFaults {
         let pr = col.pairs(0.2);
         for w in pr.windows(2) {
             pairs += 1;
-            if let Some((u, v)) = Point::crossing(w[0].0, w[0].1, w[1].0, w[1].1)
-                && (1e-3..=1.0 - 1e-3).contains(&u)
-                && (1e-3..=1.0 - 1e-3).contains(&v)
-            {
+            if emb_stitch::satin::pairs_cross(w[0], w[1]) {
                 cross += 1;
             }
         }

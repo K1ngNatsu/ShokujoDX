@@ -1,7 +1,9 @@
 # ADR 0147: The outline is the edge of a column
 
 Date: 2026-11-23 · Status: Accepted (P21 Milestone 1,
-`docs/design/p21-plan.md`). Replaces decision 3 of ADR 0143.
+`docs/design/p21-plan.md`). Replaces decision 3 of ADR 0143. ADR 0158
+adds to decision 1: a side that swells gets a foot as far as 2.5
+half-widths (`FOOT_FAR`).
 
 ## Context
 
@@ -71,7 +73,7 @@ the letter fault bench (`emb_cli::letter_faults`) showed what this gives:
    `quality::Rail::rung`); before, the first place was taken, and the
    stitches of Pacifico "P" went across its bowl.
 7. **The route cuts a column at one pair** (`quality::cut_column`, P21
-   Milestone 5 step 3, done now because the new rails showed it): both
+   Milestone 5 step 4, done now because the new rails showed it): both
    rails are cut at the pair of stitches nearest the junction, not each
    rail at its own nearest point.
 

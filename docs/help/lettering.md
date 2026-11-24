@@ -103,10 +103,10 @@ Gothic, with the kana and the 2,136 jōyō kanji). Download a package, then
 add it with **File > My Assets > Import a package**. The program downloads
 nothing itself.
 
-Four fonts of earlier versions have a score below 65: Slab Heavy, Fat
-Face Serif, Shrikhand and Great Vibes. They are not in the program now.
-A design that has one of them stays as it is. To change its text, add the
-font package **Fonts of earlier versions**.
+Four fonts of earlier versions are not in the program now: Slab Heavy,
+Fat Face Serif, Shrikhand and Great Vibes. Their score was below 65 when
+they left the program. A design that has one of them stays as it is. To
+change its text, add the font package **Fonts of earlier versions**.
 
 **Convert to embroidery font** makes an embroidery font from a TrueType
 font, with a name, a size range and a stitch type. Check that the license

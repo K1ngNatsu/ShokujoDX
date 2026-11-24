@@ -142,6 +142,12 @@ pub fn ring_signed_area(ring: &[Point]) -> f64 {
     sum / 2.0
 }
 
+/// `true` if `p` is in an odd number of `rings`: in the area of rings that
+/// do not overlap (an outer ring and not a hole of it).
+pub fn rings_contain(rings: &[Vec<Point>], p: Point) -> bool {
+    rings.iter().filter(|r| ring_contains(r, p)).count() % 2 == 1
+}
+
 /// Even-odd point-in-ring test.
 pub fn ring_contains(ring: &[Point], p: Point) -> bool {
     let n = ring.len();
@@ -196,13 +202,13 @@ pub fn intersection(a: &[Region], b: &[Region]) -> Vec<Region> {
     from_multi(&to_multi(a).intersection(&to_multi(b)))
 }
 
-/// Moves the boundary of each region outward by `distance` mm.
-/// A negative distance moves the boundary inward. Regions that become empty are removed.
 /// The areas that are in `a` or in `b`, but not in both.
 pub fn xor(a: &[Region], b: &[Region]) -> Vec<Region> {
     from_multi(&to_multi(a).xor(&to_multi(b)))
 }
 
+/// Moves the boundary of each region outward by `distance` mm.
+/// A negative distance moves the boundary inward. Regions that become empty are removed.
 pub fn offset(regions: &[Region], distance: f64, join: Join) -> Vec<Region> {
     if distance == 0.0 {
         return regions.to_vec();
@@ -275,16 +281,6 @@ fn line_join(join: Join, distance: f64) -> LineJoin<f64> {
     }
 }
 
-/// The rings of the area that `rings` fill with the nonzero rule (the rule
-/// of TrueType and OpenType outlines: a point is inside if the rings wind
-/// round it a number of times that is not 0), with no ring over another:
-/// each outer ring, then its holes.
-///
-/// Many fonts draw a letter as strokes that overlap (all variable fonts,
-/// and the static fonts made from them). Code that reads rings by even-odd
-/// nesting makes a hole of a part where two strokes overlap. If the rings
-/// do not overlap, they come back as they are (the same points), so a font
-/// with clean outlines gives the same shapes as before.
 /// The area that the rings `rings` cover with the nonzero rule, as valid
 /// regions: rings that cross themselves (the outline of a satin column
 /// whose rails cross) or each other become simple outer rings and holes.
@@ -301,20 +297,62 @@ pub fn fill_nonzero(rings: &[Vec<Point>]) -> Vec<Region> {
     if paths.is_empty() {
         return Vec::new();
     }
+    // Where two sides of a ring are nearly on one line (the rails of a
+    // column that lie on each other), the overlay gives rings with no area
+    // and rings with thousands of sides of almost no length. `offset` did
+    // not come back from such a region (the audit of P21: a picture of the
+    // font Webdings stopped the program). A ring with no area is left out,
+    // and a ring with such a side loses the points that are nearer than a
+    // millionth of the size of the rings to the line between the points
+    // that stay.
+    let (size, tiny) = BBox::from_points(rings.iter().flatten().copied()).map_or((0.0, 0.0), |b| {
+        (b.width().max(b.height()), 1e-9 * b.width() * b.height())
+    });
+    let tol = 1e-6 * size;
+    let clean = |r: Vec<Point>| -> Option<Vec<Point>> {
+        let short = (0..r.len()).any(|k| r[k].distance(r[(k + 1) % r.len()]) < tol);
+        let r = if short { thin_ring(&r, tol) } else { r };
+        (r.len() >= 3 && ring_signed_area(&r).abs() > tiny).then_some(r)
+    };
     paths
         .simplify_shape(FillRule::NonZero)
         .into_iter()
         .filter_map(|shape| {
             let mut contours = shape
                 .into_iter()
-                .map(|c| c.into_iter().map(|q| Point::new(q[0], q[1])).collect::<Vec<Point>>())
-                .filter(|r| r.len() >= 3);
-            let outer = contours.next()?;
-            Some(Region::new(outer, contours.collect()))
+                .map(|c| c.into_iter().map(|q| Point::new(q[0], q[1])).collect::<Vec<Point>>());
+            let outer = clean(contours.next()?)?;
+            Some(Region::new(outer, contours.filter_map(clean).collect()))
         })
         .collect()
 }
 
+/// The closed ring `ring` with no point that is nearer than `tol` to the
+/// line between the points that stay (`path::simplify` from its first point
+/// to the point farthest from it, and back).
+fn thin_ring(ring: &[Point], tol: f64) -> Vec<Point> {
+    let n = ring.len();
+    let Some(far) = (1..n).max_by(|&i, &j| ring[i].distance(ring[0]).total_cmp(&ring[j].distance(ring[0]))) else {
+        return ring.to_vec();
+    };
+    let mut out = crate::path::simplify(&ring[..=far], tol);
+    let mut back: Vec<Point> = ring[far..].to_vec();
+    back.push(ring[0]);
+    let back = crate::path::simplify(&back, tol);
+    out.extend_from_slice(&back[1..back.len() - 1]);
+    out
+}
+
+/// The rings of the area that `rings` fill with the nonzero rule (the rule
+/// of TrueType and OpenType outlines: a point is inside if the rings wind
+/// round it a number of times that is not 0), with no ring over another:
+/// each outer ring, then its holes.
+///
+/// Many fonts draw a letter as strokes that overlap (all variable fonts,
+/// and the static fonts made from them). Code that reads rings by even-odd
+/// nesting makes a hole of a part where two strokes overlap. If the rings
+/// do not overlap, they come back as they are (the same points), so a font
+/// with clean outlines gives the same shapes as before.
 pub fn without_overlaps(rings: &[Vec<Point>]) -> Vec<Vec<Point>> {
     use i_overlay::core::fill_rule::FillRule;
     use i_overlay::float::simplify::SimplifyShape;
@@ -498,6 +536,40 @@ mod tests {
             let m = dist_to_square(a.midpoint(b));
             assert!(m >= d - DEFAULT_FLATTEN_TOLERANCE_MM && m <= d + 1e-6, "{m}");
         }
+    }
+
+    /// Two sides of a ring that lie nearly on each other (the rails of a
+    /// column with no width, the audit of P21): the filled area has no
+    /// ring with no area and no sides of almost no length, and `offset`
+    /// comes back.
+    #[test]
+    fn a_ring_with_two_sides_on_one_line_gives_a_clean_area() {
+        // A square with a tail of no width: out along a line and back
+        // along it, with each point a millionth of a unit off the line.
+        let off = |k: usize| 2e-7 * (((k * 7919) % 13) as f64 - 6.0);
+        let mut ring = vec![Point::new(0.0, 0.0), Point::new(100.0, 0.0)];
+        let n = 300;
+        for k in 0..=n {
+            ring.push(Point::new(100.0 + 300.0 * k as f64 / n as f64, 50.0 + off(k)));
+        }
+        for k in (0..n).rev() {
+            ring.push(Point::new(
+                100.0 + 300.0 * (k as f64 + 0.5) / n as f64,
+                50.0 + off(k + 5),
+            ));
+        }
+        ring.extend([Point::new(100.0, 100.0), Point::new(0.0, 100.0)]);
+        let area = fill_nonzero(&[ring]);
+        assert_eq!(area.len(), 1, "{} regions", area.len());
+        assert!(area[0].holes.is_empty());
+        // The square, and the small corner where the tail comes back.
+        assert!((area[0].area() - 10_012.5).abs() < 1.0, "{}", area[0].area());
+        let short = (0..area[0].outer.len())
+            .filter(|&k| area[0].outer[k].distance(area[0].outer[(k + 1) % area[0].outer.len()]) < 1e-3)
+            .count();
+        assert_eq!(short, 0, "{} points", area[0].outer.len());
+        let grown = offset(&area, 1.0, Join::Miter);
+        assert_eq!(grown.len(), 1);
     }
 
     #[test]
