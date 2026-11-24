@@ -986,7 +986,7 @@ mod tests {
             ("serif", 6),
             ("script", 12),
             ("hand", 8),
-            ("earlier", 4),
+            ("earlier", 1),
         ] {
             let path = dir.join(format!("shokujodx-fonts-{name}.zip"));
             let bytes = std::fs::read(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
@@ -1014,8 +1014,9 @@ mod tests {
                 // A font keeps its place when a change of the converter
                 // changes its score (ADR 0116): a font of a package can
                 // have a score of BUNDLE or more, and a font of earlier
-                // versions can have any score (P21 Milestone 6: Fat Face
-                // Serif has 87 now; the owner decides if it comes back).
+                // versions can have any score (after P21 the owner brought
+                // back the three that had more than 85; Great Vibes, 75,
+                // stays).
                 if name == "earlier" {
                     assert!(emb_letter::bundled::EARLIER.contains(&font.family.as_str()), "{file}");
                 } else {
@@ -1030,7 +1031,7 @@ mod tests {
                 families.push(font.family.clone());
             }
         }
-        assert_eq!(families.len(), 72);
+        assert_eq!(families.len(), 69);
         assert!(
             emb_letter::bundled::EARLIER
                 .iter()

@@ -10,6 +10,26 @@ Este tema enumera los cambios de cada versión, la más reciente primero.
 **Ayuda > Novedades** lo abre. Después de una actualización, la página
 de inicio tiene un enlace a él.
 
+## La próxima versión
+
+Estos cambios todavía no están en una versión publicada.
+
+**Letras que mantienen la forma de la fuente.** El programa crea mejores
+letras a partir de las fuentes TrueType y OpenType, y las fuentes de
+bordado se han creado de nuevo con ello. Las puntadas de una columna se
+quedan dentro del contorno de la letra, los extremos de las columnas
+llegan a las esquinas de los trazos, y las puntadas que cruzan una
+columna no se cruzan entre sí. Donde dos trazos se juntan en una
+esquina, uno sigue hasta la esquina exterior y el otro termina recto en
+su lado. Una columna que termina en otra columna se borda antes que
+ella.
+
+**Tres fuentes vuelven.** El programa tiene 68 fuentes de bordado. Slab
+Heavy, Fat Face Serif y Shrikhand están de nuevo en el programa: con las
+mejores letras, su puntuación de calidad es 87, 91 y 95. Great Vibes
+sigue en el paquete de fuentes **Fonts of earlier versions**. Fat Face
+Serif tiene trazos muy finos, por eso su tamaño más pequeño es 42,5 mm.
+
 ## Versión 0.4.0
 
 **La vista de producto.** **Diseño > Producto** muestra el diseño sobre

@@ -140,6 +140,13 @@ fn embroidery_fonts_8() {
     golden("embroidery-fonts-8");
 }
 
+/// Three fonts of earlier versions, back in the program after the audit of
+/// P21 (Slab Heavy, Fat Face Serif, Shrikhand).
+#[test]
+fn embroidery_fonts_9() {
+    golden("embroidery-fonts-9");
+}
+
 /// Items of the content families (ADR 0118).
 #[test]
 fn content_families() {

@@ -10,6 +10,25 @@ Dieses Thema listet die Änderungen jeder Version, die neueste zuerst.
 **Hilfe > Was ist neu** öffnet es. Nach einem Update hat die Startseite
 einen Link dazu.
 
+## Die nächste Version
+
+Diese Änderungen sind noch in keiner Veröffentlichung.
+
+**Buchstaben, die die Form der Schrift behalten.** Das Programm macht
+bessere Buchstaben aus TrueType- und OpenType-Schriften, und die
+Stickschriften sind damit neu gemacht. Die Stiche einer Säule bleiben im
+Umriss des Buchstabens, die Enden der Säulen gehen bis in die Ecken der
+Striche, und die Stiche quer über eine Säule kreuzen sich nicht. Wo zwei
+Striche sich in einer Ecke treffen, geht einer bis zur äußeren Ecke, und
+der andere endet gerade an seiner Seite. Eine Säule, die in einer
+anderen Säule endet, wird vor ihr gestickt.
+
+**Drei Schriften sind zurück.** Das Programm hat 68 Stickschriften. Slab
+Heavy, Fat Face Serif und Shrikhand sind wieder im Programm: mit den
+besseren Buchstaben haben sie eine Qualitätswertung von 87, 91 und 95.
+Great Vibes bleibt im Schriftpaket **Fonts of earlier versions**. Fat
+Face Serif hat sehr dünne Striche, darum ist ihre kleinste Größe 42,5 mm.
+
 ## Version 0.4.0
 
 **Die Produktansicht.** **Design > Produkt** zeigt das Design auf einem

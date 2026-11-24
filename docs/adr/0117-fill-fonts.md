@@ -82,5 +82,6 @@ a score of 50: the score counted each fill letter as half a letter
 - The local width is in steps of 0.5 mm at the design size (25 mm), so
   the start of the range of a font with thin strokes is coarse.
 - The program has 65 embroidery fonts. The corpus design
-  `embroidery-fonts-8` shows the fill fonts.
+  `embroidery-fonts-8` shows the fill fonts. (After the audit of P21: 68,
+  with three fonts of earlier versions before the fill fonts; ADR 0115.)
 - No sew-out confirms the fill fonts.

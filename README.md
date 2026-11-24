@@ -57,7 +57,7 @@ ShokujoDX makes the stitches and writes the file for your machine.
   buttonholes and decorative borders.
 
 **Lettering**
-- 65 embroidery fonts, each with a quality score, and more in font
+- 68 embroidery fonts, each with a quality score, and more in font
   packages; plus the TrueType and OpenType fonts of your computer.
 - Text shaping: ligatures, the joined letters of script fonts, Arabic and
   Devanagari.

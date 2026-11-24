@@ -10,6 +10,24 @@ This topic lists the changes of each version, the newest first.
 **Help > What Is New** opens it. After an update, the start page has a
 link to it.
 
+## The next version
+
+These changes are not in a release yet.
+
+**Letters that keep the shape of the font.** The program makes better
+letters from TrueType and OpenType fonts, and the embroidery fonts are
+made again with it. The stitches of a column stay in the outline of the
+letter, the ends of the columns go to the corners of the strokes, and
+the stitches across a column do not cross. Where two strokes meet at a
+corner, one goes on to the outer corner and the other ends square on its
+side. A column that ends in another column sews before it.
+
+**Three fonts are back.** The program has 68 embroidery fonts. Slab
+Heavy, Fat Face Serif and Shrikhand are back in the program: with the
+better letters, their quality score is 87, 91 and 95. Great Vibes stays
+in the font package **Fonts of earlier versions**. Fat Face Serif has
+very thin strokes, so its smallest size is 42.5 mm.
+
 ## Version 0.4.0
 
 **The product view.** **Design > Product** shows the design on a product

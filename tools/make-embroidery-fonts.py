@@ -110,6 +110,12 @@ FONTS = [
     ("barlow-condensed", "Barlow Condensed", "barlowcondensed", "BarlowCondensed-Bold.ttf", False, None),
     ("angle-sans", "Angle Sans", "quantico", "Quantico-Bold.ttf", False, None),
     ("balsamiq-sans", "Balsamiq Sans", "balsamiqsans", "BalsamiqSans-Bold.ttf", False, None),
+    # Three fonts of earlier versions, back in the program after the audit
+    # of P21 (the owner's choice of 2026-11-24: the fonts of the package
+    # "earlier" with a score over 85; ADR 0116).
+    ("slab-heavy", "Slab Heavy", "alfaslabone", "AlfaSlabOne-Regular.ttf", False, None),
+    ("fat-face-serif", "Fat Face Serif", "abrilfatface", "AbrilFatface-Regular.ttf", False, None),
+    ("shrikhand", "Shrikhand", "shrikhand", "Shrikhand-Regular.ttf", False, None),
     # The fill fonts (ADR 0117, see FILL): the same source fonts as the
     # fonts with their names, with all letters as fills.
     ("block-sans-fill", "Block Sans Fill", "repo", "Lato-Bold.ttf", False, None),
@@ -191,12 +197,11 @@ FONTS = [
     ("pattaya", "Pattaya", "pattaya", "Pattaya-Regular.ttf", False, "script"),
     ("display-heavy", "Display Heavy", "coda", "Coda-ExtraBold.ttf", False, "display"),
     ("allura", "Allura", "allura", "Allura-Regular.ttf", False, "script"),
-    # Fonts of earlier versions of the program with a score below the limit
-    # (ADR 0115). They are not in the program now. The package lets a user
-    # change a design that has them; the tool does not stop for them.
-    ("slab-heavy", "Slab Heavy", "alfaslabone", "AlfaSlabOne-Regular.ttf", False, "earlier"),
-    ("fat-face-serif", "Fat Face Serif", "abrilfatface", "AbrilFatface-Regular.ttf", False, "earlier"),
-    ("shrikhand", "Shrikhand", "shrikhand", "Shrikhand-Regular.ttf", False, "earlier"),
+    # A font of earlier versions of the program that had a score below the
+    # limit when it left the program (ADR 0115). The package lets a user
+    # change a design that has it; the tool does not stop for it. Slab
+    # Heavy, Fat Face Serif and Shrikhand were here too; they are back in
+    # the program (above).
     ("great-vibes", "Great Vibes", "greatvibes", "GreatVibes-Regular.ttf", False, "earlier"),
     # Japanese fonts (P20 Milestone 6, ADR 0146): Latin letters, the kana
     # and the 2,136 jōyō kanji. Their names have no Reserved Font Name
@@ -232,8 +237,8 @@ PACKS = [
     (
         "earlier",
         "Fonts of earlier versions",
-        "Fonts that were in the program before version 0.4. Their quality score was below the limit "
-        "of the program when they left it. Use them to change a design that has them.",
+        "A font that was in the program before version 0.4. Its quality score was below the limit "
+        "of the program when it left it. Use it to change a design that has it.",
     ),
 ]
 # The package whose fonts can be below the limit.

@@ -1,6 +1,8 @@
 # ADR 0115: Quality score of embroidery fonts, and font packages
 
-Date: 2026-11-18 · Status: Accepted (ADR 0119 adds two measures to the score)
+Date: 2026-11-18 · Status: Accepted (ADR 0119 adds two measures to the score;
+after the audit of P21, three of the four fonts of earlier versions are
+back in the program)
 
 ## Context
 
@@ -163,3 +165,13 @@ show the score, one sentence about what it says, and the three measures.
   yet (the next tag runs it).
 - A user of an earlier version who used one of the four fonts must add a
   package to change the text of that lettering.
+- After the audit of P21 (2026-11-24) the four fonts of earlier versions
+  had 87 (Slab Heavy), 91 (Fat Face Serif), 95 (Shrikhand) and 75 (Great
+  Vibes): the letter shapes of P21 changed their letters, and each font
+  kept its place (ADR 0116). The owner brought back the fonts with a
+  score over 85. The program has 68 embroidery fonts: the three come
+  before the fill fonts (`bundled::P21_EMBROIDERY`, the corpus design
+  `embroidery-fonts-9`), so `bundled::P17_EMBROIDERY` is 58. Great Vibes
+  stays in the package "Fonts of earlier versions" (`bundled::EARLIER`).
+  Fat Face Serif has very thin strokes: its columns are from 42.5 mm,
+  and its fill letters from 43 mm.

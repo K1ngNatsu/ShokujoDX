@@ -68,7 +68,7 @@ shortcut, for example `"ShokujoDX.exe" --kiosk`.
 
 - **Monogram** makes two or three letters with a border and ornaments.
 - **Team Names** makes one design with a different name in each copy.
-- **Fonts** opens the font list (65 embroidery fonts come with the
+- **Fonts** opens the font list (68 embroidery fonts come with the
   program, each with a quality score). Convert a TrueType or OpenType font to an embroidery font
   there.
 

@@ -346,6 +346,14 @@ documents.
   wider in German and in Spanish than in English (the label of Simple
   mode is long); it fits the screen.
 
+**The owner's choice after the audit.** The fonts of earlier versions
+with a score over 85 come back into the program: Slab Heavy (87), Fat
+Face Serif (91) and Shrikhand (95). The program has 68 embroidery fonts;
+Great Vibes (75) stays in the package "Fonts of earlier versions". The
+three come before the fill fonts, and the corpus design
+`embroidery-fonts-9` shows them (ADR 0115). Their font files are the files
+of the package, made again with the code of the audit.
+
 **Exit tests.** The software parts are met or met in part, as the plan
 says for each milestone; the sew-out is open. The kit `out/p21-sewout`
 has the fonts of Milestone 14. The audit changed no font: seven fonts
