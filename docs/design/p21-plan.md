@@ -907,6 +907,67 @@ crossing pairs, Varsity 18 to 15 trims with 55 to 63 column ends on top.
 The exit test is met for the corrected letters (Fat Face Serif "y" keeps
 6 crossing pairs at the curl of its tail, fewer than before).
 
+## Milestone 11: column ends on the outline, and balls (M)
+
+**Why.** Milestone 10 left three items open (2026-11-23): the cause of
+the ends that went out of the square dots of Jazz Hand, balls at the
+ends of strokes found by the program (not by corrections), and the size
+range, which counts the pointed ends of columns as narrow (the score
+does not). The owner asked to finish them in order (ADR 0157).
+
+**Steps.**
+
+1. The cause of the ends out of the dots, and a fix in the stroke
+   finder.
+2. Balls: a cut in the split where a stroke meets a ball, and columns to
+   the edge of the ball, with stitches that lie as the last stitches of
+   the stroke where that covers the ball (the owner's request).
+3. The size range: leave out the pointed ends if the fonts sew no worse
+   at their new smallest sizes.
+4. All fonts made again; the corrections that the program no longer
+   needs go.
+
+**Exit test.** Jazz Hand "i" and "j" and Bookish Slab "S", "9" and "r"
+as good as their corrections with no corrections; the letter fault bench
+and the lettering bench of P20 no worse.
+
+**Made (2026-11-23, ADR 0157).**
+
+1. The cause of the ends out of the dots: the middle line of a square
+   dot is a diagonal that ended a part of a cell out of the dot, and a
+   ray from a point out of the outline, or on it, meets nothing there,
+   so the side took the full width out of the letter. The middle line
+   now ends on the outline, and a side from a point on the outline has
+   no width out of it. The same fault made most of the needle points out
+   of the outline in the fault bench.
+2. Balls: a cut in the split of Latin letters where a stroke meets a
+   ball at a concave corner that is not a notch; the column of a dot or
+   a ball has free ends; a ball's column goes on in the direction of its
+   stroke where that covers it (Bookish Slab "S" and "9"; "r" keeps its
+   own column).
+3. The size range keeps the pointed ends: without them, 15 fonts would
+   get a smallest size 0.5 to 3 mm smaller, where 2 to 9 % of their
+   columns are too narrow, and scores about 5 to 15 points lower.
+4. The corrections of Jazz Hand "i", "j" and Bookish Slab "S", "9", "r"
+   go; the colon of Jazz Hand keeps its correction.
+
+The letter fault bench at 25 mm (embroidery fonts / lettering):
+
+| Font | Spikes | Bare points | Crossing pairs | Open area | Trims |
+| --- | --- | --- | --- | --- | --- |
+| Block Sans | 2 / 2 to 2 / 2 | 14 / 14 to 14 / 14 | 12 / 12 to 11 / 12 | 0.15 % / 0.12 % to 0.14 % / 0.11 % | 2 / 2 to 2 / 2 |
+| Anton | 16 / 17 to 3 / 4 | 24 / 24 to 10 / 10 | 20 / 19 to 19 / 14 | 1.08 % / 1.06 % to 1.09 % / 1.07 % | 2 / 2 to 2 / 2 |
+| Pacifico | 28 / 29 to 3 / 3 | 47 / 47 to 9 / 9 | 15 / 14 to 12 / 10 | 0.27 % / 0.23 % to 0.26 % / 0.23 % | 2 / 2 to 2 / 2 |
+| Varsity | 0 / 0 to 0 / 0 | 2 / 2 to 0 / 0 | 4 / 3 to 7 / 6 | 0.06 % / 0.03 % to 0.06 % / 0.03 % | 15 / 15 to 15 / 15 |
+
+Bookish Slab as lettering, open area: "S" 4.5 to 0.2 mm2, "9" 2.7 to
+0.3, "r" 2.9 to 0.3, "j" 1.2 to 0.1. The fonts: 34,070 trims in the
+letters (33,966; Zen Maru Gothic 91 more: columns that touched the next
+stroke only with stitches out of the outline need a trim now); the
+column fonts of the program 94.3 on mean (94.2). The exit test is met;
+the lettering bench of P20 has fewer stitches out of the outline and 1
+more trim in 刺繍 at 10, 15 and 25 mm and in 龍 at 10 mm.
+
 ## Exit test of the phase
 
 The exit tests of the six milestones, and the sew-out of Milestone 6
@@ -923,12 +984,14 @@ comes first, as the measure of each milestone. The bundled fonts are made
 again only in Milestone 6, so the sew-outs of the older milestones use
 lettering in the TrueType fonts. Milestone 9 (the owner's request of
 2026-11-23, after Milestone 6) makes the fonts again before the
-sew-out, and Milestone 10 (the owner's request after Milestone 9) too.
+sew-out, and Milestones 10 and 11 (the owner's requests after Milestone
+9) too.
 
 ## Not in this phase
 
 - New fonts, and letter corrections by hand (apart from the letters of
-  Milestone 10, the owner's request).
+  Milestone 10, the owner's request; Milestone 11 took five of them
+  back).
 - The fill letters, and the stitch engine of fills.
 - Japanese characters as a target: the lettering bench of P20 shows the
   changes there, and they are checked with it. Milestone 8 is the one

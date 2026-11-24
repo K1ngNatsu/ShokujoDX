@@ -54,6 +54,11 @@ const PRUNE: f64 = 1.6;
 /// 1.4; a serif on the two sides of a stem is not a branch: the stem went
 /// across it, with stitches twice as long).
 const PIECE_PRUNE: f64 = 1.8;
+/// The column of a ball in the direction of its stroke may cover this
+/// much less of the ball than its own column (ADR 0157): the strip at the
+/// cut that the column of the stroke covers (1 to 3 %), not the side of a
+/// ball that hangs to a side of its stroke (11 % in Bookish Slab "r").
+const BALL_COVER_LOSS: f64 = 0.03;
 const PIECE_COVER_LOSS: f64 = 0.003;
 const PIECE_WIDER: f64 = 1.5;
 /// A piece of a stroke shorter than this many half-widths of another stroke
@@ -1310,7 +1315,11 @@ pub(crate) fn strokes_split_soft(rings: &[Vec<Point>], cap_height: f64, split: S
     if split != Split::Off
         && let Some(s) = crate::split::split(rings, cap_height, split == Split::Notches, soft)
     {
-        let parts: Vec<(Strokes, f64)> = s.pieces.iter().map(|p| (piece(&p.rings, cap_height), p.area)).collect();
+        let parts: Vec<(Strokes, f64)> = s
+            .pieces
+            .iter()
+            .map(|p| (piece(&p.rings, cap_height, p.axis), p.area))
+            .collect();
         return (merged(parts), s.soft);
     }
     (whole(rings, cap_height), false)
@@ -1341,13 +1350,24 @@ fn merged(parts: Vec<(Strokes, f64)>) -> Strokes {
 /// bracket of a serif, its middle line forks at the end, and the branches
 /// can be longer than side branches: with the branches of ends cut back as
 /// far as [`PIECE_PRUNE`] times the usual length, the piece keeps fewer
-/// columns if they cover it as well.
-fn piece(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
-    let s = whole_with(rings, cap_height, 1.0);
+/// columns if they cover it as well. A ball cut from its stroke (`axis`,
+/// ADR 0157) is one column in that direction, so its stitches lie as the
+/// last stitches of the stroke, if that covers it as well as its column
+/// of before (a ball that hangs to a side of its stroke does not).
+fn piece(rings: &[Vec<Point>], cap_height: f64, axis: Option<Point>) -> Strokes {
+    let s = whole_with(rings, cap_height, 1.0, None);
+    if let Some(u) = axis {
+        let along = whole_with(rings, cap_height, 1.0, Some(u));
+        return if along.coverage >= s.coverage - BALL_COVER_LOSS {
+            along
+        } else {
+            s
+        };
+    }
     if s.satins.len() < 2 {
         return s;
     }
-    let t = whole_with(rings, cap_height, PIECE_PRUNE);
+    let t = whole_with(rings, cap_height, PIECE_PRUNE, None);
     // The longest line across a column (a stitch).
     let widest = |x: &Strokes| {
         x.satins
@@ -1367,12 +1387,12 @@ fn piece(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
 
 /// The stroke finder on a whole shape.
 fn whole(rings: &[Vec<Point>], cap_height: f64) -> Strokes {
-    whole_with(rings, cap_height, 1.0)
+    whole_with(rings, cap_height, 1.0, None)
 }
 
 /// [`whole`] with side branches pruned up to `prune` times the usual
-/// length.
-fn whole_with(rings: &[Vec<Point>], cap_height: f64, prune: f64) -> Strokes {
+/// length. With `axis`, each part is one column in that direction (a ball).
+fn whole_with(rings: &[Vec<Point>], cap_height: f64, prune: f64, axis: Option<Point>) -> Strokes {
     let Some(bb) = BBox::from_points(rings.iter().flatten().copied()) else {
         return Strokes::default();
     };
@@ -1420,12 +1440,12 @@ fn whole_with(rings: &[Vec<Point>], cap_height: f64, prune: f64) -> Strokes {
             r.pts
                 .iter()
                 .find_map(|&p| part_of(p))
-                .is_none_or(|l| part_len[l] >= 1.2 * part_r[l])
+                .is_none_or(|l| axis.is_none() && part_len[l] >= 1.2 * part_r[l])
         })
         .collect();
     for l in 0..count {
-        if part_len[l] < 1.2 * part_r[l] {
-            raws.push(long_axis(&g, &label, l, part_r[l]));
+        if axis.is_some() || part_len[l] < 1.2 * part_r[l] {
+            raws.push(long_axis(&g, &label, l, part_r[l], axis));
         }
     }
 
@@ -1700,8 +1720,10 @@ fn whole_with(rings: &[Vec<Point>], cap_height: f64, prune: f64) -> Strokes {
     out
 }
 
-/// A stroke through a part of the shape along its long axis (for dots).
-fn long_axis(g: &Grid, label: &[usize], l: usize, r: f64) -> Raw {
+/// A stroke through a part of the shape along its long axis (for dots), or
+/// in the direction `dir` (a ball, so its stitches lie as the stitches of
+/// its stroke).
+fn long_axis(g: &Grid, label: &[usize], l: usize, r: f64, dir: Option<Point>) -> Raw {
     let cells: Vec<Point> = (0..label.len())
         .filter(|&k| label[k] == l)
         .map(|k| g.center_of(k))
@@ -1716,7 +1738,7 @@ fn long_axis(g: &Grid, label: &[usize], l: usize, r: f64) -> Raw {
         sxy += d.x * d.y;
     }
     let angle = 0.5 * emb_geom::math::atan2(2.0 * sxy, sxx - syy);
-    let u = Point::new(emb_geom::math::cos(angle), emb_geom::math::sin(angle));
+    let u = dir.unwrap_or(Point::new(emb_geom::math::cos(angle), emb_geom::math::sin(angle)));
     let (lo, hi) = cells
         .iter()
         .map(|p| (*p - c).dot(u))
@@ -1726,7 +1748,9 @@ fn long_axis(g: &Grid, label: &[usize], l: usize, r: f64) -> Raw {
     Raw {
         pts: (0..=steps).map(|i| a.lerp(b, i as f64 / steps as f64)).collect(),
         closed: false,
-        free: [false, false],
+        // The ends of a dot (or of a ball cut from its stroke) are free:
+        // the rails go round to the edge (P21 Milestone 11).
+        free: [true, true],
         meets: [false, false],
         r_fix: Some(r),
     }
@@ -2118,9 +2142,12 @@ fn side_rail(
             (Some(k), None) | (None, Some(k)) => pts[i] + d * width(k),
             (None, None) => pts[i] + d * radius_at(pts[i]),
         };
-        // Not past the outline.
+        // Not past the outline. From a middle point on the outline (the
+        // end of the middle line at a corner), a side that goes out of the
+        // outline at once has no width.
         let len = (p - pts[i]).length();
-        if let Some(t) = ray(pts[i], d, len, segs).filter(|t| *t < len) {
+        let t = room(pts[i], d, len, segs, outline, cell);
+        if t < len {
             p = pts[i] + d * t;
         }
         out[i] = Some(p);
@@ -2394,6 +2421,73 @@ fn in_outline(ext: &[Point], outline: &Rings, segs: &[(Point, Point)]) -> Vec<Po
     out
 }
 
+/// How far a side of a column can go from the point `p` in the direction
+/// `d`, at most `h`: to the outline, and 0 if the side goes out of the
+/// outline at once (`p` on the outline: an end at a corner). A ray from a
+/// point on the outline does not meet it, so it gave the full width out of
+/// the letter (P21 Milestone 11).
+fn room(p: Point, d: Point, h: f64, segs: &[(Point, Point)], outline: &Rings, cell: f64) -> f64 {
+    if h <= 0.0 {
+        return 0.0;
+    }
+    let step = (0.25 * cell).min(0.5 * h);
+    let t = ray(p, d, h, segs).unwrap_or(h);
+    // A ray from a point on the outline meets the next part of the letter
+    // (the stem under a dot), or nothing.
+    if t > step && outline.rings.iter().filter(|r| ring_contains(r, p + d * step)).count() % 2 == 0 {
+        0.0
+    } else {
+        t
+    }
+}
+
+/// The middle line `pts` (with the flags `flags` of its points) ends on
+/// the outline at each end: the points out of the outline at an end go,
+/// and the place where the line leaves the outline is its end. The walk on
+/// the grid can end a part of a cell past a sharp corner (the middle line
+/// of a square dot is a diagonal), and the rail of a point out of the
+/// outline is not stopped by the outline: it went out of the dot (P21
+/// Milestone 11).
+fn clip_ends(pts: &mut Vec<Point>, flags: &mut Vec<bool>, outline: &Rings, segs: &[(Point, Point)]) {
+    let inside = |p: Point| outline.rings.iter().filter(|r| ring_contains(r, p)).count() % 2 == 1;
+    // Where the line from the point `p` in the outline to `q` out of it
+    // meets the outline.
+    let exit = |p: Point, q: Point| {
+        let u = segs
+            .iter()
+            .filter_map(|&(c, d)| Point::crossing(p, q, c, d).map(|(u, _)| u))
+            .fold(1.0f64, f64::min);
+        p.lerp(q, u)
+    };
+    let Some(first) = pts.iter().position(|&p| inside(p)) else {
+        return;
+    };
+    let last = pts.iter().rposition(|&p| inside(p)).unwrap_or(first);
+    if last <= first {
+        return;
+    }
+    if last + 1 < pts.len() {
+        let end = exit(pts[last], pts[last + 1]);
+        let flag = flags[last + 1];
+        pts.truncate(last + 1);
+        flags.truncate(last + 1);
+        if end.distance(pts[last]) > 1e-9 {
+            pts.push(end);
+            flags.push(flag);
+        }
+    }
+    if first > 0 {
+        let start = exit(pts[first], pts[first - 1]);
+        let flag = flags[first - 1];
+        pts.drain(..first);
+        flags.drain(..first);
+        if start.distance(pts[0]) > 1e-9 {
+            pts.insert(0, start);
+            flags.insert(0, flag);
+        }
+    }
+}
+
 fn rails(
     piece: &Piece,
     r_med: f64,
@@ -2434,6 +2528,9 @@ fn rails(
         let tail = in_outline(&resample(&piece.pts[piece.ext[1] - 1..], false, step), outline, segs);
         pts.extend_from_slice(&tail[1.min(tail.len())..]);
         is_ext.extend(std::iter::repeat_n(true, tail.len().saturating_sub(1)));
+    }
+    if !piece.closed {
+        clip_ends(&mut pts, &mut is_ext, outline, segs);
     }
     let n = pts.len();
     if n < 2 {
@@ -2501,8 +2598,8 @@ fn rails(
         if is_ext[i] {
             // The held width, but not past the outline (a pointed end narrows).
             let (hp, hm) = if i < first { half[first] } else { half[last] };
-            let hp = ray(pts[i], nrm[i], hp, segs).unwrap_or(hp);
-            let hm = ray(pts[i], -nrm[i], hm, segs).unwrap_or(hm);
+            let hp = room(pts[i], nrm[i], hp, segs, outline, cell);
+            let hm = room(pts[i], -nrm[i], hm, segs, outline, cell);
             half[i] = (hp.max(0.25 * cell), hm.max(0.25 * cell));
         }
     }
@@ -3067,6 +3164,31 @@ fn trim_ends(columns: &mut [Rails]) {
 
 #[cfg(test)]
 mod tests {
+    /// A square dot (Jazz Hand "i"): its middle line is a diagonal that
+    /// ends at two corners. No rail point is out of the dot (P21
+    /// Milestone 11: the ends went 2.6 mm out of it).
+    #[test]
+    fn a_square_dot_stays_in_its_outline() {
+        let dot: Vec<Point> = [(4.1, -34.81), (10.07, -34.12), (9.54, -28.14), (3.57, -28.89)]
+            .iter()
+            .map(|&(x, y)| Point::new(x, y))
+            .collect();
+        let s = strokes(std::slice::from_ref(&dot), 25.0);
+        assert!(!s.satins.is_empty());
+        let segs: Vec<(Point, Point)> = (0..4).map(|k| (dot[k], dot[(k + 1) % 4])).collect();
+        for g in &s.satins {
+            for rail in [&g.rail_a, &g.rail_b] {
+                for p in rail.flatten(0.05).iter().flat_map(|l| l.points.clone()) {
+                    let off = segs
+                        .iter()
+                        .map(|&(a, b)| p.distance_to_segment(a, b))
+                        .fold(f64::MAX, f64::min);
+                    assert!(ring_contains(&dot, p) || off < 0.05, "{p:?} is {off} mm out of the dot");
+                }
+            }
+        }
+    }
+
     #[test]
     fn an_extension_stops_at_the_outline() {
         let square = vec![

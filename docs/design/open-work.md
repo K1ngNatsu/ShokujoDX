@@ -63,16 +63,11 @@ machines and systems.
 | Clipart sets with more detail, by theme, as asset packages | Shelved (owner, 2026-11-19) | Lane 8 of the review of P17 |
 | A bundled Ink/Stitch font | Needs a font with a license that permits it (the owner chose a test only) | P18 Milestone 6 |
 
-### Letter shapes (after P21 Milestone 10)
+### Letter shapes (after P21 Milestone 11)
 
-- The stroke finder gives a square dot (Jazz Hand "i", "j", ":") ends
-  that go out of the dot; the letters have corrections, the cause is
-  open (ADR 0156).
-- Balls at the ends of strokes in the stroke finder (a trial of a step
-  of the tuning did not find them well; Bookish Slab "S", "9" and "r"
-  have corrections).
-- The size range of a font (`EmbFont::fit_size_range`) still counts the
-  pointed ends of columns as narrow; the score does not.
+- A dot with the shape of a "D" (the colon of Jazz Hand): the middle line
+  goes to a corner, and the column skips a corner of the dot. The colon
+  has a correction (ADR 0157).
 
 ### Japanese lettering (after P20)
 

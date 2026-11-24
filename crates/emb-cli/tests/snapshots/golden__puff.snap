@@ -7,6 +7,6 @@ jumps: 6
 trims: 6
 colors: 1
 extents: x -60.0 .. 60.0, y -40.0 .. 40.0 (size 120.0 x 80.0 mm)
-longest stitch: 6.29 mm
+longest stitch: 6.60 mm
 threads: #c81e28
-fingerprint: aca163734e993331
+fingerprint: 9b537eaad04137aa
