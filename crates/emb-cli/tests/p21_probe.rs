@@ -875,7 +875,10 @@ fn probe_p21_stitch_files() {
 
 /// The time of the steps of each glyph of one font (`EMB_FONT=<file>`,
 /// `EMB_FONT_TEXT=<characters>`): the outline, the stroke finder with no
-/// split and with the split, and the route.
+/// split and with the split, and the route, with a hash of each route (a
+/// change of the route that must not change the letters keeps the hashes).
+/// The step that runs shows on stderr, so a glyph that does not end shows
+/// where it stops.
 #[test]
 #[ignore]
 fn probe_p21_font_times() {
@@ -947,15 +950,23 @@ fn probe_p21_font_times() {
         let split = t.elapsed();
         now("route");
         let t = Instant::now();
-        let parts = font.route(g).map_or(0, |r| r.len());
+        let routed = font.route(g);
         let route = t.elapsed();
+        let parts = routed.as_ref().map_or(0, |r| r.len());
+        // A hash of the routed parts: the same route gives the same hash.
+        let hash = {
+            use std::hash::{Hash, Hasher};
+            let mut h = std::collections::hash_map::DefaultHasher::new();
+            format!("{routed:?}").hash(&mut h);
+            h.finish()
+        };
         now("route with no split");
         let t = Instant::now();
         let plain_parts = route_of(&plain, &rings);
         let plain_route = t.elapsed();
         eprint!("\r");
         println!(
-            "{c}: {} points, {} columns ({} with no split), {parts} parts ({plain_parts}); outline {outline:.1?}, no split {no_split:.1?}, split {split:.1?}, route {route:.1?}, route with no split {plain_route:.1?}",
+            "{c}: {} points, {} columns ({} with no split), {parts} parts ({plain_parts}); outline {outline:.1?}, no split {no_split:.1?}, split {split:.1?}, route {route:.1?}, route with no split {plain_route:.1?}; route {hash:016x}",
             rings.iter().map(Vec::len).sum::<usize>(),
             shapes.strokes.satins.len(),
             plain.strokes.satins.len(),
