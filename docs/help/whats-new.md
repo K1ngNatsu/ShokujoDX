@@ -10,9 +10,7 @@ This topic lists the changes of each version, the newest first.
 **Help > What Is New** opens it. After an update, the start page has a
 link to it.
 
-## The next version
-
-These changes are not in a release yet.
+## Version 0.5.0
 
 **Letters that keep the shape of the font.** The program makes better
 letters from TrueType and OpenType fonts, and the embroidery fonts are
@@ -20,18 +18,38 @@ made again with it. The stitches of a column stay in the outline of the
 letter, the ends of the columns go to the corners of the strokes, and
 the stitches across a column do not cross. Where two strokes meet at a
 corner, one goes on to the outer corner and the other ends square on its
-side. A column that ends in another column sews before it.
+side. A column that ends in another column sews before it. The font
+packages of this version have the new letters too: import them again.
 
 **Three fonts are back.** The program has 68 embroidery fonts. Slab
 Heavy, Fat Face Serif and Shrikhand are back in the program: with the
 better letters, their quality score is 87, 91 and 95. Great Vibes stays
 in the font package **Fonts of earlier versions**. Fat Face Serif has
-very thin strokes, so its smallest size is 42.5 mm.
+very thin strokes, so its smallest size is 42.5 mm. A design that has
+one of the three fonts finds it in the program again.
 
 **Faster sew orders.** Lettering in a TrueType or OpenType font of your
 computer gets the sew order of its letters about four times faster: the
 letters and digits of a serif font such as Georgia in 8 s, 33 s before.
 The sew orders are the same as before.
+
+**Panels and the ribbon.** The side panels start as one group at the
+right, and a closed panel opens again in that group. **Reset the
+Panels** (in the Options, and in **View > Panels**) puts the panels back
+where they start. In a narrow window, the lists of a folded ribbon panel
+(for example the machine and the hoop on the Design tab) open again.
+
+**Guides from the rulers.** Right-click a ruler (on a touch screen, hold
+it) for its menu: **Add Guide at** that place, the **Construction Line**
+and **Construction Point** tools, and **Remove Guides**.
+
+**Touch screens.** A bar under the canvas has the keys of the draw tools:
+**Next** or **Finish**, **Remove Point**, **Cancel**, and **Done**, which
+goes back to Select. So you can use each tool with no keyboard.
+
+**Other changes.** **File > Check for Updates…** is there too. New
+lettering goes back to the Select tool. **Recognize Objects** finds a
+dense satin column with short stitches as a column, not as a run.
 
 ## Version 0.4.0
 

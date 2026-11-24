@@ -10,9 +10,7 @@ Dieses Thema listet die Änderungen jeder Version, die neueste zuerst.
 **Hilfe > Was ist neu** öffnet es. Nach einem Update hat die Startseite
 einen Link dazu.
 
-## Die nächste Version
-
-Diese Änderungen sind noch in keiner Veröffentlichung.
+## Version 0.5.0
 
 **Buchstaben, die die Form der Schrift behalten.** Das Programm macht
 bessere Buchstaben aus TrueType- und OpenType-Schriften, und die
@@ -21,19 +19,46 @@ Umriss des Buchstabens, die Enden der Säulen gehen bis in die Ecken der
 Striche, und die Stiche quer über eine Säule kreuzen sich nicht. Wo zwei
 Striche sich in einer Ecke treffen, geht einer bis zur äußeren Ecke, und
 der andere endet gerade an seiner Seite. Eine Säule, die in einer
-anderen Säule endet, wird vor ihr gestickt.
+anderen Säule endet, wird vor ihr gestickt. Die Schriftpakete dieser
+Version haben die neuen Buchstaben auch: importieren Sie sie neu.
 
 **Drei Schriften sind zurück.** Das Programm hat 68 Stickschriften. Slab
 Heavy, Fat Face Serif und Shrikhand sind wieder im Programm: mit den
 besseren Buchstaben haben sie eine Qualitätswertung von 87, 91 und 95.
 Great Vibes bleibt im Schriftpaket **Fonts of earlier versions**. Fat
 Face Serif hat sehr dünne Striche, darum ist ihre kleinste Größe 42,5 mm.
+Ein Design, das eine der drei Schriften hat, findet sie wieder im
+Programm.
 
 **Schnellere Stickreihenfolgen.** Schrift in einer TrueType- oder
 OpenType-Schrift Ihres Computers bekommt die Stickreihenfolge ihrer
 Buchstaben etwa viermal schneller: die Buchstaben und Ziffern einer
 Serifenschrift wie Georgia in 8 s, vorher 33 s. Die Stickreihenfolgen
 sind dieselben wie vorher.
+
+**Bereiche und Menüband.** Die seitlichen Bereiche beginnen als eine
+Gruppe rechts, und ein geschlossener Bereich öffnet sich wieder in
+dieser Gruppe. **Bereiche zurücksetzen** (in den Optionen und unter
+**Ansicht > Bereiche**) bringt die Bereiche an ihren Anfangsplatz
+zurück. In einem schmalen Fenster öffnen sich die Listen eines
+zusammengeklappten Menübandbereichs wieder (zum Beispiel Maschine und
+Rahmen im Register Design).
+
+**Hilfslinien von den Linealen.** Klicken Sie mit der rechten Maustaste
+auf ein Lineal (auf einem Touchscreen: halten Sie es gedrückt) für sein
+Menü: **Hilfslinie bei … hinzufügen** an dieser Stelle, die Werkzeuge
+**Konstruktionslinie** und **Konstruktionspunkt**, und **Hilfslinien
+entfernen**.
+
+**Touchscreens.** Eine Leiste unter der Arbeitsfläche hat die Tasten der
+Zeichenwerkzeuge: **Weiter** oder **Fertig**, **Punkt entfernen**,
+**Abbrechen** und **Fertig**, das zu Auswählen zurückgeht. So können Sie
+jedes Werkzeug ohne Tastatur benutzen.
+
+**Weitere Änderungen.** **Datei > Nach Updates suchen…** gibt es jetzt
+auch. Neue Schrift geht zum Werkzeug Auswählen zurück. **Objekte
+erkennen** findet eine dichte Satinsäule mit kurzen Stichen als Säule,
+nicht als Laufstich.
 
 ## Version 0.4.0
 

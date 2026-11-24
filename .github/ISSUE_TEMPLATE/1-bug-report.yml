@@ -13,7 +13,7 @@ body:
     attributes:
       label: Version and build
       description: "In the program: File > About (or Help > About), then **Copy build information**, and paste it here."
-      placeholder: "ShokujoDX 0.4.0 (…)"
+      placeholder: "ShokujoDX 0.5.0 (…)"
     validations:
       required: true
   - type: dropdown
