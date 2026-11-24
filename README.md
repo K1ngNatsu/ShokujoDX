@@ -194,11 +194,11 @@ first.
 ## Project status
 
 Phases 1 to 14 of the roadmap are done, and their sew-out tests passed on
-the reference machine, a Husqvarna Viking Topaz 20. Phases 16 to 18 and
-20 (the product view, better lettering, designs of other programs, the 3D
-stitch view and Japanese lettering) are done in software and are in
-version 0.4.0; their tests on fabric and with users are open. Phase 21
-(letter shapes) is done in software; its sew-out is open. Also open: tests with new users, and tests on cap frames,
+the reference machine, a Husqvarna Viking Topaz 20. Phases 16 to 18, 20
+and 21 (the product view, better lettering, designs of other programs,
+the 3D stitch view, Japanese lettering and letter shapes) are done in
+software and are in version 0.5.0; their tests on fabric and with users
+are open. Also open: tests with new users, and tests on cap frames,
 cutwork machines and other machines that the owner does not have. Sew-out
 results from **your** machine help a lot:
 see [CONTRIBUTING.md](CONTRIBUTING.md).

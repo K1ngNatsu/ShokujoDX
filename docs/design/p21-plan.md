@@ -15,7 +15,8 @@ Milestone 5 is made (ADR 0153); its exit test is met in part. Milestone 6
 is made (ADR 0154). Milestones 9 to 14 are the owner's later requests
 (2026-11-23 and 24), and they are made (ADR 0155 to 0160). All phase work
 is done in the software: fourteen milestones. The sew-out of the kit
-(`tools/make-sewout-kit-p21.py`) is open. The audit of the phase is in
+(`tools/make-sewout-kit-p21.py`) is open. Released in v0.5.0
+(2026-11-24). The audit of the phase is in
 the roadmap ("Audit of P21").
 
 ## Goal

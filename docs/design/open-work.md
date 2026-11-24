@@ -1,16 +1,15 @@
 # Open work
 
-Date: 2026-11-24 (after the audit of P21; the newest release is v0.4.0,
-of 2026-11-20) ·
+Date: 2026-11-24 (after the audit of P21 and the release of v0.5.0) ·
 Status: Reference. One list
 of all the work that is not finished: from the roadmap, the plans of the
 phases, the audits and the inventory (`docs/design/feature-inventory.md`).
 The owner selects the work. Each audit makes this list current.
 
 The program is done in software for phases P1 to P14, P16, P17 (not
-Milestone 3), P18, P20 and P21. All of it but P21 is in the release
-v0.4.0; P21 is in no release yet. What is open is mostly proof: sew-outs,
-tests with users and tests on other machines and systems.
+Milestone 3), P18, P20 and P21, and all of it is in the release v0.5.0
+(2026-11-24). What is open is mostly proof: sew-outs, tests with users
+and tests on other machines and systems.
 
 ## 1. Sew-outs and checks of the owner
 
@@ -56,7 +55,7 @@ tests with users and tests on other machines and systems.
 | Letter shapes: the split of the outline into strokes (ADR 0152) for the scripts that it does not take yet (punctuation, Hangul, Arabic, Devanagari, Greek, Cyrillic) | Not made: each script needs a measure with the split first. The other work of the phase is made (fourteen milestones) | P21, `docs/design/p21-plan.md` |
 | More speed for the route, after ADR 0161 (the route of the 62 letters and digits of Georgia takes 7.6 s, 32.8 s before; Webdings 19.8 s): a search toward the goal (A*) and reused buffers for the searches that find a way (two ways of the same length can change places, so a run could move: check the golden snapshots), work kept between the cuts of a letter, and the routes of a font of the computer kept on the disk (the second use is at once) | Proposed. Made in ADR 0161, the first part: Measured: 93 % of the time is in the searches for a travel run under the parts that are not sewn (Georgia "H": 120,000 questions, 31,000 searches of a grid of 11,000 cells, 72 % of them with no way; each cell check looks at all parts again). ADR 0161 made one map of the passable cells for each set of parts that are not sewn, with its connected groups (no search where the start and the goal are in different groups), routes the cuts of a letter on threads, and gives the converter a queue of letters: the same routes and fonts. The probe `probe_p21_font_times` (`EMB_FONT`) gives the times and a hash of each route | "Audit of P21" in the roadmap |
 | Help and tutorials: pictures in the help, Show Me, guided lessons, the sew-out doctor, samples and Try It, ways to start, the help on the web and as a manual, moving pictures, better answers | Proposed (2026-11-18): nine milestones | P19, `docs/design/p19-plan.md` |
-| Browser version | A trial on the branch `trial/browser`, on GitHub Pages for testers (2026-11-21 and 22: touch, phones, the loader); step 2 (the web version for computers) not started | P15 in the roadmap, `docs/design/p15-trial-report.md` on the branch |
+| Browser version | A trial on the branch `trial/browser`, on GitHub Pages for testers (2026-11-21 and 22: touch, phones, the loader; on 2026-11-24 it has the work of v0.5.0); step 2 (the web version for computers) not started | P15 in the roadmap, `docs/design/p15-trial-report.md` on the branch |
 | Touch in the desktop program (Windows touch screens) | Planned (owner, 2026-11-22). From the trial: two fingers pan and zoom, handles and targets for a finger, the touch bars (the draw tools and the sketch Dimension tool), the wider line between panels, the side panels under the canvas on a tall narrow screen. In the program today: the touch bar of the draw tools (Next or Finish), the ruler menu with a long press | P15 step 3 in the roadmap |
 | The assistant | Benched (owner) | P10 Milestone 9 |
 | Sequins and beads: sequin objects and lettering, sequin shapes and fixings, flip sequins, the sequin mode of DST | Waits for a tester with such a machine | P9 Milestone 6 |
