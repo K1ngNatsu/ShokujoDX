@@ -31,6 +31,7 @@
 use emb_geom::region::ring_contains;
 use emb_geom::{BBox, Path, Point, Transform};
 use emb_letter::grid::Grid;
+use emb_letter::quality::outside_by;
 use emb_letter::{EmbFont, EmbLetter, Font};
 use emb_model::{ObjectKind, SatinGeometry, SatinParams};
 use emb_stitch::satin::{Column, satin};
@@ -77,7 +78,6 @@ const CELL_MM: f64 = 0.05;
 /// The faults of one letter, or the sum of the faults of several.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Faults {
-    pub letters: usize,
     pub spike_end: usize,
     pub spike_mid: usize,
     pub bare_out: usize,
@@ -103,7 +103,6 @@ pub struct Faults {
 
 impl Faults {
     pub fn add(&mut self, o: &Faults) {
-        self.letters += o.letters;
         self.spike_end += o.spike_end;
         self.spike_mid += o.spike_mid;
         self.bare_out += o.bare_out;
@@ -191,20 +190,6 @@ fn inside(o: &Outline, p: Point) -> bool {
 
 fn rings(o: &Outline) -> impl Iterator<Item = &Vec<Point>> {
     o.iter().flat_map(|(r, h)| std::iter::once(r).chain(h.iter()))
-}
-
-/// How far `p` is outside the outline (0 inside).
-pub fn outside_by(o: &Outline, p: Point) -> f64 {
-    if inside(o, p) {
-        return 0.0;
-    }
-    let mut best = f64::MAX;
-    for r in rings(o) {
-        for i in 0..r.len() {
-            best = best.min(p.distance_to_segment(r[i], r[(i + 1) % r.len()]));
-        }
-    }
-    best
 }
 
 /// The convex corners of the outline.
@@ -309,10 +294,7 @@ impl Cover {
 /// The faults of the parts of a letter (in sew order, in mm) against its
 /// outline.
 pub fn measure(name: &str, parts: &[ObjectKind], o: &Outline) -> Letter {
-    let mut f = Faults {
-        letters: 1,
-        ..Default::default()
-    };
+    let mut f = Faults::default();
     let params = SatinParams::default();
     let bare = SatinParams {
         pull_compensation_mm: 0.0,
@@ -455,10 +437,7 @@ fn column_faults(
         }
         let Some(&(a1, b1)) = pairs.get(i + 1) else { continue };
         // Two pairs that cross (not two pairs with one point: a pivot).
-        if let Some((u, v)) = Point::crossing(*a, *b, a1, b1)
-            && (1e-3..=1.0 - 1e-3).contains(&u)
-            && (1e-3..=1.0 - 1e-3).contains(&v)
-        {
+        if emb_stitch::satin::pairs_cross((*a, *b), (a1, b1)) {
             f.cross += 1;
         }
         let (lo, hi) = (i.saturating_sub(3), (i + 4).min(pairs.len() - 1));
@@ -606,7 +585,7 @@ pub fn truetype_letter(src: &Font, c: char) -> Option<EmbLetter> {
         .into_iter()
         .flat_map(|(outer, holes)| std::iter::once(outer).chain(holes))
         .collect();
-    Some(emb_letter::route::route_with_splits_in(&letter, CAP_MM, Some(&rings)).0)
+    Some(emb_letter::route::route_with_splits_on(&letter, CAP_MM, Some(&rings), emb_letter::route::threads()).0)
 }
 
 /// The outline of `c` in `src`, in mm at [`CAP_MM`].
@@ -621,10 +600,9 @@ pub fn outline(src: &Font, c: char) -> Outline {
         .collect()
 }
 
-/// Measures the fonts of [`FONTS`] in both ways. `truetype_only`: only the
-/// TrueType path (the stroke finder of today).
-pub fn run(truetype_only: bool) -> Vec<FontFaults> {
-    run_on(truetype_only, &chars())
+/// Measures the fonts of [`FONTS`] in both ways.
+pub fn run() -> Vec<FontFaults> {
+    run_on(false, &chars())
 }
 
 /// The letters of the snapshot test (`tests/letter_faults.rs`): letters
@@ -653,7 +631,12 @@ pub fn run_on(truetype_only: bool, chars: &[char]) -> Vec<FontFaults> {
                     continue;
                 }
                 let letter = match way {
-                    "embroidery" => font.as_ref().and_then(|f| f.letters.get(&c).cloned()),
+                    // As the layout sews it (P21 Milestone 12: the columns
+                    // untangled).
+                    "embroidery" => font.as_ref().and_then(|f| f.letters.get(&c).cloned()).map(|mut l| {
+                        emb_letter::glyph::untangle_parts(&mut l.parts, CAP_MM);
+                        l
+                    }),
                     _ => truetype_letter(&src, c),
                 };
                 let Some(letter) = letter else { continue };

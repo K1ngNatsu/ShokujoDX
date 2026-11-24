@@ -9,7 +9,10 @@
 //! - **Shape:** the part of the outline of the source font that the parts
 //!   of the letter cover.
 //! - **Narrow:** the part of the length of the satin columns that is too
-//!   narrow to sew well at the smallest size of the font.
+//!   narrow to sew well at the smallest size of the font. The pointed end
+//!   of a column (a column cut at a fork or at a crossing, the tip of a
+//!   serif) is not too narrow: the column comes to a point there, as a
+//!   column of the eye does ([`tips`], P21 Milestone 10).
 //! - **Long:** the part of the length of the satin columns whose stitches
 //!   are too long at the largest size of the font.
 //! - **Outside:** the area of the parts that is outside the outline (a
@@ -55,6 +58,12 @@ const STEP_MM: f64 = 0.25;
 /// (the bar of an "e") are about three quarters of its stems, so they are
 /// not too narrow.
 pub const NARROW: f64 = 2.0 / 3.0;
+/// The narrow measures from an end of a column are its pointed end (not
+/// too narrow) if they are at most this many middle widths of the column
+/// long. The pointed ends of the letters of the fonts of the program (the
+/// columns cut at the fork of a "Y", at the crossing of an "X") are about
+/// one width long; a thin stroke is longer.
+pub const TIP_WIDTHS: f64 = 1.0;
 /// The cell of the grid that measures the widths of fill letters, in mm at
 /// the design size of the font.
 const FILL_CELL_MM: f64 = 0.25;
@@ -229,7 +238,7 @@ pub struct NeedleFaults {
 }
 
 /// How far `p` is out of `outline` (0 in it).
-fn outside_by(outline: &Outline, p: Point) -> f64 {
+pub fn outside_by(outline: &Outline, p: Point) -> f64 {
     let ring_in = |r: &[Point]| emb_geom::region::ring_contains(r, p);
     if outline.iter().any(|(o, h)| ring_in(o) && !h.iter().any(|h| ring_in(h))) {
         return 0.0;
@@ -241,8 +250,6 @@ fn outside_by(outline: &Outline, p: Point) -> f64 {
         .fold(f64::MAX, f64::min)
 }
 
-/// The needle faults of the columns of `parts` (sewn with the default
-/// satin settings and no pull compensation) against `outline`, both in mm.
 /// The needle points of the columns of `parts` more than [`SPIKE_MM`] out
 /// of the outline, sewn with no pull compensation (P21 Milestone 6: the
 /// tuning of the ends keeps no change that adds one).
@@ -285,6 +292,8 @@ pub fn shortest_stitch(parts: &[ObjectKind]) -> f64 {
         .fold(f64::MAX, f64::min)
 }
 
+/// The needle faults of the columns of `parts` (sewn with the default
+/// satin settings and no pull compensation) against `outline`, both in mm.
 pub fn needle_faults(parts: &[ObjectKind], outline: &Outline) -> NeedleFaults {
     let params = emb_model::SatinParams {
         pull_compensation_mm: 0.0,
@@ -306,10 +315,7 @@ pub fn needle_faults(parts: &[ObjectKind], outline: &Outline) -> NeedleFaults {
         let pr = col.pairs(0.2);
         for w in pr.windows(2) {
             pairs += 1;
-            if let Some((u, v)) = Point::crossing(w[0].0, w[0].1, w[1].0, w[1].1)
-                && (1e-3..=1.0 - 1e-3).contains(&u)
-                && (1e-3..=1.0 - 1e-3).contains(&v)
-            {
+            if emb_stitch::satin::pairs_cross(w[0], w[1]) {
                 cross += 1;
             }
         }
@@ -788,9 +794,11 @@ pub fn letter_quality(font: &EmbFont, letter: &EmbLetter, outline: &Outline) -> 
         let ObjectKind::Satin { geometry, .. } = part else {
             continue;
         };
-        for (width, len) in column_widths(geometry, STEP_MM) {
+        let widths = column_widths(geometry, STEP_MM);
+        let tip = tips(&widths, |w| w * small < limit);
+        for (k, &(width, len)) in widths.iter().enumerate() {
             total += len;
-            if width * small < limit {
+            if width * small < limit && !tip[k] {
                 narrow += len;
             }
             if width * large > LONG_MM {
@@ -810,6 +818,38 @@ pub fn letter_quality(font: &EmbFont, letter: &EmbLetter, outline: &Outline) -> 
         spikes: needles.spikes,
         crossing: needles.crossing,
     })
+}
+
+/// The measures of a column (from [`column_widths`]) that are its pointed
+/// ends: at each end, the measures that are `narrow`, if their length is
+/// at most [`TIP_WIDTHS`] middle widths of the column. A column that is
+/// narrow from end to end has no pointed end.
+pub fn tips(widths: &[(f64, f64)], narrow: impl Fn(f64) -> bool) -> Vec<bool> {
+    let n = widths.len();
+    let mut out = vec![false; n];
+    let mut sorted: Vec<f64> = widths.iter().map(|w| w.0).collect();
+    sorted.sort_by(f64::total_cmp);
+    let Some(&middle) = sorted.get(n / 2) else {
+        return out;
+    };
+    for from_end in [false, true] {
+        let mut run = Vec::new();
+        let mut len = 0.0;
+        for i in 0..n {
+            let k = if from_end { n - 1 - i } else { i };
+            if !narrow(widths[k].0) {
+                break;
+            }
+            len += widths[k].1;
+            run.push(k);
+        }
+        if run.len() < n && len <= TIP_WIDTHS * middle {
+            for k in run {
+                out[k] = true;
+            }
+        }
+    }
+    out
 }
 
 /// The characters that the score measures: the capital letters, the small
@@ -938,6 +978,37 @@ mod tests {
             rail_b: line(&[Point::new(width, 0.0), Point::new(width, len)]),
             rungs: Vec::new(),
         }
+    }
+
+    /// The narrow measures at an end of a column are its pointed end if
+    /// they are at most one middle width long (P21 Milestone 10).
+    #[test]
+    fn a_pointed_end_is_not_too_narrow() {
+        let narrow = |w: f64| w < 0.5;
+        let column = |end: &[(f64, f64)], n: usize| -> Vec<(f64, f64)> {
+            let mut v = end.to_vec();
+            v.extend(std::iter::repeat_n((1.0, 0.25), n));
+            v
+        };
+        // A point at the start, 0.5 mm long: a tip.
+        let w = column(&[(0.1, 0.25), (0.3, 0.25)], 20);
+        assert_eq!(tips(&w, narrow).iter().filter(|t| **t).count(), 2);
+        // At both ends.
+        let mut both = w.clone();
+        both.extend([(0.3, 0.25), (0.1, 0.25)]);
+        let t = tips(&both, narrow);
+        assert!(t[0] && t[1] && t[both.len() - 1] && t[both.len() - 2] && !t[2]);
+        // A narrow part 2 mm long (two widths): a thin stroke, not a tip.
+        let thin_end = column(&[(0.3, 0.25); 8], 20);
+        assert!(tips(&thin_end, narrow).iter().all(|t| !t));
+        // A column that is narrow from end to end.
+        let hairline = vec![(0.3, 0.25); 20];
+        assert!(tips(&hairline, narrow).iter().all(|t| !t));
+        // A narrow place in the middle is not an end.
+        let mut pinch = column(&[], 10);
+        pinch.push((0.2, 0.25));
+        pinch.extend(column(&[], 10));
+        assert!(tips(&pinch, narrow).iter().all(|t| !t));
     }
 
     #[test]

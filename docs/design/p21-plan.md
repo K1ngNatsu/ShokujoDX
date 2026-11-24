@@ -12,8 +12,11 @@ corners, a trial) was added by the owner on 2026-11-23; the trial is
 made, and the owner chose the split for Latin letters and for kana and
 kanji (2026-11-23, ADR 0152). Milestones 5 and 6 are updated for it.
 Milestone 5 is made (ADR 0153); its exit test is met in part. Milestone 6
-is made (ADR 0154): all phase work is done in the software; the sew-out
-of the kit (`tools/make-sewout-kit-p21.py`) is open.
+is made (ADR 0154). Milestones 9 to 14 are the owner's later requests
+(2026-11-23 and 24), and they are made (ADR 0155 to 0160). All phase work
+is done in the software: fourteen milestones. The sew-out of the kit
+(`tools/make-sewout-kit-p21.py`) is open. The audit of the phase is in
+the roadmap ("Audit of P21").
 
 ## Goal
 
@@ -139,7 +142,7 @@ own column is cut back, a short column that goes into others only at its
 far end stays, and only a thin band counts as a sliver. The stitch engine
 places a rung point on a rail that passes it two times near the other
 point (Pacifico "P"), and the route cuts a column at one pair (Milestone
-5, step 3).
+5, step 4).
 
 | Bench, ttf (before → after) | Block Sans | Anton | Pacifico | Varsity |
 | --- | --- | --- | --- | --- |
@@ -206,7 +209,8 @@ both pieces, in the letter); other corners and the junctions are made as
 before. The tails of the route must reach the end of the place of the
 letter (`route::TOUCH` 0), so the feet of an "A" are not a tail.
 `trace_side` stays for ends with no outline round them, and
-`tune::extend_ends` stays until the fonts are made again (Milestone 6).
+`tune::extend_ends` stays until the fonts are made again (Milestone 6;
+it stays after that too, with a check on the needle points).
 
 | Bench, ttf (before P21 → after M1 → after M2) | Block Sans | Anton | Pacifico | Varsity |
 | --- | --- | --- | --- | --- |
@@ -222,7 +226,7 @@ letter (`route::TOUCH` 0), so the feet of an "A" are not a tail.
 
 The exit test is met for Anton's bulges (half of before P21) and nearly
 for the notches (2 and 5 are left). It is not met for the rest: the
-spikes are a third to a fifth of before P21 (the target is a tenth), the
+spikes are 33 % to 83 % of before P21 (the target is a tenth), the
 open corners are 8 % to 17 % (the target is 5 %), and the crossing pairs,
 the sides that go back and the bulges of Pacifico are not down enough.
 The pictures show what is left: the tips of very sharp ends, the joints
@@ -359,7 +363,7 @@ no more trims than before the split (48, 49, 54, 56 and 56 at 10, 15,
    and fewer columns on top, and also tries a cut in the middle of a
    column whose two ends lie in other columns (a stem between two
    serifs).
-2. The trims of the split are back: the order that sees the joints keeps
+2. The split adds no trims now: the order that sees the joints keeps
    other runs, and the eight words have 48, 49, 54, 54 and 54 trims (49,
    50, 56, 56 and 56 with the split, 48, 49, 54, 56 and 56 before it).
 3. Travel runs stay in the outline of the letter when the route knows it
@@ -387,7 +391,8 @@ The bench (lettering in the source fonts at 25 mm), before and after:
 | Pacifico | 19 to 10 of 104 (10 %) | 2 to 2 | 0.7 mm to 0.2 mm |
 | Varsity | 85 to 51 of 196 (26 %) | 19 to 20 | 0.2 mm to 0.0 mm |
 
-The exit test is met in part. The trims of the words are back, and the
+The exit test is met in part. The words have the trims of before the
+split again, and the
 runs out of the outline are 0.2 mm or less in each font (short ends at
 the corners of columns). The columns on top are not at 5 %: most of the
 ones that stay are where the needle goes from one column into the next
@@ -837,10 +842,307 @@ words fewer (東京 8, 8, 8, 8, 8 to 7, 7, 8, 8, 8; 龍 9, 8, 9, 9, 9 to 6,
 at 15 mm, 5 to 6 at 25 mm, the same at 50 and 80 mm (the flag rule and
 the end branches in the pieces of kanji). The fonts: the 55 fonts of the program have a mean score of 84.8 (85.5 before; 5 higher, 19 the same, 31 lower by 1 to 4): the point of the stem at a fork is narrow at the smallest size (Bebas Neue "Y" 74 to 55), and a slanted end has longer stitches at the largest size; no font is below the limit. The golden designs with lettering: -1.8 % to +7.1 % stitches, 1 fewer trim in all (embroidery-fonts-4 48 to 50, keyboard-designs 12 to 10).
 
+## Milestone 10: the work areas of the font packages (M)
+
+**Why.** The owner asked which fonts of the packages are ready to go in
+the program (2026-11-23). Of the eighteen fonts with a score of 85 or
+more, eight had faults in a few letters, of four kinds (ADR 0156): the
+crossing of a narrow "X", balls at the ends of strokes, single letters
+and square dots, and a score that counted the pointed ends of columns
+as too narrow. The owner asked to fix the four work areas in sequence.
+
+**Steps.**
+
+1. Crossings: longer bridges between corners in Latin letters (a
+   trial; kept only if no font gets more trims), and a run of the route
+   across two columns that touch.
+2. Balls: a step of the tuning that gives a ball a column of its own (a
+   trial); if it does not find the balls well, letter corrections.
+3. Single letters and square dots: letter corrections, also for the
+   fonts of the packages (a test reads the packages).
+4. The score: the pointed ends of the columns are not too narrow.
+5. All fonts made again.
+
+**Exit test.** The letters of the four work areas: no needle point out
+of the outline, open area under 3 mm2 at 25 mm, no more crossing pairs
+than before. The letter fault bench and the lettering bench of P20: no
+font worse. No font below the limit.
+
+**Made (2026-11-23, ADR 0156).**
+
+1. Crossings: the longer bridges gave Khand "X" and "x" one whole
+   stroke, but 15 more trims in the fonts (Zilla Slab "X" 0 to 2 at each
+   size), so they are not in the program. The trial found that a run of
+   the route could not go across two columns that only touch; now it
+   can, and the fonts have 266 fewer trims (34,232 to 33,966).
+2. Balls: the step of the tuning did not find the balls well (a column
+   at the joint of the bowl and the stem of "9"), so it is not in the
+   program; the balls have corrections.
+3. Corrections (as routed letters) for 17 characters (16 letters and a
+   colon) of seven fonts of the
+   packages: Sturdy Serif "k", "3"; Rubik Mono One "A", "3"; Fat Face
+   Serif "u", "y"; Compact Heavy "X"; Bookish Slab "S", "9", "r"; Jazz
+   Hand "i", "j", "t", "w", ":"; Angular Sans "r", "k". At 25 mm:
+
+| Letter | Spikes | Crossing pairs | Open area mm2 |
+| --- | --- | --- | --- |
+| Sturdy Serif k | 0 to 0 | 0 to 0 | 31.2 to 2.9 |
+| Sturdy Serif 3 | 0 to 0 | 0 to 0 | 24.8 to 1.3 |
+| Rubik Mono One A | 2 to 0 | 11 to 0 | 11.4 to 0.2 |
+| Rubik Mono One 3 | 25 to 0 | 8 to 0 | 2.9 to 0.4 |
+| Fat Face Serif u | 0 to 0 | 7 to 1 | 18.8 to 0.3 |
+| Fat Face Serif y | 0 to 0 | 16 to 6 | 12.2 to 0.1 |
+| Compact Heavy X | 0 to 0 | 0 to 0 | 2.6 to 1.5 |
+| Bookish Slab S | 4 to 0 | 15 to 0 | 4.0 to 0.2 |
+| Bookish Slab 9 | 4 to 0 | 17 to 2 | 5.0 to 0.3 |
+| Bookish Slab r | 0 to 0 | 0 to 0 | 6.6 to 0.4 |
+| Jazz Hand i | 16 to 0 | 0 to 0 | 0.1 to 0.0 |
+| Jazz Hand j | 16 to 0 | 0 to 0 | 0.1 to 0.1 |
+| Jazz Hand t | 2 to 0 | 10 to 0 | 3.9 to 0.1 |
+| Jazz Hand w | 0 to 0 | 0 to 0 | 1.3 to 0.2 |
+| Jazz Hand : | 5 to 0 | 14 to 0 | 7.4 to 0.1 |
+| Angular Sans r | 6 to 0 | 6 to 0 | 2.4 to 0.0 |
+| Angular Sans k | 0 to 0 | 0 to 0 | 5.7 to 0.1 |
+
+4. The score: the 55 column fonts of the program 84.8 to 94.2 on mean,
+   the fonts of the packages 80.0 to 90.0; 58 fonts of the packages have
+   85 or more (18 before). No score is lower.
+
+The letter fault bench: the same, but Anton 3 to 2 trims and 22 to 20
+crossing pairs, Varsity 18 to 15 trims with 55 to 63 column ends on top.
+The exit test is met for the corrected letters (Fat Face Serif "y" keeps
+6 crossing pairs at the curl of its tail, fewer than before).
+
+## Milestone 11: column ends on the outline, and balls (M)
+
+**Why.** Milestone 10 left three items open (2026-11-23): the cause of
+the ends that went out of the square dots of Jazz Hand, balls at the
+ends of strokes found by the program (not by corrections), and the size
+range, which counts the pointed ends of columns as narrow (the score
+does not). The owner asked to finish them in order (ADR 0157).
+
+**Steps.**
+
+1. The cause of the ends out of the dots, and a fix in the stroke
+   finder.
+2. Balls: a cut in the split where a stroke meets a ball, and columns to
+   the edge of the ball, with stitches that lie as the last stitches of
+   the stroke where that covers the ball (the owner's request).
+3. The size range: leave out the pointed ends if the fonts sew no worse
+   at their new smallest sizes.
+4. All fonts made again; the corrections that the program no longer
+   needs go.
+
+**Exit test.** Jazz Hand "i" and "j" and Bookish Slab "S", "9" and "r"
+as good as their corrections with no corrections; the letter fault bench
+and the lettering bench of P20 no worse.
+
+**Made (2026-11-23, ADR 0157).**
+
+1. The cause of the ends out of the dots: the middle line of a square
+   dot is a diagonal that ended a part of a cell out of the dot, and a
+   ray from a point out of the outline, or on it, meets nothing there,
+   so the side took the full width out of the letter. The middle line
+   now ends on the outline, and a side from a point on the outline has
+   no width out of it. The same fault made most of the needle points out
+   of the outline in the fault bench.
+2. Balls: a cut in the split of Latin letters where a stroke meets a
+   ball at a concave corner that is not a notch; the column of a dot or
+   a ball has free ends; a ball's column goes on in the direction of its
+   stroke where that covers it (Bookish Slab "S" and "9"; "r" keeps its
+   own column).
+3. The size range keeps the pointed ends: without them, 15 fonts would
+   get a smallest size 0.5 to 3 mm smaller, where 2 to 9 % of their
+   columns are too narrow, and scores about 5 to 15 points lower.
+4. The corrections of Jazz Hand "i", "j" and Bookish Slab "S", "9", "r"
+   go; the colon of Jazz Hand keeps its correction.
+
+The letter fault bench at 25 mm (embroidery fonts / lettering):
+
+| Font | Spikes | Bare points | Crossing pairs | Open area | Trims |
+| --- | --- | --- | --- | --- | --- |
+| Block Sans | 2 / 2 to 2 / 2 | 14 / 14 to 14 / 14 | 12 / 12 to 11 / 12 | 0.15 % / 0.12 % to 0.14 % / 0.11 % | 2 / 2 to 2 / 2 |
+| Anton | 16 / 17 to 3 / 4 | 24 / 24 to 10 / 10 | 20 / 19 to 19 / 14 | 1.08 % / 1.06 % to 1.09 % / 1.07 % | 2 / 2 to 2 / 2 |
+| Pacifico | 28 / 29 to 3 / 3 | 47 / 47 to 9 / 9 | 15 / 14 to 12 / 10 | 0.27 % / 0.23 % to 0.26 % / 0.23 % | 2 / 2 to 2 / 2 |
+| Varsity | 0 / 0 to 0 / 0 | 2 / 2 to 0 / 0 | 4 / 3 to 7 / 6 | 0.06 % / 0.03 % to 0.06 % / 0.03 % | 15 / 15 to 15 / 15 |
+
+Bookish Slab as lettering, open area: "S" 4.5 to 0.2 mm2, "9" 2.7 to
+0.3, "r" 2.9 to 0.3, "j" 1.2 to 0.1. The fonts: 34,070 trims in the
+letters (33,966; Zen Maru Gothic 91 more: columns that touched the next
+stroke only with stitches out of the outline need a trim now); the
+column fonts of the program 94.3 on mean (94.2). The exit test is met;
+the lettering bench of P20 has fewer stitches out of the outline and 1
+more trim in 刺繍 at 10, 15 and 25 mm and in 龍 at 10 mm.
+
+## Milestone 12: the largest faults of Latin letters (M)
+
+**Why.** The owner asked to work through the largest measured faults of
+Latin letters, from the most improvement to the least (2026-11-23): open
+areas, bulges, crossing stitches at junctions, sharp corners, columns on
+top, needle points out of the outline (ADR 0158).
+
+**Steps.**
+
+1. A survey of the faults of A-Z, a-z and 0-9 in the 127 column fonts of
+   the program and of the packages (lettering in the source fonts at
+   25 mm), to rank them.
+2. The faults in that order, each kept only if the survey is better.
+3. All fonts made again.
+
+**Exit test.** Less open area and fewer crossing pairs in the survey; no
+measure of the survey worse by more than a few percent; the letter fault
+bench and the lettering bench of P20 no worse.
+
+**Made (2026-11-24, ADR 0158).** The survey ranked the faults: open
+area (1,770 letters of all 127 fonts), crossing pairs (928 letters), open
+corners (1,409 letters, 0.5 mm2 each), bulges (59 % in ten script fonts),
+needle points out of the outline (46 % in a few heavy fonts), columns on
+top (951 letters).
+
+1. Open area: a side that swells gets a foot as far as 2.5 half-widths
+   (the line to it in the letter); a column whose outline crosses itself
+   more with far feet keeps the near feet. A second pass for lost
+   strokes in all letters was tried and left out (more two layers,
+   crossing pairs and trims).
+2. Crossing stitches: the columns get untangled rungs (pivots), in the
+   stroke finder and last in the layout (the grid of a font file takes
+   the pivots away).
+3. Not changed, with the reasons in ADR 0158: open corners (the tips of
+   acute corners), bulges (the swell of calligraphic strokes), needle
+   points in counters narrower than a thread, columns on top (the route
+   takes fewer trims first).
+4. The second pass for lost strokes makes valid areas first: a column
+   that crossed itself stopped a boolean operation (the conversion of
+   Great Vibes did not end).
+
+| Measure (survey of 7,874 letters) | Before | After |
+| --- | --- | --- |
+| Open area, mm2 | 5,837 | 3,581 |
+| Crossing pairs | 4,507 | 806 |
+| Open corners, mm2 | 748 | 684 |
+| Two layers, mm2 | 56,343 | 54,792 |
+| Needle points out of the outline | 1,102 | 1,107 |
+| Trims | 787 | 783 |
+
+The letter fault bench (embroidery font / lettering): crossing pairs
+Block Sans 11 / 12 to 3 / 4, Anton 19 / 14 to 8 / 13, Pacifico 12 / 10 to
+3 / 0, Varsity 7 / 6 to 1 / 1; open area of Anton 1.09 % / 1.07 % to
+0.31 % / 0.28 %. The fonts: 33,949 trims (34,070); the column fonts of
+the program 94.2 on mean (94.3). The exit test is met.
+
+## Milestone 13: cuts at elbows (M)
+
+**Why.** The owner asked to go on with the letter shapes (2026-11-24). In
+the survey of Milestone 12, the letters with diagonal strokes are 27 % of
+the letters, but they have 50 % to 63 % of the needle points out of the
+outline, of the area with two layers and of the open corners. Many of the
+letters with the most open area have an elbow: two strokes meet at a
+corner and both end there (the corners of "Z", "z", "4" and "7"), and the
+split did not cut it (ADR 0159).
+
+**Steps.**
+
+1. A cut at an elbow in the split of Latin letters: one side at the
+   concave corner goes on to the outline across (a butt joint), where the
+   outline has a convex corner at the width of each stroke from the other.
+2. The cut is optional: a glyph keeps it only if its columns sew no worse.
+3. All fonts made again.
+
+**Exit test.** Less open area in the survey; no measure of the survey
+worse by more than a few percent but the fans; the letter fault bench and
+the lettering bench of P20 no worse.
+
+**Made (2026-11-24, ADR 0159).** A mitre (a cut to the outer corner) was
+tried first: its pointed ends had four times the needle points out of the
+outline. The butt joint has the angle of the corner at its ends. Without
+the check of step 2, a short hook at the end of a stroke (Black Ops One
+"C") became a near-square piece with an open corner. A notch from 100
+degrees was tried and left out (more needle points out of the outline and
+trims).
+
+| Measure (survey of 7,874 letters) | Before | After |
+| --- | --- | --- |
+| Open area, mm2 | 3,581 | 3,158 |
+| Two layers, mm2 | 54,792 | 50,609 |
+| Crossing pairs | 806 | 750 |
+| Columns on top | 1,238 | 1,175 |
+| Open corners | 1,951 | 1,882 |
+| Needle points out of the outline | 1,107 | 1,114 |
+| Fans, mm | 391 | 449 |
+| Trims | 783 | 780 |
+
+The letter fault bench (embroidery font / lettering): crossing pairs
+Block Sans 3 / 4 to 1 / 1, Anton 8 / 13 to 7 / 10; columns on top Anton
+10 / 8 to 6 / 5, Varsity 63 / 59 to 52 / 52; fans 0.3 to 0.5 mm more in
+each font; the open area of Varsity 0.06 % / 0.03 % to 0.07 % / 0.04 %;
+Pacifico the same. The fonts: 33,937 trims (33,949); the column fonts of
+the program 94.5 on mean (94.2). Fat Face Serif (a package) 90 to 79: its
+typical stroke is wider, so its size range starts at 29.5 mm (36.5 mm),
+where 6.4 % of its columns are too narrow (the size range allows 10 %).
+
+The exit test of the outlines of P18 (the corpus as outlines and DST, made
+into objects again) fell from 90.4 % to 89.0 %: the arms of small letters
+are columns of their own, and the parts of the stitch file found their
+dense stitches (with short stitches) as a bean stitch. A bean stitch now
+goes back into its needle holes; the test is at 92.6 %, and the other
+tests of the parts are as before or better, but the measured columns with
+the width and the spacing of their source (95.7 % to 93.5 %; the limit is
+90 %).
+
+## Milestone 14: cuts that stay in the letter (M)
+
+**Why.** The owner asked to go on with the letter shapes (2026-11-24). The
+next items of the open work: the needle points in narrow counters of very
+heavy fonts (Shrikhand "p", Poster Heavy "n", Giant Round "m") and the
+spikes at sharp tips (Funky Slab "N", "V", "W", Suez One "X", "x"). Both
+came from the split, not from pull compensation (ADR 0160).
+
+**Steps.**
+
+1. A cut from a notch that goes along a stroke (beside a narrow counter)
+   is optional: a glyph keeps it only if its columns sew no worse.
+2. The end of a piece at a cut does not go out of the letter.
+3. All fonts made again.
+
+**Exit test.** Fewer needle points out of the outline in the survey; no
+measure of the survey worse by more than a few percent; the letter fault
+bench and the lettering bench of P20 no worse.
+
+**Made (2026-11-24, ADR 0160).** A cut whose points at a quarter, the
+middle and three quarters are all nearer the outline than 0.15 of its
+length goes along a stroke. Three ways for an end that would go out of the
+letter were measured; the end that stays where it is was the best.
+
+| Measure (survey of 7,874 letters) | Before | After |
+| --- | --- | --- |
+| Needle points out of the outline | 1,114 | 220 |
+| Needle points out, no pull compensation | 2,414 | 368 |
+| Area out of the outline, mm2 | 990 | 596 |
+| Two layers, mm2 | 50,609 | 44,685 |
+| Open area, mm2 | 3,158 | 3,040 |
+| Crossing pairs | 750 | 657 |
+| Columns on top | 1,175 | 1,130 |
+| Trims | 780 | 775 |
+| Bulges, mm | 6,874 | 7,048 |
+
+The plan makes no travel stitch shorter than the shortest stitch of the
+machine (0.3 mm; one in the "A" of Lato Bold, ADR 0160). The letter fault
+bench: needle points out of the outline 0 or 1 in each font and way; rail
+points out Pacifico 32 to 8, Varsity 18 to 7; trims the same. The fonts: 33,935 trims (33,937); the column fonts of the
+program 94.4 on mean (94.5).
+
 ## Exit test of the phase
 
-The exit tests of the six milestones, and the sew-out of Milestone 6
-(with the serif joints of Milestone 9).
+The exit tests of the milestones, and the sew-out of Milestone 6 (with
+the serif joints of Milestone 9).
+
+**State (2026-11-24).** The phase is made: fourteen milestones. The exit
+tests of the milestones are met, or met in part as each section says. The
+sew-out kit was made again with the fonts of Milestone 14
+(`tools/make-sewout-kit-p21.py`, `out/p21-sewout`, 44 designs), with a
+group `late/` for Milestones 11 to 14 (elbows, balls, the narrow counters
+and sharp tips of heavy fonts); its sew-out is open (the owner's list in
+`docs/design/open-work.md`).
 
 ## Order
 
@@ -853,11 +1155,14 @@ comes first, as the measure of each milestone. The bundled fonts are made
 again only in Milestone 6, so the sew-outs of the older milestones use
 lettering in the TrueType fonts. Milestone 9 (the owner's request of
 2026-11-23, after Milestone 6) makes the fonts again before the
-sew-out.
+sew-out, and Milestones 10 to 14 (the owner's requests after
+Milestone 9) too.
 
 ## Not in this phase
 
-- New fonts, and letter corrections by hand.
+- New fonts, and letter corrections by hand (apart from the letters of
+  Milestone 10, the owner's request; Milestone 11 took five of them
+  back).
 - The fill letters, and the stitch engine of fills.
 - Japanese characters as a target: the lettering bench of P20 shows the
   changes there, and they are checked with it. Milestone 8 is the one

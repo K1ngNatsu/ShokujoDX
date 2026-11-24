@@ -47,7 +47,7 @@ Sizes are relative effort: S (days), M (one to two weeks), L (a month), XL (seve
 | 18. Designs from other programs, and the 3D stitch view | First part: accepted (owner, 2026-11-18), started 2026-11-19, Milestones 1 to 3 (the parts of a stitch file; runs and satin columns; fills) done (ADR 0131, ADR 0132, ADR 0133), Milestone 4 (Recognize Objects) done except the sew-out of the owner (ADR 0134), Milestone 5 (read Ink/Stitch files) done except the files of testers (ADR 0135), Milestone 6 (write Ink/Stitch files and read its fonts) done except the test in Ink/Stitch and the bundled fonts (ADR 0136), Milestone 7 (outlines with a stitch file) done except the test of the owner (ADR 0137), Milestone 8 (EPS files, and a message for CDR files; changed by the owner on 2026-11-20 from import helpers) done except the files of testers (ADR 0138): eight milestones (the parts of a stitch file, runs and satin columns, fills, Recognize Objects, read Ink/Stitch files, write them and read its fonts, outlines with a stitch file, EPS files). See `docs/design/p18-plan.md`. Second part (owner request, 2026-11-19): a thorough upgrade of the engine of the 3D stitch view, started first (owner, 2026-11-19); Milestone 1 (measures and a reference set) done except the sew-out (ADR 0122, `docs/design/p18-view-m1-report.md`); Milestone 2 (linear light, thread kinds and weights) done (ADR 0123); Milestone 3 (the surface with heights) done (ADR 0124); Milestone 4 (the light on the surface) done except the compare with photos (ADR 0125); Milestone 5 (the canvas on tiles) done, with a speed pass (ADR 0126); Milestone 6 (the fabric) done except the compare with photos (ADR 0127); Milestone 7 (what is not thread) done except the compare with sew-outs (ADR 0128); Milestone 8 (the viewer) done except the check of the owner (ADR 0129); Milestone 9 (all pictures, quality, audit) done except the test with users (ADR 0130): nine milestones (measures and a reference set, linear light and thread kinds, the surface with heights, the light on the surface, the canvas on tiles, the fabric, what is not thread, the viewer with tilt and light by hand, all pictures and quality settings). See `docs/design/p18-view-plan.md`. Audit of both parts in "Audit of P18" (2026-11-20). |
 | 19. Help and tutorials | Proposed (2026-11-18): nine milestones (pictures in the help, Show Me, guided lessons, the sew-out doctor, samples, ways to start, the help on the web, moving pictures, better answers); the owner selects them. See `docs/design/p19-plan.md`. |
 | 20. Japanese lettering | Accepted (owner, 2026-11-20, before v0.4.0); Milestone 1 (the Japanese reference set and the lettering bench, a test font from Noto Sans JP, and font outlines with the nonzero rule) done (ADR 0141); Milestone 2 (the stitch of each column in Auto: satin to 12 mm with split stitches, tatami columns above, the width of a column between its sides) done (ADR 0142). Milestone 3 (one stitch for the text, crossings cut, no bulges, ends cut back in other columns, stroke ends to their corners; two layers 6.3 % to 1.4 %, each character covered 95 % or more) made, the sew-out of the owner is open (ADR 0143, `tools/make-sewout-kit-p20.py`). Milestone 4 (routes for the letters of TrueType fonts, made in the background in the app; 刺繍東京 at 20 mm 48 to 23 trims) done (ADR 0144). Milestone 5 (the height of Japanese text is the height of its characters, thin strokes sew as runs, the smallest size of a text in the Lettering window) done (ADR 0145). Milestone 6 (two Japanese embroidery fonts with the 2,136 jōyō kanji in a font package, scores 89 and 88) made, its sew-out is open (ADR 0146). Audit in "Audit of P20" (2026-11-20): the route of letters with 32 to 64 parts, a size limit for the grids of the stroke finder, layouts while routes come; the fonts and the sew-out kit made again. The open work of the whole project is `docs/design/open-work.md`. Six milestones (a Japanese reference set and its measure, the stitch of each column, crossings and junctions, routes for the fonts of the computer, sizes and thin strokes, a Japanese embroidery font); the owner accepts them. The measures of 2026-11-20 (the fonts of the owner's computer): a character becomes all tatami when one column is wider than 8 mm (128 of 149 characters in Yu Gothic Bold at 50 mm), crossings have two layers on 10 % to 16 % of a kanji, and the letters of a font of the computer have no route (twice the trims). See `docs/design/p20-plan.md`. |
-| 21. Letter shapes | Accepted (owner, 2026-11-23), started 2026-11-23: the causes of spikes, bulges, a bad sew order, open areas and open corners in the letters of the stroke finder. Six milestones in the owner's order (the outline is the edge of a column, one way to end a column, the middle line, the needle points decide, the sew order at joints, one way for all letters and new fonts). The measure is the letter fault bench (`emb-cli letter-faults`). Milestone 1 (the outline is the edge of a column) made (ADR 0147): no rail point out of the outline in the middle of a column, fewer spikes and open corners; the faults at the ends of columns go to Milestone 2. Milestone 2 (free ends along the outline, mitres at corners) made (ADR 0148): spikes a third to a fifth of before P21, open area down by a third to a half; its exit test is met in part (sharp joints and short arms are left for Milestones 3 and 5). Milestone 3 (the middle line: side branches by the width of their stroke, shorter held ends) made (ADR 0149): open area 0.47 % to 1.66 %; its exit test is met in part. Milestone 4 (the needle points in the letter score, the fault bench in CI) done (ADR 0150). Milestone 7 (a middle line from a Voronoi diagram, a trial before Milestone 6) added by the owner (2026-11-23) and made: better on round strokes (Pacifico), worse at square ends and sharp corners, so the grid stays (ADR 0151; the code is on the branch `trial/voronoi-middle-line`). Milestone 8 (strokes from a split of the outline at its concave corners, a trial) added by the owner (2026-11-23) and made first: Latin letters get the split (spikes 17 to 2, 44 to 23, 37 to 25, 15 to 0; open corners less in each font); kana and kanji have 19 to 4 characters over 3 % with two layers but up to 2 more trims in the eight words. The owner chose the split for both (ADR 0152); Milestones 5 and 6 are updated for it. Milestone 5 (the sew order at joints) made (ADR 0153): columns on top 16 to 5, 29 to 11, 19 to 10, 85 to 51; runs out of the outline 0.2 mm or less; the trims of the Japanese words back; Arabic letters routed from the right; its exit test is met in part (columns on top over 5 %). Milestone 6 (one way for all letters, the fonts made again) made (ADR 0154): the mean score of the fonts of the program 78.9 to 85.5 (the score of today); the embroidery fonts as good as lettering; the sew-out of the kit (`tools/make-sewout-kit-p21.py`) is open. Milestone 9 (the joints of serif fonts, the owner's request) made (ADR 0155): bridges to curves; Friendly Serif "MNVXYn" with no spikes and the same joints on the two sides; the fonts made again (mean score 85.5 to 84.8, the narrow point of a fork). See `docs/design/p21-plan.md`. |
+| 21. Letter shapes | Done in software (2026-11-24), the sew-out is open (audit: "Audit of P21"). Accepted by the owner on 2026-11-23: the causes of spikes, bulges, a bad sew order, open areas and open corners in the letters of the stroke finder. Six milestones in the owner's order (the outline is the edge of a column, one way to end a column, the middle line, the needle points decide, the sew order at joints, one way for all letters and new fonts). The measure is the letter fault bench (`emb-cli letter-faults`). Milestone 1 (the outline is the edge of a column) made (ADR 0147): no rail point out of the outline in the middle of a column, fewer spikes and open corners; the faults at the ends of columns go to Milestone 2. Milestone 2 (free ends along the outline, mitres at corners) made (ADR 0148): spikes 33 % to 83 % of before P21, open area down by 14 % to 54 %; its exit test is met in part (sharp joints and short arms are left for Milestones 3 and 5). Milestone 3 (the middle line: side branches by the width of their stroke, shorter held ends) made (ADR 0149): open area 0.47 % to 1.66 %; its exit test is met in part. Milestone 4 (the needle points in the letter score, the fault bench in CI) done (ADR 0150). Milestone 7 (a middle line from a Voronoi diagram, a trial before Milestone 6) added by the owner (2026-11-23) and made: better on round strokes (Pacifico), worse at square ends and sharp corners, so the grid stays (ADR 0151; the code is on the branch `trial/voronoi-middle-line`). Milestone 8 (strokes from a split of the outline at its concave corners, a trial) added by the owner (2026-11-23) and made first: Latin letters get the split (spikes 17 to 2, 44 to 23, 37 to 25, 15 to 0; open corners less in each font); kana and kanji have 19 to 4 characters over 3 % with two layers but up to 2 more trims in the eight words. The owner chose the split for both (ADR 0152); Milestones 5 and 6 are updated for it. Milestone 5 (the sew order at joints) made (ADR 0153): columns on top 16 to 5, 29 to 11, 19 to 10, 85 to 51; runs out of the outline 0.2 mm or less; the trims of the Japanese words back; Arabic letters routed from the right; its exit test is met in part (columns on top over 5 %). Milestone 6 (one way for all letters, the fonts made again) made (ADR 0154): the mean score of the fonts of the program 78.9 to 85.5 (the score of today); the embroidery fonts as good as lettering; the sew-out of the kit (`tools/make-sewout-kit-p21.py`) is open. Milestone 9 (the joints of serif fonts, the owner's request) made (ADR 0155): bridges to curves; Friendly Serif "MNVXYn" with no spikes and the same joints on the two sides; the fonts made again (mean score 85.5 to 84.8, the narrow point of a fork). Milestone 10 (the work areas of the font packages, the owner's request) made (ADR 0156): corrections for 17 characters of seven fonts of the packages, a run of the route across columns that touch (266 fewer trims in the fonts), the pointed ends of columns not in the narrow measure of the score (mean score of the fonts of the program 84.8 to 94.2; 58 fonts of the packages with 85 or more, 18 before); longer bridges and a step for balls were tried and left out. Milestone 11 (column ends on the outline, and balls; the owner's request) made (ADR 0157): the middle line ends on the outline (spikes in the fault bench Anton 16 to 3, Pacifico 28 to 3), balls are cut from their strokes and sew on in the direction of the stroke, five corrections go; the size range keeps the pointed ends. Milestone 12 (the largest faults of Latin letters, ranked by a survey of 127 fonts; the owner's request) made (ADR 0158): rails follow a side that swells (open area 39 % less) and the columns have no crossing stitches (82 % fewer crossing pairs). Milestone 13 (cuts at elbows; the owner's request) made (ADR 0159): where two strokes meet at a corner and both end there, the split cuts a butt joint if the columns sew no worse (open area 12 % less, two layers 8 % less). Milestone 14 (cuts that stay in the letter; the owner's request) made (ADR 0160): a cut along a stroke is optional, and the pieces of a split stay in the letter (80 % fewer needle points out of the outline, 12 % less area with two layers). Made (2026-11-24): fourteen milestones; the sew-out kit (`tools/make-sewout-kit-p21.py`) made again with the fonts of Milestone 14, with a group for Milestones 11 to 14; its sew-out is open. See `docs/design/p21-plan.md`. |
 | 15. Browser version | Later (owner decision, 2026-11-16): not started. Start after the first feedback of users on the desktop program (about v0.4). See "P15. Browser version" below. |
 
 ## Releases
@@ -158,6 +158,230 @@ The audit of Stages 1 to 6 and the IP review of the release (the rules of the re
 - Docs: the README has the v0.3 features, the upgrade and start notes and a repaired install table; the spec has the machine library and a roadmap row for this work.
 - Open: the start test on the PC of the owner's friends. Passed (owner, 2026-11-16): endless pan with a real mouse, the My Machines window. The installer removes the older version before it asks to close a running ShokujoDX, so a Cancel at that question leaves no version installed (install again to fix).
 
+
+## Audit of P21 (2026-11-24)
+
+After the fourteen milestones of the letter shapes, a check of the code
+and the documents: probes with hard and wrong input for the split of the
+outline, the stroke finder after it, the tuning of the ends, the route,
+the untangled rungs and the parts of a stitch file
+(`crates/emb-cli/tests/p21_probe.rs`;
+`cargo test --release -p emb-cli --test p21_probe -- --ignored --nocapture`,
+with `EMB_FONT_DIR` for the fonts of a folder), the fonts of the owner's
+computer as lettering, code that is not needed, the rules of the spec,
+the translations, the help, the pictures of the windows and the
+documents.
+
+**Fixed.**
+
+- **A picture of a symbol font stopped the program.** The font Webdings
+  has pictures at the places of the letters. For the picture at "K", the
+  stroke finder made a column whose two sides lie on each other. The area
+  of such columns (`region::fill_nonzero`, Milestone 12) came from the
+  overlay as 526 areas, most of them with no area, and with one ring of
+  3,274 points, most of them less than a hundredth of a font unit apart.
+  `region::offset` did not come back from that ring in ten minutes, and
+  the layout waits for this step, so the program did not answer. Now a
+  ring with no area is left out, and a ring with a side of almost no
+  length loses the points that are nearer than a millionth of the size
+  of the rings to the line between the others: 13 of the 3,274 points
+  stay, with the same area. The picture takes 0.05 s. The release
+  v0.4.0 does not have the fault (0.3 s for the same picture, measured
+  with a build of its tag): it came with the columns of P21, and it was
+  in no release.
+- **Lettering with a height below 0 stopped the program.** The step that
+  takes the crossing stitches out of a column (Milestone 12,
+  `Column::untangled_rungs`) makes pairs across the column at a step that
+  is a part of the height of the lettering. With a step of 0 it made a
+  pair at each billionth of a mm: in the probe, a column of 40 mm asked
+  for 34 GB of memory and the process stopped. The program does not make
+  lettering with such a height, but the loader does not check the height
+  of lettering: a project file with a wrong number opens, and the next
+  change of that lettering lays it out again. Now the step gives at most
+  20,000 pairs between two rungs.
+- **A long bean stitch in a stitch file was slow.** The rule for a bean
+  stitch (Milestone 13) compared the end of each leg with all the legs
+  before it: the parts of a bean stitch of 20,000 stitches took 0.25 s,
+  and of 100,000 stitches 7 s (View > Stitch Parts and Recognize Objects
+  use this step). The needle holes are in a grid now: 0.07 s for 100,000
+  stitches and 0.3 s for 400,000. The parts are the same.
+- **Lettering much higher than a design can be did not end.** The layout
+  measures the middle width of each column at steps of 0.25 mm (P20
+  Milestone 5), so its time went up with the height: 0.3 s for 1 km, more
+  than two minutes for 1,000 km. A design cannot keep such lettering, but
+  the layout came before that check. A column is measured at 20,000
+  places at most now (5 ms for each height). This was so before P21.
+- **A glyph much larger than its capital height took ten times as long
+  with the split.** Each piece of the split got a grid of the largest
+  size: a glyph 1,000 times its capital height (a damaged font) took 24 s
+  in the layout (1.8 s with no split). A glyph larger than ten capital
+  heights is not a letter, and it is not split now.
+- **The app and the font tool did not make a font in the same order.**
+  Convert in Lettering > Fonts rounded the coordinates before the choice
+  of the fill letters, the font tool rounds them after it (Milestone 6).
+  The app has the order of the tool now.
+- **The help said that four fonts of earlier versions have a score below
+  65.** Since P21 they have 87, 91, 95 and 75 (Slab Heavy, Fat Face
+  Serif, Shrikhand, Great Vibes). The help in four languages, the text of
+  the font package (the zip file is made again; its four fonts are the
+  same bytes), the inventory and the comments say now that the score was
+  below the limit when the fonts left the program. If they come back into
+  the program is the owner's choice (`docs/design/open-work.md`).
+- **Code that is not needed.** Removed: a public function with no caller
+  (`Font::char_of`), a field that nothing read (`Faults::letters`), two
+  parameters that had one value in all calls (`Rails::geometry`,
+  `letter_faults::run`), a constant of 0 (`route::TOUCH`), and a field of
+  the split that only tests read (now a test field). One test for two
+  pairs across a column that cross (`emb_stitch::satin::pairs_cross`; it
+  was written five times, for the score, the bench, the choice of a split
+  and the untangled rungs), one for a point in rings that do not overlap
+  (`region::rings_contain`, six times), and one each for a clear line in
+  a shape and for the distance of a point out of an outline (two times
+  each). Five doc comments were on the wrong function (a new function
+  was put between a comment and its function), and nine comments
+  described the stroke finder of an earlier milestone.
+- **The documents.** `CLAUDE.md` said six milestones and that the
+  Japanese fonts are made with no `--extend`; the open-work list had the
+  phase as started; the plan and the roadmap had the status of Milestone
+  6. Five ADRs had no note of the later ADR that changed them (0146,
+  0147, 0148, 0152, 0156). Wrong numbers: the bean stitch rule ("a third"
+  for 0.3), the step of Milestone 5 that cuts a column at one pair (step
+  4), the trims of 刺繍 in the lettering bench after Milestone 12 (one
+  fewer at three sizes, not the same), the stitches of Lettering Circle
+  after Milestone 14, the corrections of Milestone 10 (17 characters, not
+  16 letters), the spikes after Milestone 2 (33 % to 83 % of before, not
+  a third to a fifth), the date of ADR 0158, the scores of the Japanese
+  fonts in the inventory (93 and 96 after P21), and the characters with
+  two layers on more than 3 % (9 at 10 mm and 6 at the larger sizes; the
+  open-work list had the 17 of P20). The inventory and the README name
+  the phase now. The note of a correction file named two letters that
+  have no correction since Milestone 11.
+
+**Left as it is.**
+
+- **The route of a letter of a serif font of the computer was slow.** A
+  letter with 6 to 8 columns took 2 s to 7 s in the route thread of its
+  font (Georgia: 32.8 s for the 62 letters and digits; Times New Roman
+  18.1 s; Arial 0.6 s). The letters show at once and get their routes
+  later. The time is in the search of the sew order, which is made again
+  for each place where a column can be cut (P17 and P20). The split of
+  P21 does not change it (Georgia with no split: 35 s); the stop rule of
+  Milestone 5 (a cut is also tried for a column on top) adds a quarter
+  (25 s with the rule of before). After the audit, the owner chose a
+  faster route (ADR 0161): the same routes, Georgia 7.6 s, Times New
+  Roman 4.6 s, Webdings 19.8 s (50.9 s), and the converter 3 to 4 times
+  faster. More speed is proposed work (`docs/design/open-work.md`).
+- **Symbol fonts are slow in the route thread.** The first ten pictures
+  of Webdings have 12 to 29 columns each, and the route of one took
+  0.1 s to 8 s (122 s for the 76 characters of the probe, with 16 fonts
+  at the same time); with ADR 0161 it is 2.5 times faster.
+- **Shapes that are not letters are slow in the route thread.** A wheel
+  of 300 teeth takes 47 s (259 columns: the tuning of the ends measures
+  all the columns again for each end), and 94 s with a hole of 300
+  teeth; a comb of 60 teeth takes 16 s (the route), 400 dots 15 s (2 s
+  in the probe of P20, which had no tuning of the ends). The layout
+  waits only for the stroke finder: at most 5.2 s in the probe (a
+  spiral of 30 turns; the same with no split). A glyph 1,000 times its
+  capital height takes 1.7 s in the layout and 46 s in the route thread.
+- **Copies that stay.** The score has a copy of the rail projection of
+  the stitch engine with another tolerance (`quality::Rail`); the stroke
+  finder thins a line with its own function (`stroke::thin_line`, as
+  `path::simplify`); the walk along an outline and the first hit of a
+  line on the outline are written three times each; the letter fault
+  bench has its own steps for a letter of a TrueType font and its own
+  constants. One function for each can change the numbers of the fonts,
+  so it needs a font remake as its proof.
+- **Paths that may not be needed, not measured:** `stroke::in_outline`
+  (Milestone 9) next to `stroke::clip_ends` (Milestone 11), the
+  `trace_side` path of Milestone 2 (only where a free end has no outline
+  round it), and the second `tune::round_parts` of each letter. Each
+  needs a count on the benches and a font remake.
+- A column with its stitches 0.02 mm apart (no machine sews it) is a run
+  in the parts of a stitch file: its needle holes are nearer to each
+  other than the size of a hole.
+- The plan has 77 and 76 for the crossing pairs of Varsity before P21 in
+  two tables, and 1.66 % and 1.67 % for the open area of Anton; the code
+  of that day would have to run again to say which is right.
+- Long sentences in ADR 0148, 0157, 0158 and 0159 (the lists of the
+  conditions of a mitre, a ball, an elbow and the untangled rungs). The
+  notes of `CLAUDE.md` for Milestones 11 to 14 have short sentences now.
+
+**Checked, no change.**
+
+- The probes: 43 outlines (letters with 12,000 points, wheels of
+  60 to 1,500 teeth, combs, stairs of 12 to 400 steps, rough edges, a
+  spiral, rings in each other, 400 dots, a lattice, 40 letters on each
+  other, slivers, empty rings, sizes from 1e-6 to 1e9 units, a point
+  that is not a number or at infinity, a capital height of 0, below 0
+  or not a number), 15 heights of lettering from below 0 to 1,000 km,
+  17 columns for the untangled rungs, 12 stitch files of up to 400,000
+  stitches, and the 360 font files of the owner's computer as lettering
+  at 25 mm (the letters, the digits and 14 other characters of each).
+  After the fixes: no crash, no hang, no stitch out of the range of a
+  project. All 360 fonts sew; a font takes 5.6 s on middle, and 17 fonts
+  take more than two minutes (the slowest is Courier Std Bold Oblique
+  with 298 s; 16 fonts were made at the same time). The split covers
+  each shape within 0.2 % of the stroke finder with no split, or better,
+  and the tuning and the route take no cover away (one measure at each
+  step).
+- Rules 3, 5 and 9: the documents and the code of the phase name no
+  closed-source program (a search for 45 product names); no `unsafe`
+  code; one new dependency between crates of the program (`emb-letter`
+  uses `emb-stitch`, in the spec and in ADR 0150) and no new crate of
+  others; the trigonometry of the new code is `emb_geom::math` (the test
+  code has its own, as the rule permits).
+- The documents against the code: about 60 constants and 75 functions,
+  types and fields that ADR 0147 to 0160 and the plan name are in the
+  code with the quoted values (the one exception is the bean stitch
+  rule, fixed). The numbers that two documents share agree (the chain of
+  the survey of Milestones 12 to 14, the trims of the fonts, the mean
+  scores, the snapshot history). The rules of `CLAUDE.md` are the rules
+  of the spec.
+- Translations and help: the phase added no text of the program; the
+  one help change of the phase (the pointed end of a column does not
+  count) and the change of this audit are in the four languages.
+- The pictures of the windows (129 s): 409 scenes in four languages, 636
+  pictures, no error, and each window fits a screen of 1366 × 768. 189
+  pictures changed since the run of 2026-11-22: the Lettering window (the
+  letters of Milestones 10 to 14), and the windows and panels that the
+  fixes from the browser trial changed after that run. The texts that do
+  not fit are the titles of dock tabs, as before. The Options window is
+  wider in German and in Spanish than in English (the label of Simple
+  mode is long); it fits the screen.
+
+**The owner's choice after the audit.** The fonts of earlier versions
+with a score over 85 come back into the program: Slab Heavy (87), Fat
+Face Serif (91) and Shrikhand (95). The program has 68 embroidery fonts;
+Great Vibes (75) stays in the package "Fonts of earlier versions". The
+three come before the fill fonts, and the corpus design
+`embroidery-fonts-9` shows them (ADR 0115). Their font files are the files
+of the package, made again with the code of the audit.
+
+**Exit tests.** The software parts are met or met in part, as the plan
+says for each milestone; the sew-out is open. The kit `out/p21-sewout`
+has the fonts of Milestone 14. The fonts of the program are the same
+files with the code of the audit and of ADR 0161 (all fonts and packages
+made again). Two letters of the packages changed with the clean area of
+columns of the audit: the pilcrow of Neucha (its columns crossed
+themselves; it is a fill letter now) and one column of the pilcrow of
+Great Vibes.
+
+| Milestone | Exit test | State |
+| --- | --- | --- |
+| 1 | No rail point out of the outline in the middle of a column; a quarter of the crossing pairs; half the bulges of Anton and Pacifico | Met for the rail points, the open area, the spikes and the open corners; not met then for the crossing pairs, the sides that go back and the bulges (the ends of columns went to Milestone 2, the crossing pairs to Milestone 12) |
+| 2 | A tenth of the spikes; at most 5 % of the convex corners open; no stitch across a notch | Met in part (spikes 33 % to 83 % of before; Milestones 8, 11 and 14 made the rest: 0 or 1 needle point out in each font of the bench) |
+| 3 | No open corner in five letters; at most 1 mm of bulges and 0.5 % open area in each font | Met in part (Varsity "X" and "x" kept open corners; Anton and Pacifico kept bulges and open area) |
+| 4 | The bench runs in CI; spikes lower the score; no font of the program below the limit | Passed |
+| 5 | At most 5 % of the joints with the column that ends on top; no run out of the outline; the trims of the eight words as before the split | Met in part (columns on top over 5 %; runs 0.2 mm or less out; trims 48, 49, 54, 54, 54) |
+| 6 | The embroidery fonts as good as lettering in their source fonts; each font at the limit or more; the owner's sew-out | Passed in software; the sew-out is open (owner) |
+| 7 | A trial: a middle line from a Voronoi diagram | Made; the grid stays (ADR 0151) |
+| 8 | A trial: strokes from a split of the outline | Made; the owner chose the split for Latin letters, kana and kanji (ADR 0152) |
+| 9 | Friendly Serif "M", "N", "V", "X", "Y", "n": no spikes, the same joints on the two sides | Passed for Friendly Serif; Pacifico "k", "m", "w" and Block Sans "9" were worse |
+| 10 | The letters of the four work areas: no needle point out, open area under 3 mm2 | Passed for the corrected letters; longer bridges and a step for balls left out |
+| 11 | Jazz Hand "i", "j" and Bookish Slab "S", "9", "r" as good with no corrections | Passed (five corrections removed) |
+| 12 | Less open area and fewer crossing pairs in the survey | Passed (39 % and 82 % less) |
+| 13 | Less open area in the survey | Passed (12 % less). The measured columns of stitch files went from 95.7 % to 93.5 % (94.3 % after Milestone 14; the limit is 90 %) |
+| 14 | Fewer needle points out of the outline in the survey | Passed (80 % fewer) |
 
 ## Audit of P20 (2026-11-20)
 
@@ -1895,7 +2119,7 @@ is all tatami from 15 mm to 80 mm, two layers on at most 3 % of each
 character, half the trims of today; a font package with the kana and the
 2,136 jōyō kanji; test sheets sew well on the owner's machine.
 
-### P21. Letter shapes (XL) — accepted, started 2026-11-23 (`docs/design/p21-plan.md`)
+### P21. Letter shapes (XL) — done in software, the sew-out is open (audit: "Audit of P21") (`docs/design/p21-plan.md`)
 
 The letters that the program makes from a font keep the shape of the
 font: the outline is the edge of each column, each end of a column is a
@@ -1906,7 +2130,7 @@ ends in another sews under it, and the bundled fonts are made again. A
 measure on the needle points (the letter fault bench) comes first.
 
 **Exit:** with the four embroidery fonts that have a source font in the
-program, the exit tests of the six milestones (spikes, crossing stitches,
+program, the exit tests of the milestones (spikes, crossing stitches,
 bulges, open area and open corners, columns on top at joints); the
 owner's sew-out of the test sheets shows no spikes, bulges or open
 corners.

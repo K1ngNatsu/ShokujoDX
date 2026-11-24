@@ -42,6 +42,9 @@ pub const AUTO_WIDE_MM: f64 = 2.0;
 /// `Auto` underlay: columns narrower than this get no underlay.
 pub const AUTO_MIN_MM: f64 = 1.0;
 const AUTO_INSET_MM: f64 = 0.4;
+/// [`Column::untangled_rungs`] makes at most this number of pairs between
+/// two rungs.
+const UNTANGLE_MAX_PAIRS: f64 = 20_000.0;
 const AUTO_ZIGZAG_SPACING_MM: f64 = 2.0;
 const HEAVY_ZIGZAG_SPACING_MM: f64 = 1.2;
 
@@ -219,6 +222,91 @@ impl Column {
             }
         }
         out
+    }
+
+    /// Rungs with which no pair across the column crosses the pair before
+    /// it, for pairs about `step` apart: where a pair would cross the one
+    /// before it (a fast turn, a slanted end), one side stays and the other
+    /// goes on (a pivot: the side that stays goes on a millionth of the
+    /// length of the rails, so that the rung comes after the one before
+    /// it). `None` if no pair crosses. The rungs are in the order of the
+    /// column, with the rail points of each.
+    pub fn untangled_rungs(&self, step: f64) -> Option<Vec<(Point, Point)>> {
+        // At most [`UNTANGLE_MAX_PAIRS`] pairs between two rungs: a step
+        // of 0 (lettering with a height that is not more than 0) asked for
+        // more memory than a computer has (the audit of P21).
+        let longest = self.a.len().max(self.b.len());
+        if !longest.is_finite() {
+            return None;
+        }
+        let step = step.max(longest / UNTANGLE_MAX_PAIRS).max(1e-9);
+        // The places of the pairs on the two rails.
+        let mut target: Vec<(f64, f64)> = vec![(0.0, 0.0)];
+        for w in self.rungs.windows(2) {
+            let (la, lb) = (w[1].0 - w[0].0, w[1].1 - w[0].1);
+            let n = ((la + lb) / 2.0 / step).round().max(1.0) as usize;
+            for q in 1..=n {
+                let f = q as f64 / n as f64;
+                target.push((w[0].0 + f * la, w[0].1 + f * lb));
+            }
+        }
+        let line = |r: (f64, f64)| (self.a.at(r.0), self.b.at(r.1));
+        let cross = |x: (f64, f64), y: (f64, f64)| pairs_cross(line(x), line(y));
+        let tiny = 1e-6 * (self.a.len() + self.b.len()).max(1e-9);
+        let mut out: Vec<(f64, f64)> = vec![target[0]];
+        let mut changed = false;
+        for &t in &target[1..] {
+            let last = out[out.len() - 1];
+            if !cross(last, t) {
+                out.push(t);
+                continue;
+            }
+            changed = true;
+            // A pivot on one side: the side that went on less stays.
+            let stay_b = (t.0, last.1 + tiny);
+            let stay_a = (last.0 + tiny, t.1);
+            let ok = |c: (f64, f64)| c.0 > last.0 && c.1 > last.1 && !cross(last, c);
+            let pick = match (ok(stay_a), ok(stay_b)) {
+                (true, true) => {
+                    if t.0 - last.0 <= t.1 - last.1 {
+                        stay_a
+                    } else {
+                        stay_b
+                    }
+                }
+                (true, false) => stay_a,
+                (false, true) => stay_b,
+                (false, false) => continue,
+            };
+            out.push(pick);
+        }
+        if !changed {
+            return None;
+        }
+        // The ends are the ends of the rails; the rungs between them, with
+        // the places that the lines between their neighbours give dropped.
+        let end = (self.a.len(), self.b.len());
+        while out.len() > 1 && (out[out.len() - 1].0 >= end.0 - tiny || out[out.len() - 1].1 >= end.1 - tiny) {
+            out.pop();
+        }
+        out.push(end);
+        let mut kept: Vec<(f64, f64)> = vec![out[0]];
+        for k in 1..out.len() - 1 {
+            let (p, q) = (kept[kept.len() - 1], out[k + 1]);
+            let along = |x: f64, x0: f64, x1: f64| {
+                if (x1 - x0).abs() > 1e-12 {
+                    (x - x0) / (x1 - x0)
+                } else {
+                    0.0
+                }
+            };
+            let fa = along(out[k].0, p.0, q.0);
+            let fb = along(out[k].1, p.1, q.1);
+            if (fa - fb).abs() > 1e-3 {
+                kept.push(out[k]);
+            }
+        }
+        Some(kept[1..].iter().map(|&r| line(r)).collect())
     }
 
     /// Liquid effect: the pairing of the rails changes evenly. The rungs
@@ -617,6 +705,14 @@ fn puff_cap(col: &Column, start: bool) -> Vec<Point> {
         .collect()
 }
 
+/// `true` if two pairs across a column cross each other (not two pairs with
+/// one point on a side: a pivot). The letter score, the letter fault bench,
+/// the choice of a split and the untangled rungs use this one test.
+pub fn pairs_cross(a: (Point, Point), b: (Point, Point)) -> bool {
+    Point::crossing(a.0, a.1, b.0, b.1)
+        .is_some_and(|(u, v)| (1e-3..=1.0 - 1e-3).contains(&u) && (1e-3..=1.0 - 1e-3).contains(&v))
+}
+
 /// The path from its end to its start, flattened.
 fn reverse_path(path: &Path) -> Path {
     let mut pts: Vec<Point> = path
@@ -633,6 +729,72 @@ fn reverse_path(path: &Path) -> Path {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A step that is not more than 0 (lettering with such a height) gives
+    /// a limited number of pairs (the audit of P21: a step of 0 asked for a
+    /// pair at each billionth of a mm, more memory than a computer has).
+    #[test]
+    fn untangled_rungs_with_a_step_of_0_are_limited() {
+        let line = |pts: &[(f64, f64)]| {
+            let mut p = emb_geom::Path::new().move_to(Point::new(pts[0].0, pts[0].1));
+            for &(x, y) in &pts[1..] {
+                p = p.line_to(Point::new(x, y));
+            }
+            p
+        };
+        let g = SatinGeometry {
+            rail_a: line(&[(0.0, 0.0), (10.0, 0.0)]),
+            rail_b: line(&[(0.0, 2.0), (6.0, 2.0), (4.0, 3.0), (10.0, 3.0)]),
+            rungs: Vec::new(),
+        };
+        let c = Column::new(&g).unwrap();
+        for step in [0.0, -0.2, 1e-12, f64::NAN] {
+            let rungs = c.untangled_rungs(step).expect("pairs that cross");
+            assert!(
+                rungs.len() <= UNTANGLE_MAX_PAIRS as usize + 2,
+                "{step}: {}",
+                rungs.len()
+            );
+        }
+    }
+
+    /// A rail that goes back for a bit (the inside of a fast turn): pairs
+    /// across the column cross; with the untangled rungs, none does, and
+    /// the column still goes from end to end.
+    #[test]
+    fn untangled_rungs_have_no_crossing_pairs() {
+        let line = |pts: &[(f64, f64)]| {
+            let mut p = emb_geom::Path::new().move_to(Point::new(pts[0].0, pts[0].1));
+            for &(x, y) in &pts[1..] {
+                p = p.line_to(Point::new(x, y));
+            }
+            p
+        };
+        let crossings = |c: &Column| {
+            let pairs = c.pairs(0.2);
+            pairs.windows(2).filter(|w| pairs_cross(w[0], w[1])).count()
+        };
+        let mut g = SatinGeometry {
+            rail_a: line(&[(0.0, 0.0), (10.0, 0.0)]),
+            rail_b: line(&[(0.0, 2.0), (6.0, 2.0), (4.0, 3.0), (10.0, 3.0)]),
+            rungs: Vec::new(),
+        };
+        let before = Column::new(&g).unwrap();
+        assert!(crossings(&before) > 0);
+        g.rungs = before.untangled_rungs(0.2).expect("rungs");
+        let after = Column::new(&g).unwrap();
+        assert_eq!(crossings(&after), 0);
+        let pairs = after.pairs(0.2);
+        assert!(pairs[0].0.distance(Point::new(0.0, 0.0)) < 1e-9);
+        assert!(pairs[pairs.len() - 1].1.distance(Point::new(10.0, 3.0)) < 1e-9);
+        // A column with no crossing pairs keeps its rungs.
+        let plain = SatinGeometry {
+            rail_a: line(&[(0.0, 0.0), (10.0, 0.0)]),
+            rail_b: line(&[(0.0, 2.0), (10.0, 2.0)]),
+            rungs: Vec::new(),
+        };
+        assert!(Column::new(&plain).unwrap().untangled_rungs(0.2).is_none());
+    }
 
     fn straight(w: f64, l: f64) -> SatinGeometry {
         SatinGeometry {

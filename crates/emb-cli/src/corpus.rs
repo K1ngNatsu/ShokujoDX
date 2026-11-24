@@ -12,7 +12,7 @@ use emb_model::{
     SatinGeometry, SatinParams, ThreadId,
 };
 
-pub const NAMES: [&str; 85] = [
+pub const NAMES: [&str; 86] = [
     "circle-fill",
     "satin-column",
     "s-curve",
@@ -29,6 +29,7 @@ pub const NAMES: [&str; 85] = [
     "embroidery-fonts-6",
     "embroidery-fonts-7",
     "embroidery-fonts-8",
+    "embroidery-fonts-9",
     "lettering-circle",
     "lettering-bridge",
     "monogram",
@@ -123,9 +124,11 @@ pub fn build(name: &str) -> Option<Design> {
         // The fonts of P17 Milestone 7 (ADR 0115).
         "embroidery-fonts-5" => embroidery_fonts(emb_letter::bundled::P11_EMBROIDERY..36),
         "embroidery-fonts-6" => embroidery_fonts(36..46),
-        "embroidery-fonts-7" => embroidery_fonts(46..emb_letter::bundled::P17_EMBROIDERY),
+        "embroidery-fonts-7" => embroidery_fonts(46..emb_letter::bundled::P21_EMBROIDERY),
         // The fill fonts (ADR 0117).
         "embroidery-fonts-8" => embroidery_fonts(emb_letter::bundled::P17_EMBROIDERY..),
+        // Three fonts of earlier versions, back after the audit of P21.
+        "embroidery-fonts-9" => stacked_fonts(emb_letter::bundled::P21_EMBROIDERY..emb_letter::bundled::P17_EMBROIDERY),
         "lettering-circle" => lettering_circle(),
         "lettering-bridge" => lettering_bridge(LetterOrder::Closest),
         "monogram" => monogram(),
@@ -1113,6 +1116,36 @@ fn embroidery_fonts(
         l.justify = Justify::Center;
         emb_letter::relayout(&mut l, &font);
         d.add_object(t, ObjectKind::Lettering(Box::new(l)));
+    }
+    d
+}
+
+/// One name in each bundled embroidery font of `fonts`, at 15 mm or the
+/// smallest size of the font, each line 10 mm under the line before it:
+/// for fonts whose smallest size is larger than the step of
+/// [`embroidery_fonts`] (Fat Face Serif, 42.5 mm).
+fn stacked_fonts(
+    fonts: impl std::slice::SliceIndex<[(&'static str, &'static [u8])], Output = [(&'static str, &'static [u8])]>,
+) -> Design {
+    let mut d = Design::new("");
+    let t = d.add_thread("Navy", Rgb(25, 35, 90));
+    let list: Vec<emb_letter::EmbFont> = emb_letter::bundled::EMBROIDERY[fonts]
+        .iter()
+        .map(|(family, _)| emb_letter::bundled::embroidery(family).expect("bundled embroidery font"))
+        .collect();
+    let height = |font: &emb_letter::EmbFont| 15.0f64.max(font.min_height_mm);
+    const GAP: f64 = 10.0;
+    let total: f64 = list.iter().map(height).sum::<f64>() + GAP * (list.len() as f64 - 1.0);
+    // The baseline of each line (Y down): the top of the first line is at
+    // half the total height above the middle.
+    let mut top = -total / 2.0;
+    for font in &list {
+        let h = height(font);
+        let mut l = Lettering::new("Team 26", emb_letter::LetterSource::font_ref(font), h, p(0.0, top + h));
+        l.justify = Justify::Center;
+        emb_letter::relayout(&mut l, font);
+        d.add_object(t, ObjectKind::Lettering(Box::new(l)));
+        top += h + GAP;
     }
     d
 }

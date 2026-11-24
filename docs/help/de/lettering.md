@@ -38,7 +38,7 @@ Es gibt zwei Arten von Schriften:
 - **Stickschriften** haben fertige Stickbuchstaben. Sie sticken sich am
   besten. Jede hat einen **Größenbereich** (die Höhe der Großbuchstaben):
   Die Schriftliste zeigt ihn, und die Objekteigenschaften warnen, wenn der
-  Text außerhalb des Bereichs ist. 65 Stickschriften kommen mit dem
+  Text außerhalb des Bereichs ist. 68 Stickschriften kommen mit dem
   Programm.
 - **TrueType**- und OpenType-Schriften des Computers. Das Programm
   erstellt die Buchstaben aus ihren Umrissen: Säulen, die den Strichen
@@ -92,7 +92,7 @@ sehen:
 
 - wie viel von den Formen der Buchstaben die Stiche decken,
 - wie viel von den Satinsäulen bei der kleinsten Größe der Schrift zu
-  schmal ist,
+  schmal ist (das spitze Ende einer Säule zählt nicht),
 - wie viel von den Satinsäulen bei der größten Größe der Schrift zu lange
   Stiche hat,
 - wie viel von den Stichen außerhalb der Formen der Buchstaben liegt,
@@ -112,11 +112,12 @@ Gothic, mit den Kana und den 2.136 Jōyō-Kanji). Laden Sie ein Paket herunter u
 Meine Ressourcen > Paket importieren** hinzu. Das Programm lädt selbst
 nichts herunter.
 
-Vier Schriften früherer Versionen haben eine Wertung unter 65: Slab Heavy,
-Fat Face Serif, Shrikhand und Great Vibes. Sie sind jetzt nicht mehr im
-Programm. Ein Design, das eine von ihnen hat, bleibt, wie es ist. Um seinen
-Text zu ändern, fügen Sie das Schriftpaket **Fonts of earlier versions**
-hinzu.
+Eine Schrift früherer Versionen ist jetzt nicht mehr im Programm: Great
+Vibes. Ihre Wertung lag unter 65, als sie das Programm verließ. Ein
+Design, das sie hat, bleibt, wie es ist. Um seinen Text zu ändern, fügen
+Sie das Schriftpaket **Fonts of earlier versions** hinzu. Slab Heavy, Fat
+Face Serif und Shrikhand verließen das Programm mit ihr und sind jetzt
+wieder im Programm.
 
 **In Stickschrift umwandeln** erstellt eine Stickschrift aus einer
 TrueType-Schrift, mit einem Namen, einem Größenbereich und einer Stichart.

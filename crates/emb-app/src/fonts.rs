@@ -115,16 +115,21 @@ pub fn convert_font(
         f.route_until(&progress.routed, &progress.stop, Some(font));
         stopped()?;
     }
-    // The coordinates of the file (P21 Milestone 6: rounded when the font is
-    // done, not before the tuning of the ends).
-    f.round_letters();
-    if !f.fill && (route || stitch == LetterStitch::Auto) {
+    let scored = !f.fill && (route || stitch == LetterStitch::Auto);
+    if scored {
         progress.step.store(STEP_SCORE, Relaxed);
         if stitch == LetterStitch::Auto {
             f.choose_fills(font, &[]);
             // The fill letters for large lettering (ADR 0120).
             f.add_fill_letters(font);
         }
+    }
+    // The coordinates of the file (P21 Milestone 6: rounded when the font is
+    // done, not before the tuning of the ends). As the font tool: after the
+    // choice of the fill letters and before the score (the audit of P21:
+    // the app rounded before that choice).
+    f.round_letters();
+    if scored {
         f.measure_quality(font);
     }
     Ok(f)
@@ -913,17 +918,17 @@ mod tests {
             assert!(score >= emb_letter::quality::LIMIT, "{}: {score}", f.label());
         }
         assert_eq!(st.fonts.score(&FontRef::new("Lato", "Bold")), None);
-        assert_eq!(st.fonts.score(&FontRef::embroidery("Varsity", "")), Some(94));
+        assert_eq!(st.fonts.score(&FontRef::embroidery("Varsity", "")), Some(98));
         // By quality: the best first, the fonts with no score last.
         let mut all = embroidery.clone();
         all.insert(3, FontRef::new("Lato", "Bold"));
         by_quality(&mut all, &st.fonts);
         let scores: Vec<Option<u8>> = all.iter().map(|f| st.fonts.score(f)).collect();
-        assert_eq!(all[0].family, "Varsity");
         assert!(scores.last().unwrap().is_none());
         // The fill fonts are a group of their own after the fonts with
         // satin letters, the best first in each group.
         let first_fill = all.iter().position(|f| st.fonts.is_fill(f)).unwrap();
+        assert_eq!(scores[0], scores[..first_fill].iter().flatten().max().copied());
         assert_eq!(first_fill, emb_letter::bundled::P17_EMBROIDERY);
         assert!(all[first_fill..all.len() - 1].iter().all(|f| st.fonts.is_fill(f)));
         for group in [&scores[..first_fill], &scores[first_fill..]] {
@@ -968,7 +973,8 @@ mod tests {
     /// `tools/make-embroidery-fonts.py`): each font reads, has its license
     /// text and a quality score of the limit or more, and is not a font of
     /// the program. The package of the fonts of earlier versions has the
-    /// fonts below the limit.
+    /// fonts that were below the limit when they left the program
+    /// (`BELOW_LIMIT` of the tool: no limit for them).
     #[test]
     fn the_font_packages_have_fonts_above_the_limit() {
         use emb_letter::quality::LIMIT;
@@ -980,7 +986,7 @@ mod tests {
             ("serif", 6),
             ("script", 12),
             ("hand", 8),
-            ("earlier", 4),
+            ("earlier", 1),
         ] {
             let path = dir.join(format!("shokujodx-fonts-{name}.zip"));
             let bytes = std::fs::read(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
@@ -1008,8 +1014,9 @@ mod tests {
                 // A font keeps its place when a change of the converter
                 // changes its score (ADR 0116): a font of a package can
                 // have a score of BUNDLE or more, and a font of earlier
-                // versions can have any score (P21 Milestone 6: Fat Face
-                // Serif has 87 now; the owner decides if it comes back).
+                // versions can have any score (after P21 the owner brought
+                // back the three that had more than 85; Great Vibes, 75,
+                // stays).
                 if name == "earlier" {
                     assert!(emb_letter::bundled::EARLIER.contains(&font.family.as_str()), "{file}");
                 } else {
@@ -1024,7 +1031,7 @@ mod tests {
                 families.push(font.family.clone());
             }
         }
-        assert_eq!(families.len(), 72);
+        assert_eq!(families.len(), 69);
         assert!(
             emb_letter::bundled::EARLIER
                 .iter()

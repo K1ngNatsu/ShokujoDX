@@ -1,11 +1,14 @@
 //! Tuning of the letters of a converted font with the outline of the
 //! source font (P17 Milestone 5, ADR 0113).
 //!
-//! [`extend_ends`]: the stroke finder ends a column where its stroke meets
-//! another stroke. At a sharp corner (the top of "N", the corners of "Z")
-//! that leaves a part of the outline with no stitches, and the two columns
-//! do not touch. The ends of the columns go on into such a part, as far as
-//! the outline, so the corner has stitches and the columns join.
+//! [`extend_ends`]: a column can end before the outline does (where its
+//! stroke meets another stroke in a glyph with no split, or at a corner
+//! that the split of the outline does not cut). That leaves a part of the
+//! outline with no stitches, and the two columns do not touch. The ends of
+//! the columns go on into such a part, as far as the outline, where that
+//! adds no needle point out of the outline (P21 Milestone 6). In Latin
+//! letters, the split cuts the top of an "N" and the corners of a "Z"
+//! first (`split::notch_cut`, `split::elbow_cut`).
 
 use emb_geom::{BBox, Path, Point};
 use emb_model::ObjectKind;

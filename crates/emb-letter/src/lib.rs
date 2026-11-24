@@ -97,7 +97,7 @@ pub mod bundled {
     /// (ADR 0115). The fonts from [`P17_EMBROIDERY`] are the fill fonts
     /// (ADR 0117). Each one has a quality score of
     /// [`crate::quality::LIMIT`] or more ([`quality`]).
-    pub const EMBROIDERY: [(&str, &[u8]); 65] = [
+    pub const EMBROIDERY: [(&str, &[u8]); 68] = [
         (
             "Block Sans",
             include_bytes!(concat!(env!("OUT_DIR"), "/block-sans.embfont.z")),
@@ -303,6 +303,20 @@ pub mod bundled {
             "Balsamiq Sans",
             include_bytes!(concat!(env!("OUT_DIR"), "/balsamiq-sans.embfont.z")),
         ),
+        // Three fonts of earlier versions, back after the audit of P21
+        // (from [`P21_EMBROIDERY`]).
+        (
+            "Slab Heavy",
+            include_bytes!(concat!(env!("OUT_DIR"), "/slab-heavy.embfont.z")),
+        ),
+        (
+            "Fat Face Serif",
+            include_bytes!(concat!(env!("OUT_DIR"), "/fat-face-serif.embfont.z")),
+        ),
+        (
+            "Shrikhand",
+            include_bytes!(concat!(env!("OUT_DIR"), "/shrikhand.embfont.z")),
+        ),
         // The fill fonts (ADR 0117).
         (
             "Block Sans Fill",
@@ -394,21 +408,32 @@ pub mod bundled {
     pub const P10_EMBROIDERY: usize = 9;
     /// The number of bundled embroidery fonts before P17 Milestone 7 (the
     /// corpus designs `embroidery-fonts-5` to `-7` show the fonts from this
-    /// one). Four fonts of earlier versions are not in the program now:
-    /// their quality score is below the limit (ADR 0115); [`EARLIER`].
+    /// one). Four fonts of earlier versions left the program then: their
+    /// quality score was below the limit (ADR 0115). Three of them are back
+    /// (from [`P21_EMBROIDERY`]); [`EARLIER`] is the other one.
     pub const P11_EMBROIDERY: usize = 26;
+    /// The number of bundled embroidery fonts with columns before the audit
+    /// of P21. The fonts from this one to [`P17_EMBROIDERY`] are three fonts
+    /// of earlier versions that the owner brought back into the program
+    /// (2026-11-24: the fonts of the package of earlier versions with a
+    /// score over 85; ADR 0116). The corpus design `embroidery-fonts-9`
+    /// shows them.
+    pub const P21_EMBROIDERY: usize = 55;
     /// The number of bundled embroidery fonts before the fill fonts (ADR
     /// 0117; [`crate::EmbFont::fill`]). The fonts from this one are the
     /// fill fonts: the same source fonts as the fonts with their names
     /// (Block Sans Fill: Block Sans), with all letters as fills, for large
-    /// text. The corpus design `embroidery-fonts-8` shows them.
-    pub const P17_EMBROIDERY: usize = 55;
+    /// text. The corpus design `embroidery-fonts-8` shows them. A new font
+    /// with columns goes before them, a new fill font at the end.
+    pub const P17_EMBROIDERY: usize = 58;
 
-    /// The embroidery fonts of earlier versions that are not in the program
-    /// now, because their quality score is below
-    /// [`crate::quality::LIMIT`]. They are in the font package
-    /// `shokujodx-fonts-earlier.zip`.
-    pub const EARLIER: [&str; 4] = ["Slab Heavy", "Fat Face Serif", "Shrikhand", "Great Vibes"];
+    /// The embroidery font of earlier versions that is not in the program
+    /// now: its quality score was below [`crate::quality::LIMIT`] when it
+    /// left it (75 after P21). It is in the font package
+    /// `shokujodx-fonts-earlier.zip`. The other three fonts of that package
+    /// had more than 85 after P21, and the owner brought them back
+    /// ([`P21_EMBROIDERY`]).
+    pub const EARLIER: [&str; 1] = ["Great Vibes"];
 
     /// The quality scores of the fonts of [`EMBROIDERY`], from their files
     /// (`build.rs` makes the table).
@@ -461,9 +486,10 @@ mod tests {
     use super::*;
 
     /// Each file of letter corrections in `data/fonts/embroidery/corrections`
-    /// is for a bundled font, and the bundled font has its corrections:
+    /// has the name of its font, and a bundled font has its corrections:
     /// `tools/make-embroidery-fonts.py` ran after the last change of the
-    /// file (ADR 0112).
+    /// file (ADR 0112). The fonts of the font packages are checked in
+    /// `emb-app` (`packaging.rs`), which reads the packages.
     #[test]
     fn the_bundled_fonts_have_their_corrections() {
         let dir = std::path::Path::new("../../data/fonts/embroidery/corrections");
@@ -483,35 +509,11 @@ mod tests {
                 "the file name of {}",
                 c.family
             );
-            let font = bundled::embroidery(&c.family).unwrap_or_else(|| panic!("{name}: no bundled font {}", c.family));
-            for (ch, fix) in &c.letters {
-                let letter = font
-                    .letters
-                    .get(ch)
-                    .unwrap_or_else(|| panic!("{name}: the font has no {ch:?}"));
-                let steps = !(fix.order.is_empty() && fix.reverse.is_empty() && fix.join.is_empty());
-                assert_eq!(
-                    letter.fixed,
-                    fix.fixed.unwrap_or(fix.parts.is_some() || steps),
-                    "{name}: {ch:?} is not corrected in the font; make the fonts again"
-                );
-                if let Some(of) = fix.of.filter(|_| fix.parts.is_none()) {
-                    assert_eq!(letter.parts.len() + fix.join.len(), of, "{name}: the parts of {ch:?}");
-                }
-                if fix.parts.is_some() && !steps {
-                    // A shape gives the letter that the font has.
-                    let mut again = font.clone();
-                    again.set_letter(
-                        *ch,
-                        fix.apply(Some(letter))
-                            .unwrap_or_else(|e| panic!("{name}: {ch:?}: {e}")),
-                    );
-                    assert_eq!(&again.letters[ch], letter, "{name}: {ch:?}; make the fonts again");
-                }
-                for (i, tune) in &fix.tuning {
-                    assert_eq!(letter.tuning.get(*i), Some(tune), "{name}: the settings of {ch:?}");
-                }
-            }
+            let Some(font) = bundled::embroidery(&c.family) else {
+                continue;
+            };
+            let missing = c.missing_in(&font);
+            assert!(missing.is_empty(), "{name}: {missing:?}; make the fonts again");
         }
     }
 
@@ -567,13 +569,14 @@ mod tests {
         // The new fonts of P17 Milestone 7 came into the program with the
         // score of a font of the program; a font keeps its place while its
         // score is the limit or more (ADR 0116; P21 Milestone 6: the score
-        // of today counts the needle points, and Pangolin has 75).
+        // counts the needle points, and Pangolin had 75 then).
         for (family, _) in &bundled::EMBROIDERY[bundled::P11_EMBROIDERY..] {
             let q = bundled::quality(family).unwrap();
             assert!(q.score >= quality::LIMIT, "{family}: {q:?}");
         }
         assert_eq!(bundled::quality("no such font"), None);
-        assert_eq!(bundled::EMBROIDERY.len(), 65);
+        // 65, and three fonts of earlier versions back after the audit of P21.
+        assert_eq!(bundled::EMBROIDERY.len(), 68);
     }
 
     /// The score in a font file is the score of the font as it is. The

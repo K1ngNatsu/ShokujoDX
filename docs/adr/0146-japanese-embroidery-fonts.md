@@ -53,7 +53,9 @@ letters each time, with routes and a quality score (ADR 0113, 0115).
    Sans JP reserves the name "Source" and Zen Maru Gothic reserves none, so
    both keep their names. They are not routed with `--extend`: the stroke
    finder takes the ends to the corners (ADR 0143), and the end steps of
-   `--extend` would make the cut ends of crossings long again.
+   `--extend` would make the cut ends of crossings long again. (ADR 0154
+   changed this: the tool passes `--extend` to all fonts, and the converter
+   leaves the ends of kana and kanji as they are.)
 6. **The app reads a large embroidery font only when it is used**: for a
    font file larger than 4 MB in the fonts folder of the user, the font
    lists read its header (`EmbFont::load_header`: the names, the marks and

@@ -10,6 +10,55 @@ Este tema enumera los cambios de cada versión, la más reciente primero.
 **Ayuda > Novedades** lo abre. Después de una actualización, la página
 de inicio tiene un enlace a él.
 
+## Versión 0.5.0
+
+**Letras que mantienen la forma de la fuente.** El programa crea mejores
+letras a partir de las fuentes TrueType y OpenType, y las fuentes de
+bordado se han creado de nuevo con ello. Las puntadas de una columna se
+quedan dentro del contorno de la letra, los extremos de las columnas
+llegan a las esquinas de los trazos, y las puntadas que cruzan una
+columna no se cruzan entre sí. Donde dos trazos se juntan en una
+esquina, uno sigue hasta la esquina exterior y el otro termina recto en
+su lado. Una columna que termina en otra columna se borda antes que
+ella. Los paquetes de fuentes de esta versión también tienen las nuevas
+letras: impórtelos de nuevo.
+
+**Tres fuentes vuelven.** El programa tiene 68 fuentes de bordado. Slab
+Heavy, Fat Face Serif y Shrikhand están de nuevo en el programa: con las
+mejores letras, su puntuación de calidad es 87, 91 y 95. Great Vibes
+sigue en el paquete de fuentes **Fonts of earlier versions**. Fat Face
+Serif tiene trazos muy finos, por eso su tamaño más pequeño es 42,5 mm.
+Un diseño que tiene una de las tres fuentes la encuentra de nuevo en el
+programa.
+
+**Órdenes de bordado más rápidos.** Las letras en una fuente TrueType u
+OpenType de su ordenador reciben el orden de bordado unas cuatro veces
+más rápido: las letras y los dígitos de una fuente con serifas como
+Georgia en 8 s, antes 33 s. Los órdenes de bordado son los mismos que
+antes.
+
+**Paneles y cinta de opciones.** Los paneles laterales empiezan como un
+grupo a la derecha, y un panel cerrado se abre de nuevo en ese grupo.
+**Restablecer los paneles** (en las Opciones y en **Ver > Paneles**)
+pone los paneles donde empiezan. En una ventana estrecha, las listas de
+un panel plegado de la cinta (por ejemplo la máquina y el bastidor en la
+pestaña Diseño) se abren de nuevo.
+
+**Guías desde las reglas.** Haga clic derecho en una regla (en una
+pantalla táctil, manténgala pulsada) para su menú: **Añadir guía en**
+ese lugar, las herramientas **Línea de construcción** y **Punto de
+construcción**, y **Quitar guías**.
+
+**Pantallas táctiles.** Una barra bajo el lienzo tiene las teclas de las
+herramientas de dibujo: **Siguiente** o **Terminar**, **Quitar punto**,
+**Cancelar** y **Hecho**, que vuelve a Seleccionar. Así puede usar cada
+herramienta sin teclado.
+
+**Otros cambios.** **Archivo > Buscar actualizaciones…** también está
+allí. Las letras nuevas vuelven a la herramienta Seleccionar.
+**Reconocer objetos** encuentra una columna de satén densa con puntadas
+cortas como columna, no como pespunte.
+
 ## Versión 0.4.0
 
 **La vista de producto.** **Diseño > Producto** muestra el diseño sobre

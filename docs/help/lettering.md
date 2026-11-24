@@ -35,7 +35,7 @@ There are two kinds of fonts:
 
 - **Embroidery fonts** have ready-made embroidery letters. They sew best.
   Each has a **size range** (the capital height): the font list shows it,
-  and Object Properties warns when the text is out of the range. 65
+  and Object Properties warns when the text is out of the range. 68
   embroidery fonts come with the program.
 - **TrueType** and OpenType fonts of the computer. The program makes the
   letters from their outlines: columns that follow the strokes
@@ -85,7 +85,7 @@ measures:
 
 - how much of the shapes of the letters the stitches cover,
 - how much of the satin columns is too narrow at the smallest size of the
-  font,
+  font (the pointed end of a column does not count),
 - how much of the satin columns has stitches that are too long at the
   largest size of the font,
 - how much of the stitches is outside the shapes of the letters,
@@ -103,10 +103,11 @@ Gothic, with the kana and the 2,136 jōyō kanji). Download a package, then
 add it with **File > My Assets > Import a package**. The program downloads
 nothing itself.
 
-Four fonts of earlier versions have a score below 65: Slab Heavy, Fat
-Face Serif, Shrikhand and Great Vibes. They are not in the program now.
-A design that has one of them stays as it is. To change its text, add the
-font package **Fonts of earlier versions**.
+One font of earlier versions is not in the program now: Great Vibes. Its
+score was below 65 when it left the program. A design that has it stays
+as it is. To change its text, add the font package **Fonts of earlier
+versions**. Slab Heavy, Fat Face Serif and Shrikhand left the program
+with it, and they are in the program again.
 
 **Convert to embroidery font** makes an embroidery font from a TrueType
 font, with a name, a size range and a stitch type. Check that the license

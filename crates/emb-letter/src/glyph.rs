@@ -27,6 +27,9 @@ pub const AUTO_RUN_STITCH_MM: f64 = 1.8;
 /// The step along a column for its middle width, in mm (as the lettering
 /// bench measures it).
 const THIN_STEP_MM: f64 = 0.25;
+/// [`thin_run`] measures a column at this many places at most (a column of
+/// 5 m at [`THIN_STEP_MM`]; a stitch object is at most 3 m).
+const THIN_MAX_PAIRS: f64 = 20_000.0;
 /// The stitch length of the rows of a tatami column of `Auto`, in mm.
 pub const AUTO_TATAMI_STITCH_MM: f64 = 3.5;
 /// A part of the glyph that the strokes do not cover is broad (a stroke
@@ -68,22 +71,55 @@ impl GlyphShapes {
     /// [`GlyphShapes::new`] with the outline split into strokes first
     /// (`stroke::Split::for_char` of the character of the glyph, ADR 0152).
     ///
-    /// A split with bridges to curves (the brackets of serifs, the shoulder
-    /// of an "n") is kept only if its columns have no more faults than the
-    /// split without them ([`split_faults`]): in some shapes (the bowls of a
-    /// condensed font) the pieces sew worse.
+    /// The cuts of elbows (ADR 0159), the cuts from notches that go along a
+    /// stroke (ADR 0160), and then the bridges to curves (the brackets of
+    /// serifs, the shoulder of an "n") and the cuts of balls, are kept only
+    /// if the columns have no more faults than the split without them
+    /// ([`split_faults`]): in some shapes (the bowls of a condensed font, a
+    /// short hook at the end of a stroke, the stem of a heavy "n" beside its
+    /// narrow counter) the pieces sew worse.
     pub fn with_split(rings: &[Vec<Point>], cap_height: f64, split: crate::stroke::Split) -> GlyphShapes {
+        use crate::stroke::{Optional, Split};
         let fills = regions(rings);
-        let make = |soft: bool| {
-            let (mut strokes, used) = crate::stroke::strokes_split_soft(rings, cap_height, split, soft);
+        // A glyph much larger than its capital height (a damaged font) is
+        // not a letter, and it is not split: each piece gets a grid of the
+        // largest size (`grid::MAX_SIDE`), and the measure of the faults
+        // sews the columns at 25 mm for each capital height, so such a
+        // glyph took ten times as long as with no split (the audit of P21).
+        let side =
+            emb_geom::BBox::from_points(rings.iter().flatten().copied()).map_or(0.0, |b| b.width().max(b.height()));
+        let split = if side > SPLIT_MAX_CAPS * cap_height {
+            Split::Off
+        } else {
+            split
+        };
+        let make = |with: Optional| {
+            let (mut strokes, used) = crate::stroke::strokes_split_soft(rings, cap_height, split, with);
             add_missed_strokes(&fills, &mut strokes, cap_height);
             tune_ends(&fills, &mut strokes, cap_height);
+            untangle(&mut strokes, cap_height);
             (strokes, used)
         };
-        let (mut strokes, used) = make(true);
-        if used {
-            let (without, _) = make(false);
-            if split_faults(&without, &fills, cap_height) < split_faults(&strokes, &fills, cap_height) {
+        let mut with = Optional::ALL;
+        let (mut strokes, used) = make(with);
+        let faults = |s: &Strokes| split_faults(s, &fills, cap_height);
+        if used.elbows {
+            let (without, _) = make(Optional { elbows: false, ..with });
+            if faults(&without) < faults(&strokes) {
+                strokes = without;
+                with.elbows = false;
+            }
+        }
+        if used.along {
+            let (without, _) = make(Optional { along: false, ..with });
+            if faults(&without) < faults(&strokes) {
+                strokes = without;
+                with.along = false;
+            }
+        }
+        if used.soft {
+            let (without, _) = make(Optional { soft: false, ..with });
+            if faults(&without) < faults(&strokes) {
                 strokes = without;
             }
         }
@@ -199,7 +235,13 @@ pub fn auto_stitches(parts: &mut [&mut ObjectKind], thin: bool) {
 /// is narrower than): its middle line, a bean stitch if it is at least
 /// [`AUTO_BEAN_MM`] long. `None` for a wider column.
 fn thin_run(g: &emb_model::SatinGeometry) -> Option<ObjectKind> {
-    let pairs = crate::quality::column_pairs(g, THIN_STEP_MM);
+    // At most `THIN_MAX_PAIRS` pairs: the time for lettering much larger
+    // than a design can be went up with its height (the audit of P21).
+    let long: f64 = crate::quality::column_widths(g, f64::INFINITY)
+        .iter()
+        .map(|(_, l)| l)
+        .sum();
+    let pairs = crate::quality::column_pairs(g, THIN_STEP_MM.max(long / THIN_MAX_PAIRS));
     let mut widths: Vec<(f64, f64)> = pairs
         .iter()
         .map(|(a, b, l)| (a.distance(*b), *l))
@@ -355,11 +397,12 @@ fn tune_ends(fills: &[(Vec<Point>, Vec<Vec<Point>>)], s: &mut Strokes, cap_heigh
     crate::stroke::trim_column_ends(&mut s.satins, &rings, cell);
 }
 
-/// The area of a satin: its two rails as one ring.
-fn satin_region(g: &emb_model::SatinGeometry) -> Region {
+/// The outline of a satin column: rail A, then rail B back. It crosses
+/// itself where the rails cross.
+fn satin_ring(g: &emb_model::SatinGeometry) -> Vec<Point> {
     let a: Vec<Point> = g.rail_a.flatten(0.5).into_iter().flat_map(|p| p.points).collect();
     let b: Vec<Point> = g.rail_b.flatten(0.5).into_iter().flat_map(|p| p.points).collect();
-    Region::new(a.into_iter().chain(b.into_iter().rev()).collect(), Vec::new())
+    a.into_iter().chain(b.into_iter().rev()).collect()
 }
 
 /// The edges of a region as closed lines.
@@ -422,7 +465,7 @@ fn add_missed_strokes(fills: &[(Vec<Point>, Vec<Vec<Point>>)], s: &mut Strokes, 
         return;
     }
     let w = s.max_width;
-    let covered = region::union(&s.satins.iter().map(satin_region).collect::<Vec<_>>(), &[]);
+    let covered = region::fill_nonzero(&s.satins.iter().map(satin_ring).collect::<Vec<_>>());
     // The edges of the satins, a little wide, to find the edges of a part
     // that touch them.
     let near = region::offset(&covered, 0.01 * w, Join::Miter);
@@ -458,7 +501,11 @@ fn add_missed_strokes(fills: &[(Vec<Point>, Vec<Vec<Point>>)], s: &mut Strokes, 
             if more.coverage >= 0.5 {
                 let min_area = LEFT_MIN_SHARE * g_area(&rings);
                 for satin in more.satins {
-                    if satin_region(&satin).area() >= min_area {
+                    let area: f64 = region::fill_nonzero(&[satin_ring(&satin)])
+                        .iter()
+                        .map(Region::area)
+                        .sum();
+                    if area >= min_area {
                         s.max_width = s.max_width.max(more.max_width);
                         added.push(satin);
                     }
@@ -467,17 +514,42 @@ fn add_missed_strokes(fills: &[(Vec<Point>, Vec<Vec<Point>>)], s: &mut Strokes, 
         }
     }
     s.satins.extend(added);
-    let areas: Vec<Region> = s.satins.iter().map(satin_region).collect();
-    let on_glyph: f64 = region::intersection(&glyph, &region::union(&areas, &[]))
-        .iter()
-        .map(Region::area)
-        .sum();
+    let areas = region::fill_nonzero(&s.satins.iter().map(satin_ring).collect::<Vec<_>>());
+    let on_glyph: f64 = region::intersection(&glyph, &areas).iter().map(Region::area).sum();
     s.coverage = ((on_glyph + slivers) / glyph_area).clamp(0.0, 1.0);
 }
 
-/// Outer rings and their holes: a ring inside an even number of other
-/// rings is an outer ring; a ring inside an odd number is a hole of the
-/// smallest outer ring around it.
+/// No pair across a column crosses the pair before it (P21 Milestone 12):
+/// where it would (a fast turn, a slanted end, the joint of a crossbar),
+/// the column gets rungs on which one side stays
+/// (`emb_stitch::satin::Column::untangled_rungs`).
+fn untangle(strokes: &mut Strokes, cap_height: f64) {
+    for g in &mut strokes.satins {
+        untangle_column(g, cap_height);
+    }
+}
+
+fn untangle_column(g: &mut emb_model::SatinGeometry, cap_height: f64) {
+    if let Some(rungs) = emb_stitch::satin::Column::new(g).and_then(|c| c.untangled_rungs(UNTANGLE_STEP * cap_height)) {
+        g.rungs = rungs;
+    }
+}
+
+/// [`untangle`] for the parts of a letter with the capital height
+/// `cap_height`: the layout does it last, as the pivots of the rungs do not
+/// stay when the points are rounded (an embroidery font file).
+pub fn untangle_parts(parts: &mut [ObjectKind], cap_height: f64) {
+    for p in parts {
+        if let ObjectKind::Satin { geometry, .. } = p {
+            untangle_column(geometry, cap_height);
+        }
+    }
+}
+
+/// The pairs that [`untangle`] checks are this part of the capital height
+/// apart (0.2 mm at 25 mm, as the letter fault bench).
+const UNTANGLE_STEP: f64 = 0.008;
+
 /// The capital height (mm) at which [`split_faults`] measures.
 const SPLIT_CAP_MM: f64 = 25.0;
 /// The pairs across a column for [`split_faults`] are this far apart (mm),
@@ -486,6 +558,9 @@ const SPLIT_STEP_MM: f64 = 0.2;
 /// A pair that crosses the next is a smaller fault than a needle point out
 /// of the letter: it counts as this much (with each 1 mm2 open as 1).
 const SPLIT_CROSS: f64 = 0.5;
+/// A glyph larger than this many capital heights is not split
+/// ([`GlyphShapes::with_split`]).
+const SPLIT_MAX_CAPS: f64 = 10.0;
 
 /// The faults of the columns of `strokes` in the outline `fills` (font
 /// units), for the choice of a split: the needle points out of the outline
@@ -527,10 +602,7 @@ fn split_faults(strokes: &Strokes, fills: &[(Vec<Point>, Vec<Vec<Point>>)], cap_
         .map(|c| {
             c.pairs(SPLIT_STEP_MM)
                 .windows(2)
-                .filter(|w| {
-                    Point::crossing(w[0].0, w[0].1, w[1].0, w[1].1)
-                        .is_some_and(|(u, v)| (1e-3..=1.0 - 1e-3).contains(&u) && (1e-3..=1.0 - 1e-3).contains(&v))
-                })
+                .filter(|w| emb_stitch::satin::pairs_cross(w[0], w[1]))
                 .count()
         })
         .sum::<usize>();
@@ -539,6 +611,9 @@ fn split_faults(strokes: &Strokes, fills: &[(Vec<Point>, Vec<Vec<Point>>)], cap_
         + (1.0 - strokes.coverage).max(0.0) * area
 }
 
+/// Outer rings and their holes: a ring inside an even number of other
+/// rings is an outer ring; a ring inside an odd number is a hole of the
+/// smallest outer ring around it.
 fn regions(rings: &[Vec<Point>]) -> Vec<(Vec<Point>, Vec<Vec<Point>>)> {
     let area = |r: &[Point]| emb_geom::region::ring_signed_area(r).abs();
     let inside =
@@ -589,22 +664,25 @@ mod tests {
         // the comma, a stem of the pilcrow); Auto made them fill letters in
         // satin fonts. It finds the stems of "p", "q" and "u" now (the
         // stroke finder goes on along the pen stroke at a junction).
+        // Since P21 Milestone 12 the first pass covers the comma of Lato (a
+        // rail follows the side of the tail that swells).
+        let mut second = 0;
         for (family, c) in [("Lato", ','), ("Lato", '\u{b6}'), ("Pacifico", '\u{b6}')] {
             let (first, shapes) = passes(family, c);
-            assert!(
-                first.coverage < AUTO_MIN_COVERAGE,
-                "{family} {c}: the first pass covers it now"
-            );
-            assert!(
-                shapes.strokes.satins.len() > first.satins.len(),
-                "{family} {c}: no satin for the lost stroke"
-            );
+            if first.coverage < AUTO_MIN_COVERAGE {
+                second += 1;
+                assert!(
+                    shapes.strokes.satins.len() > first.satins.len(),
+                    "{family} {c}: no satin for the lost stroke"
+                );
+            }
             assert!(
                 shapes.strokes.coverage >= AUTO_MIN_COVERAGE,
                 "{family} {c}: coverage {:.2}",
                 shapes.strokes.coverage
             );
         }
+        assert!(second > 0, "no character needs the second pass");
     }
 
     #[test]
@@ -620,7 +698,14 @@ mod tests {
                 "{family} {c}: coverage {:.2}",
                 first.coverage
             );
-            assert_eq!(shapes.strokes.satins, first.satins, "{family} {c}");
+            // The same columns (the rungs can change: `untangle`).
+            let rails = |s: &Strokes| {
+                s.satins
+                    .iter()
+                    .map(|g| (g.rail_a.clone(), g.rail_b.clone()))
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(rails(&shapes.strokes), rails(&first), "{family} {c}");
         }
     }
 
@@ -738,6 +823,48 @@ mod tests {
         ];
         run(&mut parts);
         assert_eq!(patterns(&parts), [satin, satin, tatami, ColumnPattern::Zigzag]);
+    }
+
+    /// A glyph much larger than its capital height is not split (the audit
+    /// of P21): a "T" 11 capital heights high has the columns of the stroke
+    /// finder with no split.
+    #[test]
+    fn a_glyph_much_larger_than_its_capital_height_is_not_split() {
+        let t: Vec<Point> = [
+            (-10.0, 0.0),
+            (10.0, 0.0),
+            (10.0, 1080.0),
+            (50.0, 1080.0),
+            (50.0, 1100.0),
+            (-50.0, 1100.0),
+            (-50.0, 1080.0),
+            (-10.0, 1080.0),
+        ]
+        .iter()
+        .map(|&(x, y)| Point::new(x, y))
+        .collect();
+        let rings = [t];
+        let split = GlyphShapes::with_split(&rings, 100.0, crate::stroke::Split::Notches);
+        let plain = GlyphShapes::new(&rings, 100.0);
+        assert!(!plain.strokes.satins.is_empty());
+        assert_eq!(split.strokes.satins, plain.strokes.satins);
+    }
+
+    /// A column is measured at a limited number of places (the audit of
+    /// P21: the time for lettering much higher than a design can be went up
+    /// with its height).
+    #[test]
+    fn a_very_long_column_is_measured_at_few_places() {
+        let rail = |y: f64| Path::new().move_to(Point::new(0.0, y)).line_to(Point::new(1e9, y));
+        let g = emb_model::SatinGeometry {
+            rail_a: rail(-0.25),
+            rail_b: rail(0.25),
+            rungs: Vec::new(),
+        };
+        let Some(ObjectKind::Running { path, .. }) = thin_run(&g) else {
+            panic!("a column of 0.5 mm is a run");
+        };
+        assert!(path.points().count() <= THIN_MAX_PAIRS as usize + 2);
     }
 
     #[test]

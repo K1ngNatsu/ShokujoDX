@@ -57,7 +57,7 @@ ShokujoDX makes the stitches and writes the file for your machine.
   buttonholes and decorative borders.
 
 **Lettering**
-- 65 embroidery fonts, each with a quality score, and more in font
+- 68 embroidery fonts, each with a quality score, and more in font
   packages; plus the TrueType and OpenType fonts of your computer.
 - Text shaping: ligatures, the joined letters of script fonts, Arabic and
   Devanagari.
@@ -197,7 +197,8 @@ Phases 1 to 14 of the roadmap are done, and their sew-out tests passed on
 the reference machine, a Husqvarna Viking Topaz 20. Phases 16 to 18 and
 20 (the product view, better lettering, designs of other programs, the 3D
 stitch view and Japanese lettering) are done in software and are in
-version 0.4.0; their tests on fabric and with users are open. Also open: tests with new users, and tests on cap frames,
+version 0.4.0; their tests on fabric and with users are open. Phase 21
+(letter shapes) is done in software; its sew-out is open. Also open: tests with new users, and tests on cap frames,
 cutwork machines and other machines that the owner does not have. Sew-out
 results from **your** machine help a lot:
 see [CONTRIBUTING.md](CONTRIBUTING.md).

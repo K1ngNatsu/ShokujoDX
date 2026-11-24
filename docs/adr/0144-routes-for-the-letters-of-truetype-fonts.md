@@ -1,7 +1,8 @@
 # ADR 0144: Routes for the letters of TrueType and OpenType fonts
 
 Date: 2026-11-20 · Status: Accepted (P20 Milestone 4,
-`docs/design/p20-plan.md`)
+`docs/design/p20-plan.md`). ADR 0161 makes the route faster; the routes
+stay the same.
 
 ## Context
 

@@ -271,6 +271,47 @@ fn the_release_has_the_font_packages() {
     assert_eq!(packages, 7);
 }
 
+/// Each file of letter corrections (ADR 0112) is for a font of the program
+/// or of a font package, and the font of a package has its corrections:
+/// `tools/make-embroidery-fonts.py` made the packages after the last change
+/// of the file. `emb-letter` checks the fonts of the program.
+#[test]
+fn the_font_packages_have_their_corrections() {
+    let mut fonts = std::collections::BTreeMap::new();
+    for entry in std::fs::read_dir(root().join("data/font-packages"))
+        .expect("data/font-packages")
+        .flatten()
+    {
+        let bytes = std::fs::read(entry.path()).expect("a package");
+        for (name, data) in crate::share::unzip(&bytes).expect("a zip file") {
+            if let Some(slug) = name.strip_prefix("fonts/").and_then(|n| n.strip_suffix(".embfont")) {
+                fonts.insert(slug.to_string(), data);
+            }
+        }
+    }
+    let Ok(files) = std::fs::read_dir(root().join("data/fonts/embroidery/corrections")) else {
+        return;
+    };
+    for path in files.flatten().map(|e| e.path()) {
+        let c = emb_letter::correction::Corrections::load(&path).expect("a file of corrections");
+        if emb_letter::bundled::embroidery(&c.family).is_some() {
+            continue;
+        }
+        let slug = path.file_stem().and_then(|s| s.to_str()).unwrap_or_default();
+        let data = fonts.get(slug).unwrap_or_else(|| {
+            panic!(
+                "{}: no font {} in the program or in a package",
+                path.display(),
+                c.family
+            )
+        });
+        let font = emb_letter::embfont::EmbFont::from_json(std::str::from_utf8(data).expect("text"))
+            .unwrap_or_else(|e| panic!("{slug}: {e}"));
+        let missing = c.missing_in(&font);
+        assert!(missing.is_empty(), "{slug}: {missing:?}; make the fonts again");
+    }
+}
+
 /// The release checks of the thumbnails use a test design of the
 /// repository, not a sample in a package (there are none, ADR 0080), and
 /// the program can open it.

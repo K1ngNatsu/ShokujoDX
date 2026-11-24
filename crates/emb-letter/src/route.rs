@@ -51,12 +51,6 @@ const _: () = assert!(MOST_PARTS <= 64);
 const BEAM: usize = 12;
 /// The number of steps along the end of a column where a run can start.
 const EDGE_POINTS: usize = 8;
-/// A letter goes on into the next letter if a stroke of it ends this near
-/// to the end of its place in the line, or after it (a part of the capital
-/// height). P21: 0 (it was 0.03): the end of a column reaches the corner of
-/// its stroke now, and the feet of an "A" at the edge of its place were
-/// taken as a tail (a run from the left foot, sewn as one long stitch).
-const TOUCH: f64 = 0.0;
 /// For a letter with a tail: a route that ends 1 mm nearer to the end of
 /// the tail is as good as a route with this much less travel, in mm.
 const TAIL_END: f64 = 12.0;
@@ -206,11 +200,6 @@ fn nearest_on(rings: &[Vec<Point>], p: Point) -> Point {
 /// [`area_of`]).
 type Area = (Vec<Vec<Point>>, Vec<Vec<Point>>);
 
-/// `p` is inside an odd number of `rings`.
-fn in_rings(rings: &[Vec<Point>], p: Point) -> bool {
-    rings.iter().filter(|r| emb_geom::region::ring_contains(r, p)).count() % 2 == 1
-}
-
 /// For each part, the columns that the middle of an end of it lies in, as
 /// bits; not where each of two columns ends in the other.
 fn joints(parts: &[ObjectKind]) -> Vec<u64> {
@@ -234,7 +223,7 @@ fn end_joints(parts: &[ObjectKind]) -> Vec<[u64; 2]> {
         .iter()
         .map(|k| matches!(k, ObjectKind::Satin { .. }).then(|| area_of(k)))
         .collect();
-    let inside = in_rings;
+    let inside = emb_geom::region::rings_contain;
     let mut out = vec![[0u64; 2]; n];
     for (j, part) in parts[..n].iter().enumerate() {
         let (ObjectKind::Satin { .. }, Some((s, e))) = (part, part_edges(part)) else {
@@ -301,6 +290,26 @@ struct Router {
     /// not sewn.
     joins: RefCell<HashMap<(EdgeKey, u64), Rc<Joins>>>,
     links: HashMap<(usize, usize, usize, u64), Link>,
+    /// The map of the passable cells (see [`Router::passage`]).
+    passage: RefCell<Passage>,
+}
+
+/// The cells that a run can go through while the set of parts `unsewn` is
+/// not sewn (ADR 0161), each made when a search first asks for it: the
+/// value of [`Router::passable`] (negative: not passable), and the group
+/// of each passable cell that a flood fill reached (the passable cells
+/// that a run can go along from one to the other have the same group). A
+/// cell is for the set of now if its `stamp` is `set`, so another set needs
+/// no new memory and no new values in all the cells (with a new map for
+/// each set, the converter, which routes 16 letters at the same time, took
+/// two times as long).
+struct Passage {
+    unsewn: u64,
+    set: u32,
+    stamp: Vec<u32>,
+    mid: Vec<f64>,
+    group: Vec<u32>,
+    groups: u32,
 }
 
 impl Router {
@@ -358,6 +367,14 @@ impl Router {
             near: RefCell::new(HashMap::new()),
             joins: RefCell::new(HashMap::new()),
             links: HashMap::new(),
+            passage: RefCell::new(Passage {
+                unsewn: 0,
+                set: 0,
+                stamp: Vec::new(),
+                mid: Vec::new(),
+                group: Vec::new(),
+                groups: 0,
+            }),
         })
     }
 
@@ -511,12 +528,127 @@ impl Router {
         if !self.in_letter(idx) {
             return None;
         }
-        self.pieces
+        let inside = self
+            .pieces
             .iter()
             .enumerate()
             .filter(|(i, p)| unsewn & (1 << i) != 0 && p.dist[idx] >= p.edge)
             .map(|(_, p)| (p.dist[idx] / (0.8 * p.half).max(1e-9)).min(1.0))
-            .reduce(f64::max)
+            .reduce(f64::max);
+        if inside.is_some() {
+            return inside;
+        }
+        // Where two parts that are not sewn touch (the two sides of a
+        // bridge of the split, ADR 0156), the cell is near the edge of
+        // each, but the parts cover all round it: the run can go across.
+        let edge = self
+            .pieces
+            .iter()
+            .enumerate()
+            .filter(|(i, p)| unsewn & (1 << i) != 0 && p.mask[idx])
+            .map(|(_, p)| p.edge)
+            .reduce(f64::max)?;
+        let n = (edge / self.grid.cell).ceil() as isize;
+        let (ci, cj) = (idx % self.grid.w, idx / self.grid.w);
+        for dj in -n..=n {
+            for di in -n..=n {
+                let (i, j) = (ci as isize + di, cj as isize + dj);
+                if i < 0 || j < 0 || i as usize >= self.grid.w || j as usize >= self.grid.h {
+                    return None;
+                }
+                let k = self.grid.idx(i as usize, j as usize);
+                if self.grid.center_of(k).distance(self.grid.center_of(idx)) <= edge
+                    && !(self.covered(k, unsewn) && self.in_letter(k))
+                {
+                    return None;
+                }
+            }
+        }
+        Some(0.0)
+    }
+
+    /// The map of the passable cells while the parts of `unsewn` are not
+    /// sewn (ADR 0161), for all the links of that set: a cell is checked
+    /// one time for each set, not one time for each search (Georgia "H":
+    /// 183 million checks of a cell, each over all the parts, for 31,000
+    /// searches). The search of all orders asks for one set at a time.
+    fn passage(&self, unsewn: u64) -> std::cell::RefMut<'_, Passage> {
+        let mut p = self.passage.borrow_mut();
+        if p.stamp.is_empty() {
+            let size = self.grid.w * self.grid.h;
+            p.stamp = vec![0; size];
+            p.mid = vec![0.0; size];
+            p.group = vec![u32::MAX; size];
+        }
+        if p.set == 0 || p.unsewn != unsewn {
+            p.unsewn = unsewn;
+            p.groups = 0;
+            p.set = p.set.wrapping_add(1);
+            if p.set == 0 {
+                // After 2^32 sets: no stamp of an earlier set stays.
+                p.stamp.fill(0);
+                p.set = 1;
+            }
+        }
+        p
+    }
+
+    /// [`Router::passable`] of the cell `idx` in the map `p` (negative: not
+    /// passable).
+    fn mid(&self, p: &mut Passage, idx: usize) -> f64 {
+        if p.stamp[idx] != p.set {
+            p.stamp[idx] = p.set;
+            p.mid[idx] = self.passable(idx, p.unsewn).unwrap_or(-1.0);
+            p.group[idx] = u32::MAX;
+        }
+        p.mid[idx]
+    }
+
+    /// The group of the cell `idx` if a flood fill reached it.
+    fn group_of(p: &Passage, idx: usize) -> Option<u32> {
+        (p.stamp[idx] == p.set && p.group[idx] != u32::MAX).then_some(p.group[idx])
+    }
+
+    /// The group of the passable cell `idx`: a flood fill through the
+    /// neighbours of the search (`Grid::neighbors`) gives it to all the
+    /// passable cells that the search can reach from it.
+    fn group(&self, p: &mut Passage, idx: usize) -> u32 {
+        if let Some(g) = Router::group_of(p, idx) {
+            return g;
+        }
+        let g = p.groups;
+        p.groups += 1;
+        p.group[idx] = g;
+        let mut stack = vec![idx];
+        while let Some(i) = stack.pop() {
+            for n in self.grid.neighbors(i) {
+                if self.mid(p, n) >= 0.0 && p.group[n] == u32::MAX {
+                    p.group[n] = g;
+                    stack.push(n);
+                }
+            }
+        }
+        g
+    }
+
+    /// `true` if the search from the cells `starts` can reach a cell of
+    /// `goals` in the map `p`: a goal that is a start, or a passable goal
+    /// in the group of a passable start or of a passable neighbour of a
+    /// start (a start can be a cell that is not passable: the search goes
+    /// from it to its passable neighbours). The groups of the starts are
+    /// filled, so a goal with no group yet is in none of them.
+    fn reaches(&self, p: &mut Passage, starts: &Joins, goals: &Joins) -> bool {
+        let mut groups = std::collections::HashSet::new();
+        for &start in starts.keys() {
+            for idx in std::iter::once(start).chain(self.grid.neighbors(start)) {
+                if self.mid(p, idx) >= 0.0 {
+                    groups.insert(self.group(p, idx));
+                }
+            }
+        }
+        goals
+            .keys()
+            .any(|&g| starts.contains_key(&g) || Router::group_of(p, g).is_some_and(|group| groups.contains(&group)))
     }
 
     /// The straight line from `a` to `b` is under the parts of `unsewn`
@@ -615,6 +747,13 @@ impl Router {
     /// parts of `unsewn` (the part that starts at `to` with them) are not
     /// sewn.
     fn link(&self, from: Edge, to: Edge, unsewn: u64) -> Link {
+        self.link_with(from, to, unsewn, true)
+    }
+
+    /// [`Router::link`]; with `groups`, no search where no goal is in a
+    /// group that the starts reach (ADR 0161: most searches found no way;
+    /// the tests compare it with the search of each link).
+    fn link_with(&self, from: Edge, to: Edge, unsewn: u64, groups: bool) -> Link {
         let (ps, qs) = (self.along_in(from), self.along_in(to));
         let pairs = || ps.iter().flat_map(|p| qs.iter().map(move |q| (*p, *q)));
         let gap = pairs().map(|(p, q)| p.distance(q)).fold(f64::MAX, f64::min);
@@ -651,6 +790,10 @@ impl Router {
         if starts.is_empty() || goals.is_empty() {
             return trim;
         }
+        let mut passage = self.passage(unsewn);
+        if groups && !self.reaches(&mut passage, &starts, &goals) {
+            return trim;
+        }
         // The shortest way through the passable cells; a cell near the
         // edge of its part costs more, so the run goes down the middle.
         let size = self.grid.w * self.grid.h;
@@ -680,9 +823,10 @@ impl Router {
             }
             let here = self.grid.center_of(idx);
             for next in self.grid.neighbors(idx) {
-                let Some(mid) = self.passable(next, unsewn) else {
+                let mid = self.mid(&mut passage, next);
+                if mid < 0.0 {
                     continue;
-                };
+                }
                 let step = here.distance(self.grid.center_of(next));
                 let cost = best[idx] + step * (1.0 + 4.0 * (1.0 - mid) * (1.0 - mid));
                 if cost < best[next] {
@@ -702,6 +846,7 @@ impl Router {
         }
         cells.push(starts[&idx].1);
         cells.reverse();
+        drop(passage);
         let run = self.simplify(&cells, unsewn);
         let length = run.windows(2).map(|w| w[0].distance(w[1])).sum();
         Link {
@@ -714,12 +859,13 @@ impl Router {
     /// Fewer points for the run `pts`: a point goes if the line between
     /// its neighbors stays in the passable cells.
     fn simplify(&self, pts: &[Point], unsewn: u64) -> Vec<Point> {
-        let clear = |a: Point, b: Point| {
+        let mut passage = self.passage(unsewn);
+        let mut clear = |a: Point, b: Point| {
             let steps = (a.distance(b) / (0.5 * self.grid.cell)).ceil().max(1.0) as usize;
             (0..=steps).map(|i| a.lerp(b, i as f64 / steps as f64)).all(|p| {
                 self.grid
                     .cell_of(p)
-                    .is_some_and(|(i, j)| self.passable(self.grid.idx(i, j), unsewn).is_some())
+                    .is_some_and(|(i, j)| self.mid(&mut passage, self.grid.idx(i, j)) >= 0.0)
             })
         };
         let last = pts.len() - 1;
@@ -890,7 +1036,12 @@ pub fn route_in(letter: &EmbLetter, cap_mm: f64, outline: Option<&[Vec<Point>]>)
         .filter_map(|p| p.ends)
         .flat_map(|(a, b)| [a, b])
         .max_by(|a, b| a.x.total_cmp(&b.x))
-        .filter(|p| p.x >= letter.advance_mm - TOUCH * cap_mm);
+        // A letter goes on into the next letter if a stroke of it ends at
+        // the end of its place in the line, or after it (P21: not 0.03 of
+        // the capital height before it: the end of a column reaches the
+        // corner of its stroke now, and the feet of an "A" at the edge of
+        // its place were taken as a tail).
+        .filter(|p| p.x >= letter.advance_mm);
     let lead = tail.and_then(|p| r.nearest_covered(Point::new(p.x - letter.advance_mm, p.y), all));
     let (order, trims, on_top): (Vec<usize>, usize, usize) = if n > MAX_PARTS {
         // Too many parts for the search of all orders.
@@ -1128,6 +1279,51 @@ fn with_split(letter: &EmbLetter, part: usize, at: Point, cap: f64) -> Option<Em
     Some(out)
 }
 
+/// The routes ([`route_in`]) of `letters`, in their order, on at most
+/// `threads` threads: this thread and the threads that it can start. A
+/// route that stops with a fault is `None`.
+fn routes_of(
+    letters: &[EmbLetter],
+    cap: f64,
+    outline: Option<&[Vec<Point>]>,
+    threads: usize,
+) -> Vec<Option<(EmbLetter, Routed)>> {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let one = |letter: &EmbLetter| {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| route_in(letter, cap, outline))).ok()
+    };
+    let threads = threads.min(letters.len());
+    if threads <= 1 {
+        return letters.iter().map(one).collect();
+    }
+    // Each thread takes the next letter that no thread has taken.
+    let next = AtomicUsize::new(0);
+    let work = || {
+        let mut done = Vec::new();
+        loop {
+            let i = next.fetch_add(1, Ordering::Relaxed);
+            let Some(letter) = letters.get(i) else { break };
+            done.push((i, one(letter)));
+        }
+        done
+    };
+    let mut out: Vec<Option<(EmbLetter, Routed)>> = vec![None; letters.len()];
+    std::thread::scope(|scope| {
+        let others: Vec<_> = (1..threads)
+            .filter_map(|_| std::thread::Builder::new().spawn_scoped(scope, work).ok())
+            .collect();
+        for (i, r) in work() {
+            out[i] = r;
+        }
+        for job in others {
+            for (i, r) in job.join().unwrap_or_default() {
+                out[i] = r;
+            }
+        }
+    });
+    out
+}
+
 /// [`route`], and with cuts: if the letter still has trims or columns
 /// that end on top of others, a column is cut at a junction or a crossing
 /// (the stem of "H" at its bar: each half sews to the bar), or in its
@@ -1149,9 +1345,10 @@ pub fn route_with_splits_dir(
     cap_mm: f64,
     outline: Option<&[Vec<Point>]>,
     rtl: bool,
+    threads: usize,
 ) -> (EmbLetter, Routed) {
     if !rtl {
-        return route_with_splits_in(letter, cap_mm, outline);
+        return route_with_splits_on(letter, cap_mm, outline, threads);
     }
     let mirror = Transform::scale(-1.0, 1.0).then(Transform::translate(letter.advance_mm, 0.0));
     let mut mirrored = letter.clone();
@@ -1160,7 +1357,7 @@ pub fn route_with_splits_dir(
     }
     let rings: Option<Vec<Vec<Point>>> =
         outline.map(|o| o.iter().map(|r| r.iter().map(|&p| mirror.apply(p)).collect()).collect());
-    let (mut routed, found) = route_with_splits_in(&mirrored, cap_mm, rings.as_deref());
+    let (mut routed, found) = route_with_splits_on(&mirrored, cap_mm, rings.as_deref(), threads);
     for p in &mut routed.parts {
         p.transform(&mirror);
     }
@@ -1175,6 +1372,26 @@ pub fn is_rtl(c: char) -> bool {
 
 /// [`route_with_splits`] with the outline of the letter (see [`route_in`]).
 pub fn route_with_splits_in(letter: &EmbLetter, cap_mm: f64, outline: Option<&[Vec<Point>]>) -> (EmbLetter, Routed) {
+    route_with_splits_on(letter, cap_mm, outline, 1)
+}
+
+/// The number of threads for the cuts of one letter ([`route_with_splits_on`])
+/// where nothing else routes at the same time (the route thread of a font
+/// of the computer): the processors of the computer, at most 8.
+pub fn threads() -> usize {
+    std::thread::available_parallelism().map_or(1, |n| n.get()).min(8)
+}
+
+/// [`route_with_splits_in`], with the cuts of the letter tried on at most
+/// `threads` threads at the same time (ADR 0161). The routes and the
+/// choice are the same with each number of threads. The converter routes
+/// the letters of a font on threads already, so it uses 1 here.
+pub fn route_with_splits_on(
+    letter: &EmbLetter,
+    cap_mm: f64,
+    outline: Option<&[Vec<Point>]>,
+    threads: usize,
+) -> (EmbLetter, Routed) {
     let mut source = letter.clone();
     let (mut best, mut found) = route_in(&source, cap_mm, outline);
     for _ in 0..MAX_SPLITS {
@@ -1182,11 +1399,14 @@ pub fn route_with_splits_in(letter: &EmbLetter, cap_mm: f64, outline: Option<&[V
             break;
         }
         let mut better: Option<(EmbLetter, EmbLetter, Routed)> = None;
-        for (part, at) in split_places(&source, cap_mm) {
-            let Some(cut) = with_split(&source, part, at, cap_mm) else {
-                continue;
-            };
-            let (routed, f) = route_in(&cut, cap_mm, outline);
+        let cuts: Vec<EmbLetter> = split_places(&source, cap_mm)
+            .into_iter()
+            .filter_map(|(part, at)| with_split(&source, part, at, cap_mm))
+            .collect();
+        let routes = routes_of(&cuts, cap_mm, outline, threads);
+        for (cut, route) in cuts.into_iter().zip(routes) {
+            // A cut whose route stopped with a fault is not used.
+            let Some((routed, f)) = route else { continue };
             let now = better
                 .as_ref()
                 .map_or((found.trims, found.on_top), |b| (b.2.trims, b.2.on_top));
@@ -1328,8 +1548,8 @@ mod tests {
             column((17.0, -2.0), (17.0, -20.0), 3.0),
         ]);
         let end_x = |l: &EmbLetter| l.parts.iter().filter_map(middle_x).next_back().map(|x| x.1);
-        let (ltr, _) = route_with_splits_dir(&two, 25.0, None, false);
-        let (rtl, _) = route_with_splits_dir(&two, 25.0, None, true);
+        let (ltr, _) = route_with_splits_dir(&two, 25.0, None, false, 1);
+        let (rtl, _) = route_with_splits_dir(&two, 25.0, None, true, 1);
         assert!(end_x(&ltr).is_some_and(|x| x > 10.0), "{:?}", end_x(&ltr));
         assert!(end_x(&rtl).is_some_and(|x| x < 10.0), "{:?}", end_x(&rtl));
     }
@@ -1487,6 +1707,30 @@ mod tests {
         assert_eq!(route(&letter(Vec::new()), 25.0).1, Routed::default());
     }
 
+    /// Two columns that are not sewn yet and touch end to end (the two
+    /// sides of a bridge of the split): a run goes from one into the other
+    /// (P21 Milestone 10). Each cell near the joint is near the edge of its
+    /// column, so the run had no way and the letter got a trim.
+    #[test]
+    fn a_run_goes_across_two_columns_that_touch() {
+        // Columns 6 mm wide: a run keeps 0.3 mm from the edge of a column,
+        // more than a cell of the grid.
+        let parts = vec![
+            column((3.0, 0.0), (3.0, -20.0), 6.0),
+            column((6.0, -17.0), (16.0, -17.0), 6.0),
+            column((16.0, -17.0), (26.0, -17.0), 6.0),
+        ];
+        let r = Router::new(&parts, 25.0, None).unwrap();
+        let unsewn = 0b110;
+        // From the top of the stem to the far end of the second bar.
+        let from = r.end_edge((0, false), r.start((0, false), Point::ZERO));
+        let to = r.start_edge((2, true), Point::ZERO);
+        let link = r.link(from, to, unsewn);
+        assert!(!link.trim, "a trim of {} mm", link.length);
+        let run = link.run.expect("a run");
+        assert!(run.iter().any(|p| p.x > 18.0), "{run:?}");
+    }
+
     #[test]
     fn the_settings_of_the_parts_go_with_them() {
         let mut l = e();
@@ -1510,6 +1754,101 @@ mod tests {
                 .enumerate()
                 .all(|(i, t)| i == middle || t.is_empty())
         );
+    }
+
+    /// The groups of the passable cells (ADR 0161) give each link of the
+    /// search with no groups: the trim, the run and its length, for sets
+    /// of parts that are not sewn, in letters of a font with their outline
+    /// (a run stays in it).
+    #[test]
+    fn the_groups_give_the_links_of_the_search() {
+        let source = crate::bundled::font("Lato", "Bold").unwrap();
+        let chars: Vec<char> = "HkWMx".chars().collect();
+        let f = crate::embfont::convert(&source, "Block Sans", "", emb_model::LetterStitch::Auto, &chars);
+        let s = f.cap_height_mm / source.cap_height;
+        let (mut trims, mut runs) = (0, 0);
+        for c in chars {
+            let parts = &f.letters[&c].parts;
+            let outline: Vec<Vec<Point>> = source
+                .contours(source.glyph(c).unwrap())
+                .into_iter()
+                .map(|r| r.into_iter().map(|p| Point::new(p.x * s, p.y * s)).collect())
+                .collect();
+            let r = Router::new(parts, f.cap_height_mm, Some(&outline)).unwrap();
+            let modes = r.modes();
+            let all: u64 = (1 << parts.len()) - 1;
+            for unsewn in (1..=all).step_by(3) {
+                for &a in &modes {
+                    let from = r.end_edge(a, r.start(a, Point::ZERO));
+                    for &b in modes.iter().filter(|b| unsewn & (1 << b.0) != 0 && b.0 != a.0) {
+                        let to = r.start_edge(b, from.0.midpoint(from.1));
+                        let fast = r.link_with(from, to, unsewn, true);
+                        let full = r.link_with(from, to, unsewn, false);
+                        assert_eq!(fast.trim, full.trim, "{c} {a:?} {b:?} {unsewn:b}");
+                        assert_eq!(fast.run, full.run, "{c} {a:?} {b:?} {unsewn:b}");
+                        assert_eq!(fast.length.to_bits(), full.length.to_bits());
+                        trims += usize::from(fast.trim);
+                        runs += usize::from(fast.run.is_some());
+                    }
+                }
+            }
+        }
+        // Both kinds of link are in the test.
+        assert!(trims > 0 && runs > 0, "{trims} trims, {runs} runs");
+    }
+
+    /// A start of a search can be a cell that is not passable: the search
+    /// goes from it to its passable neighbours (ADR 0161).
+    #[test]
+    fn a_start_that_is_not_passable_reaches_through_its_neighbours() {
+        let r = Router::new(&e().parts, 25.0, None).unwrap();
+        let w = r.grid.w;
+        let size = w * r.grid.h;
+        assert!(w > 21 && r.grid.h > 4);
+        // Passable cells from (2, 2) to (9, 2), and (20, 2); the others
+        // are not passable.
+        let mut mid = vec![-1.0; size];
+        for i in (2..10).chain([20]) {
+            mid[2 * w + i] = 0.5;
+        }
+        let map = || Passage {
+            unsewn: 0,
+            set: 1,
+            stamp: vec![1; size],
+            mid: mid.clone(),
+            group: vec![u32::MAX; size],
+            groups: 0,
+        };
+        let cells = |cells: &[usize]| -> Joins { cells.iter().map(|&c| (c, (0.0, Point::ZERO))).collect() };
+        // The start (1, 2) is not passable; its neighbour (2, 2) is.
+        let start = cells(&[2 * w + 1]);
+        assert!(r.reaches(&mut map(), &start, &cells(&[2 * w + 9])));
+        assert!(!r.reaches(&mut map(), &start, &cells(&[2 * w + 20])));
+        // A goal that is a start; a goal that is not passable.
+        assert!(r.reaches(&mut map(), &start, &cells(&[2 * w + 1])));
+        assert!(!r.reaches(&mut map(), &start, &cells(&[3 * w + 5])));
+        // A goal in a group that an earlier link filled, not reached.
+        let mut p = map();
+        assert!(!r.reaches(&mut p, &cells(&[2 * w + 20]), &cells(&[2 * w + 3])));
+        assert!(!r.reaches(&mut p, &start, &cells(&[2 * w + 20])));
+        assert!(r.reaches(&mut p, &start, &cells(&[2 * w + 5])));
+    }
+
+    /// The cuts of a letter tried on threads give the route of one thread
+    /// (ADR 0161).
+    #[test]
+    fn the_cuts_on_threads_give_the_route_of_one_thread() {
+        let source = crate::bundled::font("Lato", "Bold").unwrap();
+        let chars: Vec<char> = "HMk".chars().collect();
+        let f = crate::embfont::convert(&source, "Block Sans", "", emb_model::LetterStitch::Auto, &chars);
+        let mut splits = 0;
+        for c in chars {
+            let one = route_with_splits_on(&f.letters[&c], f.cap_height_mm, None, 1);
+            let four = route_with_splits_on(&f.letters[&c], f.cap_height_mm, None, 4);
+            assert_eq!(one, four, "{c}");
+            splits += one.1.splits;
+        }
+        assert!(splits > 0, "no letter was cut");
     }
 
     #[test]

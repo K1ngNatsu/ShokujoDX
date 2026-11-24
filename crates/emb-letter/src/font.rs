@@ -150,8 +150,8 @@ impl Shared {
         // The steps of the converter (`EmbFont::extend_ends`, P21 Milestone
         // 6): round dots, and ends of columns on to the corners of the
         // outline where that adds no needle point out of it. Not for kana
-        // and kanji: the Japanese fonts are made with no `--extend` (it
-        // makes the ends that stop at a crossing long again).
+        // and kanji, as in the converter (`EmbFont::extend_ends`): it makes
+        // the ends that stop at a crossing long again.
         if !self.char_of(glyph).is_some_and(crate::layout::is_cjk) {
             let scale = |r: &Vec<Point>| -> Vec<Point> { r.iter().map(|p| Point::new(p.x * s, p.y * s)).collect() };
             let fills: Vec<(Vec<Point>, Vec<Vec<Point>>)> = shapes
@@ -176,8 +176,13 @@ impl Shared {
             .map(|r| r.into_iter().map(|p| Point::new(p.x * s, p.y * s)).collect())
             .collect();
         let rtl = self.char_of(glyph).is_some_and(crate::route::is_rtl);
-        let (routed, _) =
-            crate::route::route_with_splits_dir(&letter, crate::embfont::DESIGN_CAP_MM, Some(&outline), rtl);
+        let (routed, _) = crate::route::route_with_splits_dir(
+            &letter,
+            crate::embfont::DESIGN_CAP_MM,
+            Some(&outline),
+            rtl,
+            crate::route::threads(),
+        );
         let mut parts = routed.parts;
         for p in &mut parts {
             p.transform(&Transform::scale(1.0 / s, 1.0 / s));
@@ -495,12 +500,6 @@ impl Font {
     /// The shapes of a glyph (cached).
     pub fn shapes(&self, glyph: u16) -> Arc<GlyphShapes> {
         self.shared.shapes(glyph)
-    }
-
-    /// The character of a glyph: the lowest character that the Unicode
-    /// tables of the font map to it (`None` for a glyph from shaping only).
-    pub fn char_of(&self, glyph: u16) -> Option<char> {
-        self.shared.char_of(glyph)
     }
 }
 

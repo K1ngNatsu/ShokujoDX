@@ -37,7 +37,7 @@ Hay dos tipos de fuentes:
 - Las **fuentes de bordado** tienen letras de bordado ya hechas. Se bordan
   mejor. Cada una tiene un **rango de tamaños** (la altura de las
   mayúsculas): la lista de fuentes lo muestra, y Propiedades del objeto
-  avisa cuando el texto está fuera del rango. Con el programa vienen 65
+  avisa cuando el texto está fuera del rango. Con el programa vienen 68
   fuentes de bordado.
 - Fuentes **TrueType** y OpenType del ordenador. El programa crea las
   letras a partir de sus contornos: columnas que siguen los trazos
@@ -89,7 +89,7 @@ una fuente para ver su puntuación y estas medidas:
 
 - qué parte de las formas de las letras cubren las puntadas,
 - qué parte de las columnas de satén es demasiado estrecha en el tamaño más
-  pequeño de la fuente,
+  pequeño de la fuente (el extremo en punta de una columna no cuenta),
 - qué parte de las columnas de satén tiene puntadas demasiado largas en el
   tamaño más grande de la fuente,
 - qué parte de las puntadas queda fuera de las formas de las letras,
@@ -109,10 +109,12 @@ jōyō). Descargue un paquete
 y añádalo con **Archivo > Mis recursos > Importar un paquete**. El programa
 no descarga nada por sí mismo.
 
-Cuatro fuentes de versiones anteriores tienen una puntuación inferior a 65:
-Slab Heavy, Fat Face Serif, Shrikhand y Great Vibes. Ya no están en el
-programa. Un diseño que tiene una de ellas se queda como está. Para cambiar
-su texto, añada el paquete de fuentes **Fonts of earlier versions**.
+Una fuente de versiones anteriores ya no está en el programa: Great
+Vibes. Su puntuación era inferior a 65 cuando salió del programa. Un
+diseño que la tiene se queda como está. Para cambiar su texto, añada el
+paquete de fuentes **Fonts of earlier versions**. Slab Heavy, Fat Face
+Serif y Shrikhand salieron del programa con ella, y ahora están de nuevo
+en el programa.
 
 **Convertir en fuente de bordado** crea una fuente de bordado a partir de
 una fuente TrueType, con un nombre, un rango de tamaños y un tipo de
