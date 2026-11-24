@@ -176,8 +176,13 @@ impl Shared {
             .map(|r| r.into_iter().map(|p| Point::new(p.x * s, p.y * s)).collect())
             .collect();
         let rtl = self.char_of(glyph).is_some_and(crate::route::is_rtl);
-        let (routed, _) =
-            crate::route::route_with_splits_dir(&letter, crate::embfont::DESIGN_CAP_MM, Some(&outline), rtl);
+        let (routed, _) = crate::route::route_with_splits_dir(
+            &letter,
+            crate::embfont::DESIGN_CAP_MM,
+            Some(&outline),
+            rtl,
+            crate::route::threads(),
+        );
         let mut parts = routed.parts;
         for p in &mut parts {
             p.transform(&Transform::scale(1.0 / s, 1.0 / s));

@@ -30,6 +30,12 @@ mejores letras, su puntuación de calidad es 87, 91 y 95. Great Vibes
 sigue en el paquete de fuentes **Fonts of earlier versions**. Fat Face
 Serif tiene trazos muy finos, por eso su tamaño más pequeño es 42,5 mm.
 
+**Órdenes de bordado más rápidos.** Las letras en una fuente TrueType u
+OpenType de su ordenador reciben el orden de bordado unas cuatro veces
+más rápido: las letras y los dígitos de una fuente con serifas como
+Georgia en 8 s, antes 33 s. Los órdenes de bordado son los mismos que
+antes.
+
 ## Versión 0.4.0
 
 **La vista de producto.** **Diseño > Producto** muestra el diseño sobre

@@ -585,7 +585,7 @@ pub fn truetype_letter(src: &Font, c: char) -> Option<EmbLetter> {
         .into_iter()
         .flat_map(|(outer, holes)| std::iter::once(outer).chain(holes))
         .collect();
-    Some(emb_letter::route::route_with_splits_in(&letter, CAP_MM, Some(&rings)).0)
+    Some(emb_letter::route::route_with_splits_on(&letter, CAP_MM, Some(&rings), emb_letter::route::threads()).0)
 }
 
 /// The outline of `c` in `src`, in mm at [`CAP_MM`].

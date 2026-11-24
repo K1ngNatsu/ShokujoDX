@@ -114,4 +114,7 @@ the outline 46 % in a few heavy fonts; columns on top in 951 letters.
   (the picture at "K" of the font Webdings: the layout waits for this
   step, so the program did not answer). The area has no ring with no
   area now, and a ring with a side shorter than a millionth of the size
-  of the rings is thinned by that distance.
+  of the rings is thinned by that distance. This changed two letters of
+  the font packages: the pilcrow of Neucha (a fill letter now: its
+  columns crossed themselves) and one column of the pilcrow of Great
+  Vibes; the fonts of the program are the same files.

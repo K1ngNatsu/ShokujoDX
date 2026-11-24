@@ -259,19 +259,22 @@ documents.
 
 **Left as it is.**
 
-- **The route of a letter of a serif font of the computer is slow.** A
-  letter with 6 to 8 columns takes 2 s to 7 s in the route thread of its
-  font (Georgia: 32 s for the 62 letters and digits; Times New Roman
-  18 s; Arial 0.6 s). The letters show at once and get their routes
+- **The route of a letter of a serif font of the computer was slow.** A
+  letter with 6 to 8 columns took 2 s to 7 s in the route thread of its
+  font (Georgia: 32.8 s for the 62 letters and digits; Times New Roman
+  18.1 s; Arial 0.6 s). The letters show at once and get their routes
   later. The time is in the search of the sew order, which is made again
   for each place where a column can be cut (P17 and P20). The split of
   P21 does not change it (Georgia with no split: 35 s); the stop rule of
   Milestone 5 (a cut is also tried for a column on top) adds a quarter
-  (25 s with the rule of before). A faster route is proposed work
-  (`docs/design/open-work.md`).
+  (25 s with the rule of before). After the audit, the owner chose a
+  faster route (ADR 0161): the same routes, Georgia 7.6 s, Times New
+  Roman 4.6 s, Webdings 19.8 s (50.9 s), and the converter 3 to 4 times
+  faster. More speed is proposed work (`docs/design/open-work.md`).
 - **Symbol fonts are slow in the route thread.** The first ten pictures
-  of Webdings have 12 to 29 columns each, and the route of one takes
-  0.1 s to 8 s (122 s for the 76 characters of the probe).
+  of Webdings have 12 to 29 columns each, and the route of one took
+  0.1 s to 8 s (122 s for the 76 characters of the probe, with 16 fonts
+  at the same time); with ADR 0161 it is 2.5 times faster.
 - **Shapes that are not letters are slow in the route thread.** A wheel
   of 300 teeth takes 47 s (259 columns: the tuning of the ends measures
   all the columns again for each end), and 94 s with a hole of 300
@@ -356,9 +359,12 @@ of the package, made again with the code of the audit.
 
 **Exit tests.** The software parts are met or met in part, as the plan
 says for each milestone; the sew-out is open. The kit `out/p21-sewout`
-has the fonts of Milestone 14. The audit changed no font: seven fonts
-made again with its code (Pacifico, Anton, Block Sans, Shrikhand, Fat
-Face Serif, Bookish Slab, Poster Heavy) are the same files.
+has the fonts of Milestone 14. The fonts of the program are the same
+files with the code of the audit and of ADR 0161 (all fonts and packages
+made again). Two letters of the packages changed with the clean area of
+columns of the audit: the pilcrow of Neucha (its columns crossed
+themselves; it is a fill letter now) and one column of the pilcrow of
+Great Vibes.
 
 | Milestone | Exit test | State |
 | --- | --- | --- |

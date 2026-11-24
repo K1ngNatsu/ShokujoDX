@@ -692,32 +692,40 @@ impl EmbFont {
         // A letter of a script from right to left is routed from its right
         // (P21 Milestone 5).
         type Job<'a> = (bool, Option<&'a Vec<Vec<emb_geom::Point>>>, &'a mut EmbLetter);
-        let mut todo: Vec<Job> = self
+        let todo: Vec<Job> = self
             .letters
             .iter_mut()
             .filter(|(_, l)| !l.fixed && !l.parts.is_empty())
             .map(|(c, l)| (crate::route::is_rtl(*c), outlines.get(c), l))
             .collect();
-        // The letters do not depend on each other: one thread for each
-        // group of them.
+        // The letters do not depend on each other: each thread takes the
+        // next letter that no thread has taken (ADR 0161; with a group of
+        // letters for each thread, the threads with the slow letters, such
+        // as the "M" and "W" of a serif font, worked long after the others
+        // were done: Friendly Serif took 35 s, 9 s now). The cuts of a
+        // letter are tried on its thread: more threads for them gave little
+        // more (two: 7.7 s), and the font tool makes some fonts at the same
+        // time.
         let threads = std::thread::available_parallelism().map_or(1, |n| n.get()).min(16);
-        let size = todo.len().div_ceil(threads).max(1);
+        let todo = std::sync::Mutex::new(todo);
         let found: Vec<crate::route::Routed> = std::thread::scope(|scope| {
-            let jobs: Vec<_> = todo
-                .chunks_mut(size)
-                .map(|group| {
-                    scope.spawn(move || {
+            let jobs: Vec<_> = (0..threads)
+                .map(|_| {
+                    scope.spawn(|| {
                         let mut sum = crate::route::Routed::default();
-                        for (rtl, outline, letter) in group.iter_mut() {
+                        loop {
                             if stop.load(Ordering::Relaxed) {
                                 break;
                             }
+                            let Some((rtl, outline, letter)) = todo.lock().ok().and_then(|mut t| t.pop()) else {
+                                break;
+                            };
                             let (mut routed, found) =
-                                crate::route::route_with_splits_dir(letter, cap, outline.map(|o| o.as_slice()), *rtl);
+                                crate::route::route_with_splits_dir(letter, cap, outline.map(|o| o.as_slice()), rtl, 1);
                             for p in &mut routed.parts {
                                 round_part(p);
                             }
-                            **letter = routed;
+                            *letter = routed;
                             done.fetch_add(1, Ordering::Relaxed);
                             sum.trims += found.trims;
                             sum.runs += found.runs;

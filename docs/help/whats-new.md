@@ -28,6 +28,11 @@ better letters, their quality score is 87, 91 and 95. Great Vibes stays
 in the font package **Fonts of earlier versions**. Fat Face Serif has
 very thin strokes, so its smallest size is 42.5 mm.
 
+**Faster sew orders.** Lettering in a TrueType or OpenType font of your
+computer gets the sew order of its letters about four times faster: the
+letters and digits of a serif font such as Georgia in 8 s, 33 s before.
+The sew orders are the same as before.
+
 ## Version 0.4.0
 
 **The product view.** **Design > Product** shows the design on a product

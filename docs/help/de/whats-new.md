@@ -29,6 +29,12 @@ besseren Buchstaben haben sie eine Qualitätswertung von 87, 91 und 95.
 Great Vibes bleibt im Schriftpaket **Fonts of earlier versions**. Fat
 Face Serif hat sehr dünne Striche, darum ist ihre kleinste Größe 42,5 mm.
 
+**Schnellere Stickreihenfolgen.** Schrift in einer TrueType- oder
+OpenType-Schrift Ihres Computers bekommt die Stickreihenfolge ihrer
+Buchstaben etwa viermal schneller: die Buchstaben und Ziffern einer
+Serifenschrift wie Georgia in 8 s, vorher 33 s. Die Stickreihenfolgen
+sind dieselben wie vorher.
+
 ## Version 0.4.0
 
 **Die Produktansicht.** **Design > Produkt** zeigt das Design auf einem

@@ -297,7 +297,13 @@ fn letter_steps(rings: Vec<Vec<Point>>, cap: f64) -> Steps {
         fill_parts: Vec::new(),
     };
     let outline: Vec<Vec<Point>> = rings.iter().filter(|r| r.len() > 2).map(scale).collect();
-    let (routed, _) = emb_letter::route::route_with_splits_dir(&letter, design_cap, Some(&outline), false);
+    let (routed, _) = emb_letter::route::route_with_splits_dir(
+        &letter,
+        design_cap,
+        Some(&outline),
+        false,
+        emb_letter::route::threads(),
+    );
     step("route");
     let mut parts = routed.parts;
     emb_letter::glyph::untangle_parts(&mut parts, design_cap);
@@ -913,7 +919,7 @@ fn probe_p21_font_times() {
             fill_parts: Vec::new(),
         };
         let outline: Vec<Vec<Point>> = rings.iter().map(scale).collect();
-        emb_letter::route::route_with_splits_dir(&letter, cap, Some(&outline), false)
+        emb_letter::route::route_with_splits_dir(&letter, cap, Some(&outline), false, emb_letter::route::threads())
             .0
             .parts
             .len()
