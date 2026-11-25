@@ -1,0 +1,35 @@
+# The steps of "Tutorial: a lace ornament" (tutorial-lace.md). The test
+# each_tutorial_runs_in_each_language (crates/emb-app/src/
+# tutorial_steps.rs) does them in each language; write_tutorial_pictures
+# makes the pictures. A change of a step needs the same change in the topic
+# and its translations.
+
+# Start from the template.
+[[step]]
+command = "Design > Library and Templates > New from Template"
+expect = { window = "New from Template" }
+
+[[step]]
+button = "Lace ornament"
+expect = { fabric = "water_soluble" }
+
+# Check it.
+[[step]]
+command = "View > Show > Thread Look"
+
+[[step]]
+button = "Thread Look"
+
+[[step]]
+key = "Escape"
+
+[[step]]
+picture = "lace-ornament"
+around = [[-46.0, -52.0], [46.0, 46.0]]
+
+[[step]]
+command = "View > Show > Density Map"
+expect = { on = "View > Show > Density Map" }
+
+[[step]]
+command = "View > Show > Density Map"

@@ -302,6 +302,21 @@ next release.
   correct. The seven tutorials of before have their cards; they get
   start designs, steps and pictures in Milestone 2. What Is New gets
   the tutorials at the next release.
+- **Milestone 2: made (2026-11-24, ADR 0162).** Path 2 has four
+  tutorials: "A logo by hand" (a fill with a hole, a satin column and a
+  line on a backdrop picture; the manual way of the patch tutorial moved
+  here), "Make a design sew well" (the fabric, the density, the pull
+  compensation, the density map), "Columns that turn" (Column Pairs,
+  Column C, Turning, To Satin) and "Sew order, trims and travel" (Fewer
+  Color Changes, Shortest Order, hidden travel). The seven tutorials of
+  before have start designs (or the lace template), steps and pictures:
+  the patch tutorial uses Picture to Design on a start picture, the
+  appliqué starts from a heart fill, the hoopings from a row of five
+  dots. All 13 tutorials run in CI in four languages; 54 pictures, 3.9
+  MB. The steps found two weak places of the program, now in
+  `docs/design/open-work.md`: four of the six monogram templates build
+  up too much thread (the towel tutorial uses one that sews clean), and
+  the lace ornament template shows ten "Thread builds up" warnings.
 
 ### Answers to the open questions
 

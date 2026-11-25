@@ -12,20 +12,24 @@ keywords: tutorial, lace, free-standing lace, fsl, ornament, water-soluble, stab
 
 In this tutorial you make a free-standing lace ornament. Free-standing
 lace has no fabric: you sew it on water-soluble stabilizer and wash the
-stabilizer away. It takes about 15 minutes, and more to sew.
+stabilizer away. It takes more time to sew than to make.
 
 You need water-soluble stabilizer (the kind like fabric, not the thin
 film), and the same thread in the needle and the bobbin.
 
 ## Start from the template
 
-1. Click **Design > New from Template** (or File > New from Template).
-2. Select **Lace ornament**. The new design is a snowflake 80 mm across:
+1. Click **Design > Library and Templates > New from Template**.
+2. Click **Lace ornament**. The new design is a snowflake 80 mm across:
    a round lace mesh, six spokes with branches, a ring in the middle, a
    border ring and a loop to hang it. Its fabric is **Water-soluble
    stabilizer (free-standing lace)**, and the satins have the lace
    underlay.
-3. Select your machine and a hoop on the Design tab.
+3. Select your machine and a hoop on the **Design** tab.
+4. Click **View > Show > Thread Look**, and select **Thread Look** in its
+   menu.
+
+![The lace ornament](lace-ornament)
 
 ## Change the ornament
 
@@ -41,10 +45,12 @@ film), and the same thread in the needle and the bobbin.
 1. Look at **Design Info**. A **Loose lace part** warning shows a part
    that touches no other part. Click the warning to select the part, then
    move it, or make it larger, so it touches.
-2. Click **View > Stitch Player** and play the sew-out: the mesh sews
-   first, then the spokes, the rings and the loop.
-3. Turn on **View > Density Map**: lace has many layers where parts
-   cross. Keep them under the limit.
+2. Design Info also shows **Thread builds up** where the spokes and the
+   rings cross the mesh and each other. Click **View > Show > Density
+   Map** to see these places. Many layers make a hard knot that can break
+   the needle: sew a test before you sew many ornaments.
+3. Click **View > Stitch Cursor > Stitch Player** and play the sew-out:
+   the mesh sews first, then the spokes, the rings and the loop.
 
 ## Sew it
 
@@ -57,7 +63,17 @@ film), and the same thread in the needle and the bobbin.
    water until the stabilizer is gone.
 5. Lay the lace flat on a towel, pin it into its shape, and let it dry.
 
+## If it does not look right
+
+- **A part falls off after the wash.** It did not touch another part.
+  Design Info shows it as a loose lace part.
+- **The lace is soft and loses its shape.** Rinse less: a little
+  stabilizer left in the lace makes it stiffer.
+- **The stabilizer tears while the machine sews.** Use two layers, and
+  hoop them tighter.
+
 ## Next
 
+- [Tutorial: an appliqué](tutorial-applique)
 - [Specialty decoration](specialty)
 - [Stitch types](stitch-types)

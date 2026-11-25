@@ -1,0 +1,50 @@
+# The steps of "Tutorial: an appliqué" (tutorial-applique.md). The test
+# each_tutorial_runs_in_each_language (crates/emb-app/src/
+# tutorial_steps.rs) does them in each language; write_tutorial_pictures
+# makes the pictures. A change of a step needs the same change in the topic
+# and its translations.
+
+# Open the start design: a heart (a fill).
+[[step]]
+open = "applique-heart"
+expect = { objects = 1, kinds = ["Fill"] }
+
+# Make it an appliqué.
+[[step]]
+command = "Digitize > Select > Select"
+
+[[step]]
+click = [0.0, 0.0]
+expect = { selected = 1 }
+
+[[step]]
+command = "Digitize > Appliqué > To Appliqué"
+expect = { objects = 1, kinds = ["Appliqué"] }
+
+[[step]]
+key = "Escape"
+
+# Check it.
+[[step]]
+expect = { on = "View > Show > Appliqué Fabric" }
+
+[[step]]
+command = "View > Show > Thread Look"
+
+[[step]]
+button = "Thread Look"
+
+[[step]]
+key = "Escape"
+
+[[step]]
+picture = "applique-heart"
+around = [[-34.0, -32.0], [34.0, 30.0]]
+
+[[step]]
+expect = { warnings = 0 }
+
+# Cut the piece with a cutter.
+[[step]]
+command = "Digitize > Appliqué > Cutter File"
+check_only = true

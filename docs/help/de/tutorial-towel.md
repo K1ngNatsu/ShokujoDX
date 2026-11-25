@@ -8,50 +8,54 @@ keywords: anleitung, handtuch, frottee, monogramm, initialen, grundlage, deckvli
 
 In dieser Anleitung setzen Sie ein Monogramm auf ein Handtuch. Das
 Handtuch hat einen hohen Flor, darum braucht das Design eine Grundlage und
-die richtigen Stoffeinstellungen. Es dauert etwa 10 Minuten.
+die richtigen Stoffeinstellungen.
 
 Sie brauchen ein Handtuch, ein Reiß- oder Schneidvlies und ein
 wasserlösliches Deckvlies.
 
 ## Den Stoff festlegen
 
-1. Beginnen Sie ein neues Design.
-2. Wählen Sie auf dem Tab **Design** Ihre Maschine und einen Rahmen.
-3. Klicken Sie auf **Design > Stoff** und wählen Sie **Towel (terry)**. Das
-   Programm macht die Unterlage schwerer und die Stiche dichter, damit sie
-   über dem Flor bleiben. Das Arbeitsblatt zeigt das Stickvlies und das
-   Deckvlies.
+1. Klicken Sie auf [Das Startdesign öffnen](sample:towel). Es ist ein
+   leeres Design.
+2. Klicken Sie auf **Design > Stoff und Stile > Stoff**.
+3. Wählen Sie in der Liste **Stoff** den Eintrag **Handtuch (Frottee)**,
+   und klicken Sie auf **Anwenden**. Das Programm macht die Unterlage
+   schwerer und die Stiche dichter, damit sie über dem Flor bleiben. Das
+   Arbeitsblatt zeigt das Stickvlies und das Deckvlies.
 
 ## Das Monogramm erstellen
 
-1. Klicken Sie auf **Schrift > Monogramm**.
+1. Klicken Sie auf **Schrift > Personalisieren > Monogramm**.
 2. Tippen Sie die **Initialen**, zum Beispiel `JMK`.
-3. Wählen Sie einen **Stil**, zum Beispiel **Classic (large middle)**, und
-   setzen Sie die **Höhe** auf 60 mm.
-4. Wählen Sie unter **Rand** eine **Form** (zum Beispiel **Kreis**) und den
-   **Stich** **Satin**.
-5. Fügen Sie **Ornamente** hinzu, wenn Sie wollen, zum Beispiel ein
-   **Leaf** links und rechts.
-6. Klicken Sie auf **Als neu hinzufügen**. Das Monogramm ist auf der
-   Arbeitsfläche.
+3. Klicken Sie auf die Vorlage **Stacked in an oval**. Sie legt den Stil,
+   die Größe, den Rand und die Ornamente fest. Sie können jedes davon
+   danach ändern.
+4. Klicken Sie auf **Zum Design hinzufügen**. Das Monogramm ist auf der
+   Arbeitsfläche, und das Fenster ändert nun das ausgewählte Monogramm.
+5. Schließen Sie das Fenster **Monogramm**.
+
+![Das Fenster Monogramm](towel-monogram)
 
 ## Die Grundlage hinzufügen
 
-1. Wählen Sie alle Objekte aus (Strg+A).
-2. Klicken Sie auf **Spezial > Grundlage**. Eine leichte Füllung kommt
-   unter das Monogramm. Sie wird zuerst gestickt, in einem eigenen Garn.
-3. Geben Sie der Grundlage ein Garn in der Farbe des Handtuchs, damit sie
-   nicht zu sehen ist.
+1. Klicken Sie auf **Bearbeiten > Auswählen > Alles auswählen**.
+2. Klicken Sie auf **Spezial > Puff und Grundlage > Grundlage**. Eine
+   leichte Füllung kommt unter das Monogramm. Sie wird zuerst gestickt, in
+   einem Garn in der Farbe des Stoffs, damit sie nicht zu sehen ist. Sie
+   drückt den Flor nieder.
+3. Drücken Sie **Esc**.
 
 ## Prüfen
 
-1. Klicken Sie auf **Ansicht > Garnansicht**, um die Garne auf dem Stoff zu
-   sehen. Die Stoffstruktur des Handtuchs zeigt sich unter der Stofffarbe
-   (**Farbe > Stofffarbe**).
-2. Sehen Sie sich die **Designinfo** an: Sie hat die Größe, die Stickzeit
-   und die Warnungen.
-3. **Design > Produkt** zeigt das Design in Originalgröße auf einem
-   Handtuch.
+1. Klicken Sie auf **Ansicht > Zeigen > Garnansicht**, und wählen Sie
+   **Garnansicht** in ihrem Menü. Unter der Stofffarbe (**Farbe >
+   Stofffarbe**) zeigt sich die Stoffstruktur des Handtuchs.
+2. Die Statuszeile zeigt **Farben: 3** (die Grundlage, die Buchstaben und
+   der Rand) und keine Warnung.
+3. **Design > Produkt > Produkt** zeigt das Design in Originalgröße auf
+   einem Handtuch.
+
+![Das Monogramm auf dem Handtuchstoff](towel-stitches)
 
 ## Sticken
 
@@ -61,7 +65,18 @@ wasserlösliches Deckvlies.
 3. Sticken Sie das Design. Reißen Sie das Stickvlies ab, und waschen oder
    reißen Sie das Deckvlies ab.
 
+## Wenn es nicht richtig aussieht
+
+- **Der Flor kommt durch die Buchstaben.** Benutzen Sie das Deckvlies,
+  und behalten Sie die Grundlage. Der Stoff **Handtuch (Frottee)** muss
+  festgelegt sein.
+- **Die Statuszeile zeigt „Faden baut sich auf“.** Buchstaben oder ein
+  Rand liegen übereinander. Machen Sie das Monogramm größer, oder wählen
+  Sie eine andere Vorlage.
+- **Die Grundlage ist zu sehen.** Geben Sie dem Garn der Grundlage die
+  Farbe des Handtuchs.
+
 ## Weiter
 
 - [Schrift und Monogramme](lettering)
-- [Spezielle Verzierungen](specialty)
+- [Spezialveredelung](specialty)

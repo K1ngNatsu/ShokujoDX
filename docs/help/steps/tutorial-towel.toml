@@ -1,0 +1,75 @@
+# The steps of "Tutorial: a monogram on a towel" (tutorial-towel.md). The
+# test each_tutorial_runs_in_each_language (crates/emb-app/src/
+# tutorial_steps.rs) does them in each language; write_tutorial_pictures
+# makes the pictures. A change of a step needs the same change in the topic
+# and its translations.
+
+# Open the start design: an empty design.
+[[step]]
+open = "towel"
+expect = { objects = 0 }
+
+# The fabric.
+[[step]]
+command = "Design > Fabric and Styles > Fabric"
+expect = { window = "Fabric" }
+
+[[step]]
+button = "Not set"
+
+[[step]]
+button = "Towel (terry)"
+
+[[step]]
+button = "Apply"
+expect = { fabric = "towel" }
+
+# The monogram.
+[[step]]
+command = "Lettering > Personalize > Monogram"
+expect = { window = "Monogram" }
+
+[[step]]
+set = ["Initials", "JMK"]
+
+[[step]]
+button = "Stacked in an oval"
+
+[[step]]
+picture = "towel-monogram"
+area = "windows"
+
+[[step]]
+button = "Add to the design"
+expect = { window = "Monogram (Selected)", warnings = 0 }
+
+[[step]]
+close = "Monogram (Selected)"
+
+# The laydown.
+[[step]]
+command = "Edit > Select > Select All"
+
+[[step]]
+command = "Specialty > Puff and Laydown > Laydown"
+expect = { selected = 1 }
+
+[[step]]
+key = "Escape"
+
+# Look at it.
+[[step]]
+command = "View > Show > Thread Look"
+
+[[step]]
+button = "Thread Look"
+
+[[step]]
+key = "Escape"
+
+[[step]]
+picture = "towel-stitches"
+around = [[-40.0, -40.0], [40.0, 40.0]]
+
+[[step]]
+expect = { colors = 3, warnings = 0 }

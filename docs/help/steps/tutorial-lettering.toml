@@ -1,0 +1,58 @@
+# The steps of "Tutorial: a name on an arc" (tutorial-lettering.md). The
+# test each_tutorial_runs_in_each_language (crates/emb-app/src/
+# tutorial_steps.rs) does them in each language; write_tutorial_pictures
+# makes the pictures. A change of a step needs the same change in the topic
+# and its translations.
+
+# Open the start design: a construction point where the name starts.
+[[step]]
+open = "lettering-start"
+expect = { objects = 0 }
+
+# Add the lettering.
+[[step]]
+command = "Lettering > Lettering > Lettering"
+
+[[step]]
+click = [-35.0, 10.0]
+expect = { window = "Lettering" }
+
+[[step]]
+type = "Anna"
+
+[[step]]
+set = ["Height", "25"]
+
+[[step]]
+picture = "lettering-window"
+area = "windows"
+
+[[step]]
+button = "OK"
+expect = { objects = 1, kinds = ["Lettering"], selected = 1 }
+
+# Put the name on an arc.
+[[step]]
+choose = ["Baseline", "Arc over"]
+
+[[step]]
+set = ["Radius", "80"]
+
+[[step]]
+key = "Escape"
+
+[[step]]
+command = "View > Show > Thread Look"
+
+[[step]]
+button = "Thread Look"
+
+[[step]]
+key = "Escape"
+
+[[step]]
+picture = "lettering-arc"
+around = [[-45.0, -35.0], [45.0, 20.0]]
+
+[[step]]
+expect = { objects = 1, colors = 1, warnings = 0 }

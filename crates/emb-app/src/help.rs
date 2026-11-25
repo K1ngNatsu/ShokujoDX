@@ -50,6 +50,10 @@ const FILES: &[&str] = &[
     include_str!("../../../docs/help/whats-new.md"),
     include_str!("../../../docs/help/tutorial-first-design.md"),
     include_str!("../../../docs/help/tutorial-to-machine.md"),
+    include_str!("../../../docs/help/tutorial-logo-by-hand.md"),
+    include_str!("../../../docs/help/tutorial-sew-well.md"),
+    include_str!("../../../docs/help/tutorial-columns.md"),
+    include_str!("../../../docs/help/tutorial-sew-order.md"),
     include_str!("../../../docs/help/tutorial-patch.md"),
     include_str!("../../../docs/help/tutorial-lettering.md"),
     include_str!("../../../docs/help/tutorial-applique.md"),
@@ -1890,7 +1894,13 @@ mod tests {
         assert_eq!(top("stitches sink into the towel").0, "troubleshooting");
         let id = top("what is pull compensation").0;
         assert!(
-            ["glossary", "embroidery-basics", "objects-and-stitches"].contains(&id.as_str()),
+            [
+                "glossary",
+                "embroidery-basics",
+                "objects-and-stitches",
+                "tutorial-sew-well"
+            ]
+            .contains(&id.as_str()),
             "{id}"
         );
         assert_eq!(top("which formats can the program read").0, "file-formats");

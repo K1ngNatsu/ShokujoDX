@@ -24,6 +24,7 @@
 
 use std::path::{Path, PathBuf};
 
+use eframe::egui::accesskit::Role;
 use eframe::egui::{self, Event, Key, Modifiers, PointerButton, Pos2, Rect, Vec2};
 use emb_geom::Point;
 use serde::Deserialize;
@@ -68,6 +69,10 @@ struct Step {
     drag: Option<[[f64; 2]; 2]>,
     /// Click on the canvas at this point (mm).
     click: Option<[f64; 2]>,
+    /// Clicks on the canvas, one after the other (mm): `[x, y]` with the
+    /// left button (a corner), `[x, y, 1]` with the right button (a curve
+    /// point).
+    clicks: Vec<Vec<f64>>,
     /// The keys held for `drag` and `click`: `ctrl`, `shift`, `alt`.
     holding: Vec<String>,
     /// Push a key: `Enter`, `Escape`, `Delete`.
@@ -77,6 +82,15 @@ struct Step {
     button: Option<String>,
     /// Close the window with this English title.
     close: Option<String>,
+    /// Type this text (into the field that has the keyboard).
+    #[serde(rename = "type")]
+    text: Option<String>,
+    /// Set the field after the English label to the value: `["Height",
+    /// "25"]` (a number field or a text field on the row of the label).
+    set: Option<[String; 2]>,
+    /// Choose an item of the list after the English label: `["Baseline",
+    /// "Arc over"]` (the item in English too).
+    choose: Option<[String; 2]>,
     /// Check the design and the program.
     expect: Option<Expect>,
     /// Make the picture of this name.
@@ -107,6 +121,8 @@ struct Expect {
     colors: Option<usize>,
     /// The number of stitches is in this range.
     stitches: Option<[usize; 2]>,
+    /// The number of trims (the status line).
+    trims: Option<usize>,
     /// The width and the height of the design (mm, within 0.5 mm).
     size: Option<[f64; 2]>,
     /// The number of selected objects.
@@ -117,6 +133,14 @@ struct Expect {
     window: Option<String>,
     /// The command at this place is on (a view, a tool).
     on: Option<String>,
+    /// The id of the fabric of the design.
+    fabric: Option<String>,
+    /// The number of warnings and problems of Design Info.
+    warnings: Option<usize>,
+    /// The number of holes of all fills.
+    holes: Option<usize>,
+    /// The number of hoopings (Hooping mode).
+    hoopings: Option<usize>,
 }
 
 /// The step files: the id of the tutorial and the text of its steps.
@@ -180,12 +204,14 @@ fn check_place(place: &[&str], file: &[String]) -> Result<(), String> {
     command_at(place).map(|_| ())
 }
 
-/// A widget for a screen reader: its name and its place.
+/// A widget for a screen reader: its name (empty if it has none), its
+/// place and its kind.
 #[derive(Debug, Clone)]
 struct Node {
     name: String,
     rect: Rect,
     enabled: bool,
+    role: Role,
 }
 
 fn nodes_of(out: &egui::FullOutput) -> Vec<Node> {
@@ -198,9 +224,10 @@ fn nodes_of(out: &egui::FullOutput) -> Vec<Node> {
         .filter_map(|(_, n)| {
             let b = n.bounds()?;
             Some(Node {
-                name: n.label().or(n.value())?.to_string(),
+                name: n.label().or(n.value()).unwrap_or_default().to_string(),
                 rect: Rect::from_min_max(Pos2::new(b.x0 as f32, b.y0 as f32), Pos2::new(b.x1 as f32, b.y1 as f32)),
                 enabled: !n.is_disabled(),
+                role: n.role(),
             })
         })
         .collect()
@@ -264,6 +291,21 @@ impl Runner {
                 std::thread::sleep(std::time::Duration::from_millis(20));
             }
         }
+        // The background work of the Picture to Design wizard (at most two
+        // minutes, as its tests).
+        let start = std::time::Instant::now();
+        while self
+            .app
+            .state()
+            .wizard
+            .as_ref()
+            .is_some_and(|w| w.working() || w.editing())
+            && start.elapsed() < std::time::Duration::from_secs(120)
+        {
+            std::thread::sleep(std::time::Duration::from_millis(20));
+            let out = self.studio.input(&mut self.app, SCREEN, Vec::new());
+            self.nodes = nodes_of(&out);
+        }
     }
 
     fn press(&mut self, at: Pos2, mods: Modifiers, pressed: bool) -> Event {
@@ -277,7 +319,17 @@ impl Runner {
     }
 
     fn click_at(&mut self, at: Pos2, mods: Modifiers) {
-        let (down, up) = (self.press(at, mods, true), self.press(at, mods, false));
+        self.click_with(at, mods, PointerButton::Primary);
+    }
+
+    fn click_with(&mut self, at: Pos2, mods: Modifiers, button: PointerButton) {
+        let ev = |pressed| Event::PointerButton {
+            pos: at,
+            button,
+            pressed,
+            modifiers: mods,
+        };
+        let (down, up) = (ev(true), ev(false));
         self.frame(vec![Event::ModifiersChanged(mods), Event::PointerMoved(at)]);
         self.frame(vec![down]);
         self.frame(vec![up]);
@@ -350,6 +402,65 @@ impl Runner {
         self.in_window(name).map_or_else(|| self.node(name), Ok)
     }
 
+    /// The widget of one of `roles` after the label `label`, on its row
+    /// (a label in a window first).
+    fn after_label(&self, label: &str, roles: &[Role]) -> Result<Node, String> {
+        let l = self.button_node(label)?;
+        let row: Vec<&Node> = self
+            .nodes
+            .iter()
+            .filter(|n| roles.contains(&n.role))
+            .filter(|n| (n.rect.center().y - l.rect.center().y).abs() < l.rect.height().max(12.0))
+            .collect();
+        let right = row
+            .iter()
+            .filter(|n| n.rect.left() >= l.rect.right() - 1.0)
+            .min_by(|a, b| a.rect.left().total_cmp(&b.rect.left()));
+        // A list made with `ComboBox::from_label` has its label after it.
+        let left = || {
+            row.iter()
+                .filter(|n| n.rect.right() <= l.rect.left() + 1.0)
+                .max_by(|a, b| a.rect.right().total_cmp(&b.rect.right()))
+        };
+        right
+            .or_else(left)
+            .map(|n| (*n).clone())
+            .ok_or_else(|| format!("no field after \"{label}\""))
+    }
+
+    /// Sets the field after `label` to `value`: a click on it, all its
+    /// text selected, the value typed, Enter.
+    fn set_field(&mut self, label: &str, value: &str) -> Result<(), String> {
+        let f = self.after_label(label, &[Role::SpinButton, Role::TextInput, Role::MultilineTextInput])?;
+        if !f.enabled {
+            return Err(format!("the field \"{label}\" is off"));
+        }
+        self.click_at(f.rect.center(), Modifiers::NONE);
+        let all = |pressed| Event::Key {
+            key: Key::A,
+            physical_key: None,
+            pressed,
+            repeat: false,
+            modifiers: Modifiers::COMMAND,
+        };
+        self.frame(vec![Event::ModifiersChanged(Modifiers::COMMAND), all(true)]);
+        self.frame(vec![all(false), Event::ModifiersChanged(Modifiers::NONE)]);
+        self.frame(vec![Event::Text(value.to_string())]);
+        self.key(Key::Enter);
+        Ok(())
+    }
+
+    /// Chooses `item` in the list after `label`.
+    fn choose(&mut self, label: &str, item: &str) -> Result<(), String> {
+        let list = self.after_label(label, &[Role::ComboBox])?;
+        self.click_at(list.rect.center(), Modifiers::NONE);
+        let n = self
+            .in_window(item)
+            .ok_or_else(|| format!("no item \"{item}\" in the list \"{label}\""))?;
+        self.click_at(n.rect.center(), Modifiers::NONE);
+        Ok(())
+    }
+
     /// The close button of the window with the title `title`: on the row
     /// of the title, right of it.
     fn close_button(&self, title: &str) -> Result<Node, String> {
@@ -418,6 +529,15 @@ impl Runner {
             let at = self.screen(p)?;
             self.click_at(at, mods);
         }
+        for c in &s.clicks {
+            let (button, p) = match c.as_slice() {
+                [x, y] => (PointerButton::Primary, [*x, *y]),
+                [x, y, r] if *r == 1.0 => (PointerButton::Secondary, [*x, *y]),
+                _ => return Err(format!("a click is [x, y] or [x, y, 1], not {c:?}")),
+            };
+            let at = self.screen(p)?;
+            self.click_with(at, mods, button);
+        }
         if let Some(k) = &s.key {
             let key = Key::from_name(k).ok_or_else(|| format!("no key \"{k}\""))?;
             self.key(key);
@@ -428,6 +548,16 @@ impl Runner {
                 return Err(format!("the button \"{text}\" is off"));
             }
             self.click_at(n.rect.center(), Modifiers::NONE);
+        }
+        if let Some(text) = &s.text {
+            self.frame(vec![Event::Text(text.clone())]);
+            self.settle();
+        }
+        if let Some([label, value]) = &s.set {
+            self.set_field(tr(label), value)?;
+        }
+        if let Some([label, item]) = &s.choose {
+            self.choose(tr(label), tr(item))?;
         }
         if let Some(title) = &s.close {
             let n = self.close_button(tr(title))?;
@@ -496,11 +626,59 @@ impl Runner {
                 bad.push(format!("{n} stitches, not {lo} to {hi}"));
             }
         }
+        if let Some(n) = e.trims {
+            let now = st.plan_view().plan.stitches.trim_count();
+            if now != n {
+                bad.push(format!("{now} trims, not {n}"));
+            }
+        }
         if let Some(place) = &e.on {
             let here: Vec<&str> = place.split(" > ").map(tr).collect();
             let (cmd, _, _) = command_at(&here)?;
             if !self.app.state().is_on(cmd) {
                 bad.push(format!("\"{place}\" is not on"));
+            }
+        }
+        let st = self.app.state();
+        let d = st.doc.design();
+        if let Some(id) = &e.fabric
+            && d.fabric.as_deref() != Some(id.as_str())
+        {
+            bad.push(format!("the fabric is {:?}, not {id}", d.fabric));
+        }
+        if let Some(n) = e.holes {
+            let now: usize = d
+                .objects()
+                .iter()
+                .map(|o| match &o.kind {
+                    emb_model::ObjectKind::Fill { holes, .. } => holes.len(),
+                    _ => 0,
+                })
+                .sum();
+            if now != n {
+                bad.push(format!("{now} holes, not {n}"));
+            }
+        }
+        if let Some(n) = e.hoopings {
+            let now = d.hooping.as_ref().map_or(0, |h| h.hoopings.len());
+            if now != n {
+                bad.push(format!("{now} hoopings, not {n}"));
+            }
+        }
+        if let Some(n) = e.warnings {
+            let info = st.design_info();
+            let st = &*st;
+            if info.issues.len() != n {
+                let texts: Vec<String> = info
+                    .issues
+                    .iter()
+                    .map(|i| {
+                        let objects = st.doc.design().objects();
+                        let at = i.object.and_then(|id| objects.iter().position(|o| o.id == id));
+                        format!("{} (object {at:?})", i.text)
+                    })
+                    .collect();
+                bad.push(format!("{} warnings, not {n}: {texts:?}", texts.len()));
             }
         }
         if let Some(name) = &e.shows {
@@ -553,7 +731,7 @@ impl Runner {
         }
         let picture = self.paint.then(|| {
             let shot = self.studio.shot(&mut self.app, SCREEN);
-            shot.picture.crop(rect)
+            fit_width(shot.picture.crop(rect))
         });
         self.made.push(Made {
             name: name.to_string(),
@@ -603,6 +781,29 @@ impl Runner {
     }
 }
 
+/// The widest picture in the help, in pixels: the Help window shows it
+/// at this size or smaller.
+const MAX_PICTURE_W: u32 = 720;
+
+/// `p`, made smaller to [`MAX_PICTURE_W`] if it is wider.
+fn fit_width(p: Picture) -> Picture {
+    let w = p.width as u32;
+    if w <= MAX_PICTURE_W {
+        return p;
+    }
+    let bytes: Vec<u8> = p.pixels.iter().flatten().copied().collect();
+    let Some(img) = image::RgbaImage::from_raw(w, p.height as u32, bytes) else {
+        return p;
+    };
+    let h = (f64::from(p.height as u32) * f64::from(MAX_PICTURE_W) / f64::from(w)).round() as u32;
+    let small = image::imageops::resize(&img, MAX_PICTURE_W, h.max(1), image::imageops::FilterType::Triangle);
+    Picture {
+        width: small.width() as usize,
+        height: small.height() as usize,
+        pixels: small.pixels().map(|px| px.0).collect(),
+    }
+}
+
 /// The modifiers of the names in `holding`.
 fn holding(names: &[String]) -> Result<Modifiers, String> {
     let mut m = Modifiers::NONE;
@@ -621,10 +822,19 @@ fn holding(names: &[String]) -> Result<Modifiers, String> {
 /// made, or the first step that went wrong.
 fn run(id: &str, text: &str, lang: &str, paint: bool) -> Result<Vec<Made>, String> {
     let steps: Steps = toml::from_str(text).map_err(|e| format!("{id}: {e}"))?;
+    // The steps as the file writes them, for the messages.
+    let written: Vec<String> = toml::from_str::<toml::Table>(text)
+        .ok()
+        .and_then(|t| t.get("step")?.as_array().cloned())
+        .unwrap_or_default()
+        .iter()
+        .map(|v| v.to_string().replace('\n', " "))
+        .collect();
     let mut r = Runner::new(lang, paint);
     for (i, s) in steps.step.iter().enumerate() {
+        let shown = written.get(i).map_or("", String::as_str);
         r.step(s)
-            .map_err(|e| format!("{id} in {lang}, step {} ({s:?}): {e}", i + 1))?;
+            .map_err(|e| format!("{id} in {lang}, step {} ({shown}): {e}", i + 1))?;
     }
     crate::i18n::set_language("en");
     Ok(r.made)
@@ -677,7 +887,9 @@ mod tests {
             assert!(files.iter().any(|(id, _)| *id == t.id), "{} has no step file", t.id);
         }
         let mut errors = Vec::new();
-        for (id, text) in &files {
+        // `EMB_TUTORIAL=<id>`: only this tutorial (while you write it).
+        let only = std::env::var("EMB_TUTORIAL").unwrap_or_default();
+        for (id, text) in files.iter().filter(|(id, _)| only.is_empty() || *id == only) {
             assert!(topics.iter().any(|t| t.id == *id), "no topic for the steps {id}");
             let shown = topic_pictures(id);
             for lang in LANGUAGES {
@@ -767,7 +979,11 @@ mod tests {
     fn write_tutorial_pictures() {
         let dir = pictures_dir();
         let mut written = 0;
-        for (id, text) in step_files() {
+        let only = std::env::var("EMB_TUTORIAL").unwrap_or_default();
+        for (id, text) in step_files()
+            .into_iter()
+            .filter(|(id, _)| only.is_empty() || *id == only)
+        {
             for lang in LANGUAGES {
                 let made = run(&id, &text, lang, true).unwrap_or_else(|e| panic!("{e}"));
                 for m in made {

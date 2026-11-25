@@ -6,76 +6,83 @@ path: artwork
 time: 15
 level: new
 before: tutorial-first-design
-keywords: tutorial, patch, logo, picture, png, jpeg, wizard, trace, backdrop, digitize, export, auto digitize, image
+keywords: tutorial, patch, logo, picture, png, jpeg, wizard, picture to design, background, colors, stitches, backdrop, digitize, export, auto digitize, image
 ---
 # Tutorial: a patch from a picture
 
-In this tutorial you make a two-color patch from a logo picture, and you
-write the file for your machine. It takes about 15 minutes.
+In this tutorial you make a two-color patch from a logo picture with
+**Picture to Design**, and you write the file for your machine. The
+wizard finds the areas of each color and gives them stitches.
 
-You need a simple picture (PNG, JPEG, BMP, TIFF or GIF) with few colors.
+You need no file: the start design has a logo picture, a navy circle with
+a yellow star. With your own picture, use a simple picture (PNG, JPEG,
+BMP, TIFF or GIF) with few colors.
 
-## The fast way: Picture to design
+## Open the start design
 
-1. Click **Artwork > Picture to Design**. (The start page has the same
-   command.)
-2. Select your picture. The wizard opens.
-3. **Background:** click the background color to remove it. Use the
-   erase and restore brushes if a part is wrong.
-4. **Colors:** set the number of thread colors. Leave out colors that you
-   do not want to sew. In **Simplify**, **Even out** makes the areas of a
-   JPEG or a scan even, and **Colors from the thread chart** uses the
-   threads of the chart of the Threads panel.
-5. **Stitches:** for each color, select fill, satin or outline. Look at
-   the picture of the stitches on the right. Small details inside an area
-   sew on top of it (**Details on top up to**), each fill sews along its
-   area (**Fill along each area**), and very small areas become satins or
-   runs (**Small areas under**). With **Auto**, the dark outlines of a
-   drawing sew last, as runs or narrow satins.
-6. **Finish:** read the checks under the numbers. A check can have a
-   button that changes the settings to fix it. Then click **Finish**. The
-   design is on the canvas, in the hoop.
+Click [Open the start design](sample:patch-picture). The logo shows as a
+backdrop picture, dimmed under the design.
 
-The wizard makes the pictures of the later steps in the background. While
-it works, the preview shows **Working…** and the last picture. You can
-change more settings; the wizard then uses the newest settings. A photo
-from a phone comes in upright.
+![The logo picture](patch-start)
 
-## The manual way: draw on the picture
+## Picture to Design
 
-1. Click **Artwork > Backdrop Picture** and select your picture. It shows
-   under the design, dimmed. To change the picture, click **Edit in Another Program** in the Backdrop panel; save it there and it changes
-   here.
-2. On the **Digitize** tab, click **Shape**. Click round the large area:
-   a left click makes a corner, a right click makes a curve point. Push
-   **Enter** to finish. The area fills with tatami stitches.
-3. Click **Column**. Click along one side of the border and push
-   **Enter**, then click along the other side and push **Enter**. The
-   border is a satin column.
-4. Click the color of each object in the **Threads** panel to set its
-   thread.
-5. Push **Esc** to stop drawing. Click an object to select it.
+1. Click **Artwork > Import > Picture to Design**. The design has a
+   backdrop picture, so the wizard uses it. (With no backdrop picture,
+   the wizard asks for a picture file.)
+2. Click **Next ›**. The **Background** step removes the parts that do not
+   sew.
+3. Click **Remove the edge color**. The white round the logo goes: it is
+   the color at the edges of the picture. To remove other parts, click
+   **Click a color** and click them in the picture, or use the brushes.
 
-## Check the design
+![The Background step of the wizard](patch-background)
 
-- Click **View > Stitch Player** to see how the machine sews the design.
-- Turn on **View > Thread Look** to see the threads with light and shade.
-- The status line shows the number of stitches, colors and trims.
-- Orange outlines show objects that are out of the hoop margin.
+4. Click **Next ›**. In the **Simplify** step, set **Colors** to 2: the
+   logo has two thread colors.
+5. Click **Next ›**. The **Colors** step shows each color. Clear a color
+   that you do not want to sew.
+6. Click **Next ›**. The **Stitches** step gives each color a fill, a
+   satin or an outline. **Auto** chooses by the shape of each area: the
+   points of the star are narrow, so they can become satins.
+7. Click **Next ›**. The **Finish** step shows the number of objects and
+   the checks. A check can have a button that fixes it.
+8. Click **Finish**. The design is on the canvas, and the objects are
+   selected. Push **Esc**.
+
+The wizard makes the pictures of its steps in the background. While it
+works, the preview shows **Working…** and the last picture.
+
+## Look at the stitches
+
+Click **View > Show > Thread Look**, and select **Thread Look** in its
+menu. The status line shows **Colors: 2**.
+
+![The patch with the thread look](patch-stitches)
 
 ## Write the machine file
 
-1. Click **File > Export Machine File** (Ctrl+E). The format of your
-   machine is the default.
-2. Save the file, and copy it to a USB stick. Or use **Design > Send to
-   USB**: it writes the file to the stick in one step.
-3. Save the project too (Ctrl+S), to make changes later.
+1. Click **Design > Output > Export**, then **Export…**. The format of
+   your machine is the default.
+2. Save the project too (**Save**), to change the design later.
+
+For a real patch, add a satin border round the logo (see [Tutorial: your
+first design](tutorial-first-design)), and sew it on twill with a firm
+backing.
+
+## If it does not look right
+
+- **The background sews.** Go back to the **Background** step (click
+  **‹ Back**), and remove the background color.
+- **There are too many small areas.** In the **Simplify** step, set
+  **Remove specks under** larger, or set fewer **Colors**.
+- **A thin line is missing.** In the **Stitches** step, make the value of
+  **Small areas under** smaller.
 
 ## Next
 
-- [Tutorial: a name on an arc](tutorial-lettering)
-- [Tutorial: an appliqué](tutorial-applique)
-- [Tutorial: production output](tutorial-output)
+- [Tutorial: a logo by hand](tutorial-logo-by-hand): the same work with
+  the drawing tools
 - [Pictures and Picture to design](pictures): all the settings of the
   wizard
-- [Objects and stitches](objects-and-stitches)
+- [Tutorial: a name on an arc](tutorial-lettering)

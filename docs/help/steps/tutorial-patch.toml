@@ -1,0 +1,76 @@
+# The steps of "Tutorial: a patch from a picture" (tutorial-patch.md). The
+# test each_tutorial_runs_in_each_language (crates/emb-app/src/
+# tutorial_steps.rs) does them in each language; write_tutorial_pictures
+# makes the pictures. A change of a step needs the same change in the topic
+# and its translations.
+
+# Open the start design: the logo picture.
+[[step]]
+open = "patch-picture"
+expect = { objects = 0 }
+
+[[step]]
+picture = "patch-start"
+around = [[-36.0, -36.0], [36.0, 36.0]]
+
+# The wizard.
+[[step]]
+command = "Artwork > Import > Picture to Design"
+expect = { window = "Picture to Design" }
+
+# Background.
+[[step]]
+button = "Next ›"
+
+[[step]]
+button = "Remove the edge color"
+
+[[step]]
+picture = "patch-background"
+area = "windows"
+
+# Simplify: the number of thread colors.
+[[step]]
+button = "Next ›"
+
+[[step]]
+set = ["Colors", "2"]
+
+# Colors, Stitches, Finish.
+[[step]]
+button = "Next ›"
+
+[[step]]
+button = "Next ›"
+
+[[step]]
+button = "Next ›"
+
+[[step]]
+button = "Finish"
+expect = { colors = 2, warnings = 0 }
+
+[[step]]
+key = "Escape"
+
+# Look at the stitches.
+[[step]]
+command = "View > Show > Thread Look"
+
+[[step]]
+button = "Thread Look"
+
+[[step]]
+key = "Escape"
+
+[[step]]
+picture = "patch-stitches"
+around = [[-36.0, -36.0], [36.0, 36.0]]
+
+# Write the machine file.
+[[step]]
+command = "Design > Output > Export"
+expect = { window = "Export machine file" }
+
+[[step]]
+button = "Cancel"

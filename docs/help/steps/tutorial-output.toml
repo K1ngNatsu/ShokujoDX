@@ -1,0 +1,40 @@
+# The steps of "Tutorial: production output" (tutorial-output.md). The
+# test each_tutorial_runs_in_each_language (crates/emb-app/src/
+# tutorial_steps.rs) does them in each language; write_tutorial_pictures
+# makes the pictures. A change of a step needs the same change in the topic
+# and its translations. (No picture of the Output Design window: it shows
+# the folder of the computer.)
+
+# Open the badge.
+[[step]]
+open = "first-badge"
+expect = { objects = 2 }
+
+# Output design.
+[[step]]
+command = "Design > Output > Output Design"
+expect = { window = "Output Design" }
+
+[[step]]
+close = "Output Design"
+
+# The production worksheet.
+[[step]]
+command = "Design > Output > Print Preview"
+expect = { window = "Print Preview" }
+
+[[step]]
+picture = "output-worksheet"
+area = "windows"
+
+[[step]]
+close = "Print Preview"
+
+# Send to USB, and many designs at once.
+[[step]]
+command = "Design > Output > Send to USB"
+check_only = true
+
+[[step]]
+command = "Design > Output > Batch Output"
+check_only = true

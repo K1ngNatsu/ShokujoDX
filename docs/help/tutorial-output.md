@@ -15,8 +15,8 @@ machine file, the worksheet and a picture of the design.
 
 ## Output design
 
-1. Open your design.
-2. Click **Design > Output Design**.
+1. Click [Open the badge](sample:first-badge), or open your design.
+2. Click **Design > Output > Output Design**.
 3. Select the folder and the files: the machine formats, the production
    worksheet (PDF), the approval sheet (PDF), the design picture (PNG,
    with the 3D thread look) and others. The program keeps your choice for
@@ -33,20 +33,36 @@ The worksheet tells the operator how to sew the design:
 - a picture of the design;
 - for rhinestones, the order of work.
 
-**Design > Print Preview** shows the worksheet before you print it.
+Click **Design > Output > Print Preview** to see the worksheet before you
+print it. **Approval sheet** shows the sheet for the customer. **Save
+PDF…** saves the sheet.
+
+![The worksheet in Print Preview](output-worksheet)
 
 ## Send to USB
 
-**Design > Send to USB** writes the machine file to your USB stick, in the
-folder of your machine. The first time, select the stick and the folder.
+**Design > Output > Send to USB** writes the machine file to your USB
+stick, in the folder of your machine. The first time, select the stick
+and the folder.
 
 ## Many designs at once
 
-**Design > Batch Output** makes the files of many designs. The design
-library (the **Library** tab next to the design) can output the selected
-designs too. See [The design library and clipart](library).
+**Design > Output > Batch Output** makes the files of many designs: select
+the designs, then the folder. The design library (the **Library** tab
+next to the design) can output the selected designs too. See [The design
+library and clipart](library).
+
+## If it does not look right
+
+- **The worksheet has the wrong threads.** Set the threads of the design
+  on the **Color** tab (the chart and the colorway) before the output.
+- **The machine does not read the file.** Check the machine of the
+  design: it sets the format. See [Machines and hoops](machines-and-hoops).
+- **The output is slow.** Large pictures with the 3D look take time; the
+  **Exports** panel shows each job.
 
 ## Next
 
 - [Files and output](files-and-output): all the files and formats
 - [Checking a design](checking): check a design before you sew it
+- [Tutorial: a design in two hoopings](tutorial-hooping)

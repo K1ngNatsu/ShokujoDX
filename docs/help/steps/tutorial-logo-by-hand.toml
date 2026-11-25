@@ -1,0 +1,117 @@
+# The steps of "Tutorial: a logo by hand" (tutorial-logo-by-hand.md). The
+# test each_tutorial_runs_in_each_language (crates/emb-app/src/
+# tutorial_steps.rs) does them in each language; write_tutorial_pictures
+# makes the pictures. The clicks are the points of the leaf in
+# crates/emb-app/src/samples.rs. A change of a step needs the same change in
+# the topic and its translations.
+
+# Open the start design.
+[[step]]
+open = "logo-backdrop"
+expect = { objects = 0 }
+
+[[step]]
+picture = "logo-by-hand-start"
+around = [[-45.0, -40.0], [40.0, 45.0]]
+
+# The leaf: a fill with a hole.
+[[step]]
+thread = "Green"
+
+[[step]]
+command = "Digitize > Fills > Complex Fill"
+
+[[step]]
+clicks = [[-25.0, 25.0], [-28.0, -5.0, 1], [-5.0, -25.0, 1], [28.0, -28.0], [25.0, 5.0, 1], [5.0, 25.0, 1]]
+
+[[step]]
+key = "Enter"
+
+[[step]]
+clicks = [[-8.0, -10.0, 1], [-4.0, -6.0, 1], [-8.0, -2.0, 1], [-12.0, -6.0, 1]]
+
+[[step]]
+key = "Enter"
+
+[[step]]
+key = "Enter"
+expect = { objects = 1, kinds = ["Fill"], holes = 1, threads = ["Green"] }
+
+[[step]]
+key = "Escape"
+
+[[step]]
+key = "Escape"
+expect = { selected = 0 }
+
+# The stem: a satin column.
+[[step]]
+thread = "Brown"
+
+[[step]]
+command = "Digitize > Columns > Column"
+
+[[step]]
+clicks = [[-23.5, 26.5], [-30.0, 32.0, 1], [-36.0, 39.5]]
+
+[[step]]
+key = "Enter"
+
+[[step]]
+clicks = [[-26.5, 23.5], [-33.0, 29.0, 1], [-39.5, 36.5]]
+
+[[step]]
+key = "Enter"
+expect = { objects = 2, kinds = ["Fill", "Satin"], threads = ["Green", "Brown"] }
+
+[[step]]
+key = "Escape"
+
+[[step]]
+key = "Escape"
+
+# The vein: a line.
+[[step]]
+thread = "Dark green"
+
+[[step]]
+command = "Digitize > Lines > Line"
+
+[[step]]
+clicks = [[-18.0, 18.0], [0.0, -1.0, 1], [16.0, -16.0]]
+
+[[step]]
+key = "Enter"
+expect = { objects = 3, kinds = ["Fill", "Satin", "Running"], threads = ["Green", "Brown", "Dark green"] }
+
+[[step]]
+key = "Escape"
+
+[[step]]
+key = "Escape"
+
+[[step]]
+picture = "logo-by-hand-objects"
+around = [[-45.0, -40.0], [40.0, 45.0]]
+
+# Look at the stitches.
+[[step]]
+command = "View > Show > Thread Look"
+
+[[step]]
+button = "Thread Look"
+
+[[step]]
+key = "Escape"
+
+[[step]]
+picture = "logo-by-hand-stitches"
+around = [[-45.0, -40.0], [40.0, 45.0]]
+
+[[step]]
+expect = { objects = 3, colors = 3, warnings = 0 }
+
+# A picture of your own.
+[[step]]
+command = "Artwork > Import > Backdrop Picture"
+check_only = true

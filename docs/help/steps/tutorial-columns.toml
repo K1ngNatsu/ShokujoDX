@@ -1,0 +1,92 @@
+# The steps of "Tutorial: columns that turn" (tutorial-columns.md). The
+# test each_tutorial_runs_in_each_language (crates/emb-app/src/
+# tutorial_steps.rs) does them in each language; write_tutorial_pictures
+# makes the pictures. The clicks are the points of ARCH, S_LINE, CRESCENT
+# and WAVE in crates/emb-app/src/samples.rs. A change of a step needs the
+# same change in the topic and its translations.
+
+# Open the start design.
+[[step]]
+open = "columns"
+expect = { objects = 1, kinds = ["Vector"] }
+
+[[step]]
+picture = "columns-start"
+around = [[-55.0, -35.0], [50.0, 45.0]]
+
+# The arch: Column Pairs.
+[[step]]
+command = "Digitize > Columns > Column Pairs"
+
+[[step]]
+clicks = [[-50.0, 0.0], [-44.0, 0.0], [-42.7, -17.7], [-38.4, -13.4], [-25.0, -25.0], [-25.0, -19.0], [-7.3, -17.7], [-11.6, -13.4], [0.0, 0.0], [-6.0, 0.0]]
+
+[[step]]
+key = "Enter"
+expect = { objects = 2, kinds = ["Vector", "Satin"] }
+
+# The S: Column C.
+[[step]]
+command = "Digitize > Columns > Column C"
+
+[[step]]
+clicks = [[20.0, -30.0], [32.0, -22.0, 1], [20.0, -12.0, 1], [8.0, -2.0, 1], [20.0, 6.0]]
+
+[[step]]
+key = "Enter"
+expect = { objects = 3, kinds = ["Vector", "Satin", "Satin"] }
+
+# The crescent: Turning.
+[[step]]
+command = "Digitize > Fills > Turning"
+
+[[step]]
+clicks = [[-45.0, 15.0], [-25.0, 40.0, 1], [-5.0, 15.0], [-25.0, 28.0, 1]]
+
+[[step]]
+key = "Enter"
+
+[[step]]
+clicks = [[-38.0, 20.0], [-35.0, 33.0], [-25.0, 26.0], [-25.0, 42.0], [-12.0, 20.0], [-15.0, 33.0]]
+
+[[step]]
+key = "Enter"
+expect = { objects = 4, kinds = ["Vector", "Satin", "Satin", "Satin"] }
+
+[[step]]
+key = "Escape"
+
+[[step]]
+key = "Escape"
+
+# The wave: a vector line to a satin.
+[[step]]
+command = "Digitize > Select > Select"
+
+[[step]]
+click = [45.0, 30.0]
+expect = { selected = 1 }
+
+[[step]]
+command = "Artwork > Convert > To Satin"
+expect = { objects = 4, kinds = ["Satin", "Satin", "Satin", "Satin"] }
+
+[[step]]
+key = "Escape"
+
+# Look at the stitches.
+[[step]]
+command = "View > Show > Thread Look"
+
+[[step]]
+button = "Thread Look"
+
+[[step]]
+key = "Escape"
+
+[[step]]
+picture = "columns-stitches"
+around = [[-55.0, -35.0], [50.0, 45.0]]
+
+[[step]]
+expect = { warnings = 0 }

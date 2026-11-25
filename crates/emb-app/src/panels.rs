@@ -46,7 +46,10 @@ fn param_slider(
             egui::Slider::new(&mut v, range)
                 .clamping(egui::SliderClamping::Edits)
                 .suffix(" mm")
-                .fixed_decimals(2),
+                .fixed_decimals(2)
+                // A typed value can have a decimal comma (German,
+                // Spanish) and a unit, as the other length fields.
+                .custom_parser(|s| crate::workspace::parse_length(s, crate::workspace::Units::Mm)),
         );
         ui.weak(format!("({})", word(v)));
         if resp.changed() {

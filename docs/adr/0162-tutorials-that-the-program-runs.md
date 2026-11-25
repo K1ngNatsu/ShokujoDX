@@ -70,12 +70,38 @@ languages by hand after each change of the program.
    of the start page shows them and "All tutorials"; the Help tab has
    **All Tutorials**.
 7. **The size of the pictures.** The pictures of Milestone 1 are 15
-   files, 0.8 MB. Each milestone measures them; if all pictures go over
-   10 MB, they go to a help package (open question 1 of the draft).
+   files, 0.8 MB; with Milestone 2, 54 files, 3.9 MB. Each milestone
+   measures them; if all pictures go over 10 MB, they go to a help
+   package (open question 1 of the draft).
 
 The thread colors of the Threads strip now have screen reader names (the
 names of the threads): the runner clicks them by name, and a screen
 reader says them.
+
+Milestone 2 (path 2 and the seven tutorials of before) added:
+
+- **More step kinds:** `clicks` (a list of left clicks and right clicks,
+  the corners and curve points of the drawing tools), `type` (text into
+  the field that has the keyboard), `set` (the number or text field
+  after a label: a click, all the text, the value, Enter) and `choose`
+  (an item of the list after a label, or before it for a list with its
+  label after it). Number fields and lists have no screen reader name,
+  so the runner finds them by the label on their row. More checks:
+  `fabric`, `warnings` (Design Info), `holes`, `hoopings` and `trims`.
+  The runner waits for the background work of the Picture to Design
+  wizard.
+- **Start pictures:** a start design can have a backdrop picture that
+  `samples.rs` draws (a leaf logo to trace, a logo for Picture to
+  Design). Its shapes come from the same points that the step file
+  clicks, so the stitches of the steps go on the picture. The wizard uses
+  the backdrop picture, so no file is needed.
+- **Pictures at most 720 pixels wide** (the Help window shows them at
+  that size or smaller).
+- The step files found two weak places of the program that the
+  tutorials now avoid (`docs/design/open-work.md`): four of the six
+  monogram templates, and the Classic style, build up too much thread
+  where letters and borders overlap; the lace ornament template shows
+  ten "Thread builds up" warnings.
 
 ## Consequences
 
