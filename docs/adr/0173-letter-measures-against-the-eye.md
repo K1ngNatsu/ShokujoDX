@@ -28,8 +28,8 @@ program under Apache-2.0); the code is our own.
   Block Sans 6, Anton N, Y, a, Pacifico p; open corner: Anton r, x,
   Varsity a; each in both ways). The owner looks at 50 of them (all the
   faulty letters, the letters near a limit, the letters that the bench
-  measures call faulty, and some at random; `out/p22-judged`) and
-  corrects the set.
+  measures call faulty, and some at random; `out/p22-judged`). On
+  2026-11-25 the owner saw all 50 in the same way: no corrections.
 - The survey of 127 fonts (ADR 0158) is not in the set: its source fonts
   are not in the repository, and the test must run on each computer.
 - **A new measure.** The open area of a letter (any open cell) called

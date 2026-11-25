@@ -6,8 +6,8 @@ efficiently on itself"). Milestone 1 is made (ADR 0167), and the travel
 faults that it found are fixed (ADR 0168). Milestone 2 is made (ADR
 0169). Milestone 3 is made in the software (ADR 0170); its sew-out is
 open. Milestone 4 is made in the software (ADR 0171); its sew-out is
-open. Milestone 5 is made (ADR 0172). Milestone 6 is made (ADR 0173);
-the owner's look at 50 of the judged letters is open.
+open. Milestone 5 is made (ADR 0172). Milestone 6 is made (ADR 0173),
+and the owner agrees with the 50 judged letters that the owner looked at.
 
 ## Goal
 
@@ -396,9 +396,9 @@ Notes of the changes where the measures and the eye did not agree:
 `emb-cli letter-faults --judged <file>`: the measures agree with the eye
 on all 496 letters (100 %), with no letter where they do not agree; the
 limits come from this set, so the report lists the letters near a limit.
-The snapshot of the bench did not change. The owner looks at the 50
-letters of `out/p22-judged` (checklist and two sheets) and corrects the
-set (the owner's list in `docs/design/open-work.md`).
+The snapshot of the bench did not change. The owner looked at the 50
+letters of `out/p22-judged` (checklist and two sheets) on 2026-11-25 and
+saw them in the same way: no corrections. The exit test is met.
 
 ## Milestone 7: overlapped strokes (trial) (L)
 
