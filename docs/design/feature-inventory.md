@@ -36,7 +36,7 @@ Clean-room rules (spec, "Key decisions"):
 | ⇄ | Replaced by our own approach (see note) |
 | ✕ | Out of scope (see note) |
 
-**Phase** refers to `docs/design/roadmap.md` (P1 to P20).
+**Phase** refers to `docs/design/roadmap.md` (P1 to P22).
 
 ## 1. Product structure
 
@@ -340,7 +340,9 @@ The reference product reads and writes its own native format and more than forty
 Features that the reference product does not have, or that this inventory did
 not list, from the public features of Ink/Stitch and of other free and
 commercial embroidery programs (owner request, 2026-10-25).
-Phase P11 (`docs/design/p11-plan.md`) plans them.
+Phase P11 (`docs/design/p11-plan.md`) plans them. The rows from zigzag
+(an open-source program under Apache-2.0; the comparison of 2026-11-25)
+are planned in phase P22 (`docs/design/p22-plan.md`).
 
 | Feature | In | What it does | Status | Phase |
 | --- | --- | --- | --- | --- |
@@ -361,6 +363,18 @@ Phase P11 (`docs/design/p11-plan.md`) plans them.
 | Cap sequencing | Commercial programs | Sew order from the center out and from the bottom up for caps | ✅ Arrange > Sew order > Cap order; cap frame hint in Design info (ADR 0050) | P11 (7) |
 | Cutwork needles | The programs of machine makers, others | Lines that cutting needles cut, with the needle angle | ◐ Specialty > Cutwork: cut lines by needle angle, a color for each needle (ADR 0051); files not tried on a machine | P11 (8) |
 | Update check | All | The program tells the user that a new version exists | ✅ Help > Check for Updates, and at the start if the user permits it (the installer and the first start ask): the version, its notes and the download page; no download and no install; the help topic What is new (ADR 0109) | P17 (1) |
+| Travel that shows | zigzag | A warning for travel stitches that lie on top of stitches sewn before them | — Not started | P22 (1) |
+| Live numbers for trims | zigzag | While the user drags the distance up to which the machine sews across gaps, the trims, the travel that shows and the sew time change, and the canvas marks the new travel | — Not started | P22 (2) |
+| Quicker to sew | zigzag | One window: merge threads that look almost the same, remove small details, sew across small gaps, fewer color changes, with the numbers before and after | — Not started | P22 (2) |
+| Test swatches | zigzag | Copies of the selection in a grid, one setting in steps, each copy with its value as lettering, to sew on the fabric | — Not started | P22 (3) |
+| Satin lean | zigzag | The top stitches of a column lean from square across it by an angle (knits, a look) | — Not started | P22 (4) |
+| Bands of threads across a column | zigzag, Ink/Stitch | More than one thread across one satin column, each in its band | — Not started | P22 (4) |
+| Fix a machine file | zigzag | Check a stitch file and fix it in place: join blocks of the same thread, remove short stitches, split long ones, trim long jumps, add locks | — Not started | P22 (5) |
+| Letter measures checked by eye | zigzag | A set of letters judged by eye, and a check that the measures of the letters agree with it | — Not started | P22 (6) |
+| Overlapped strokes in letters | zigzag | At a joint, the stroke that meets a stem goes under it to the middle of the joint and sews first (a trial) | — Not started | P22 (7) |
+| The open tabs come back; one program | zigzag | After a quit the open tabs come back with their changes; a file opens in the program that runs | — Not started | P22 (8) |
+| AI agents (MCP) | zigzag | The AI agent of the user opens, changes, checks, shows and exports designs through MCP (in `emb-cli`, on standard input and output; no network code) | — Not started | P22 (9) |
+| Send to the Brother Skitch over Bluetooth | zigzag | Send a design to the Skitch PP1, follow the sewing | — Not planned: waits for a tester with a Skitch (open work) | — |
 
 ## 10. Shop tools
 
