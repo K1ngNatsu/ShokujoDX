@@ -16,8 +16,12 @@ use crate::hidden::{Cover, TRAVEL_STITCH_MM};
 use crate::object::{Run, RunLink, StitchCache, StitchError, StopReason};
 use crate::running;
 
-/// Lock stitches shorter than this are left out, in mm.
+/// Lock stitches shorter than this are left out, in mm (and shorter than
+/// the shortest stitch of the machine).
 const MIN_LOCK_MM: f64 = 0.1;
+/// A tie-off looks back at most this many needle points for a point far
+/// enough for its lock stitches.
+const LOCK_LOOK_BACK: usize = 12;
 
 /// A run that starts nearer than this to the needle starts where the
 /// needle is, in mm: a travel stitch to it is not made. The unit of the
@@ -497,14 +501,21 @@ impl<'a> Builder<'a> {
         self.needle = p;
     }
 
+    /// The shortest lock stitch: the shortest stitch of the machine (a
+    /// shorter one breaks the thread, and Design Info warns of it), at
+    /// least [`MIN_LOCK_MM`].
+    fn min_lock(&self) -> f64 {
+        self.opts.min_stitch_mm.max(MIN_LOCK_MM)
+    }
+
     /// Two short stitches forward and back toward `toward`, ending where they started.
     fn lock(&mut self, toward: Point) {
         let at = self.needle;
         let Some(u) = (toward - at).normalized() else { return };
         let len = self.opts.lock_mm.min(at.distance(toward) / 2.0);
-        // Shorter lock stitches hold nothing, and a machine file (0.1 mm
-        // steps) puts them all on one point.
-        if len < MIN_LOCK_MM {
+        // Shorter lock stitches hold nothing, break the thread, and a
+        // machine file (0.1 mm steps) puts them all on one point.
+        if len < self.min_lock() {
             return;
         }
         let q = at + u * len;
@@ -518,9 +529,22 @@ impl<'a> Builder<'a> {
             return;
         }
         if let Some(prev) = self.prev {
+            // Toward a needle point before it that is far enough for a lock
+            // stitch (the end of a column in a point has very short
+            // stitches), else the one just before it.
+            let far = 2.0 * self.min_lock();
+            let toward = self
+                .recs
+                .iter()
+                .rev()
+                .take(LOCK_LOOK_BACK)
+                .take_while(|r| r.kind == StitchKind::Stitch)
+                .map(|r| r.pos)
+                .find(|p| p.distance(self.needle) >= far)
+                .unwrap_or(prev);
             // The lock stitches belong to the object that ends: its speed.
             let want = std::mem::replace(&mut self.want_slow, self.slow);
-            self.lock(prev);
+            self.lock(toward);
             self.want_slow = want;
         }
     }
@@ -645,7 +669,7 @@ impl<'a> Builder<'a> {
             // hold nothing: lock toward the next point past it.
             if let Some(&next) = rest
                 .iter()
-                .find(|p| p.distance(first) >= 2.0 * MIN_LOCK_MM)
+                .find(|p| p.distance(first) >= 2.0 * self.min_lock())
                 .or(rest.first())
                 && tie_in
             {
@@ -847,6 +871,47 @@ mod tests {
         // The lock stitches go 0.5 mm toward (0.05, 10), not 0.025 mm
         // toward (0.05, 0), which a machine file would put in one hole.
         assert!(s[1].distance(s[0]) > 0.4, "{:?}", &s[..4]);
+    }
+
+    /// No lock stitch is shorter than the shortest stitch of the machine:
+    /// where the first or last stitch is very short (a column that ends in
+    /// a point), the lock goes toward a needle point farther on (ADR 0163).
+    #[test]
+    fn lock_stitches_are_not_shorter_than_the_shortest_stitch() {
+        let mut d = Design::new("t");
+        let red = d.add_thread("Red", Rgb(255, 0, 0));
+        d.add_object(
+            red,
+            ObjectKind::Running {
+                path: Path::new()
+                    .move_to(Point::new(0.0, 0.0))
+                    .line_to(Point::new(0.2, 0.0))
+                    .line_to(Point::new(0.2, 10.0))
+                    .line_to(Point::new(0.4, 10.0)),
+                params: RunningParams {
+                    style: emb_model::RunStyle::Manual,
+                    ..RunningParams::default()
+                },
+            },
+        );
+        let p = plan(&d);
+        let min = PlanOptions::default().min_stitch_mm;
+        let s: Vec<Point> = p
+            .stitches
+            .records
+            .iter()
+            .filter(|r| r.kind == StitchKind::Stitch)
+            .map(|r| r.pos)
+            .collect();
+        // The tie-in: four stitches from the start; the tie-off: the last
+        // four (the path keeps its own short corners: a manual run).
+        let n = s.len();
+        let locks: Vec<f64> = s[..5]
+            .windows(2)
+            .chain(s[n - 5..].windows(2))
+            .map(|w| w[0].distance(w[1]))
+            .collect();
+        assert!(locks.iter().all(|&l| l >= min - 1e-9), "{locks:?} in {s:?}");
     }
 
     #[test]

@@ -32,9 +32,8 @@ romper.
 
 Un tejido de punto se estira, así que el programa hace las filas un poco
 más abiertas, pone una base fuerte y añade compensación de tiro. Las
-filas de la hoja siguen demasiado juntas (0,22 mm), y ahora la línea de
-estado muestra dos advertencias: la densidad y las puntadas cortas que
-crean las filas densas.
+filas de la hoja siguen demasiado juntas (0,22 mm): la advertencia
+sigue.
 
 ## Definir la densidad
 
@@ -42,7 +41,7 @@ crean las filas densas.
    clic en la hoja (no en la nervadura).
 2. En Propiedades del objeto, ponga **Densidad** en 0,4. Es la distancia
    entre las filas en mm: un valor mayor crea menos puntadas.
-3. Las dos advertencias desaparecen.
+3. La advertencia desaparece.
 
 Valores habituales: 0,4 mm para rellenos, de 0,35 a 0,45 mm para
 satenes. Una tela fina o un hilo grueso necesitan filas más abiertas.

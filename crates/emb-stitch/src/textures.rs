@@ -387,7 +387,7 @@ pub(crate) fn sew_sections(todo: &mut Vec<Section>, params: &SatinParams, entry:
             }
         }
         let sec = todo.remove(best.1);
-        let Some(pts) = crate::satin::satin_with(&sec.geometry, params, at, None, true) else {
+        let Some(pts) = crate::satin::satin_with(&sec.geometry, params, at, None, true, &[]) else {
             continue;
         };
         // The first needle point can be a little outside (pull

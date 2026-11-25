@@ -399,6 +399,18 @@ impl Design {
     /// `true`, the satin and fill objects change too. Returns the changed
     /// objects.
     pub fn set_fabric(&mut self, catalog: &FabricCatalog, id: Option<&str>, objects: bool) -> Vec<ObjectId> {
+        self.set_fabric_inner(catalog, id, objects)
+    }
+
+    /// The change from the base settings to the fabric of the design. New
+    /// lettering and monograms start from the base settings, not from
+    /// `current`: with this change they suit the fabric as the objects that
+    /// the tools draw (ADR 0163).
+    pub fn fabric_change(&self, catalog: &FabricCatalog) -> FabricChange {
+        FabricChange::new(&Fabric::base(), &catalog.of(self))
+    }
+
+    fn set_fabric_inner(&mut self, catalog: &FabricCatalog, id: Option<&str>, objects: bool) -> Vec<ObjectId> {
         let from = catalog.of(self);
         let to = id.and_then(|id| catalog.get(id)).cloned().unwrap_or_else(Fabric::base);
         let change = FabricChange::new(&from, &to);

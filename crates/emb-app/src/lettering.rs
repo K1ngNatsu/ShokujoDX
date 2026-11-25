@@ -937,6 +937,10 @@ impl AppState {
             }
             None => {
                 let mut l = Lettering::new(&text, any.source().font_ref(), d.height_mm, d.at);
+                // New lettering suits the fabric of the design (ADR 0163).
+                let change = self.doc.design().fabric_change(&self.fabrics);
+                change.satin(&mut l.satin);
+                change.fill(&mut l.fill);
                 emb_letter::relayout(&mut l, any.source());
                 l
             }

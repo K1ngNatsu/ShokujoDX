@@ -29,6 +29,10 @@ use crate::running;
 pub const SHORT_DIST_MM: f64 = 0.25;
 /// A short stitch ends this fraction of the column width before the rail.
 pub const SHORT_INSET: f64 = 0.15;
+/// The underlay of a column of a letter stops this far before another
+/// part of the letter, in mm: the top stitches of that part go past its
+/// outline (pull compensation), and a joint is not a sharp line (ADR 0163).
+pub const JOINT_MARGIN_MM: f64 = 1.0;
 /// Smallest split length that the generator accepts, in mm.
 pub const MIN_SPLIT_MM: f64 = 1.0;
 /// The liquid effect samples the rails this often, in mm.
@@ -182,37 +186,11 @@ impl Column {
     /// Point pairs across the column, about `step` apart along the middle,
     /// from the start to the end. The first and last pairs are the rail ends.
     pub fn pairs(&self, step: f64) -> Vec<(Point, Point)> {
+        if self.even {
+            return self.even_pairs(step);
+        }
         let step = step.max(0.05);
         let mut out = vec![(self.a.at(0.0), self.b.at(0.0))];
-        if self.even {
-            // The middle length at each rung, then pairs at even steps of it.
-            let mut mid = vec![0.0];
-            for w in self.rungs.windows(2) {
-                let d = if self.across {
-                    let (a0, b0) = (self.a.at(w[0].0), self.b.at(w[0].1));
-                    let m1 = self.a.at(w[1].0).midpoint(self.b.at(w[1].1));
-                    let r = b0 - a0;
-                    match r.normalized() {
-                        Some(u) => u.cross(m1 - a0).abs(),
-                        None => a0.distance(m1),
-                    }
-                } else {
-                    ((w[1].0 - w[0].0) + (w[1].1 - w[0].1)) / 2.0
-                };
-                mid.push(mid[mid.len() - 1] + d);
-            }
-            let total = mid[mid.len() - 1];
-            let n = (total / step).round().max(1.0) as usize;
-            for q in 1..=n {
-                let m = total * q as f64 / n as f64;
-                let j = mid.partition_point(|&l| l <= m).clamp(1, mid.len() - 1);
-                let seg = mid[j] - mid[j - 1];
-                let f = if seg > 0.0 { (m - mid[j - 1]) / seg } else { 0.0 };
-                let (r0, r1) = (self.rungs[j - 1], self.rungs[j]);
-                out.push((self.a.at(r0.0 + f * (r1.0 - r0.0)), self.b.at(r0.1 + f * (r1.1 - r0.1))));
-            }
-            return out;
-        }
         for w in self.rungs.windows(2) {
             let (la, lb) = (w[1].0 - w[0].0, w[1].1 - w[0].1);
             let n = ((la + lb) / 2.0 / step).round().max(1.0) as usize;
@@ -220,6 +198,42 @@ impl Column {
                 let f = q as f64 / n as f64;
                 out.push((self.a.at(w[0].0 + f * la), self.b.at(w[0].1 + f * lb)));
             }
+        }
+        out
+    }
+
+    /// As [`Column::pairs`], at even steps of the middle length over the
+    /// whole column: not a pair at each rung. Where rungs come close (the
+    /// pivots of a column that turns), the pairs do not crowd. The
+    /// underlay uses these pairs (ADR 0163).
+    pub fn even_pairs(&self, step: f64) -> Vec<(Point, Point)> {
+        let step = step.max(0.05);
+        let mut out = vec![(self.a.at(0.0), self.b.at(0.0))];
+        // The middle length at each rung, then pairs at even steps of it.
+        let mut mid = vec![0.0];
+        for w in self.rungs.windows(2) {
+            let d = if self.across {
+                let (a0, b0) = (self.a.at(w[0].0), self.b.at(w[0].1));
+                let m1 = self.a.at(w[1].0).midpoint(self.b.at(w[1].1));
+                let r = b0 - a0;
+                match r.normalized() {
+                    Some(u) => u.cross(m1 - a0).abs(),
+                    None => a0.distance(m1),
+                }
+            } else {
+                ((w[1].0 - w[0].0) + (w[1].1 - w[0].1)) / 2.0
+            };
+            mid.push(mid[mid.len() - 1] + d);
+        }
+        let total = mid[mid.len() - 1];
+        let n = (total / step).round().max(1.0) as usize;
+        for q in 1..=n {
+            let m = total * q as f64 / n as f64;
+            let j = mid.partition_point(|&l| l <= m).clamp(1, mid.len() - 1);
+            let seg = mid[j] - mid[j - 1];
+            let f = if seg > 0.0 { (m - mid[j - 1]) / seg } else { 0.0 };
+            let (r0, r1) = (self.rungs[j - 1], self.rungs[j]);
+            out.push((self.a.at(r0.0 + f * (r1.0 - r0.0)), self.b.at(r0.1 + f * (r1.1 - r0.1))));
         }
         out
     }
@@ -493,20 +507,20 @@ pub fn underlay_layers(u: &Underlay, mean_width: f64) -> Vec<UnderlayLayer> {
 fn underlay_layer(col: &Column, layer: &UnderlayLayer) -> Vec<Point> {
     match *layer {
         UnderlayLayer::CenterWalk => {
-            let mids: Vec<Point> = col.pairs(0.5).iter().map(|(a, b)| a.midpoint(*b)).collect();
+            let mids: Vec<Point> = col.even_pairs(0.5).iter().map(|(a, b)| a.midpoint(*b)).collect();
             let mut pts = walk(mids);
             let back: Vec<Point> = pts.iter().rev().skip(1).copied().collect();
             pts.extend(back);
             pts
         }
         UnderlayLayer::EdgeWalk { inset_mm } => {
-            let pairs = inset_pairs(&col.pairs(0.5), inset_mm);
+            let pairs = inset_pairs(&col.even_pairs(0.5), inset_mm);
             let mut pts = walk(pairs.iter().map(|p| p.0).collect());
             pts.extend(walk(pairs.iter().rev().map(|p| p.1).collect()));
             pts
         }
         UnderlayLayer::Zigzag { inset_mm, spacing_mm } => {
-            let pairs = inset_pairs(&col.pairs(spacing_mm.max(0.2) / 2.0), inset_mm);
+            let pairs = inset_pairs(&col.even_pairs(spacing_mm.max(0.2) / 2.0), inset_mm);
             let mut pts: Vec<Point> = pairs
                 .iter()
                 .enumerate()
@@ -583,7 +597,66 @@ pub(crate) fn satin_top(pairs: &[(Point, Point)], p: &SatinParams) -> Vec<Point>
 /// The column starts at the end nearer to `entry`; if `exit` is set, it
 /// starts at the end farther from `exit` instead, so it ends near `exit`.
 pub fn satin(g: &SatinGeometry, p: &SatinParams, entry: Point, exit: Option<Point>) -> Option<Vec<Point>> {
-    satin_with(g, p, entry, exit, false)
+    satin_with(g, p, entry, exit, false, &[])
+}
+
+/// As [`satin`], for a column of a letter with other parts (`sewn`: the
+/// areas of the other satin and fill parts of the letter, each a list of
+/// rings). The underlay leaves out the places where another part lies, and
+/// [`JOINT_MARGIN_MM`] round them: at a joint of the letter two columns lie
+/// on each other, so the fabric has two layers of satin there, and
+/// underlay under them only makes the joint stiff (ADR 0163). The underlay
+/// goes across such a place with a walk, under the top stitches of the
+/// column.
+pub(crate) fn satin_on(
+    g: &SatinGeometry,
+    p: &SatinParams,
+    entry: Point,
+    exit: Option<Point>,
+    sewn: &[Vec<Vec<Point>>],
+) -> Option<Vec<Point>> {
+    satin_with(g, p, entry, exit, false, sewn)
+}
+
+/// A walk from the last point of `out` to `to` where the step is longer
+/// than a walk stitch (an underlay with its ends left out), so no long
+/// stitch goes there.
+fn walk_to(out: &mut Vec<Point>, to: Option<&Point>) {
+    if let (Some(&from), Some(&to)) = (out.last(), to)
+        && from.distance(to) > WALK_LEN_MM
+    {
+        out.extend(walk(vec![from, to]).into_iter().skip(1));
+        out.pop();
+    }
+}
+
+/// The points of an underlay with the points in `sewn` left out: the
+/// points before and after such a place are joined by a walk.
+fn underlay_off(points: Vec<Point>, sewn: &[Vec<Vec<Point>>]) -> Vec<Point> {
+    let near = |q: Point, r: &[Point]| {
+        (0..r.len()).any(|i| q.distance_to_segment(r[i], r[(i + 1) % r.len()]) < JOINT_MARGIN_MM)
+    };
+    let inside = |q: Point| {
+        sewn.iter().any(|rings| {
+            rings.iter().filter(|r| emb_geom::region::ring_contains(r, q)).count() % 2 == 1
+                || rings.iter().any(|r| near(q, r))
+        })
+    };
+    let mut out: Vec<Point> = Vec::with_capacity(points.len());
+    let mut skipped = false;
+    for q in points {
+        if inside(q) {
+            skipped = true;
+            continue;
+        }
+        if skipped && let Some(&last) = out.last() {
+            out.extend(walk(vec![last, q]).into_iter().skip(1));
+        } else {
+            out.push(q);
+        }
+        skipped = false;
+    }
+    out
 }
 
 /// As [`satin`]. With `across`, the spacing is measured across the
@@ -595,6 +668,7 @@ pub(crate) fn satin_with(
     entry: Point,
     exit: Option<Point>,
     across: bool,
+    sewn: &[Vec<Vec<Point>>],
 ) -> Option<Vec<Point>> {
     let mut col = Column::new(g)?;
     let (s, e) = (col.start(), col.end());
@@ -625,7 +699,21 @@ pub(crate) fn satin_with(
         if p.puff && !matches!(layer, UnderlayLayer::CenterWalk | UnderlayLayer::EdgeWalk { .. }) {
             continue;
         }
-        out.extend(underlay_layer(&col, layer));
+        let points = underlay_layer(&col, layer);
+        let points = if sewn.is_empty() {
+            points
+        } else {
+            // The needle comes to the start of the column: from there a
+            // walk goes to the first point that the underlay keeps.
+            if out.is_empty()
+                && let Some(&start) = points.first()
+            {
+                out.push(start);
+            }
+            underlay_off(points, sewn)
+        };
+        walk_to(&mut out, points.first());
+        out.extend(points);
     }
     if p.puff {
         out.extend(puff_cap(&col, true));
@@ -646,6 +734,9 @@ pub(crate) fn satin_with(
         _ => p,
     };
     let top = crate::column::top(&col, p);
+    // An underlay with its ends left out (on another part of a letter)
+    // ends away from the start of the top stitches: a walk goes there.
+    walk_to(&mut out, top.first());
     // Omit last stitch: the column ends on the rail before the last one.
     let keep = if p.omit_last && p.pattern.is_satin() && top.len() > 3 {
         top.len() - 1
@@ -813,6 +904,81 @@ mod tests {
             split_mm: emb_model::object::SATIN_SPLIT_MM,
             ..SatinParams::default()
         }
+    }
+
+    /// A straight column 20 mm long and 4 mm wide, with the rungs of
+    /// `extra` (pairs across it) and its two ends.
+    fn ruled(rungs: Vec<(Point, Point)>) -> SatinGeometry {
+        SatinGeometry {
+            rail_a: Path::new().move_to(Point::new(0.0, 0.0)).line_to(Point::new(20.0, 0.0)),
+            rail_b: Path::new().move_to(Point::new(0.0, 4.0)).line_to(Point::new(20.0, 4.0)),
+            rungs,
+        }
+    }
+
+    /// The underlay goes at even steps along the column, not at each rung:
+    /// many rungs close together (a column that pivots) do not crowd it
+    /// (ADR 0163). The top stitches still have a needle point at each rung.
+    #[test]
+    fn the_underlay_does_not_crowd_at_close_rungs() {
+        let zigzag = SatinParams {
+            underlay: Underlay::Custom(vec![UnderlayLayer::Zigzag {
+                inset_mm: 0.4,
+                spacing_mm: 2.0,
+            }]),
+            ..plain(0.4)
+        };
+        let none = plain(0.4);
+        let count = |g: &SatinGeometry, p: &SatinParams| satin(g, p, Point::ZERO, None).unwrap().len();
+        // 40 rungs in the first 2 mm of the column.
+        let close: Vec<(Point, Point)> = (1..=40)
+            .map(|i| {
+                let x = 0.05 * f64::from(i);
+                (Point::new(x, 0.0), Point::new(x, 4.0))
+            })
+            .collect();
+        let (plain_g, ruled) = (ruled(Vec::new()), ruled(close));
+        let underlay = |g: &SatinGeometry| count(g, &zigzag) - count(g, &none);
+        assert_eq!(
+            underlay(&ruled),
+            underlay(&plain_g),
+            "the same underlay with close rungs"
+        );
+        assert!(
+            count(&ruled, &none) > count(&plain_g, &none),
+            "the top stitches keep the rungs"
+        );
+    }
+
+    /// On another part of a letter, the underlay is left out (with the
+    /// joint margin) and crossed with a walk; the top stitches stay.
+    #[test]
+    fn the_underlay_stops_on_another_part() {
+        let p = SatinParams {
+            underlay: Underlay::Custom(vec![UnderlayLayer::Zigzag {
+                inset_mm: 0.4,
+                spacing_mm: 2.0,
+            }]),
+            ..plain(0.4)
+        };
+        let g = ruled(Vec::new());
+        // Another column across the first 6 mm.
+        let other = vec![vec![
+            Point::new(-1.0, -1.0),
+            Point::new(6.0, -1.0),
+            Point::new(6.0, 5.0),
+            Point::new(-1.0, 5.0),
+        ]];
+        let near = |pts: &[Point]| pts.iter().filter(|q| q.x < 6.0 + JOINT_MARGIN_MM).count();
+        let all = satin(&g, &p, Point::ZERO, None).unwrap();
+        let on = satin_on(&g, &p, Point::ZERO, None, &[other]).unwrap();
+        let top = satin(&g, &plain(0.4), Point::ZERO, None).unwrap();
+        assert!(near(&on) < near(&all), "{} of {}", near(&on), near(&all));
+        // There, only the top stitches and a walk across.
+        assert!(near(&on) <= near(&top) + (2.0 * (6.0 + JOINT_MARGIN_MM) / WALK_LEN_MM).ceil() as usize + 4);
+        // Past the other part, the underlay is there.
+        let far = |pts: &[Point]| pts.iter().filter(|q| q.x > 10.0).count();
+        assert_eq!(far(&on), far(&all));
     }
 
     #[test]

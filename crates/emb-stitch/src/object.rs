@@ -936,6 +936,22 @@ struct LetterSewer<'a> {
     runs: Vec<Run>,
     needle: Point,
     long_gap: RunLink,
+    /// The satin and fill parts of the letter that sews, with their areas:
+    /// a satin sews no underlay where another of them lies (ADR 0163).
+    parts: Vec<(&'a ObjectKind, Vec<Vec<Point>>)>,
+}
+
+impl<'a> LetterSewer<'a> {
+    /// The parts of `letter` that a satin does not sew its underlay on.
+    fn start_letter(&mut self, letter: &'a emb_model::Letter) {
+        self.parts = letter
+            .parts
+            .iter()
+            .filter(|p| matches!(p, ObjectKind::Satin { .. } | ObjectKind::Fill { .. }))
+            .map(|p| (p, part_area(p)))
+            .filter(|(_, a)| !a.is_empty())
+            .collect();
+    }
 }
 
 impl LetterSewer<'_> {
@@ -952,7 +968,27 @@ impl LetterSewer<'_> {
         smart: bool,
         joined: Option<bool>,
     ) {
-        let Ok(mut st) = stitch_kind(part, from, exit) else {
+        let others: Vec<Vec<Vec<Point>>> = self
+            .parts
+            .iter()
+            .filter(|(p, _)| !std::ptr::eq(*p, part))
+            .map(|(_, a)| a.clone())
+            .collect();
+        let made = match part {
+            ObjectKind::Satin { geometry, params } if !others.is_empty() => {
+                match satin::satin_on(geometry, params, from, exit, &others) {
+                    Some(points) if points.len() >= 2 => Ok(ObjectStitches {
+                        runs: vec![Run {
+                            long_jumps: params.auto_jump,
+                            ..Run::new(points)
+                        }],
+                    }),
+                    _ => Err(StitchError::Empty),
+                }
+            }
+            _ => stitch_kind(part, from, exit),
+        };
+        let Ok(mut st) = made else {
             return;
         };
         let fixed = joined.is_some();
@@ -1021,10 +1057,12 @@ fn lettering_runs(l: &emb_model::Lettering, entry: Point, exit: Option<Point>) -
             LetterConnection::Trim => RunLink::Trim,
             LetterConnection::Jump => RunLink::Jump,
         },
+        parts: Vec::new(),
     };
     let seq = letter_sequence(l, entry);
     for (n, &li) in seq.iter().enumerate() {
         let letter = &l.letters[li];
+        w.start_letter(letter);
         // Where this letter should end: near the next letter.
         let target = match seq.get(n + 1) {
             None => exit,

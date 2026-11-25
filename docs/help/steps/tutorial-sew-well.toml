@@ -26,7 +26,7 @@ area = "windows"
 
 [[step]]
 button = "Apply"
-expect = { fabric = "knit", warnings = 2 }
+expect = { fabric = "knit", warnings = 1 }
 
 # The density of the leaf.
 [[step]]

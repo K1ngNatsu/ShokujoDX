@@ -32,9 +32,8 @@ ist steif, und die Nadel kann brechen.
 
 Ein Strickstoff dehnt sich, darum macht das Programm die Reihen etwas
 offener, setzt eine starke Unterlage und fügt Zugausgleich hinzu. Die
-Reihen des Blatts liegen noch zu nah beieinander (0,22 mm), und nun zeigt
-die Statuszeile zwei Warnungen: die Dichte und kurze Stiche, die die
-dichten Reihen machen.
+Reihen des Blatts liegen noch zu nah beieinander (0,22 mm): Die Warnung
+bleibt.
 
 ## Die Dichte festlegen
 
@@ -43,7 +42,7 @@ dichten Reihen machen.
 2. Setzen Sie in den Objekteigenschaften die **Dichte** auf 0,4. Das ist
    der Abstand zwischen den Reihen in mm: Ein größerer Wert macht weniger
    Stiche.
-3. Die zwei Warnungen verschwinden.
+3. Die Warnung verschwindet.
 
 Übliche Werte: 0,4 mm für Füllungen, 0,35 bis 0,45 mm für Satins. Ein
 dünner Stoff oder ein dickes Garn braucht offenere Reihen.

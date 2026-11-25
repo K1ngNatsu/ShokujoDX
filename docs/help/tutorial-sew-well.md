@@ -34,8 +34,7 @@ leaf are 0.20 mm apart. Such a fill is stiff, and the needle can break.
 
 A knit stretches, so the program makes the rows a little more open, sets
 a heavy underlay and adds pull compensation. The rows of the leaf are
-still too near (0.22 mm), and now the status line shows two warnings:
-the density, and short stitches that the dense rows make.
+still too near (0.22 mm): the warning stays.
 
 ## Set the density
 
@@ -43,7 +42,7 @@ the density, and short stitches that the dense rows make.
    vein).
 2. In Object Properties, set **Density** to 0.4. This is the distance
    between the rows in mm: a larger value makes fewer stitches.
-3. The two warnings go away.
+3. The warning goes away.
 
 Usual values: 0.4 mm for fills, 0.35 to 0.45 mm for satins. A thin
 fabric or a thick thread needs more open rows.
