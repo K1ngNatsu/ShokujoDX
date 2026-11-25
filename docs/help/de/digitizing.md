@@ -136,7 +136,10 @@ einen Abdecksatin. Siehe [Anleitung: eine Applikation](tutorial-applique).
 ## Die Form ändern: Umformen
 
 1. Wählen Sie das Objekt aus und klicken Sie auf **Umformen**
-   (Digitalisieren > Auswählen).
+   (Digitalisieren > Auswählen). Oder klicken Sie mit der rechten
+   Maustaste auf das Objekt (auf einem Touchscreen: halten Sie es
+   gedrückt) und klicken Sie auf **Knoten bearbeiten**, oder klicken Sie in
+   den Objekteigenschaften auf **Knoten bearbeiten**.
 2. Ziehen Sie einen Knoten, um ihn zu verschieben. Quadrate sind Ecken;
    Kreise sind Kurvenknoten.
 3. Ziehen Sie einen Griff, um eine Kurve zu ändern. **Alt** beim Ziehen

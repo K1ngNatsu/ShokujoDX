@@ -327,6 +327,19 @@ pub fn object_menu(ui: &mut egui::Ui, st: &mut AppState) {
         }
         ui.separator();
     }
+    // The nodes of one line or shape: the Reshape tool (owner's request of
+    // 2026-11-25: the way to them was not clear).
+    if crate::reshape::can_edit_nodes(st) {
+        if ui
+            .button(tr("Edit Nodes"))
+            .on_hover_text(crate::draw::Tool::Reshape.tooltip())
+            .clicked()
+        {
+            crate::reshape::edit_nodes(st);
+            ui.close();
+        }
+        ui.separator();
+    }
     // A sketch, or an object made from one (ADR 0076).
     if let Some(sketch) = st.selection.single().and_then(|id| st.doc.design().sketch_for(id)) {
         if item(ui, true, tr("Edit Sketch"), tr("Double-click")) {

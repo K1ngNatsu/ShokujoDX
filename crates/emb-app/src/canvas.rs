@@ -310,9 +310,10 @@ pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
             ui.ctx().set_cursor_icon(icon);
         }
 
-        // Right click: select what is under the pointer, then show the menu.
-        // A right drag still pans (above), because a drag is not a click.
-        if response.secondary_clicked()
+        // Right click (a long press on a touch screen): select what is under
+        // the pointer, then show the menu. A right drag still pans (above),
+        // because a drag is not a click.
+        if (response.secondary_clicked() || response.long_touched())
             && let Some(pos) = response.interact_pointer_pos()
         {
             st.guide_menu = None;

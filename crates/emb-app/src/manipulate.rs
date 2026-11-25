@@ -334,6 +334,12 @@ pub fn begin_drag(st: &mut AppState, map: &ViewMap, press: Pos2, mods: Modifiers
 /// Replaces each object with its state at drag start plus `t`, as one merged undo step.
 /// Linked cuts (border traces, shape links) follow the step from the last frame.
 fn apply(st: &mut AppState, label: &str, key: &MergeKey, originals: &[DesignObject], t: &Transform) {
+    // A drag that has not moved yet (a press held still: a long press for
+    // the menu) changes nothing, and makes no undo step.
+    let started = matches!(&st.drag_step, Some((k, _)) if k == key);
+    if !started && *t == Transform::IDENTITY {
+        return;
+    }
     let last = match &st.drag_step {
         Some((k, last)) if k == key => *last,
         _ => Transform::IDENTITY,

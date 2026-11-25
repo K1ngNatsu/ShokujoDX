@@ -135,7 +135,9 @@ cubierta. Vea [Tutorial: un aplique](tutorial-applique).
 ## Cambiar la forma: Remodelar
 
 1. Seleccione el objeto y haga clic en **Remodelar** (Digitalizar >
-   Seleccionar).
+   Seleccionar). O haga clic con el botón derecho en el objeto (en una
+   pantalla táctil: manténgalo pulsado) y haga clic en **Editar nodos**, o
+   haga clic en **Editar nodos** en Propiedades del objeto.
 2. Arrastre un nodo para moverlo. Los cuadrados son esquinas; los
    círculos son nodos de curva.
 3. Arrastre un tirador para cambiar una curva. **Alt** mientras arrastra
