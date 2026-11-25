@@ -100,6 +100,11 @@ pub struct StitchPlan {
     pub spans: Vec<ObjectSpan>,
     /// The stops, in sew order (not the color changes).
     pub stops: Vec<PlanStop>,
+    /// The records that end a travel stitch (P22 Milestone 1): ranges of
+    /// indices in `stitches.records`, in order and apart. The travel inside
+    /// objects (`Run::travel`), the stitch to the next run of the same color
+    /// when the gap is short, and hidden travel (ADR 0082).
+    pub travel: Vec<std::ops::Range<usize>>,
 }
 
 /// One run of a color block, routed: its object, needle points (output
@@ -107,6 +112,8 @@ pub struct StitchPlan {
 struct Routed {
     id: ObjectId,
     points: Vec<Point>,
+    /// For each segment of `points`, if it is travel (empty: none).
+    travel: Vec<bool>,
     link: RunLink,
     exact: bool,
     stop: Option<StopReason>,
@@ -187,12 +194,13 @@ pub fn build_plan_until(
                     .end
                     .filter(|_| i + 1 == runs.len() && (i > 0 || obj.start.is_none()))
                     .map(|e| to_out.apply(e));
-                let pts = route(run, &to_out, reference, end);
+                let (pts, travel) = route(run, &to_out, reference, end);
                 if let (Some(&first), Some(&last)) = (pts.first(), pts.last()) {
                     needle = last;
                     block.push(Routed {
                         id,
                         points: pts,
+                        travel,
                         link: run.link,
                         exact: run.exact,
                         stop: run.stop,
@@ -237,6 +245,7 @@ pub fn build_plan_until(
             let Routed {
                 id,
                 points: pts,
+                travel,
                 link,
                 exact,
                 stop,
@@ -263,7 +272,7 @@ pub fn build_plan_until(
             b.place = places.get(id).copied().unwrap_or(0);
             b.long_jumps = *long_jumps;
             b.want_slow = f.slow;
-            b.sew_run(pts, join, f.tie_in, *exact);
+            b.sew_run(pts, travel, join, f.tie_in, *exact);
             b.long_jumps = false;
             b.tie_off_enabled = f.tie_off;
             let end = b.recs.len();
@@ -311,6 +320,7 @@ pub fn build_plan_until(
         warnings,
         spans,
         stops: b.stops,
+        travel: b.travel,
     })
 }
 
@@ -339,11 +349,21 @@ impl StitchPlan {
 
 /// Puts the run in output coordinates, chooses where it starts, and applies
 /// the style (backstitch, stem stitch), bean stitch and the pass (backtrack,
-/// repeat). With `end`, the run ends as near to `end` as it can.
-fn route(run: &Run, to_out: &Transform, reference: Point, end: Option<Point>) -> Vec<Point> {
+/// repeat). With `end`, the run ends as near to `end` as it can. Also gives,
+/// for each segment of the points, if it is travel (empty: none is).
+fn route(run: &Run, to_out: &Transform, reference: Point, end: Option<Point>) -> (Vec<Point>, Vec<bool>) {
     let mut pts: Vec<Point> = run.points.iter().map(|p| to_out.apply(*p)).collect();
     if pts.len() < 2 {
-        return pts;
+        return (pts, Vec::new());
+    }
+    let mut travel: Vec<bool> = Vec::new();
+    if !run.travel.is_empty() {
+        travel = vec![false; pts.len() - 1];
+        for r in &run.travel {
+            for t in travel.iter_mut().take(r.end).skip(r.start) {
+                *t = true;
+            }
+        }
     }
     if run.fixed {
         // Fill and satin: the object chose its start from the needle position.
@@ -355,13 +375,20 @@ fn route(run: &Run, to_out: &Transform, reference: Point, end: Option<Point>) ->
         let start = nearest(&pts, end.unwrap_or(reference));
         pts.rotate_left(start);
         pts.push(pts[0]);
+        if !travel.is_empty() {
+            let n = travel.len();
+            travel.rotate_left(start % n);
+        }
     } else if let Some(e) = end {
         if e.distance(pts[0]) < e.distance(pts[pts.len() - 1]) {
             pts.reverse();
+            travel.reverse();
         }
     } else if reference.distance(pts[pts.len() - 1]) < reference.distance(pts[0]) {
         pts.reverse();
+        travel.reverse();
     }
+    let segments = pts.len() - 1;
     let pts = match run.style {
         RunStyle::Backstitch => running::backstitch(&pts),
         RunStyle::Stemstitch => running::stemstitch(&pts),
@@ -380,7 +407,12 @@ fn route(run: &Run, to_out: &Transform, reference: Point, end: Option<Point>) ->
         }
         RunPass::Once | RunPass::Redwork | RunPass::Branch => {}
     }
-    pts
+    // The style, the bean stitch and the pass make other points: travel
+    // stays only if all of the run was travel.
+    if !travel.is_empty() && pts.len() != segments + 1 {
+        travel = vec![travel.iter().all(|t| *t); pts.len().saturating_sub(1)];
+    }
+    (pts, travel)
 }
 
 /// Index of the point nearest to `p` (the first one on a tie).
@@ -433,6 +465,8 @@ struct Builder<'a> {
     cover: Option<Cover>,
     /// The place in the sew order of the object of the run that sews now.
     place: u32,
+    /// The records that end travel stitches (`StitchPlan::travel`).
+    travel: Vec<std::ops::Range<usize>>,
 }
 
 impl<'a> Builder<'a> {
@@ -451,6 +485,19 @@ impl<'a> Builder<'a> {
             want_slow: false,
             cover: None,
             place: 0,
+            travel: Vec::new(),
+        }
+    }
+
+    /// The records from `from` to the end are travel stitches.
+    fn mark_travel(&mut self, from: usize) {
+        let to = self.recs.len();
+        if to <= from {
+            return;
+        }
+        match self.travel.last_mut() {
+            Some(r) if r.end >= from => r.end = r.end.max(to),
+            _ => self.travel.push(from..to),
         }
     }
 
@@ -605,7 +652,7 @@ impl<'a> Builder<'a> {
     /// Sews one run. `join` says how to go from the last run to this one;
     /// `tie_in` adds lock stitches when the run starts after a trim; `exact`
     /// keeps stitches shorter than the minimum.
-    fn sew_run(&mut self, run: &[Point], join: Join, tie_in: bool, exact: bool) {
+    fn sew_run(&mut self, run: &[Point], travel: &[bool], join: Join, tie_in: bool, exact: bool) {
         let Some((&first, rest)) = run.split_first() else {
             return;
         };
@@ -621,7 +668,9 @@ impl<'a> Builder<'a> {
         let apart = exact || self.needle.distance(first) >= SAME_PLACE_MM.max(self.opts.min_stitch_mm);
         if self.sewing && join == Join::Travel {
             self.stop_here();
+            let at = self.recs.len();
             self.stitch(first, apart);
+            self.mark_travel(at);
         } else if self.sewing && join == Join::Jump {
             self.stop_here();
             self.jump(first);
@@ -641,7 +690,9 @@ impl<'a> Builder<'a> {
                 }
                 TrimMode::Hidden if hidden.is_some() => {
                     self.stop_here();
+                    let at = self.recs.len();
                     self.travel(hidden.as_deref().unwrap_or_default());
+                    self.mark_travel(at);
                 }
                 TrimMode::Auto | TrimMode::Hidden if !near => {
                     self.tie_off();
@@ -651,7 +702,9 @@ impl<'a> Builder<'a> {
                 // Travel stitch to the next run of the same color.
                 TrimMode::Auto | TrimMode::Never | TrimMode::Hidden if near => {
                     self.stop_here();
+                    let at = self.recs.len();
                     self.stitch(first, apart);
+                    self.mark_travel(at);
                 }
                 // A long gap with no trim: the thread stays and the needle jumps.
                 TrimMode::Never | TrimMode::Auto | TrimMode::Hidden => {
@@ -677,8 +730,12 @@ impl<'a> Builder<'a> {
             }
             self.sewing = true;
         }
-        for &p in rest {
+        for (k, &p) in rest.iter().enumerate() {
+            let at = self.recs.len();
             self.stitch(p, exact);
+            if travel.get(k).copied().unwrap_or(false) {
+                self.mark_travel(at);
+            }
         }
     }
 
@@ -704,11 +761,12 @@ mod tests {
             let mut b = Builder::new(&opts);
             b.sew_run(
                 &[Point::new(0.0, 0.0), Point::new(3.0, 0.0)],
+                &[],
                 Join::Travel,
                 false,
                 false,
             );
-            b.sew_run(&[start, Point::new(3.0, 3.0)], Join::Travel, false, exact);
+            b.sew_run(&[start, Point::new(3.0, 3.0)], &[], Join::Travel, false, exact);
             b.recs
                 .iter()
                 .filter(|r| r.kind == StitchKind::Stitch)

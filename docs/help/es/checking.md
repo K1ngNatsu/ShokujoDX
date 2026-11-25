@@ -51,6 +51,7 @@ El panel **Información del diseño** muestra los números del diseño:
 
 - el tamaño, los bastidores en los que cabe, el número de objetos,
   puntadas, colores, cambios de color, cortes, saltos y paradas;
+- el desplazamiento visible: sobre puntadas cosidas y sobre la tela;
 - el tiempo de bordado a la velocidad de la máquina;
 - la tela, el hilo superior y el hilo de bobina, y el costo del hilo;
 - la densidad (el mayor número de capas de hilo);
@@ -68,6 +69,8 @@ advertencia para seleccionar el objeto. El programa avisa de:
 - en un bastidor de gorra, un orden de bordado que no va del centro hacia
   fuera;
 - en encaje independiente, una parte que no toca ninguna otra parte;
+- puntadas de desplazamiento que se ven: más de 2 mm sobre puntadas
+  cosidas en un objeto, o un tramo de 4 mm o más sobre la tela;
 - objetos que no hacen puntadas.
 
 ## El mapa de densidad
@@ -140,6 +143,13 @@ comprobar un diseño antes de bordarlo.
 - **Hilo alto** marca los lugares donde el hilo es más alto que el
   límite sobre la tela (la espuma y el relleno no cuentan): un riesgo de
   roturas del hilo.
+- **Desplazamiento visible** marca las puntadas de desplazamiento que
+  ninguna puntada cubre: en rojo donde quedan sobre puntadas cosidas antes
+  que ellas, en azul donde quedan sobre la tela. El desplazamiento bajo
+  puntadas que se cosen después, entre las filas de un relleno y a lo
+  largo del borde de un área no se ve. Cambie el punto de inicio o de fin
+  del objeto, o el orden de bordado, para que el desplazamiento quede bajo
+  las puntadas que se cosen después.
 
 Defina los límites de las dos comprobaciones en **Opciones** (**La tela
 se ve** y **Límite de altura del hilo**).

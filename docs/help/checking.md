@@ -50,6 +50,7 @@ The **Design Info** panel shows the numbers of the design:
 
 - the size, the hoops it fits, the number of objects, stitches, colors,
   color changes, trims, jumps and stops;
+- the travel that shows: on top of sewn stitches and on the fabric;
 - the sew time at the speed of the machine;
 - the fabric, the top thread and the bobbin thread, and the thread cost;
 - the density (the most layers of thread);
@@ -66,6 +67,8 @@ object. The program warns about:
 - lettering that is smaller or larger than the size range of its font;
 - on a cap frame, a sew order that is not from the center out;
 - in free-standing lace, a part that touches no other part;
+- travel stitches that show: more than 2 mm on top of sewn stitches in
+  one object, or a piece of 4 mm or more on the fabric;
 - objects that make no stitches.
 
 ## The density map
@@ -136,6 +139,12 @@ you sew it.
 - **High Thread** marks the places where the thread is higher than the
   limit over the fabric (foam and padding do not count): a risk of
   thread breaks.
+- **Travel That Shows** marks the travel stitches that no stitch covers:
+  red where they lie on top of stitches sewn before them, blue where they
+  lie on the fabric. Travel under stitches that sew later, between the
+  rows of a fill and along the edge of an area does not show. Change the
+  start or the end point of the object, or the sew order, so that the
+  travel goes under the stitches that sew later.
 
 Set the limits of the two checks in **Options** (**Fabric shows
 through** and **Thread height limit**).

@@ -2,7 +2,7 @@
 
 Date: 2026-11-25 · Status: Accepted (owner, 2026-11-25: "build those
 ideas into a new phase with milestones ordered so work builds
-efficiently on itself"). No milestone is started.
+efficiently on itself"). Milestone 1 is made (ADR 0167).
 
 ## Goal
 
@@ -103,6 +103,41 @@ travel of before ADR 0166) gives the length of that travel; a design
 with only hidden travel gives 0; the corpus numbers are in the snapshot;
 the measure of the largest corpus design takes less than 10 % of the
 time of its plan.
+
+**Made (2026-11-25, ADR 0167).** The plan marks its travel stitches
+(`Run::travel`, `StitchPlan::travel`; the stitches do not change, and
+the golden snapshots stay). `emb_stitch::shown_travel` measures, at
+points 0.2 mm apart, the travel that no later stitch covers: on top of
+the stitch sewn last there if it crosses it (not at the edge of an
+area, where the rows turn), or on the fabric. The first measure counted
+all stitches under the travel; the pictures of the corpus showed that it
+marked the travel along the edge of a fill and along the lanes between
+sections, so the top stitch and the turns of the needle path decide.
+Design info shows the travel that shows and warns of more than 2 mm on
+sewn stitches in an object, or a piece of 4 mm on the fabric (not in
+lace); View > Check > Travel That Shows draws it (red on stitches, blue
+on the fabric). The snapshot `tests/travel_shows.rs` keeps the numbers
+of the corpus.
+
+The exit test is met in part: the travel straight across 25 rows gives
+9.1 mm (the test `travel_across_sewn_rows_shows`), hidden travel gives 0
+(`hidden_travel_does_not_show`), and the snapshot runs in CI. The time is
+not under 10 %: the design with the most stitches (`full-field`, 43,680
+stitches) plans in 2.5 ms and the measure takes 1.7 ms; over the corpus
+the measure takes about 11 % of the time of the plans (32 ms against
+300 ms; at most 5.5 ms for one design, `embroidery-fonts-8` with 3.9 m of
+travel). The measure runs once for each plan (Design info), so this is
+small; the test `the_measure_of_the_corpus_is_quick` (release) keeps it
+under 15 %. Three steps made it faster: one pass over the records, the
+cells that the travel goes through with a table of sums (a stitch far
+from all travel is left out with one look), and each turn of the needle
+path in one cell.
+
+What the measure found in the corpus (open work): travel straight across
+sewn rows in guided fills (55 and 42 mm) and a circular fill (37 mm),
+which ADR 0166 did not change; a fill in `shaping` whose travel crosses
+its own cut-out part (19 mm on the fabric); travel of 8 to 20 mm across
+the fabric in lettering of five corpus designs.
 
 ## Milestone 2: live numbers and Quicker to Sew (M)
 

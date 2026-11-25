@@ -706,6 +706,28 @@ fn scenes() -> Vec<Scene> {
         st.show_through = true;
         st.show_high_thread = true;
     }));
+    // A circular fill with a hole: its travel goes across rings that are
+    // sewn (P22 Milestone 1, ADR 0167).
+    v.push(Scene::new("travel that shows", View::Screen, |st, _| {
+        use emb_geom::{BBox, Path, Point};
+        use emb_model::{FillParams, FillPattern, ObjectKind, Rgb};
+        st.doc.edit("Travel", |d| {
+            let ids: Vec<_> = d.objects().iter().map(|o| o.id).collect();
+            for id in ids {
+                d.remove_object(id);
+            }
+            let t = d.add_thread("Orange", Rgb(230, 120, 30));
+            d.add_object(
+                t,
+                ObjectKind::Fill {
+                    outer: Path::rect(BBox::new(Point::new(-25.0, -25.0), Point::new(25.0, 25.0))),
+                    holes: vec![Path::rect(BBox::new(Point::new(-7.0, -7.0), Point::new(7.0, 7.0)))],
+                    params: FillParams::default().with_pattern(FillPattern::Circular { center: None }),
+                },
+            );
+        });
+        st.show_travel = true;
+    }));
     v.push(Scene::new("product photo", View::Windows, |st, _| {
         let data = crate::product_photo::tests::shirt_png();
         if st.set_product_picture(data, "shirt.png", 500.0).is_ok() {

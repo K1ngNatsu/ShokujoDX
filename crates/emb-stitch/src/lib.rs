@@ -29,6 +29,7 @@ pub mod rings;
 pub mod ripple;
 pub mod running;
 pub mod satin;
+pub mod shown_travel;
 pub mod tartan;
 pub mod textures;
 pub mod travel;

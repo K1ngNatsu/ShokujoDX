@@ -129,7 +129,11 @@ fn color(map: &CheckMap, i: usize, through: Option<f64>, high: Option<f64>) -> C
 /// Draws the checks that are on over the stitches, with a line that counts
 /// the places.
 pub fn draw(painter: &egui::Painter, ctx: &egui::Context, rect: Rect, st: &mut AppState) {
+    let travel = st.show_travel.then(|| draw_travel(painter, rect, st));
     if !(st.show_through || st.show_high_thread) {
+        if let Some(line) = travel {
+            status(painter, ctx, rect, st, &[line]);
+        }
         return;
     }
     let through = st.show_through.then_some(st.settings.show_through_limit);
@@ -189,7 +193,7 @@ pub fn draw(painter: &egui::Painter, ctx: &egui::Context, rect: Rect, st: &mut A
     }
     mesh.indices.extend_from_slice(&[0, 1, 2, 0, 2, 3]);
     painter.add(egui::Shape::mesh(mesh));
-    let mut lines = Vec::new();
+    let mut lines: Vec<String> = travel.into_iter().collect();
     if let Some(limit) = through {
         let places = map.show_through(limit);
         lines.push(match places.first() {
@@ -221,6 +225,39 @@ pub fn draw(painter: &egui::Painter, ctx: &egui::Context, rect: Rect, st: &mut A
         });
     }
     status(painter, ctx, rect, st, &lines);
+}
+
+/// The colors of the travel that shows: on sewn stitches, on the fabric.
+const TRAVEL_ON_STITCHES: Color32 = Color32::from_rgb(230, 30, 30);
+const TRAVEL_ON_FABRIC: Color32 = Color32::from_rgb(30, 110, 255);
+
+/// Draws the travel that shows (P22 Milestone 1, ADR 0167) and gives the
+/// line that counts it.
+fn draw_travel(painter: &egui::Painter, rect: Rect, st: &mut AppState) -> String {
+    use emb_stitch::shown_travel::Shows;
+    let info = st.design_info();
+    let back = st.doc.design().from_hoop_transform();
+    let view = st.view;
+    for p in &info.travel.pieces {
+        let color = match p.shows {
+            Shows::OnStitches => TRAVEL_ON_STITCHES,
+            Shows::OnFabric => TRAVEL_ON_FABRIC,
+        };
+        let (a, b) = (back.apply(p.from), back.apply(p.to));
+        painter.line_segment(
+            [view.to_screen(rect, a), view.to_screen(rect, b)],
+            egui::Stroke::new(3.0, color),
+        );
+    }
+    let u = st.settings.units;
+    if info.travel.pieces.is_empty() {
+        tr("Travel that shows: none.").to_string()
+    } else {
+        fill(
+            "Travel that shows: {} on sewn stitches (red), {} on the fabric (blue).",
+            &[&u.fmt(info.travel.on_stitches_mm()), &u.fmt(info.travel.on_fabric_mm())],
+        )
+    }
 }
 
 /// Lines of text at the bottom left of the canvas (right of the ruler),

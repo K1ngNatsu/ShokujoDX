@@ -626,6 +626,9 @@ pub struct Sewer<'a> {
     /// The direction of the rows of the fill that is sewn (a unit vector):
     /// travel between its sections goes along the rows where it can.
     pub rows: Option<Point>,
+    /// The travel of [`Sewer::go_to`]: the index of a run in `runs` and
+    /// the range of its segments (segment `k` from point `k` to `k + 1`).
+    travel_marks: Vec<(usize, std::ops::Range<usize>)>,
 }
 
 impl<'a> Sewer<'a> {
@@ -636,6 +639,7 @@ impl<'a> Sewer<'a> {
             runs: Vec::new(),
             edge_only: false,
             rows: None,
+            travel_marks: Vec::new(),
         }
     }
 
@@ -647,7 +651,7 @@ impl<'a> Sewer<'a> {
     /// Goes to `p` with travel stitches inside the shape, along the edge
     /// where it can. If there is no path inside the shape, a new needle path starts at `p`.
     pub fn go_to(&mut self, p: Point) {
-        self.travel_to(p, true);
+        self.travel_to(p, true, true);
     }
 
     /// Starts a new needle path at `p` (the plan joins it with a jump or a
@@ -661,10 +665,12 @@ impl<'a> Sewer<'a> {
 
     /// Goes to `p` the shortest way inside the shape (a straight stitch if it can).
     pub fn step_to(&mut self, p: Point) {
-        self.travel_to(p, self.edge_only);
+        self.travel_to(p, self.edge_only, false);
     }
 
-    fn travel_to(&mut self, p: Point, along_edge: bool) {
+    /// Goes to `p` inside the shape. `mark`: the stitches are travel (from
+    /// one part of the fill to the next), not a step from row to row.
+    fn travel_to(&mut self, p: Point, along_edge: bool, mark: bool) {
         let Some(cur) = self.needle() else {
             self.runs.push(vec![p]);
             return;
@@ -687,10 +693,17 @@ impl<'a> Sewer<'a> {
                     closed: false,
                 };
                 let pts = running::running_points(&line, self.travel_len);
-                self.runs
-                    .last_mut()
-                    .expect("needle is set")
-                    .extend(pts.into_iter().skip(1));
+                let k = self.runs.len() - 1;
+                let run = self.runs.last_mut().expect("needle is set");
+                let from = run.len() - 1;
+                run.extend(pts.into_iter().skip(1));
+                let to = run.len() - 1;
+                if mark && to > from {
+                    match self.travel_marks.last_mut() {
+                        Some((j, r)) if *j == k && r.end == from => r.end = to,
+                        _ => self.travel_marks.push((k, from..to)),
+                    }
+                }
             }
             None => self.runs.push(vec![p]),
         }
@@ -710,6 +723,22 @@ impl<'a> Sewer<'a> {
 
     pub fn finish(self) -> Vec<Vec<Point>> {
         self.runs.into_iter().filter(|r| r.len() >= 2).collect()
+    }
+
+    /// As [`Sewer::finish`], with the travel of each run: the ranges of
+    /// its segments that [`Sewer::go_to`] made.
+    pub fn finish_with_travel(self) -> Vec<(Vec<Point>, Vec<std::ops::Range<usize>>)> {
+        let mut out: Vec<(Vec<Point>, Vec<std::ops::Range<usize>>)> =
+            self.runs.into_iter().map(|r| (r, Vec::new())).collect();
+        for (k, r) in self.travel_marks {
+            if let Some((pts, marks)) = out.get_mut(k)
+                && r.end < pts.len()
+            {
+                marks.push(r);
+            }
+        }
+        out.retain(|(r, _)| r.len() >= 2);
+        out
     }
 }
 

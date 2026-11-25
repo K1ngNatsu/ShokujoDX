@@ -54,6 +54,8 @@ Die Gruppe **Designinfo** zeigt die Zahlen des Designs:
 
 - die Größe, die Rahmen, in die es passt, die Zahl der Objekte, Stiche,
   Farben, Farbwechsel, Fadenschnitte, Sprünge und Stopps;
+- die sichtbaren Verbindungsstiche: auf gestickten Stichen und auf dem
+  Stoff;
 - die Stickzeit beim Tempo der Maschine;
 - den Stoff, das Obergarn und das Unterfadengarn, und die Garnkosten;
 - die Dichte (die meisten Garnlagen);
@@ -73,6 +75,8 @@ das Objekt auszuwählen. Das Programm warnt vor:
 - auf einem Kapprahmen einer Stickreihenfolge, die nicht von der Mitte
   nach außen geht;
 - in freistehender Spitze einem Teil, das kein anderes Teil berührt;
+- sichtbaren Verbindungsstichen: mehr als 2 mm auf gestickten Stichen in
+  einem Objekt oder ein Stück von 4 mm oder mehr auf dem Stoff;
 - Objekten, die keine Stiche machen.
 
 ## Die Dichtekarte
@@ -148,6 +152,13 @@ Design zu prüfen, bevor Sie es sticken.
 - **Hohes Garn** markiert die Stellen, an denen das Garn höher als die
   Grenze über dem Stoff ist (Schaum und Polster zählen nicht): ein Risiko
   für Fadenrisse.
+- **Sichtbare Verbindungsstiche** markiert die Verbindungsstiche, die kein
+  Stich bedeckt: rot, wo sie auf Stichen liegen, die vor ihnen gestickt
+  werden, blau, wo sie auf dem Stoff liegen. Verbindungsstiche unter
+  Stichen, die später gestickt werden, zwischen den Reihen einer Füllung
+  und am Rand einer Fläche sind nicht sichtbar. Ändern Sie den Start- oder
+  Endpunkt des Objekts oder die Stickreihenfolge, damit die
+  Verbindungsstiche unter den Stichen liegen, die später gestickt werden.
 
 Legen Sie die Grenzen der beiden Prüfungen in den **Optionen** fest
 (**Stoff scheint durch** und **Grenze der Garnhöhe**).

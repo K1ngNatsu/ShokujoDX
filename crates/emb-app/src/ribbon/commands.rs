@@ -340,6 +340,8 @@ pub enum Flag {
     ShowThrough,
     /// The check view: the thread higher than the limit (ADR 0129).
     HighThread,
+    /// The check view: the travel that shows (P22 Milestone 1, ADR 0167).
+    TravelShows,
     /// The stitches colored by the kind of their part (ADR 0131).
     Parts,
 }
@@ -872,6 +874,13 @@ impl Cmd {
                     tr("Stitch Parts"),
                     tr(
                         "Color the stitches by the kind of their part: runs, columns, rows of a fill and other stitches; the underlay of a part is paler. Lines show the running, satin and fill objects that the parts become. It shows how the program reads the stitches of a machine file.",
+                    ),
+                ),
+                Flag::TravelShows => (
+                    g(ph::FOOTPRINTS),
+                    tr("Travel That Shows"),
+                    tr(
+                        "Mark the travel stitches that no stitch covers: red where they lie on top of sewn stitches, blue where they lie on the fabric.",
                     ),
                 ),
                 Flag::HighThread => (

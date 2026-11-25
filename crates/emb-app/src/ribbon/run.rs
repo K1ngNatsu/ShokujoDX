@@ -256,6 +256,7 @@ impl AppState {
             Flag::BeforeAfter => self.before_after.is_some(),
             Flag::ShowThrough => self.show_through,
             Flag::HighThread => self.show_high_thread,
+            Flag::TravelShows => self.show_travel,
             Flag::Parts => self.parts_view.on,
         }
     }
@@ -339,6 +340,10 @@ impl AppState {
             Flag::HighThread => {
                 self.show_high_thread = !self.show_high_thread;
                 self.show_plan |= self.show_high_thread;
+            }
+            Flag::TravelShows => {
+                self.show_travel = !self.show_travel;
+                self.show_plan |= self.show_travel;
             }
             Flag::Parts => {
                 self.parts_view.on = !self.parts_view.on;

@@ -26,6 +26,14 @@ pub const MANY_TRIMS: usize = 4;
 pub const THREAD_USE_HELP: &str = "An estimate from the stitches: the thread on the front, the part that the tension pulls to the back, the thickness of the fabric at each needle point and a tail at each start and trim. The tension, the thread and the fabric change it.";
 /// The most places of thread build-up in the warnings.
 pub const MAX_BUILD_UP: usize = 20;
+/// An object with more travel than this on top of sewn stitches gets a
+/// warning, mm (P22 Milestone 1, ADR 0167).
+pub const TRAVEL_ON_STITCHES_MM: f64 = 2.0;
+/// An object with a piece of travel on the fabric longer than this gets a
+/// warning, mm. A short travel stitch to the next part is normal: about
+/// 3 mm between the parts of small letters (the tutorial of Japanese
+/// lettering at 5 mm), 7.5 to 20 mm in the faults of the corpus.
+pub const TRAVEL_ON_FABRIC_MM: f64 = 4.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Severity {
@@ -82,6 +90,9 @@ pub struct DesignInfo {
     /// The number of threads to buy for the order (ADR 0066), if the user
     /// has a thread stock.
     pub to_buy: Option<usize>,
+    /// The travel of the plan that shows (P22 Milestone 1, ADR 0167), in
+    /// the coordinates of the plan.
+    pub travel: emb_stitch::shown_travel::ShownTravel,
     pub issues: Vec<Issue>,
 }
 
@@ -324,6 +335,44 @@ impl AppState {
                 );
             }
         }
+        // Travel that shows (P22 Milestone 1, ADR 0167): on top of sewn
+        // stitches, and long travel on the fabric. Lace is all thread.
+        info.travel = emb_stitch::shown_travel::shown_travel(&plan);
+        if !emb_stitch::lace::is_lace(d, &self.fabrics) {
+            use emb_stitch::shown_travel::Shows;
+            for (id, on_stitches, _) in info.travel.by_object() {
+                let longest = |shows: Shows| {
+                    info.travel
+                        .pieces
+                        .iter()
+                        .filter(|p| p.object == Some(id) && p.shows == shows)
+                        .max_by(|a, b| a.length().total_cmp(&b.length()))
+                };
+                let at = |p: &emb_stitch::shown_travel::ShownPiece| Some(back.apply(p.from.lerp(p.to, 0.5)));
+                if on_stitches >= TRAVEL_ON_STITCHES_MM {
+                    info.issues.push(Issue {
+                        severity: Severity::Warning,
+                        object: Some(id),
+                        text: fill(
+                            "Travel shows on top of sewn stitches: {} mm; View > Travel That Shows marks it",
+                            &[&format!("{on_stitches:.0}")],
+                        ),
+                        at: longest(Shows::OnStitches).and_then(at),
+                    });
+                }
+                if let Some(p) = longest(Shows::OnFabric).filter(|p| p.length() >= TRAVEL_ON_FABRIC_MM) {
+                    info.issues.push(Issue {
+                        severity: Severity::Warning,
+                        object: Some(id),
+                        text: fill(
+                            "Travel shows on the fabric: {} mm in one piece; View > Travel That Shows marks it",
+                            &[&format!("{:.0}", p.length())],
+                        ),
+                        at: at(p),
+                    });
+                }
+            }
+        }
         for w in &plan.warnings {
             let at = w.object.and_then(|id| d.bbox_of(&[id])).map(|b| b.center());
             info.issues.push(Issue {
@@ -465,6 +514,15 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
                 row(tr("Color changes"), info.colors.len().saturating_sub(1).to_string());
                 row(tr("Trims"), info.trims.to_string());
                 row(tr("Jumps"), info.jumps.to_string());
+                if info.travel.travel_mm > 0.0 {
+                    row(
+                        tr("Travel that shows"),
+                        fill(
+                            "{} on stitches, {} on the fabric",
+                            &[&u.fmt(info.travel.on_stitches_mm()), &u.fmt(info.travel.on_fabric_mm())],
+                        ),
+                    );
+                }
                 if info.stops > 0 {
                     row(tr("Stops"), info.stops.to_string());
                 }

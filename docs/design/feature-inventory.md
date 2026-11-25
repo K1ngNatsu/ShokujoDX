@@ -363,7 +363,7 @@ are planned in phase P22 (`docs/design/p22-plan.md`).
 | Cap sequencing | Commercial programs | Sew order from the center out and from the bottom up for caps | ✅ Arrange > Sew order > Cap order; cap frame hint in Design info (ADR 0050) | P11 (7) |
 | Cutwork needles | The programs of machine makers, others | Lines that cutting needles cut, with the needle angle | ◐ Specialty > Cutwork: cut lines by needle angle, a color for each needle (ADR 0051); files not tried on a machine | P11 (8) |
 | Update check | All | The program tells the user that a new version exists | ✅ Help > Check for Updates, and at the start if the user permits it (the installer and the first start ask): the version, its notes and the download page; no download and no install; the help topic What is new (ADR 0109) | P17 (1) |
-| Travel that shows | zigzag | A warning for travel stitches that lie on top of stitches sewn before them | — Not started | P22 (1) |
+| Travel that shows | zigzag | A warning for travel stitches that lie on top of stitches sewn before them | ✅ Design info: the travel that shows and warnings; View > Check > Travel That Shows (ADR 0167) | P22 (1) |
 | Live numbers for trims | zigzag | While the user drags the distance up to which the machine sews across gaps, the trims, the travel that shows and the sew time change, and the canvas marks the new travel | — Not started | P22 (2) |
 | Quicker to sew | zigzag | One window: merge threads that look almost the same, remove small details, sew across small gaps, fewer color changes, with the numbers before and after | — Not started | P22 (2) |
 | Test swatches | zigzag | Copies of the selection in a grid, one setting in steps, each copy with its value as lettering, to sew on the fabric | — Not started | P22 (3) |

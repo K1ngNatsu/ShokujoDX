@@ -86,6 +86,8 @@ pub struct AppState {
     /// through, the high thread, and their map.
     pub show_through: bool,
     pub show_high_thread: bool,
+    /// The check view of the travel that shows (P22 Milestone 1, ADR 0167).
+    pub show_travel: bool,
     pub check_cache: crate::checks::CheckCache,
     /// The tilt view (ADR 0129).
     pub tilt: crate::tilt::TiltView,
@@ -695,6 +697,7 @@ impl AppState {
             density_cache: None,
             show_through: false,
             show_high_thread: false,
+            show_travel: false,
             check_cache: Default::default(),
             tilt: Default::default(),
             magnifier: Default::default(),

@@ -1597,6 +1597,7 @@ pub fn stress_plan(n: usize) -> StitchPlan {
         warnings: Vec::new(),
         spans,
         stops: Vec::new(),
+        travel: Vec::new(),
     }
 }
 

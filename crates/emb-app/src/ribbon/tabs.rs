@@ -577,6 +577,7 @@ pub(super) const VIEW: &[Panel] = &[
             Large(f(Flag::Tilt)),
             Small(&[Cmd::TiltWindow, f(Flag::Magnifier), Cmd::Compare3d]),
             Small(&[f(Flag::BeforeAfter), f(Flag::ShowThrough), f(Flag::HighThread)]),
+            Small(&[f(Flag::TravelShows)]),
             Custom(light_column, &[]),
         ],
     },

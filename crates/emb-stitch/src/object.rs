@@ -64,6 +64,12 @@ pub struct Run {
     /// Auto jump: stitches longer than the machine allows are sewn as
     /// jumps, not split with needle points.
     pub long_jumps: bool,
+    /// The stitches of the run that are travel: the needle goes from one
+    /// part of the object to the next, and the stitches are not a part of
+    /// its look. Ranges of segments: segment `k` goes from `points[k]` to
+    /// `points[k + 1]`. Empty for most runs. The plan keeps them in
+    /// `StitchPlan::travel` (P22 Milestone 1).
+    pub travel: Vec<std::ops::Range<usize>>,
 }
 
 /// Why the machine stops.
@@ -122,6 +128,7 @@ impl Run {
             exact: false,
             stop: None,
             long_jumps: false,
+            travel: Vec::new(),
         }
     }
 }
@@ -389,6 +396,7 @@ fn stitch_kind(kind: &ObjectKind, entry: Point, exit: Option<Point>) -> Result<O
                             exact: params.style == RunStyle::Manual,
                             stop: None,
                             long_jumps: false,
+                            travel: Vec::new(),
                         }
                     })
                     .collect()
@@ -419,7 +427,13 @@ fn stitch_kind(kind: &ObjectKind, entry: Point, exit: Option<Point>) -> Result<O
                 Err(StitchError::Empty)
             } else {
                 Ok(ObjectStitches {
-                    runs: runs.into_iter().map(Run::new).collect(),
+                    runs: runs
+                        .into_iter()
+                        .map(|(points, travel)| Run {
+                            travel,
+                            ..Run::new(points)
+                        })
+                        .collect(),
                 })
             }
         }
@@ -1036,6 +1050,14 @@ impl LetterSewer<'_> {
                 first.points.remove(0);
             }
         }
+        // A run in a fixed letter is a travel run (the route makes it under
+        // the parts that sew later).
+        if fixed && matches!(part, ObjectKind::Running { .. }) {
+            for run in &mut st.runs {
+                let all = 0..run.points.len().saturating_sub(1);
+                run.travel = Vec::from([all]);
+            }
+        }
         if let Some(p) = st.runs.last().and_then(|r| r.points.last()) {
             self.needle = *p;
         }
@@ -1289,9 +1311,12 @@ fn row_split(shape: &Shape, p: &FillParams) -> Option<crate::fill::RowSplit> {
     Some(split)
 }
 
+/// Needle paths, each with the ranges of its segments that are travel.
+type MarkedRuns = Vec<(Vec<Point>, Vec<std::ops::Range<usize>>)>;
+
 /// Needle paths of a fill: underlay, then the top rows. Underlay tatami
 /// angles are relative to the fill angle.
-fn fill_runs(shape: &Shape, p: &FillParams, entry: Point, exit: Option<Point>) -> Vec<Vec<Point>> {
+fn fill_runs(shape: &Shape, p: &FillParams, entry: Point, exit: Option<Point>) -> MarkedRuns {
     if shape.is_empty() {
         return Vec::new();
     }
@@ -1357,7 +1382,7 @@ fn fill_runs(shape: &Shape, p: &FillParams, entry: Point, exit: Option<Point>) -
     } else {
         crate::curves::sew(shape, p, entry, &mut sewer);
     }
-    sewer.finish()
+    sewer.finish_with_travel()
 }
 
 pub type CachedStitches = Arc<Result<ObjectStitches, StitchError>>;
