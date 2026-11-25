@@ -340,6 +340,28 @@ next release.
   (they write files in the folder of the user's fonts), and they make
   the test sheet of an embroidery font of the program (the letters of a
   TrueType font take too long in a test).
+- **Milestone 4: made (2026-11-24, ADR 0162).** Path 5 has seven new
+  tutorials: "Borders, motifs and families" (a border of hearts, a motif
+  run and a motif fill, a clipart star from a family), "Puff on a cap"
+  (a multi-needle machine and a cap frame, puff lettering, the cap
+  order), "Buttonholes" (a string of four on a placket, a standard size,
+  mitre corners), "Cutwork" (a running line, the cut lines of a Bernina
+  kit, a satin edge), "Rhinestones" (Outline to Stones, a stone run, the
+  template marks), "A quilt block" (echo lines, a stipple, a block from a
+  wave line) and "Cross stitch" (Picture to Cross Stitch on Aida, crosses
+  and a backstitch line by hand, the chart). 27 tutorials run in CI in
+  four languages. The steps found two faults of the program, now fixed:
+  the Fabric list was too short to show its last fabrics (Aida, Quilt),
+  and puff letters put end stitches two times at their joints (ADR
+  0165). The puff apex of "A" still builds up thread (open-work list).
+  The steps do not use the Clipart tab (it writes the built-in clipart
+  into the folder of the user the first time it shows), and they only
+  check the commands that save a file (Template, Chart). The pictures of
+  the tutorials are now 127 files, 13 MB: more than the 10 MB of answer
+  1, so they would go to a help package. The owner put the size of the
+  program off to a later phase (2026-11-24: "we're not bloated, I'd
+  rather not deal with optimization yet"), so they stay in the program
+  for now (`docs/design/open-work.md`).
 
 ### Answers to the open questions
 

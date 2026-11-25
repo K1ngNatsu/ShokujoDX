@@ -546,16 +546,35 @@ impl Runner {
     }
 
     /// Chooses `item` in the list after `label`. A long list that does
-    /// not show the item, and has a search field, gets the item typed in it.
+    /// not show the item gets the item typed in its search field, or, with
+    /// none, scrolls down with the wheel of the mouse (as a user does).
     fn choose(&mut self, label: &str, item: &str) -> Result<(), String> {
         let list = self.after_label(label, &[Role::ComboBox])?;
         self.click_at(list.rect.center(), Modifiers::NONE);
-        if self.in_window(item).is_none()
-            && let Ok(search) = self.text_field(tr("Search"))
-        {
-            self.click_select_all(&search);
-            self.frame(vec![Event::Text(item.to_string())]);
-            self.settle();
+        if self.in_window(item).is_none() {
+            if let Ok(search) = self.text_field(tr("Search")) {
+                self.click_select_all(&search);
+                self.frame(vec![Event::Text(item.to_string())]);
+                self.settle();
+            } else {
+                // The open list is under the list button.
+                let at = list.rect.center_bottom() + Vec2::new(0.0, 40.0);
+                for _ in 0..40 {
+                    if self.in_window(item).is_some() {
+                        break;
+                    }
+                    self.frame(vec![
+                        Event::PointerMoved(at),
+                        Event::MouseWheel {
+                            unit: egui::MouseWheelUnit::Point,
+                            delta: Vec2::new(0.0, -40.0),
+                            phase: egui::TouchPhase::Move,
+                            modifiers: Modifiers::NONE,
+                        },
+                    ]);
+                    self.frame(Vec::new());
+                }
+            }
         }
         let n = self.in_window(item).ok_or_else(|| {
             format!(
@@ -569,13 +588,22 @@ impl Runner {
 
     /// The close button of the window with the title `title`: on the row
     /// of the title, right of it.
+    /// A label in the window can have the text of the title (in Japanese
+    /// "Family" and "Families" are both ファミリー): the title is the one
+    /// with a close button on its row.
     fn close_button(&self, title: &str) -> Result<Node, String> {
-        let t = self.in_window(title).ok_or_else(|| format!("no window \"{title}\""))?;
+        self.in_window(title).ok_or_else(|| format!("no window \"{title}\""))?;
+        let windows = self.windows();
         self.nodes
             .iter()
-            .filter(|n| n.name == "Close window" && n.rect.left() > t.rect.left())
-            .filter(|n| (n.rect.center().y - t.rect.center().y).abs() < t.rect.height())
-            .min_by(|a, b| a.rect.left().total_cmp(&b.rect.left()))
+            .filter(|t| t.name == title && windows.iter().any(|w| w.contains_rect(t.rect)))
+            .find_map(|t| {
+                self.nodes
+                    .iter()
+                    .filter(|n| n.name == "Close window" && n.rect.left() > t.rect.left())
+                    .filter(|n| (n.rect.center().y - t.rect.center().y).abs() < t.rect.height())
+                    .min_by(|a, b| a.rect.left().total_cmp(&b.rect.left()))
+            })
             .cloned()
             .ok_or_else(|| format!("the window \"{title}\" has no close button"))
     }
@@ -795,7 +823,10 @@ impl Runner {
                     .map(|i| {
                         let objects = st.doc.design().objects();
                         let at = i.object.and_then(|id| objects.iter().position(|o| o.id == id));
-                        format!("{} (object {at:?})", i.text)
+                        let place =
+                            i.at.map(|p| format!(" at ({:.1}, {:.1})", p.x, p.y))
+                                .unwrap_or_default();
+                        format!("{} (object {at:?}){place}", i.text)
                     })
                     .collect();
                 bad.push(format!("{} warnings, not {n}: {texts:?}", texts.len()));

@@ -133,6 +133,15 @@ Milestone 3 (paths 3 and 4, seven tutorials) added:
   width of the hoop, so Design Info warned of the outer names (the rows
   are now not wider than the hoop in its safety margin).
 
+Milestone 4 (path 5, seven tutorials) added: `choose` scrolls a long
+list with the wheel of the mouse when the item is not in sight and the
+list has no search field (the list of machines, of hoops); `close` finds
+the title with a close button on its row (in Japanese "Family" and
+"Families" are both ファミリー); a failed check of the warnings says
+where each warning is. The steps found two faults of the program: the
+Fabric list did not show its last fabrics, and puff letters had two
+layers of end stitches at their joints (ADR 0165).
+
 ## Consequences
 
 - A change of the name or the place of a command, of the text of a

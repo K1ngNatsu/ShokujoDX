@@ -94,7 +94,7 @@ features that the program has better before it gets new ones.
 | Thirty fonts, all converted by the program; small libraries of motifs, split patterns, stamps, borders and clipart; no text shaping | P17 Milestones 4 to 8 |
 | A user of an old version does not learn of a new one; the packages have no signature | P17 Milestone 1 (update check); code signing continues (ADR 0062) |
 | No window is checked automatically; texts in German and Japanese are longer | P17 Milestone 2 (pictures of the windows, development only) |
-| The help has pictures only in the tutorials; 20 tutorials; no videos | P19 (Part 2 accepted) |
+| The help has pictures only in the tutorials; 27 tutorials; no videos | P19 (Part 2 accepted) |
 | EPS and CDR artwork cannot be read | P18 Milestone 8 (import helpers; changed by the owner on 2026-11-20: the program reads EPS files, and a CDR file gives a message, ADR 0138) |
 
 **Decided, no work.**
@@ -2086,7 +2086,7 @@ open designs) (ADR 0130).
 `docs/design/p18-view-plan.md`; the last one is a test with users: a
 photo of a sew-out next to a picture of the view.
 
-### P19. Help and tutorials (L) — proposed; Part 2 (more tutorials) accepted, its Milestones 1 to 3 done (`docs/design/p19-plan.md`)
+### P19. Help and tutorials (L) — proposed; Part 2 (more tutorials) accepted, its Milestones 1 to 4 done (`docs/design/p19-plan.md`)
 
 The help becomes a part of the work: pictures made from the program,
 Show Me on the ribbon, guided lessons that check each step, a doctor for
@@ -2096,8 +2096,9 @@ on the web and as a manual, moving pictures, better answers.
 Part 2 (accepted 2026-11-24) makes about 31 tutorials in seven paths.
 Each tutorial has a start design, pictures and a step file that a test
 does in four languages (ADR 0162). Milestone 1 (the tools and the first
-path), Milestone 2 (drawing by hand, the tutorials of before) and
-Milestone 3 (lettering, pictures and artwork) are done.
+path), Milestone 2 (drawing by hand, the tutorials of before),
+Milestone 3 (lettering, pictures and artwork) and Milestone 4
+(decoration and specialty) are done.
 
 **Exit:** the exit tests of the milestones that the owner selects.
 

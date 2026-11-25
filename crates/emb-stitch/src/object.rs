@@ -936,9 +936,11 @@ struct LetterSewer<'a> {
     runs: Vec<Run>,
     needle: Point,
     long_gap: RunLink,
-    /// The satin and fill parts of the letter that sews, with their areas:
-    /// a satin sews no underlay where another of them lies (ADR 0163).
-    parts: Vec<(&'a ObjectKind, Vec<Vec<Point>>)>,
+    /// The satin and fill parts of the letter that sews, with their areas
+    /// and `true` once they are sewn: a satin sews no underlay where
+    /// another of them lies (ADR 0163), and a puff column no end stitches
+    /// where one sewn before it lies (ADR 0165).
+    parts: Vec<(&'a ObjectKind, Vec<Vec<Point>>, bool)>,
 }
 
 impl<'a> LetterSewer<'a> {
@@ -948,8 +950,8 @@ impl<'a> LetterSewer<'a> {
             .parts
             .iter()
             .filter(|p| matches!(p, ObjectKind::Satin { .. } | ObjectKind::Fill { .. }))
-            .map(|p| (p, part_area(p)))
-            .filter(|(_, a)| !a.is_empty())
+            .map(|p| (p, part_area(p), false))
+            .filter(|(_, a, _)| !a.is_empty())
             .collect();
     }
 }
@@ -971,12 +973,21 @@ impl LetterSewer<'_> {
         let others: Vec<Vec<Vec<Point>>> = self
             .parts
             .iter()
-            .filter(|(p, _)| !std::ptr::eq(*p, part))
-            .map(|(_, a)| a.clone())
+            .filter(|(p, _, _)| !std::ptr::eq(*p, part))
+            .map(|(_, a, _)| a.clone())
             .collect();
+        let before: Vec<Vec<Vec<Point>>> = self
+            .parts
+            .iter()
+            .filter(|(p, _, sewn)| *sewn && !std::ptr::eq(*p, part))
+            .map(|(_, a, _)| a.clone())
+            .collect();
+        if let Some(entry) = self.parts.iter_mut().find(|(p, _, _)| std::ptr::eq(*p, part)) {
+            entry.2 = true;
+        }
         let made = match part {
             ObjectKind::Satin { geometry, params } if !others.is_empty() => {
-                match satin::satin_on(geometry, params, from, exit, &others) {
+                match satin::satin_on(geometry, params, from, exit, &others, &before) {
                     Some(points) if points.len() >= 2 => Ok(ObjectStitches {
                         runs: vec![Run {
                             long_jumps: params.auto_jump,

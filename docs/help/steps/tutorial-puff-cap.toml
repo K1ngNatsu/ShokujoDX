@@ -1,0 +1,57 @@
+# The steps of "Tutorial: puff on a cap" (tutorial-puff-cap.md). The test
+# each_tutorial_runs_in_each_language (crates/emb-app/src/
+# tutorial_steps.rs) does them in each language; write_tutorial_pictures
+# makes the pictures. A change of a step needs the same change in the topic
+# and its translations.
+
+# Open the start design: a frame line and the lettering CAP.
+[[step]]
+open = "cap-front"
+expect = { objects = 2, kinds = ["Running", "Lettering"] }
+
+# The machine, the cap frame and the fabric.
+[[step]]
+tab = "Design"
+
+[[step]]
+choose = ["Machine", "Tajima multi-needle"]
+
+[[step]]
+choose = ["Hoop", "Wide cap frame 360 x 75 (270 degree class)  (360 × 75 mm)"]
+
+[[step]]
+command = "Design > Fabric and Styles > Fabric"
+expect = { window = "Fabric" }
+
+[[step]]
+choose = ["Fabric", "Structured cap"]
+
+[[step]]
+button = "Apply"
+expect = { fabric = "cap" }
+
+# Puff letters.
+[[step]]
+drag = [[-32.0, -15.0], [32.0, 15.0]]
+expect = { selected = 1, warnings = 0 }
+
+[[step]]
+command = "Specialty > Puff and Laydown > Puff"
+expect = { objects = 2, colors = 2, warnings = 1 }
+
+# The cap order.
+[[step]]
+command = "Arrange > Sew Order > Cap Order"
+expect = { objects = 2, kinds = ["Running", "Lettering"], warnings = 1 }
+
+[[step]]
+command = "View > Show > Thread Look"
+
+[[step]]
+button = "Thread Look"
+
+[[step]]
+key = "Escape"
+
+[[step]]
+picture = "puff-cap-stitches"

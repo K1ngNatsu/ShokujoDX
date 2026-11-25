@@ -597,7 +597,7 @@ pub(crate) fn satin_top(pairs: &[(Point, Point)], p: &SatinParams) -> Vec<Point>
 /// The column starts at the end nearer to `entry`; if `exit` is set, it
 /// starts at the end farther from `exit` instead, so it ends near `exit`.
 pub fn satin(g: &SatinGeometry, p: &SatinParams, entry: Point, exit: Option<Point>) -> Option<Vec<Point>> {
-    satin_with(g, p, entry, exit, false, &[])
+    satin_with(g, p, entry, exit, false, &[], &[])
 }
 
 /// As [`satin`], for a column of a letter with other parts (`sewn`: the
@@ -607,15 +607,27 @@ pub fn satin(g: &SatinGeometry, p: &SatinParams, entry: Point, exit: Option<Poin
 /// on each other, so the fabric has two layers of satin there, and
 /// underlay under them only makes the joint stiff (ADR 0163). The underlay
 /// goes across such a place with a walk, under the top stitches of the
-/// column.
+/// column. `before` are the areas of the parts that sewed before this one:
+/// a puff column has no end stitches at an end in one of them, as that
+/// part closed the foam there (ADR 0165).
 pub(crate) fn satin_on(
     g: &SatinGeometry,
     p: &SatinParams,
     entry: Point,
     exit: Option<Point>,
     sewn: &[Vec<Vec<Point>>],
+    before: &[Vec<Vec<Point>>],
 ) -> Option<Vec<Point>> {
-    satin_with(g, p, entry, exit, false, sewn)
+    satin_with(g, p, entry, exit, false, sewn, before)
+}
+
+/// `true` if `q` is in one of the areas `parts`, or nearer than
+/// [`JOINT_MARGIN_MM`] to one of their rings.
+fn in_parts(q: Point, parts: &[Vec<Vec<Point>>]) -> bool {
+    let near = |r: &[Point]| (0..r.len()).any(|i| q.distance_to_segment(r[i], r[(i + 1) % r.len()]) < JOINT_MARGIN_MM);
+    parts.iter().any(|rings| {
+        rings.iter().filter(|r| emb_geom::region::ring_contains(r, q)).count() % 2 == 1 || rings.iter().any(|r| near(r))
+    })
 }
 
 /// A walk from the last point of `out` to `to` where the step is longer
@@ -633,15 +645,7 @@ fn walk_to(out: &mut Vec<Point>, to: Option<&Point>) {
 /// The points of an underlay with the points in `sewn` left out: the
 /// points before and after such a place are joined by a walk.
 fn underlay_off(points: Vec<Point>, sewn: &[Vec<Vec<Point>>]) -> Vec<Point> {
-    let near = |q: Point, r: &[Point]| {
-        (0..r.len()).any(|i| q.distance_to_segment(r[i], r[(i + 1) % r.len()]) < JOINT_MARGIN_MM)
-    };
-    let inside = |q: Point| {
-        sewn.iter().any(|rings| {
-            rings.iter().filter(|r| emb_geom::region::ring_contains(r, q)).count() % 2 == 1
-                || rings.iter().any(|r| near(q, r))
-        })
-    };
+    let inside = |q: Point| in_parts(q, sewn);
     let mut out: Vec<Point> = Vec::with_capacity(points.len());
     let mut skipped = false;
     for q in points {
@@ -669,6 +673,7 @@ pub(crate) fn satin_with(
     exit: Option<Point>,
     across: bool,
     sewn: &[Vec<Vec<Point>>],
+    before: &[Vec<Vec<Point>>],
 ) -> Option<Vec<Point>> {
     let mut col = Column::new(g)?;
     let (s, e) = (col.start(), col.end());
@@ -715,7 +720,9 @@ pub(crate) fn satin_with(
         walk_to(&mut out, points.first());
         out.extend(points);
     }
-    if p.puff {
+    // Puff: no end stitches at an end that a part sewn before covers.
+    let capped = |end: (Point, Point)| !in_parts(end.0.midpoint(end.1), before);
+    if p.puff && capped(col.start()) {
         out.extend(puff_cap(&col, true));
     }
     // The accordion profile goes from the start of the column as drawn, also
@@ -744,7 +751,7 @@ pub(crate) fn satin_with(
         top.len()
     };
     out.extend(&top[..keep]);
-    if p.puff {
+    if p.puff && capped(col.end()) {
         out.extend(puff_cap(&col, false));
     }
     out.dedup();
@@ -971,7 +978,7 @@ mod tests {
         ]];
         let near = |pts: &[Point]| pts.iter().filter(|q| q.x < 6.0 + JOINT_MARGIN_MM).count();
         let all = satin(&g, &p, Point::ZERO, None).unwrap();
-        let on = satin_on(&g, &p, Point::ZERO, None, &[other]).unwrap();
+        let on = satin_on(&g, &p, Point::ZERO, None, &[other], &[]).unwrap();
         let top = satin(&g, &plain(0.4), Point::ZERO, None).unwrap();
         assert!(near(&on) < near(&all), "{} of {}", near(&on), near(&all));
         // There, only the top stitches and a walk across.
@@ -1161,6 +1168,42 @@ mod tests {
             .map(|p| (p.y * 1000.0).round() as i64)
             .collect();
         assert_eq!(ys.len(), 2);
+    }
+
+    /// At a joint of a letter, the puff column that sews first closes the
+    /// foam: a column whose end lies in a part sewn before it has no end
+    /// stitches there (ADR 0165).
+    #[test]
+    fn a_puff_end_on_a_part_sewn_before_has_no_end_stitches() {
+        let p = SatinParams {
+            puff: true,
+            ..plain(0.25)
+        };
+        let col = straight(5.0, 30.0);
+        // Another column across the end of this one (x 27 to 35).
+        let other = vec![vec![
+            Point::new(27.0, -3.0),
+            Point::new(35.0, -3.0),
+            Point::new(35.0, 8.0),
+            Point::new(27.0, 8.0),
+        ]];
+        let past_end = |pts: &[Point]| pts.iter().filter(|q| q.x > 30.3).count();
+        let past_start = |pts: &[Point]| pts.iter().filter(|q| q.x < -0.3).count();
+        // The other part sews after this one: both ends are closed.
+        let after = satin_on(&col, &p, Point::ZERO, None, std::slice::from_ref(&other), &[]).unwrap();
+        assert!(past_end(&after) > 0 && past_start(&after) > 0);
+        // It sewed before: the end in it is not closed again, the start is.
+        let before = satin_on(
+            &col,
+            &p,
+            Point::ZERO,
+            None,
+            std::slice::from_ref(&other),
+            std::slice::from_ref(&other),
+        )
+        .unwrap();
+        assert_eq!(past_end(&before), 0);
+        assert!(past_start(&before) > 0);
     }
 
     #[test]

@@ -1,0 +1,108 @@
+# The steps of "Tutorial: borders, motifs and families"
+# (tutorial-borders.md). The test each_tutorial_runs_in_each_language
+# (crates/emb-app/src/tutorial_steps.rs) does them in each language;
+# write_tutorial_pictures makes the pictures. A change of a step needs the
+# same change in the topic and its translations.
+#
+# The steps do not use the Clipart tab: the first time it shows, it writes
+# the built-in clipart into the folder of the user.
+
+# Open the start design: a circle and a line.
+[[step]]
+open = "decor-shapes"
+expect = { objects = 2, kinds = ["Fill", "Running"] }
+
+# Add a border.
+[[step]]
+click = [0.0, -10.0]
+expect = { selected = 1 }
+
+[[step]]
+command = "Digitize > Decorate > Borders"
+expect = { window = "Borders" }
+
+[[step]]
+field = "Search"
+
+[[step]]
+type = "hearts"
+
+[[step]]
+button = "Hearts"
+
+[[step]]
+set = ["Space round the objects", "3"]
+
+[[step]]
+picture = "borders-window"
+area = "windows"
+
+[[step]]
+button = "Add the border"
+expect = { objects = 3, kinds = ["Fill", "Running", "Running"] }
+
+[[step]]
+close = "Borders"
+
+# Give a line a motif.
+[[step]]
+click = [0.0, 40.0]
+expect = { selected = 1 }
+
+[[step]]
+command = "Edit > Stitch Types > Motifs"
+expect = { window = "Motifs" }
+
+[[step]]
+button = "Scallop"
+
+[[step]]
+button = "Use for the selection"
+
+[[step]]
+click = [0.0, -10.0]
+expect = { selected = 1 }
+
+[[step]]
+button = "Bead"
+
+[[step]]
+button = "Use for the selection"
+expect = { objects = 3, kinds = ["Fill", "Running", "Running"] }
+
+# A clipart item from a family.
+[[step]]
+button = "Families…"
+expect = { window = "Families" }
+
+[[step]]
+button = "Clipart"
+
+[[step]]
+button = "Six-point star"
+
+[[step]]
+picture = "borders-families"
+area = "windows"
+
+[[step]]
+button = "Insert"
+expect = { objects = 5, kinds = ["Fill", "Running", "Running", "Fill", "Running"] }
+
+[[step]]
+close = "Families"
+
+[[step]]
+close = "Motifs"
+
+[[step]]
+command = "View > Show > Thread Look"
+
+[[step]]
+button = "Thread Look"
+
+[[step]]
+key = "Escape"
+
+[[step]]
+picture = "borders-stitches"

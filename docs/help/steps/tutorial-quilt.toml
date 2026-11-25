@@ -1,0 +1,96 @@
+# The steps of "Tutorial: a quilt block" (tutorial-quilt.md). The test
+# each_tutorial_runs_in_each_language (crates/emb-app/src/
+# tutorial_steps.rs) does them in each language; write_tutorial_pictures
+# makes the pictures. A change of a step needs the same change in the topic
+# and its translations.
+
+# Open the start design: a heart and a wave line.
+[[step]]
+open = "quilt-heart"
+expect = { objects = 2, kinds = ["Fill", "Running"] }
+
+# The fabric.
+[[step]]
+command = "Design > Fabric and Styles > Fabric"
+expect = { window = "Fabric" }
+
+[[step]]
+choose = ["Fabric", "Quilt (top, batting and backing)"]
+
+[[step]]
+button = "Apply"
+expect = { fabric = "quilt" }
+
+# Echo lines.
+[[step]]
+click = [0.0, 0.0]
+expect = { selected = 1 }
+
+[[step]]
+command = "Specialty > Quilting > Quilting"
+expect = { window = "Quilting" }
+
+[[step]]
+set = ["Distance", "3"]
+
+[[step]]
+set = ["Spacing", "5"]
+
+[[step]]
+set = ["Lines", "3"]
+
+[[step]]
+picture = "quilt-window"
+area = "windows"
+
+[[step]]
+button = "Add echo lines"
+expect = { objects = 3, kinds = ["Fill", "Running", "Running"] }
+
+# A background.
+[[step]]
+click = [0.0, 0.0]
+expect = { selected = 1 }
+
+[[step]]
+button = "Background"
+
+[[step]]
+set = ["Gap", "16"]
+
+[[step]]
+button = "Add background"
+expect = { objects = 4, kinds = ["Fill", "Fill", "Running", "Running"] }
+
+# A quilt block.
+[[step]]
+click = [0.0, 85.0]
+expect = { selected = 1 }
+
+[[step]]
+button = "Quilt block"
+
+[[step]]
+set = ["Width", "110"]
+
+[[step]]
+set = ["Height", "50"]
+
+[[step]]
+button = "Make quilt block"
+expect = { objects = 5, kinds = ["Fill", "Fill", "Running", "Running", "Running"], hoopings = 0, colors = 1 }
+
+[[step]]
+close = "Quilting"
+
+[[step]]
+command = "View > Show > Thread Look"
+
+[[step]]
+button = "Thread Look"
+
+[[step]]
+key = "Escape"
+
+[[step]]
+picture = "quilt-stitches"

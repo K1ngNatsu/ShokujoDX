@@ -1,0 +1,62 @@
+# The steps of "Tutorial: buttonholes" (tutorial-buttonholes.md). The test
+# each_tutorial_runs_in_each_language (crates/emb-app/src/
+# tutorial_steps.rs) does them in each language; write_tutorial_pictures
+# makes the pictures. A change of a step needs the same change in the topic
+# and its translations.
+
+# Open the start design: the middle line of a placket, 80 mm.
+[[step]]
+open = "placket"
+expect = { objects = 1, kinds = ["Running"] }
+
+# Place the buttonholes.
+[[step]]
+click = [0.0, 0.0]
+expect = { selected = 1 }
+
+[[step]]
+command = "Digitize > Decorate > Buttonholes"
+expect = { window = "Buttonholes" }
+
+[[step]]
+choose = ["Shape", "Square ends"]
+
+[[step]]
+choose = ["Button", "18 mm (28L)"]
+
+[[step]]
+set = ["Button thickness", "3"]
+
+[[step]]
+set = ["Number", "4"]
+
+[[step]]
+picture = "buttonholes-window"
+area = "windows"
+
+[[step]]
+button = "Place buttonholes"
+expect = { objects = 20, selected = 20 }
+
+# Change the buttonholes.
+[[step]]
+button = "Mitre corners"
+
+[[step]]
+button = "Change the selected buttonholes"
+expect = { objects = 8, kinds = ["Running", "Satin", "Running", "Satin", "Running", "Satin", "Running", "Satin"] }
+
+[[step]]
+close = "Buttonholes"
+
+[[step]]
+command = "View > Show > Thread Look"
+
+[[step]]
+button = "Thread Look"
+
+[[step]]
+key = "Escape"
+
+[[step]]
+picture = "buttonholes-stitches"

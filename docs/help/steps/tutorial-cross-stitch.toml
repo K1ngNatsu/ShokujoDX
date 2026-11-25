@@ -1,0 +1,98 @@
+# The steps of "Tutorial: cross stitch" (tutorial-cross-stitch.md). The
+# test each_tutorial_runs_in_each_language (crates/emb-app/src/
+# tutorial_steps.rs) does them in each language; write_tutorial_pictures
+# makes the pictures. A change of a step needs the same change in the topic
+# and its translations.
+#
+# The steps check the Chart command only: it saves a file.
+
+# Open the start design: the picture of a navy circle with a yellow star.
+[[step]]
+open = "patch-picture"
+expect = { objects = 0 }
+
+# The fabric.
+[[step]]
+command = "Design > Fabric and Styles > Fabric"
+expect = { window = "Fabric" }
+
+[[step]]
+choose = ["Fabric", "Aida cloth (cross stitch)"]
+
+[[step]]
+button = "Apply"
+expect = { fabric = "aida" }
+
+# Picture to Cross Stitch.
+[[step]]
+command = "Specialty > Cross Stitch > Picture to Cross Stitch"
+expect = { window = "Picture to Design" }
+
+[[step]]
+button = "Next ›"
+
+[[step]]
+button = "Remove the edge color"
+
+[[step]]
+button = "Next ›"
+
+[[step]]
+set = ["Cell size", "1.81"]
+
+[[step]]
+set = ["Thread colors", "2"]
+
+[[step]]
+picture = "cross-stitch-wizard"
+area = "windows"
+
+[[step]]
+button = "Next ›"
+
+[[step]]
+button = "Finish"
+expect = { objects = 2, kinds = ["Cross stitch", "Cross stitch"], colors = 2 }
+
+# Crosses by hand: a row under the circle, then erase its first crosses.
+[[step]]
+command = "Specialty > Cross Stitch > Cross Stitch"
+
+[[step]]
+drag = [[-9.0, 33.5], [9.0, 33.5]]
+expect = { objects = 2 }
+
+[[step]]
+command = "Specialty > Cross Stitch > Erase Cells"
+
+[[step]]
+drag = [[-9.0, 33.5], [-5.0, 33.5]]
+expect = { objects = 2 }
+
+[[step]]
+command = "Specialty > Cross Stitch > Backstitch"
+
+[[step]]
+clicks = [[-9.05, 36.2], [9.05, 36.2]]
+
+[[step]]
+key = "Escape"
+
+[[step]]
+command = "View > Show > Thread Look"
+
+[[step]]
+button = "Thread Look"
+
+[[step]]
+key = "Escape"
+
+[[step]]
+picture = "cross-stitch-stitches"
+around = [[-35.0, -35.0], [35.0, 40.0]]
+
+# The chart.
+[[step]]
+command = "Specialty > Cross Stitch > Chart"
+check_only = true
+expect = { objects = 2, colors = 2 }

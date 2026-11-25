@@ -1,0 +1,66 @@
+# The steps of "Tutorial: cutwork" (tutorial-cutwork.md). The test
+# each_tutorial_runs_in_each_language (crates/emb-app/src/
+# tutorial_steps.rs) does them in each language; write_tutorial_pictures
+# makes the pictures. A change of a step needs the same change in the topic
+# and its translations.
+
+# Open the start design: a circle line, the edge of the hole.
+[[step]]
+open = "cutwork-circle"
+expect = { objects = 1, kinds = ["Running"] }
+
+# Make the cut lines, from a copy of the circle.
+[[step]]
+command = "Edit > Select > Select All"
+expect = { selected = 1 }
+
+[[step]]
+command = "Edit > Clipboard > Copy"
+
+[[step]]
+command = "Edit > Clipboard > Paste"
+expect = { objects = 2, selected = 1 }
+
+[[step]]
+command = "Specialty > Cutwork > Cutwork"
+expect = { window = "Cutwork" }
+
+[[step]]
+choose = ["Kit", "Bernina"]
+
+[[step]]
+picture = "cutwork-window"
+area = "windows"
+
+[[step]]
+button = "Make cut lines"
+expect = { objects = 5, colors = 5, threads = ["Navy", "Cutwork needle 1 (|)", "Cutwork needle 2 (/)", "Cutwork needle 3 (—)", "Cutwork needle 4 (\\)"] }
+
+[[step]]
+close = "Cutwork"
+
+# The satin edge, from a second copy.
+[[step]]
+command = "Edit > Clipboard > Paste"
+expect = { objects = 6, selected = 1 }
+
+# Another tab: the Edit tab has a list "Outline Type" too.
+[[step]]
+tab = "View"
+
+[[step]]
+choose = ["Outline Type", "Satin"]
+expect = { objects = 6, colors = 6 }
+
+[[step]]
+command = "View > Show > Thread Look"
+
+[[step]]
+button = "Thread Look"
+
+[[step]]
+key = "Escape"
+
+[[step]]
+picture = "cutwork-stitches"
+around = [[-25.0, -25.0], [25.0, 25.0]]

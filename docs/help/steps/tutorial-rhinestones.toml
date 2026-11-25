@@ -1,0 +1,62 @@
+# The steps of "Tutorial: rhinestones" (tutorial-rhinestones.md). The test
+# each_tutorial_runs_in_each_language (crates/emb-app/src/
+# tutorial_steps.rs) does them in each language; write_tutorial_pictures
+# makes the pictures. A change of a step needs the same change in the topic
+# and its translations.
+#
+# The steps check the Template command only: it saves a file.
+
+# Open the start design: a heart.
+[[step]]
+open = "applique-heart"
+expect = { objects = 1, kinds = ["Fill"] }
+
+# Stones on the outline.
+[[step]]
+command = "Edit > Select > Select All"
+expect = { selected = 1 }
+
+[[step]]
+command = "Specialty > Rhinestones > Outline to Stones"
+expect = { objects = 1, kinds = ["Rhinestones"], colors = 0 }
+
+# Another tab: on the Specialty tab, the tool "Stone" has the name of the
+# row "Stone" of Object Properties.
+[[step]]
+tab = "Edit"
+
+[[step]]
+choose = ["Stone", "SS16 (3.9 mm)"]
+
+[[step]]
+set = ["Gap", "1"]
+
+[[step]]
+picture = "rhinestones-heart"
+around = [[-32.0, -30.0], [32.0, 28.0]]
+
+# A row of stones by hand.
+[[step]]
+command = "Specialty > Rhinestones > Stone Run"
+
+[[step]]
+clicks = [[-25.0, 34.0], [25.0, 34.0]]
+
+[[step]]
+key = "Enter"
+expect = { objects = 2, kinds = ["Rhinestones", "Rhinestones"] }
+
+# The template and its marks.
+[[step]]
+command = "Specialty > Rhinestones > Template Marks"
+expect = { objects = 3, kinds = ["Rhinestones", "Rhinestones", "Running"], colors = 1 }
+
+[[step]]
+command = "Specialty > Rhinestones > Template"
+check_only = true
+
+[[step]]
+key = "Escape"
+
+[[step]]
+picture = "rhinestones-marks"

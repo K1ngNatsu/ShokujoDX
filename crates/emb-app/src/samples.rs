@@ -35,6 +35,11 @@ pub const SAMPLES: &[(&str, &str)] = &[
     ("photo-apple", "Apple photo"),
     ("vector-logo", "Cloud logo"),
     ("customer-dst", "LEAF"),
+    ("decor-shapes", "Circle and line"),
+    ("placket", "Placket"),
+    ("quilt-heart", "Quilt heart"),
+    ("cap-front", "Cap front"),
+    ("cutwork-circle", "Cutwork circle"),
 ];
 
 /// The prefix of a link to a start design in a help topic.
@@ -125,6 +130,24 @@ pub const TEAM_TEXTS: [(&str, &str, f64, Point); 2] = [
 pub const CLOUD_CIRCLES: [(f64, f64, f64); 3] = [(-18.0, 4.0, 12.0), (0.0, -4.0, 16.0), (17.0, 5.0, 11.0)];
 pub const CLOUD_BASE: [Point; 2] = [Point { x: -30.0, y: 4.0 }, Point { x: 28.0, y: 16.0 }];
 pub const SUN: (f64, f64, f64) = (26.0, -22.0, 12.0);
+
+/// The circle (a fill) and the line under it of `tutorial-borders`.
+pub const DECOR_CIRCLE: (Point, f64) = (Point { x: 0.0, y: -10.0 }, 30.0);
+pub const DECOR_LINE: [Point; 2] = [Point { x: -35.0, y: 40.0 }, Point { x: 35.0, y: 40.0 }];
+
+/// The line of the buttonholes of `tutorial-buttonholes`: the middle of
+/// the placket of a shirt, 80 mm.
+pub const PLACKET: [Point; 2] = [Point { x: 0.0, y: -40.0 }, Point { x: 0.0, y: 40.0 }];
+
+/// The wave line of `tutorial-quilt`: the pattern of the quilt block. Its
+/// ends are level, so the copies of the block join.
+pub const QUILT_WAVE: [Point; 5] = [
+    Point { x: -20.0, y: 85.0 },
+    Point { x: -10.0, y: 80.0 },
+    Point { x: 0.0, y: 85.0 },
+    Point { x: 10.0, y: 80.0 },
+    Point { x: 20.0, y: 85.0 },
+];
 
 /// The width of the satin column of Column C (the default of the settings).
 const COLUMN_C_MM: f64 = 3.0;
@@ -521,6 +544,84 @@ pub fn design(name: &str) -> Option<Design> {
         }
         // A photo for Photo stitch.
         "photo-apple" => d.backdrop = photo_picture(),
+        // A circle to put a border round, and a line for a motif run.
+        "decor-shapes" => {
+            let gold = d.add_thread("Gold", Rgb(230, 170, 40));
+            let navy = d.add_thread("Navy", Rgb(25, 35, 90));
+            let (c, r) = DECOR_CIRCLE;
+            d.add_object(gold, fill(Path::ellipse(c, r, r), Vec::new()));
+            let [a, b] = DECOR_LINE;
+            d.add_object(
+                navy,
+                ObjectKind::Running {
+                    path: Path::new().move_to(a).line_to(b),
+                    params: Default::default(),
+                },
+            );
+        }
+        // A heart to quilt round, and a wave line for a quilt block.
+        "quilt-heart" => {
+            let red = d.add_thread("Red", Rgb(200, 40, 40));
+            d.add_object(red, fill(path_of(HEART, true), Vec::new()));
+            d.add_object(
+                red,
+                ObjectKind::Running {
+                    path: QUILT_WAVE[1..]
+                        .iter()
+                        .fold(Path::new().move_to(QUILT_WAVE[0]), |p, q| p.line_to(*q)),
+                    params: Default::default(),
+                },
+            );
+        }
+        // The front of a cap: a frame line (flat, it sews first) and
+        // lettering to make puff.
+        "cap-front" => {
+            let navy = d.add_thread("Navy", Rgb(25, 35, 90));
+            let red = d.add_thread("Red", Rgb(200, 30, 45));
+            d.add_object(
+                navy,
+                ObjectKind::Running {
+                    path: Path::rounded_rect(
+                        emb_geom::BBox::new(Point::new(-45.0, -20.0), Point::new(45.0, 20.0)),
+                        6.0,
+                    ),
+                    params: Default::default(),
+                },
+            );
+            let font = emb_letter::bundled::embroidery("Block Sans")?;
+            let mut l = emb_model::Lettering::new(
+                "CAP",
+                emb_letter::LetterSource::font_ref(&font),
+                20.0,
+                Point::new(0.0, 10.0),
+            );
+            l.justify = emb_model::Justify::Center;
+            emb_letter::relayout(&mut l, &font);
+            d.add_object(red, ObjectKind::Lettering(Box::new(l)));
+        }
+        // A circle line: the edge of a hole to cut.
+        "cutwork-circle" => {
+            let navy = d.add_thread("Navy", Rgb(25, 35, 90));
+            d.add_object(
+                navy,
+                ObjectKind::Running {
+                    path: Path::ellipse(Point::ZERO, 10.0, 10.0),
+                    params: Default::default(),
+                },
+            );
+        }
+        // The middle line of a placket, for a string of buttonholes.
+        "placket" => {
+            let navy = d.add_thread("Navy", Rgb(25, 35, 90));
+            let [a, b] = PLACKET;
+            d.add_object(
+                navy,
+                ObjectKind::Running {
+                    path: Path::new().move_to(a).line_to(b),
+                    params: Default::default(),
+                },
+            );
+        }
         // A logo as vector artwork (as Import as Vectors makes it): a cloud
         // of four shapes that overlap, and a sun.
         "vector-logo" => {
@@ -597,6 +698,11 @@ mod tests {
         assert_eq!(d("hooping-banner").extents().unwrap().width().round(), 380.0);
         assert_eq!(d("team-shirt").objects().len(), 2);
         assert_eq!(d("vector-logo").objects().len(), 5);
+        assert_eq!(d("decor-shapes").objects().len(), 2);
+        assert_eq!(d("placket").objects().len(), 1);
+        assert_eq!(d("quilt-heart").objects().len(), 2);
+        assert_eq!(d("cap-front").objects().len(), 2);
+        assert_eq!(d("cutwork-circle").objects().len(), 1);
         let file = d("customer-dst");
         assert!(
             file.objects().len() >= 3
