@@ -79,3 +79,5 @@ The limit of the density map stays 5 layers.
   joints of "JMK" in Block Sans at 30 mm have no place over the limit.
 - `emb_render::density::DensityMap::layers_at` is public (the probes of
   the monograms use it).
+- ADR 0164 fixed the Oval style (the ends of the oval envelope, and the
+  height of the middle initial of the oval and diamond styles).

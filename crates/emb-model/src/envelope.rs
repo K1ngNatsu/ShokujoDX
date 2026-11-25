@@ -103,6 +103,11 @@ impl Default for Envelope {
 /// The largest amount; more would turn the text inside out (pinch).
 pub const MAX_AMOUNT: f64 = 0.9;
 
+/// The part of the width of an ellipse that the oval envelope uses. A whole
+/// ellipse has vertical ends: the letter at each end got a foot that was
+/// almost along its column, and its stitches fanned there (ADR 0164).
+pub const OVAL_ARC: f64 = 0.9;
+
 impl Envelope {
     pub fn is_none(&self) -> bool {
         self.shape == EnvelopeShape::None || self.amount == 0.0
@@ -130,7 +135,12 @@ impl Envelope {
             EnvelopeShape::Diamond => (a * tri / 2.0, a * tri / 2.0),
             EnvelopeShape::Wave => (a * wave, -a * wave),
             EnvelopeShape::Oval => {
-                let half = (1.0 - (2.0 * u - 1.0).powi(2)).max(0.0).sqrt() - 0.5;
+                // The middle `OVAL_ARC` of an ellipse, made as high as the
+                // whole ellipse: its ends are not vertical, so the letters
+                // at the ends do not shear without limit.
+                let end = (1.0 - OVAL_ARC * OVAL_ARC).sqrt();
+                let t = OVAL_ARC * (2.0 * u - 1.0);
+                let half = ((1.0 - t * t).max(0.0).sqrt() - end) / (1.0 - end) - 0.5;
                 (a * half, a * half)
             }
         }
@@ -257,6 +267,25 @@ mod tests {
             }
         }
         assert!(Envelope::default().is_none());
+    }
+
+    /// The ends of the oval are not vertical (ADR 0164): the edges move a
+    /// limited amount near the ends, and as far as before in the middle and
+    /// at the ends.
+    #[test]
+    fn the_oval_has_no_vertical_ends() {
+        let e = Envelope {
+            shape: EnvelopeShape::Oval,
+            amount: 0.5,
+        };
+        let (end, _) = e.edges(0.0);
+        let (middle, _) = e.edges(0.5);
+        assert!(
+            (end - -0.25).abs() < 1e-9 && (middle - 0.25).abs() < 1e-9,
+            "{end} {middle}"
+        );
+        let slope = (e.edges(0.001).0 - end) / 0.001;
+        assert!(slope < 4.0, "{slope}");
     }
 
     #[test]

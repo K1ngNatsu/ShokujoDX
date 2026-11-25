@@ -315,8 +315,10 @@ next release.
   dots. All 13 tutorials run in CI in four languages; 54 pictures, 3.9
   MB. The steps found two weak places of the program, now in
   `docs/design/open-work.md`: four of the six monogram templates build
-  up too much thread (the towel tutorial uses one that sews clean), and
-  the lace ornament template shows ten "Thread builds up" warnings.
+  up too much thread (the towel tutorial uses one that sews clean; ADR
+  0163 and ADR 0164 fixed them, except one small place of "Block in a
+  square" on towel fabric), and the lace ornament template shows ten
+  "Thread builds up" warnings.
 
 ### Answers to the open questions
 
