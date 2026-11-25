@@ -1565,6 +1565,21 @@ impl Cmd {
             ),
             Cmd::HelpTopic(id) => {
                 let (icon, label, tip) = match id {
+                    crate::help::TUTORIALS_ID => (
+                        ph::BOOKS,
+                        tr("All Tutorials"),
+                        tr("The list of all tutorials, in paths from the first steps to production."),
+                    ),
+                    "tutorial-first-design" => (
+                        ph::GRADUATION_CAP,
+                        tr("Your First Design"),
+                        tr("Tutorial: draw a badge, add a border, play the sew-out and write the machine file."),
+                    ),
+                    "tutorial-to-machine" => (
+                        ph::GRADUATION_CAP,
+                        tr("To the Machine"),
+                        tr("Tutorial: your machine and hoop, the machine file on a USB stick, and the first sew-out."),
+                    ),
                     "tutorial-patch" => (
                         ph::GRADUATION_CAP,
                         tr("A Patch from a Picture"),

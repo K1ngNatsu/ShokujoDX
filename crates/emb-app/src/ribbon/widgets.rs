@@ -19,6 +19,10 @@ thread_local! {
     pub static PANELS_W: std::cell::Cell<f32> = const { std::cell::Cell::new(0.0) };
 }
 
+/// The start of the name of the place of a panel in `RECTS` (then its title).
+#[cfg(test)]
+pub const PANEL_KEY: &str = "panel: ";
+
 pub(super) fn note_rect(_label: &str, _rect: Rect) {
     #[cfg(test)]
     RECTS.with(|r| r.borrow_mut().push((_label.to_string(), _rect)));
@@ -446,7 +450,7 @@ pub(super) fn folded_panel(ui: &mut egui::Ui, st: &mut AppState, s: &SelInfo, p:
 }
 
 pub(super) fn panel(ui: &mut egui::Ui, st: &mut AppState, s: &SelInfo, p: &Panel) {
-    ui.vertical(|ui| {
+    let _shown = ui.vertical(|ui| {
         ui.spacing_mut().item_spacing = vec2(2.0, 2.0);
         let content = ui
             .horizontal_top(|ui| {
@@ -472,6 +476,9 @@ pub(super) fn panel(ui: &mut egui::Ui, st: &mut AppState, s: &SelInfo, p: &Panel
         let (r, _) = ui.allocate_exact_size(vec2(content.width().max(galley.size().x), TITLE_H), Sense::hover());
         ui.painter().galley(r.center() - galley.size() / 2.0, galley, color);
     });
+    // The place of the panel, for the pictures of the tutorials.
+    #[cfg(test)]
+    note_rect(&format!("{PANEL_KEY}{}", tr(p.title)), _shown.response.rect);
     // A line between the panels.
     let (r, _) = ui.allocate_exact_size(vec2(11.0, LARGE.y + TITLE_H), Sense::hover());
     let stroke = ui.visuals().widgets.noninteractive.bg_stroke;

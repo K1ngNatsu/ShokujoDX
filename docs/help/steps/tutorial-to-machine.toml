@@ -1,0 +1,36 @@
+# The steps of "Tutorial: from the computer to the machine"
+# (tutorial-to-machine.md). The test each_tutorial_runs_in_each_language
+# (crates/emb-app/src/tutorial_steps.rs) does them in each language;
+# write_tutorial_pictures makes the pictures. A change of a step needs the
+# same change in the topic and its translations.
+
+# Open the badge.
+[[step]]
+open = "first-badge"
+expect = { objects = 2, colors = 2, kinds = ["Fill", "Running"], threads = ["Gold", "Navy"], size = [65.0, 65.0] }
+
+# Set your machine and your hoop.
+[[step]]
+tab = "Design"
+expect = { shows = "Machine" }
+
+[[step]]
+picture = "to-machine-machine-hoop"
+area = "panel"
+panel = "Machine and Hoop"
+
+# Write the machine file.
+[[step]]
+command = "Design > Output > Send to USB"
+check_only = true
+
+[[step]]
+command = "Design > Output > Export"
+expect = { window = "Export machine file" }
+
+[[step]]
+picture = "to-machine-export"
+area = "windows"
+
+[[step]]
+button = "Cancel"

@@ -827,17 +827,22 @@ pub(super) const HELP: &[Panel] = &[
     Panel {
         title: "Tutorials",
         items: &[
+            Large(Cmd::HelpTopic(crate::help::TUTORIALS_ID)),
             Small(&[
+                Cmd::HelpTopic("tutorial-first-design"),
+                Cmd::HelpTopic("tutorial-to-machine"),
                 Cmd::HelpTopic("tutorial-patch"),
+            ]),
+            Small(&[
                 Cmd::HelpTopic("tutorial-lettering"),
                 Cmd::HelpTopic("tutorial-applique"),
+                Cmd::HelpTopic("tutorial-towel"),
             ]),
             Small(&[
-                Cmd::HelpTopic("tutorial-towel"),
                 Cmd::HelpTopic("tutorial-hooping"),
                 Cmd::HelpTopic("tutorial-lace"),
+                Cmd::HelpTopic("tutorial-output"),
             ]),
-            Small(&[Cmd::HelpTopic("tutorial-output")]),
         ],
     },
 ];

@@ -75,12 +75,12 @@ pub struct Picture {
 }
 
 impl Picture {
-    fn at(&self, x: usize, y: usize) -> [u8; 4] {
+    pub(crate) fn at(&self, x: usize, y: usize) -> [u8; 4] {
         self.pixels[y * self.width + x]
     }
 
     /// The part of the picture in `rect` (in pixels), cut at its edges.
-    fn crop(&self, rect: Rect) -> Picture {
+    pub(crate) fn crop(&self, rect: Rect) -> Picture {
         let x0 = (rect.min.x.floor().max(0.0) as usize).min(self.width);
         let y0 = (rect.min.y.floor().max(0.0) as usize).min(self.height);
         let x1 = (rect.max.x.ceil().max(0.0) as usize).clamp(x0, self.width);
@@ -96,7 +96,7 @@ impl Picture {
         }
     }
 
-    fn save(&self, path: &Path) -> Result<(), String> {
+    pub(crate) fn save(&self, path: &Path) -> Result<(), String> {
         let bytes: Vec<u8> = self.pixels.iter().flatten().copied().collect();
         let image = image::RgbaImage::from_raw(self.width as u32, self.height as u32, bytes)
             .ok_or("the picture has a wrong size")?;
@@ -317,22 +317,22 @@ fn texts(shapes: &[egui::epaint::ClippedShape]) -> Vec<Text> {
 }
 
 /// One frame as a picture, with what the checks need.
-struct Shot {
-    picture: Picture,
+pub(crate) struct Shot {
+    pub(crate) picture: Picture,
     texts: Vec<Text>,
     /// The windows and menus that show, in points.
-    windows: Vec<Rect>,
+    pub(crate) windows: Vec<Rect>,
 }
 
 /// An egui context with the fonts of the program and a painter. One
 /// studio draws all scenes of a language.
-struct Studio {
-    ctx: egui::Context,
+pub(crate) struct Studio {
+    pub(crate) ctx: egui::Context,
     painter: Painter,
 }
 
 impl Studio {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let ctx = egui::Context::default();
         crate::icons::install(&ctx);
         // No fade-in: a picture shows the window as it is at rest.
@@ -344,8 +344,13 @@ impl Studio {
     }
 
     fn frame(&mut self, app: &mut EmbApp, size: Vec2) -> egui::FullOutput {
+        self.frame_with(app, size, Vec::new())
+    }
+
+    fn frame_with(&mut self, app: &mut EmbApp, size: Vec2, events: Vec<egui::Event>) -> egui::FullOutput {
         let input = egui::RawInput {
             screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)),
+            events,
             ..Default::default()
         };
         let mut out = self.ctx.run_ui(input, |ui| app.draw(ui));
@@ -353,10 +358,18 @@ impl Studio {
         out
     }
 
+    /// One frame with the pointer and key `events`, as a user gives them
+    /// (the tutorial steps, `tutorial_steps.rs`).
+    pub(crate) fn input(&mut self, app: &mut EmbApp, size: Vec2, events: Vec<egui::Event>) -> egui::FullOutput {
+        let mut out = self.frame_with(app, size, events);
+        self.painter.free(&mut out.textures_delta);
+        out
+    }
+
     /// Draws frames until the windows have their sizes and the background
     /// work of the program is done (or a short time went by), and gives
     /// the picture of the last frame.
-    fn shot(&mut self, app: &mut EmbApp, size: Vec2) -> Shot {
+    pub(crate) fn shot(&mut self, app: &mut EmbApp, size: Vec2) -> Shot {
         let mut out = self.frame(app, size);
         for i in 0..40 {
             let wait = out
@@ -450,7 +463,7 @@ impl Scene {
 }
 
 /// The program with the sample design, as a user of `lang` sees it.
-fn base(lang: &str) -> AppState {
+pub(crate) fn base(lang: &str) -> AppState {
     let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
     st.start_on_machine("husqvarna_topaz20", None);
     st.add_sample_objects();

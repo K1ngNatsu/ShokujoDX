@@ -12,7 +12,8 @@ schreiben Sie eine Datei für Ihre Stickmaschine.
 
 Wenn Sticken neu für Sie ist, lesen Sie zuerst [Grundlagen des
 Stickens](embroidery-basics). Um durch Tun zu lernen, beginnen Sie mit
-[Anleitung: ein Aufnäher aus einem Bild](tutorial-patch).
+[Anleitung: Ihr erstes Design](tutorial-first-design), dann sehen Sie
+[Alle Anleitungen](tutorials).
 
 ## Die Startseite
 

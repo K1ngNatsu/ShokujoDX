@@ -1481,6 +1481,8 @@ impl AppState {
                 egui::Stroke::new(1.0, ui.visuals().weak_text_color())
             };
             p.rect_stroke(rect, 3.0, ring, egui::StrokeKind::Outside);
+            // The name of the thread for a screen reader (and the tutorial steps).
+            let resp = crate::a11y::named(resp, &t.name);
             let resp = resp.on_hover_text(if self.selection.is_empty() {
                 crate::i18n::fill("{}\nClick: use for new objects", &[&t.name])
             } else {

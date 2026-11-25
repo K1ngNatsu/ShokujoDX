@@ -436,6 +436,11 @@ pub(crate) mod tests {
         out.extend(crate::kiosk::PRODUCT_COLORS.iter().map(|(name, _)| *name));
         out.extend(crate::viewtools::PANELS.iter().map(|(_, name)| *name));
         out.extend(crate::library::LIST_COLUMNS.iter().map(|(name, _, _)| *name));
+        // The paths and levels of the tutorials, and the start designs (P19
+        // Part 2).
+        out.extend(crate::help::PATHS.iter().map(|(_, name)| *name));
+        out.extend(crate::help::LEVELS.iter().map(|(_, name)| *name));
+        out.extend(crate::samples::SAMPLES.iter().map(|(_, name)| *name));
         let mut out: BTreeSet<String> = out.into_iter().map(str::to_string).collect();
         // The fabrics of the program (`data/fabrics.toml`) and "no fabric".
         let base = emb_model::Fabric::base();

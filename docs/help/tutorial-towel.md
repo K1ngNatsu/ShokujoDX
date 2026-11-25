@@ -2,6 +2,10 @@
 id: tutorial-towel
 title: "Tutorial: a monogram on a towel"
 group: tutorials
+path: lettering
+time: 10
+level: practice
+before: tutorial-lettering
 keywords: tutorial, towel, terry, monogram, initials, laydown, topping, pile, fabric, gift, bath
 ---
 # Tutorial: a monogram on a towel

@@ -2,6 +2,10 @@
 id: tutorial-patch
 title: "Tutorial: a patch from a picture"
 group: tutorials
+path: artwork
+time: 15
+level: new
+before: tutorial-first-design
 keywords: tutorial, patch, logo, picture, png, jpeg, wizard, trace, backdrop, digitize, export, auto digitize, image
 ---
 # Tutorial: a patch from a picture
@@ -61,7 +65,7 @@ from a phone comes in upright.
 
 ## Write the machine file
 
-1. Click **File > Export machine file** (Ctrl+E). The format of your
+1. Click **File > Export Machine File** (Ctrl+E). The format of your
    machine is the default.
 2. Save the file, and copy it to a USB stick. Or use **Design > Send to
    USB**: it writes the file to the stick in one step.

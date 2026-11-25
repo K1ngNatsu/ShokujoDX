@@ -2,6 +2,10 @@
 id: tutorial-applique
 title: "Tutorial: an appliqué"
 group: tutorials
+path: decoration
+time: 15
+level: practice
+before: tutorial-first-design
 keywords: tutorial, appliqué, applique, fabric piece, placement, tack-down, cover, satin, stop, cut, cutter file, layers, combine, partial, from selection, back to original, border as cover
 ---
 # Tutorial: an appliqué

@@ -2,6 +2,10 @@
 id: tutorial-hooping
 title: "Tutorial: a design in two hoopings"
 group: tutorials
+path: production
+time: 20
+level: practice
+before: tutorial-to-machine
 keywords: tutorial, large, hoopings, multi hooping, split, auto layout, registration marks, banner, rehoop
 ---
 # Tutorial: a design in two hoopings

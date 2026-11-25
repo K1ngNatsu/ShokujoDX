@@ -2,6 +2,10 @@
 id: tutorial-lettering
 title: "Tutorial: a name on an arc"
 group: tutorials
+path: lettering
+time: 15
+level: new
+before: tutorial-first-design
 keywords: tutorial, lettering, text, name, font, arc, circle, baseline, size, height, larger, smaller, spacing, kerning, letter, monogram, kiosk, shop, towel, product
 ---
 # Tutorial: a name on an arc

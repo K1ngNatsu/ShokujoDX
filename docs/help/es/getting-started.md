@@ -12,7 +12,8 @@ un archivo para su máquina de bordar.
 
 Si el bordado es nuevo para usted, lea primero [Conceptos básicos del
 bordado](embroidery-basics). Para aprender haciendo, empiece con
-[Tutorial: un parche a partir de una imagen](tutorial-patch).
+[Tutorial: su primer diseño](tutorial-first-design) y después vea
+[Todos los tutoriales](tutorials).
 
 ## La página de inicio
 

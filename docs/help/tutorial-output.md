@@ -2,6 +2,10 @@
 id: tutorial-output
 title: "Tutorial: production output"
 group: tutorials
+path: production
+time: 15
+level: practice
+before: tutorial-to-machine
 keywords: tutorial, output, worksheet, print, pdf, export, usb, machine file, picture, approval, queue, send
 ---
 # Tutorial: production output

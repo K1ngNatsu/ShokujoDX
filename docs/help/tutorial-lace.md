@@ -2,6 +2,10 @@
 id: tutorial-lace
 title: "Tutorial: a lace ornament"
 group: tutorials
+path: decoration
+time: 15
+level: practice
+before: tutorial-first-design
 keywords: tutorial, lace, free-standing lace, fsl, ornament, water-soluble, stabilizer, mesh, loose part, christmas
 ---
 # Tutorial: a lace ornament

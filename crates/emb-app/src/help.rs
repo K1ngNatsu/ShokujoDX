@@ -10,7 +10,17 @@
 //!   they always agree with the program.
 //! - The Markdown is a small part of Markdown: headings (`#`, `##`, `###`),
 //!   paragraphs, lists (`-` and `1.`), tables (`| a | b |`, the first row
-//!   is the head), `**bold**`, `` `code` `` and links `[text](topic-id)`.
+//!   is the head), `**bold**`, `` `code` ``, links `[text](topic-id)`, and
+//!   pictures `![text](name)` on a line of their own (P19 Part 2: the
+//!   files `docs/help/pictures/<code>/<name>.png` of the language, else
+//!   `docs/help/pictures/<name>.png`, which has no text; [`HELP_PICTURES`]).
+//!   A link `[text](sample:<name>)` opens a start design (`samples`).
+//! - A tutorial has a path (`path`: one of [`PATHS`]), a time in minutes
+//!   (`time`), a level (`level`: new, practice, advanced) and the tutorial
+//!   before it (`before`) in its head. The Help window shows a card with
+//!   them, the contents list the tutorials by path, and the topic
+//!   [`TUTORIALS_ID`] is made from them. The translations take them from
+//!   the English topic.
 //! - The search answers questions from the help text, with no network: it
 //!   ranks the sections (BM25) by the words of the question, with the
 //!   question words left out, each word reduced to its stem, and words of
@@ -38,6 +48,8 @@ const FILES: &[&str] = &[
     include_str!("../../../docs/help/embroidery-basics.md"),
     include_str!("../../../docs/help/troubleshooting.md"),
     include_str!("../../../docs/help/whats-new.md"),
+    include_str!("../../../docs/help/tutorial-first-design.md"),
+    include_str!("../../../docs/help/tutorial-to-machine.md"),
     include_str!("../../../docs/help/tutorial-patch.md"),
     include_str!("../../../docs/help/tutorial-lettering.md"),
     include_str!("../../../docs/help/tutorial-applique.md"),
@@ -78,8 +90,55 @@ const FILES: &[&str] = &[
 ];
 
 // The translated topics: `HELP_TRANSLATIONS`, made by `build.rs` from the
-// folders `docs/help/<code>/` (ADR 0084).
+// folders `docs/help/<code>/` (ADR 0084), and the pictures of the help:
+// `HELP_PICTURES` (language code, "" for a picture with no text; name;
+// PNG bytes), from `docs/help/pictures`.
 include!(concat!(env!("OUT_DIR"), "/help_translations.rs"));
+
+/// The id of the topic with all tutorials by path (made from the tutorials).
+pub const TUTORIALS_ID: &str = "tutorials";
+
+/// The paths of the tutorials, in order: the id in the head of a tutorial
+/// and the name (P19 Part 2).
+pub const PATHS: &[(&str, &str)] = &[
+    ("first-steps", "First steps"),
+    ("drawing", "Drawing by hand"),
+    ("lettering", "Lettering"),
+    ("artwork", "Pictures and artwork"),
+    ("decoration", "Decoration and specialty"),
+    ("production", "Production"),
+    ("more", "More"),
+];
+
+/// The levels of the tutorials: the id in the head of a tutorial and the
+/// name.
+pub const LEVELS: &[(&str, &str)] = &[
+    ("new", "New user"),
+    ("practice", "Some practice"),
+    ("advanced", "Advanced"),
+];
+
+/// The name of the path `id` in the language of the program.
+pub fn path_name(id: &str) -> &'static str {
+    PATHS.iter().find(|(p, _)| *p == id).map_or("", |(_, name)| tr(name))
+}
+
+fn level_name(id: &str) -> &'static str {
+    LEVELS.iter().find(|(l, _)| *l == id).map_or("", |(_, name)| tr(name))
+}
+
+/// The PNG bytes of the help picture `name` in the language `code`: the
+/// picture of that language, else the picture with no text, else the
+/// English picture.
+pub fn picture_bytes(name: &str, code: &str) -> Option<&'static [u8]> {
+    let find = |lang: &str| {
+        HELP_PICTURES
+            .iter()
+            .find(|(l, n, _)| *l == lang && *n == name)
+            .map(|(_, _, b)| *b)
+    };
+    find(code).or_else(|| find("")).or_else(|| find("en"))
+}
 
 /// The part of the contents that a topic is in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -209,6 +268,21 @@ pub struct Topic {
     pub keywords: Vec<String>,
     /// Markdown.
     pub body: String,
+    /// The card of a tutorial (empty for other topics).
+    pub card: Card,
+}
+
+/// What the head of a tutorial says about it (P19 Part 2).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Card {
+    /// The id of its path ([`PATHS`]).
+    pub path: Option<String>,
+    /// About this many minutes.
+    pub minutes: Option<u32>,
+    /// The id of its level ([`LEVELS`]).
+    pub level: Option<String>,
+    /// The tutorial to do before it.
+    pub before: Option<String>,
 }
 
 /// Reads a help file: the head and the Markdown body.
@@ -238,6 +312,12 @@ pub fn parse_topic(text: &str) -> Option<Topic> {
             })
             .unwrap_or_default(),
         body: body.trim().to_string(),
+        card: Card {
+            path: fields.get("path").map(|s| s.to_string()),
+            minutes: fields.get("time").and_then(|s| s.parse().ok()),
+            level: fields.get("level").map(|s| s.to_string()),
+            before: fields.get("before").map(|s| s.to_string()),
+        },
     })
 }
 
@@ -320,6 +400,7 @@ fn ribbon_topic(tab: RibbonTab, ctx: &egui::Context) -> Topic {
         group: Group::Ribbon,
         keywords: vec![tab.label().to_lowercase(), "ribbon".into(), "tab".into()],
         body,
+        card: Card::default(),
     }
 }
 
@@ -371,14 +452,75 @@ fn keyboard_topic(ctx: &egui::Context) -> Topic {
         group: Group::Reference,
         keywords: vec!["keyboard".into(), "shortcut".into(), "key".into(), "hotkey".into()],
         body,
+        card: Card::default(),
     }
+}
+
+/// The tutorials of a path, in the order of the contents.
+pub fn path_tutorials<'a>(topics: &'a [Topic], path: &str) -> Vec<&'a Topic> {
+    topics
+        .iter()
+        .filter(|t| t.group == Group::Tutorials && t.card.path.as_deref() == Some(path))
+        .collect()
+}
+
+/// The topic with all tutorials by path, made from the tutorials (in the
+/// language of `topics`).
+fn tutorials_topic(topics: &[Topic]) -> Topic {
+    let mut body = format!(
+        "# {}\n\n{}\n",
+        tr("Tutorials"),
+        tr(
+            "Each tutorial makes one thing, step by step, from a start design that it opens. Start with the first path; each tutorial says which one comes before it."
+        )
+    );
+    for (path, _) in PATHS {
+        let list = path_tutorials(topics, path);
+        if list.is_empty() {
+            continue;
+        }
+        body.push_str(&format!("\n## {}\n\n", path_name(path)));
+        for t in list {
+            let mut about = Vec::new();
+            if let Some(m) = t.card.minutes {
+                about.push(crate::i18n::fill("{} min", &[&m]).to_string());
+            }
+            if let Some(l) = &t.card.level {
+                about.push(level_name(l).to_string());
+            }
+            body.push_str(&format!("- [{}]({}): {}\n", t.title, t.id, about.join(", ")));
+        }
+    }
+    Topic {
+        id: TUTORIALS_ID.into(),
+        title: tr("All tutorials").into(),
+        group: Group::Tutorials,
+        keywords: vec![
+            "tutorial".into(),
+            "lesson".into(),
+            "learn".into(),
+            "path".into(),
+            "course".into(),
+        ],
+        body,
+        card: Card::default(),
+    }
+}
+
+/// The topics of the files, in the language `code` where a translation
+/// exists (English with "en").
+pub fn file_topics(code: &str) -> Vec<Topic> {
+    let mut v: Vec<Topic> = FILES.iter().filter_map(|f| parse_topic(f)).collect();
+    translate_topics(&mut v, code);
+    v
 }
 
 /// All topics: the files (in the language of the program where a
 /// translation exists), the ribbon tabs and the keyboard.
 pub fn all_topics(ctx: &egui::Context) -> Vec<Topic> {
-    let mut v: Vec<Topic> = FILES.iter().filter_map(|f| parse_topic(f)).collect();
-    translate_topics(&mut v, crate::i18n::current());
+    let mut v = file_topics(crate::i18n::current());
+    let all = tutorials_topic(&v);
+    v.insert(0, all);
     v.extend(RibbonTab::ALL.iter().map(|t| ribbon_topic(*t, ctx)));
     v.push(keyboard_topic(ctx));
     v
@@ -386,8 +528,8 @@ pub fn all_topics(ctx: &egui::Context) -> Vec<Topic> {
 
 /// The topics of `topics` that have a translation in the language `code`
 /// (ADR 0084) get its title, its body and its keywords; the English
-/// keywords stay too, so an English word still finds the topic. The id and
-/// the group stay.
+/// keywords stay too, so an English word still finds the topic. The id,
+/// the group and the card stay.
 fn translate_topics(topics: &mut [Topic], code: &str) {
     for (lang, _, text) in HELP_TRANSLATIONS {
         if *lang != code {
@@ -411,10 +553,20 @@ fn translate_topics(topics: &mut [Topic], code: &str) {
 pub enum Block {
     Heading(u8, String),
     Para(String),
-    /// A list: numbered or not, and its items.
-    List(bool, Vec<String>),
+    /// A list: the number of its first item (`None`: not numbered), and
+    /// its items. A numbered list after a picture goes on with its number.
+    List(Option<u32>, Vec<String>),
     /// A table: the rows of cells; the first row is the head.
     Table(Vec<Vec<String>>),
+    /// A picture: its text (for a reader) and its name (`![text](name)`).
+    Picture(String, String),
+}
+
+/// The text and the name of a picture line (`![text](name)`).
+fn picture_line(t: &str) -> Option<(String, String)> {
+    let r = t.strip_prefix("![")?.strip_suffix(')')?;
+    let (text, name) = r.split_once("](")?;
+    (!name.is_empty() && !name.contains(char::is_whitespace)).then(|| (text.to_string(), name.to_string()))
 }
 
 /// The cells of a table row (`| a | b |`); `None` for the line under the
@@ -433,9 +585,9 @@ fn table_row(t: &str) -> Option<Vec<String>> {
 pub fn blocks(md: &str) -> Vec<Block> {
     let mut out: Vec<Block> = Vec::new();
     let mut para: Option<String> = None;
-    let mut list: Option<(bool, Vec<String>)> = None;
+    let mut list: Option<(Option<u32>, Vec<String>)> = None;
     let mut table: Vec<Vec<String>> = Vec::new();
-    let flush = |out: &mut Vec<Block>, para: &mut Option<String>, list: &mut Option<(bool, Vec<String>)>| {
+    let flush = |out: &mut Vec<Block>, para: &mut Option<String>, list: &mut Option<(Option<u32>, Vec<String>)>| {
         if let Some(p) = para.take() {
             out.push(Block::Para(p));
         }
@@ -457,6 +609,11 @@ pub fn blocks(md: &str) -> Vec<Block> {
             flush(&mut out, &mut para, &mut list);
             continue;
         }
+        if let Some((text, name)) = picture_line(t) {
+            flush(&mut out, &mut para, &mut list);
+            out.push(Block::Picture(text, name));
+            continue;
+        }
         let hashes = t.chars().take_while(|c| *c == '#').count();
         if (1..=3).contains(&hashes) && t[hashes..].starts_with(' ') {
             flush(&mut out, &mut para, &mut list);
@@ -465,18 +622,19 @@ pub fn blocks(md: &str) -> Vec<Block> {
         }
         let numbered = t
             .split_once(". ")
-            .filter(|(n, _)| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()));
+            .filter(|(n, _)| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()))
+            .and_then(|(n, r)| Some((n.parse::<u32>().ok()?, r)));
         let item = t
             .strip_prefix("- ")
-            .map(|r| (false, r))
-            .or(numbered.map(|(_, r)| (true, r)));
+            .map(|r| (None, r))
+            .or(numbered.map(|(n, r)| (Some(n), r)));
         match item {
             Some((n, text)) => {
                 if let Some(p) = para.take() {
                     out.push(Block::Para(p));
                 }
                 match &mut list {
-                    Some((m, items)) if *m == n => items.push(text.to_string()),
+                    Some((m, items)) if m.is_some() == n.is_some() => items.push(text.to_string()),
                     _ => {
                         if let Some((m, items)) = list.take() {
                             out.push(Block::List(m, items));
@@ -756,6 +914,8 @@ impl Index {
                     }
                     Block::Para(p) => cur.passages.push(plain(&p)),
                     Block::List(_, items) => cur.passages.extend(items.iter().map(|i| plain(i))),
+                    // A picture shows what the text says.
+                    Block::Picture(..) => {}
                     // Each row is a passage: "head: cell; head: cell".
                     Block::Table(rows) => {
                         let head = rows.first().cloned().unwrap_or_default();
@@ -1008,7 +1168,67 @@ fn show_spans(ui: &mut egui::Ui, text: &str, strong: bool) -> Option<String> {
 }
 
 /// Shows a topic. Returns a link that was clicked.
-fn show_topic(ui: &mut egui::Ui, topic: &Topic, find: Option<&str>, scrolled: &mut bool) -> Option<String> {
+/// The texture of the help picture `name` in the language of the program,
+/// made one time (`None`: no such picture).
+fn picture_texture(ctx: &egui::Context, name: &str) -> Option<egui::TextureHandle> {
+    let lang = crate::i18n::current();
+    let id = egui::Id::new(("help picture", lang, name));
+    if let Some(t) = ctx.data(|d| d.get_temp::<Option<egui::TextureHandle>>(id)) {
+        return t;
+    }
+    let made = picture_bytes(name, lang)
+        .and_then(|bytes| image::load_from_memory(bytes).ok())
+        .map(|img| {
+            let rgba = img.to_rgba8();
+            let size = [rgba.width() as usize, rgba.height() as usize];
+            let image = egui::ColorImage::from_rgba_unmultiplied(size, rgba.as_raw());
+            ctx.load_texture(format!("help {name}"), image, egui::TextureOptions::LINEAR)
+        });
+    ctx.data_mut(|d| d.insert_temp(id, made.clone()));
+    made
+}
+
+/// The card of a tutorial: its time, its level, its path and the tutorial
+/// before it (a link). Returns a link that was clicked.
+fn show_card(ui: &mut egui::Ui, card: &Card, all: &[Topic]) -> Option<String> {
+    let mut link = None;
+    egui::Frame::group(ui.style()).show(ui, |ui| {
+        ui.horizontal_wrapped(|ui| {
+            if let Some(m) = card.minutes {
+                ui.label(crate::i18n::fill("About {} minutes", &[&m]));
+                ui.weak("·");
+            }
+            if let Some(l) = &card.level {
+                ui.label(level_name(l));
+                ui.weak("·");
+            }
+            if let Some(p) = &card.path {
+                ui.label(crate::i18n::fill("Path: {}", &[&path_name(p)]));
+            }
+        });
+        if let Some(before) = &card.before
+            && let Some(t) = all.iter().find(|t| t.id == *before)
+        {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(tr("Do this tutorial first:"));
+                if ui.link(&t.title).clicked() {
+                    link = Some(t.id.clone());
+                }
+            });
+        }
+    });
+    link
+}
+
+/// Shows a topic. Returns a link that was clicked. `all` are the topics
+/// (the titles of the links of a card).
+fn show_topic(
+    ui: &mut egui::Ui,
+    topic: &Topic,
+    all: &[Topic],
+    find: Option<&str>,
+    scrolled: &mut bool,
+) -> Option<String> {
     let mut link = None;
     let find = find.map(str::to_lowercase);
     let mut marked = false;
@@ -1017,6 +1237,7 @@ fn show_topic(ui: &mut egui::Ui, topic: &Topic, find: Option<&str>, scrolled: &m
             Block::Heading(_, t) | Block::Para(t) => plain(t),
             Block::List(_, items) => items.iter().map(|i| plain(i)).collect::<Vec<_>>().join(" "),
             Block::Table(rows) => rows.iter().flatten().map(|c| plain(c)).collect::<Vec<_>>().join(" "),
+            Block::Picture(text, _) => text.clone(),
         };
         let mark = !marked && find.as_ref().is_some_and(|f| text.to_lowercase().contains(f.as_str()));
         let mut draw = |ui: &mut egui::Ui| match &b {
@@ -1028,12 +1249,28 @@ fn show_topic(ui: &mut egui::Ui, topic: &Topic, find: Option<&str>, scrolled: &m
                     _ => 14.0,
                 };
                 ui.label(RichText::new(plain(t)).size(size).strong());
+                if *level == 1 && topic.card != Card::default() {
+                    ui.add_space(4.0);
+                    if let Some(l) = show_card(ui, &topic.card, all) {
+                        link = Some(l);
+                    }
+                }
             }
             Block::Para(t) => {
                 if let Some(l) = show_spans(ui, t, false) {
                     link = Some(l);
                 }
             }
+            Block::Picture(text, name) => match picture_texture(ui.ctx(), name) {
+                Some(tex) => {
+                    let size = tex.size_vec2();
+                    let scale = (ui.available_width() / size.x).min(1.0);
+                    ui.add(egui::Image::new((tex.id(), size * scale)).alt_text(text.as_str()));
+                }
+                None => {
+                    ui.weak(crate::i18n::fill("(The picture \"{}\" is not there.)", &[&text]));
+                }
+            },
             Block::List(numbered, items) => {
                 for (k, item) in items.iter().enumerate() {
                     // In a long list, mark only the item with the text.
@@ -1044,7 +1281,10 @@ fn show_topic(ui: &mut egui::Ui, topic: &Topic, find: Option<&str>, scrolled: &m
                             .is_some_and(|f| plain(item).to_lowercase().contains(f.as_str()));
                     let mut row = |ui: &mut egui::Ui| {
                         ui.horizontal_top(|ui| {
-                            let bullet = if *numbered { format!("{}.", k + 1) } else { "•".into() };
+                            let bullet = match numbered {
+                                Some(first) => format!("{}.", *first as usize + k),
+                                None => "•".into(),
+                            };
                             ui.add_sized([18.0, 14.0], egui::Label::new(bullet));
                             if let Some(l) = show_spans(ui, item, false) {
                                 link = Some(l);
@@ -1160,10 +1400,29 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                     egui::ScrollArea::vertical().show(ui, |ui| {
                         for g in Group::ALL {
                             ui.label(RichText::new(g.label()).strong());
-                            for t in h.topics.iter().filter(|t| t.group == g) {
+                            let mut entry = |ui: &mut egui::Ui, t: &Topic| {
                                 let on = h.results.is_none() && t.id == h.current;
                                 if ui.selectable_label(on, &t.title).clicked() {
                                     go = Some((t.id.clone(), None));
+                                }
+                            };
+                            if g == Group::Tutorials {
+                                // All tutorials, then each path with its tutorials.
+                                for t in h.topics.iter().filter(|t| t.id == TUTORIALS_ID) {
+                                    entry(ui, t);
+                                }
+                                for (path, _) in PATHS {
+                                    let list = path_tutorials(&h.topics, path);
+                                    if !list.is_empty() {
+                                        ui.weak(path_name(path));
+                                        for t in list {
+                                            entry(ui, t);
+                                        }
+                                    }
+                                }
+                            } else {
+                                for t in h.topics.iter().filter(|t| t.group == g) {
+                                    entry(ui, t);
                                 }
                             }
                             ui.add_space(6.0);
@@ -1203,7 +1462,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                     }
                     None => {
                         if let Some(topic) = h.topics.iter().find(|t| t.id == h.current)
-                            && let Some(id) = show_topic(ui, topic, h.find.as_deref(), &mut h.scrolled)
+                            && let Some(id) = show_topic(ui, topic, &h.topics, h.find.as_deref(), &mut h.scrolled)
                         {
                             go = Some((id, None));
                         }
@@ -1211,7 +1470,11 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                 });
         });
     if let Some((id, find)) = go {
-        st.help.go(&id, find);
+        match id.strip_prefix(crate::samples::LINK) {
+            // A start design opens; the help stays.
+            Some(name) => st.open_sample(name),
+            None => st.help.go(&id, find),
+        }
     }
     if !open {
         st.help.open = false;
@@ -1243,7 +1506,7 @@ mod tests {
         let all = topics();
         assert_eq!(
             all.iter()
-                .filter(|t| t.group != Group::Ribbon && t.id != KEYBOARD_ID)
+                .filter(|t| t.group != Group::Ribbon && t.id != KEYBOARD_ID && t.id != TUTORIALS_ID)
                 .count(),
             FILES.len()
         );
@@ -1256,11 +1519,19 @@ mod tests {
                     Block::Heading(_, s) | Block::Para(s) => vec![s],
                     Block::List(_, items) => items,
                     Block::Table(rows) => rows.into_iter().flatten().collect(),
+                    Block::Picture(..) => Vec::new(),
                 };
                 for s in texts {
                     for sp in spans(&s) {
                         if let Span::Link(_, id) = sp {
-                            assert!(ids.contains(id.as_str()), "{}: a link to {id}", t.id);
+                            match id.strip_prefix(crate::samples::LINK) {
+                                Some(name) => assert!(
+                                    crate::samples::design(name).is_some(),
+                                    "{}: no start design {name}",
+                                    t.id
+                                ),
+                                None => assert!(ids.contains(id.as_str()), "{}: a link to {id}", t.id),
+                            }
                         }
                     }
                 }
@@ -1293,7 +1564,7 @@ mod tests {
                     out.extend(marks(&p));
                 }
                 Block::List(numbered, items) => {
-                    out.push(format!("list {numbered} {}", items.len()));
+                    out.push(format!("list {numbered:?} {}", items.len()));
                     for i in &items {
                         out.extend(marks(i));
                     }
@@ -1307,9 +1578,84 @@ mod tests {
                         }
                     }
                 }
+                Block::Picture(_, name) => out.push(format!("picture {name}")),
             }
         }
         out
+    }
+
+    /// Each picture of a topic is there in the language of the topic, or
+    /// with no text (P19 Part 2). Each picture that is built in is in a
+    /// topic and reads.
+    #[test]
+    fn each_picture_of_a_topic_is_there() {
+        let english = FILES.iter().filter_map(|f| parse_topic(f)).map(|t| ("en", t));
+        let translated = HELP_TRANSLATIONS
+            .iter()
+            .filter_map(|(code, _, text)| parse_topic(text).map(|t| (*code, t)));
+        for (code, t) in english.chain(translated) {
+            for b in blocks(&t.body) {
+                if let Block::Picture(text, name) = b {
+                    assert!(!text.is_empty(), "{code}/{}: the picture {name} has no text", t.id);
+                    assert!(
+                        HELP_PICTURES
+                            .iter()
+                            .any(|(l, n, _)| *n == name && (*l == code || l.is_empty())),
+                        "{code}/{}: no picture {name} (docs/help/pictures)",
+                        t.id
+                    );
+                }
+            }
+        }
+        for (l, n, bytes) in HELP_PICTURES {
+            assert!(image::load_from_memory(bytes).is_ok(), "{l}/{n} does not read");
+            let used = FILES
+                .iter()
+                .copied()
+                .chain(HELP_TRANSLATIONS.iter().map(|(_, _, text)| *text))
+                .any(|f| f.contains(&format!("]({n})")));
+            assert!(used, "the picture {l}/{n} is in no topic");
+        }
+    }
+
+    /// Each tutorial has a path, a time and a level; the tutorial before it
+    /// is a tutorial; the topic of all tutorials lists each one (P19 Part 2).
+    #[test]
+    fn each_tutorial_has_a_card_and_is_in_its_path() {
+        let all = topics();
+        let paths: Vec<&str> = PATHS.iter().map(|(p, _)| *p).collect();
+        let index = all
+            .iter()
+            .find(|t| t.id == TUTORIALS_ID)
+            .expect("the topic of all tutorials");
+        for t in all
+            .iter()
+            .filter(|t| t.group == Group::Tutorials && t.id != TUTORIALS_ID)
+        {
+            let c = &t.card;
+            assert!(c.path.as_deref().is_some_and(|p| paths.contains(&p)), "{}: path", t.id);
+            assert!(c.minutes.is_some_and(|m| (5..=60).contains(&m)), "{}: time", t.id);
+            assert!(
+                c.level
+                    .as_deref()
+                    .is_some_and(|l| LEVELS.iter().any(|(id, _)| *id == l)),
+                "{}: level",
+                t.id
+            );
+            if let Some(b) = &c.before {
+                assert!(
+                    all.iter().any(|x| x.id == *b && x.group == Group::Tutorials),
+                    "{}: before {b}",
+                    t.id
+                );
+            }
+            assert!(
+                index.body.contains(&format!("]({})", t.id)),
+                "{} is not in {TUTORIALS_ID}",
+                t.id
+            );
+        }
+        assert!(!path_tutorials(&all, "first-steps").is_empty());
     }
 
     /// Each translated topic (ADR 0084) is a topic of the program, in the
@@ -1461,14 +1807,17 @@ mod tests {
 
     #[test]
     fn markdown_blocks_and_spans() {
-        let md = "# Title\n\nOne line\nand more.\n\n- A **bold** item\n  goes on\n- [Link](x)\n\n1. First\n2. Second\n";
+        let md = "# Title\n\nOne line\nand more.\n\n- A **bold** item\n  goes on\n- [Link](x)\n\n1. First\n2. Second\n![The badge](badge)\n3. Third\n\n![not a picture]( x y)\n";
         assert_eq!(
             blocks(md),
             vec![
                 Block::Heading(1, "Title".into()),
                 Block::Para("One line and more.".into()),
-                Block::List(false, vec!["A **bold** item goes on".into(), "[Link](x)".into()]),
-                Block::List(true, vec!["First".into(), "Second".into()]),
+                Block::List(None, vec!["A **bold** item goes on".into(), "[Link](x)".into()]),
+                Block::List(Some(1), vec!["First".into(), "Second".into()]),
+                Block::Picture("The badge".into(), "badge".into()),
+                Block::List(Some(3), vec!["Third".into()]),
+                Block::Para("![not a picture]( x y)".into()),
             ]
         );
         assert_eq!(
@@ -1660,6 +2009,7 @@ mod tests {
             group: Group::Reference,
             keywords: vec![],
             body: md.into(),
+            card: Card::default(),
         };
         let index = Index::new(&[t]);
         assert!(index.sections[0].passages.contains(&"DST; Read: yes".to_string()));

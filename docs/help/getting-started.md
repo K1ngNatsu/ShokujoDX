@@ -11,8 +11,8 @@ lettering or start from a picture, and the program makes the stitches.
 Then you write a file for your embroidery machine.
 
 If embroidery is new to you, read [Embroidery basics](embroidery-basics)
-first. To learn by doing, start with [Tutorial: a patch from a
-picture](tutorial-patch).
+first. To learn by doing, start with [Tutorial: your first
+design](tutorial-first-design), then see [All tutorials](tutorials).
 
 ## The start page
 

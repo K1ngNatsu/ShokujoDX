@@ -406,8 +406,8 @@ fn the_numbers_in_the_readme_are_the_numbers_of_the_program() {
         .flatten()
         .filter(|e| e.file_name().to_string_lossy().starts_with("tutorial-"))
         .count();
-    assert_eq!(tutorials, 7, "the README says seven tutorials");
-    has("seven step-by-step tutorials".into());
+    assert_eq!(tutorials, 9, "the README says nine tutorials");
+    has("nine step-by-step tutorials".into());
     // The formats table: the formats to write, eight more by name, and the
     // number of the others.
     let (read_n, write) = (emb_formats::READ_EXTENSIONS.len(), emb_formats::WRITE_EXTENSIONS);

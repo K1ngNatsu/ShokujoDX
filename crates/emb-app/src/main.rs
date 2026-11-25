@@ -91,6 +91,7 @@ mod repeats;
 mod reshape;
 mod resources;
 mod ribbon;
+mod samples;
 mod scripts;
 mod selection;
 mod send;
@@ -114,6 +115,8 @@ mod test_util;
 mod threads;
 mod tilt;
 mod turntable;
+#[cfg(test)]
+mod tutorial_steps;
 mod update;
 mod vectors;
 mod view_bench;

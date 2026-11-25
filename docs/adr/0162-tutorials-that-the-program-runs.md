@@ -1,0 +1,92 @@
+# ADR 0162: Tutorials that the program runs
+
+Date: 2026-11-24 · Status: Accepted (the owner: "Begin M1 as drafted",
+Milestone 1 of Part 2 of `docs/design/p19-plan.md`).
+
+## Context
+
+The program had seven tutorials in four languages. They were text only:
+each started from nothing, and no test checked them. A tutorial went
+wrong with no sign when a command got a new name or went to another
+panel. The first check of the places in the tutorials found one such
+place (**File > Export machine file**: the menu item is **Export Machine
+File…**).
+
+The owner wants many more tutorials (the draft has 31), each in four
+languages, with pictures. A person cannot check 31 tutorials in four
+languages by hand after each change of the program.
+
+## Decision
+
+1. **The card of a tutorial.** The head of a tutorial has its path
+   (`path`, one of `help::PATHS`), its time in minutes (`time`), its
+   level (`level`, one of `help::LEVELS`) and the tutorial to do before
+   it (`before`). The translations take them from the English topic. The
+   Help window shows them as a card under the title, the contents list
+   the tutorials by path, and the topic `help::TUTORIALS_ID` ("All
+   tutorials") is made from them.
+2. **Pictures in the help.** A line `![text](name)` is a picture
+   (`Block::Picture`). The file is `docs/help/pictures/<code>/<name>.png`
+   (a picture with text: one for each language) or
+   `docs/help/pictures/<name>.png` (a picture of the canvas: no text, one
+   file). `build.rs` puts them in the program (`HELP_PICTURES`);
+   `help::picture_bytes` takes the picture of the language, else the one
+   with no text, else the English one. A numbered list after a picture
+   goes on with its number (`Block::List` keeps the number of its first
+   item), so a picture can show between two steps.
+3. **Start designs from the program.** A link `[text](sample:<name>)`
+   opens a start design that the program makes in code
+   (`emb-app/src/samples.rs`), in a new tab, on the machine and in the
+   hoop of the design of now. Nothing goes in the folders of the user
+   (ADR 0080).
+4. **A step file for each tutorial.** `docs/help/steps/<id>.toml` has
+   the steps of the tutorial: open a start design, click a tab, click a
+   command by its place (`Digitize > Shapes > Ellipse`), click a thread
+   color, drag or click on the canvas (mm), push a key, click a button
+   of a window by its English text, close a window, check the design
+   (objects, kinds, threads, colors, stitches, size, selection, a window
+   that shows, a command that is on), and make a picture (of the canvas
+   round a part of the design, of the open windows, or of a ribbon
+   panel). The runner (`emb-app/src/tutorial_steps.rs`, test code) does
+   them in the whole program with pointer and key events, through the
+   studio of the window pictures (ADR 0110). It finds each name in the
+   language of the run with `tr`, so one step file is for all languages.
+   A command that opens a window of the system (a file or a folder) is
+   only checked (`check_only`).
+   - `each_tutorial_runs_in_each_language` (a normal test, in CI) does
+     each step file in English, German, Spanish and Japanese, and checks
+     that the steps make the pictures that the topic shows. A changed
+     name of a command makes it fail.
+   - `write_tutorial_pictures` (ignored, release) writes the pictures.
+   - The runner uses a screen of 3840 × 1600 points, so no panel of the
+     ribbon folds (a folded panel stays open as a menu, and it showed in
+     the pictures of windows). It can still open a folded panel.
+5. **A quick check of all tutorials.** Each bold place with " > " in a
+   tutorial, in each language, is `Tab > Panel`, `Tab > Command`, `Tab >
+   Panel > Command` or `File > Item` of the program
+   (`the_places_in_the_tutorials_are_in_the_program`).
+6. **The first path.** The tutorials "Your first design" and "From the
+   computer to the machine" are the path "First steps". The Learn part
+   of the start page shows them and "All tutorials"; the Help tab has
+   **All Tutorials**.
+7. **The size of the pictures.** The pictures of Milestone 1 are 15
+   files, 0.8 MB. Each milestone measures them; if all pictures go over
+   10 MB, they go to a help package (open question 1 of the draft).
+
+The thread colors of the Threads strip now have screen reader names (the
+names of the threads): the runner clicks them by name, and a screen
+reader says them.
+
+## Consequences
+
+- A change of the name or the place of a command, of the text of a
+  button, or of what a step does makes a test fail. Change the topic,
+  its translations and the step file together, then make the pictures
+  again (`cargo test --release -p emb-app -- --ignored
+  write_tutorial_pictures`) and look at them.
+- A new tutorial needs: the topic with its card (and `help::FILES`), its
+  translations, its step file, its pictures, and a start design if it
+  needs one. The lessons (Milestone 6 of Part 2) can do the same step
+  files in the program.
+- The pictures of the canvas show the thread look of the quality Fast,
+  as the tests of the app have no surface (ADR 0126).

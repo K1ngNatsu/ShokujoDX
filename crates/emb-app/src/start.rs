@@ -3,8 +3,9 @@
 //!
 //! - Start: New design, New from template, Open, Picture to design, the
 //!   design library.
-//! - Learn: the tutorials, the help, the keyboard shortcuts, and a box for
-//!   a question (the help search answers it).
+//! - Learn: the first path of the tutorials and the list of all tutorials,
+//!   the help, the keyboard shortcuts, and a box for a question (the help
+//!   search answers it).
 //! - The recent designs of the user, with a picture of each. A thread makes
 //!   the pictures, so the page shows at once. A new user starts with a
 //!   clean slate: the program has no sample designs (ADR 0080).
@@ -249,17 +250,19 @@ pub fn page(ui: &mut egui::Ui, st: &mut AppState) {
                     }
                     ui.add_space(12.0);
                     ui.label(RichText::new(tr("Learn")).size(16.0).strong());
+                    // The first path of the tutorials, and all paths (P19
+                    // Part 2).
                     for id in [
                         "getting-started",
-                        "tutorial-patch",
-                        "tutorial-lettering",
-                        "tutorial-output",
+                        "tutorial-first-design",
+                        "tutorial-to-machine",
+                        crate::help::TUTORIALS_ID,
                     ] {
                         let title = match id {
                             "getting-started" => tr("Getting started"),
-                            "tutorial-patch" => tr("Tutorial: a patch from a picture"),
-                            "tutorial-lettering" => tr("Tutorial: a name on an arc"),
-                            _ => tr("Tutorial: production output"),
+                            "tutorial-first-design" => tr("Tutorial: your first design"),
+                            "tutorial-to-machine" => tr("Tutorial: from the computer to the machine"),
+                            _ => tr("All tutorials"),
                         };
                         if ui.link(title).clicked() {
                             st.open_help(id, None);
