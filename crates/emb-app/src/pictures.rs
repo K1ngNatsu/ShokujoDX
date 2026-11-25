@@ -587,6 +587,15 @@ fn scenes() -> Vec<Scene> {
         }
         st.focus_tab = Some(Tab::Properties);
     }));
+    // Fix Stitches with the sample design opened as a machine file with no
+    // trims (ADR 0172): long jumps with no trim.
+    v.push(Scene::new("fix stitches file", View::Windows, |st, _| {
+        let mut s = st.plan_view().plan.stitches.clone();
+        s.records.retain(|r| r.kind != emb_model::StitchKind::Trim);
+        let d = emb_model::design_from_stitches(&s, "file");
+        st.doc.edit("Open", |x| *x = d);
+        st.fix_stitches.open = true;
+    }));
     // The windows that no command opens with the sample design.
     v.push(Scene::new("first start", View::Windows, |st, _| {
         st.ask_machine = Some(crate::first_start::MachineStep::new(st));

@@ -69,7 +69,12 @@ object. The program warns about:
 - in free-standing lace, a part that touches no other part;
 - travel stitches that show: more than 2 mm on top of sewn stitches in
   one object, or a piece of 4 mm or more on the fabric;
-- objects that make no stitches.
+- objects that make no stitches;
+- in stitch objects (a machine file opened as stitches): stitches longer
+  than the machine sews, color changes to the same thread, long jumps
+  with no trim, pieces too short for the trimmer, starts and ends with
+  no lock stitches, and travel of the file that shows. **Fix Stitches**
+  fixes most of them.
 
 ## The density map
 
@@ -161,6 +166,26 @@ object, the two sides of a satin column, and the outline and the holes of
 a fill. It shows how the program
 reads the stitches of a machine file of another program, the first step
 to make objects of them.
+
+## Fix a machine file
+
+A machine file opens as stitch objects. **Edit > Machine Functions >
+Fix Stitches…** checks them and fixes the faults that it can:
+
+- **Join color blocks of the same thread**: the color change to the same
+  thread goes.
+- **Remove stitches shorter than** the shortest stitch of the machine:
+  the next stitch starts at the needle point before.
+- **Split stitches longer than** the longest stitch of the machine into
+  equal stitches.
+- **Trim jumps longer than** the trim distance.
+- **Add lock stitches at starts and ends** that have none.
+
+Each fix has a check box and the number that the check found. **Apply
+Fixes** makes the fixes that are on, as one undo step. The other needle points
+stay where they are. Pieces too short for the trimmer and travel that
+shows have no fix: Design info shows where they are. On the command
+line, `emb-cli check` and `emb-cli fix` do the same for a file.
 
 ## The product
 

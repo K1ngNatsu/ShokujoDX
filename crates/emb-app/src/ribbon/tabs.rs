@@ -465,6 +465,7 @@ pub(super) const EDIT: &[Panel] = &[
                 Cmd::Func(Func::TrimNever),
             ]),
             Small(&[Cmd::Func(Func::TieIn), Cmd::Func(Func::TieOff)]),
+            Small(&[Cmd::FixStitches]),
         ],
     },
     Panel {

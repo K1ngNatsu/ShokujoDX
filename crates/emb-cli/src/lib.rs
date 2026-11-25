@@ -139,6 +139,89 @@ pub fn write_output(s: &StitchDesign, path: &Path) -> Result<(), String> {
 /// As [`write_output`], with the encoding settings of the machine (the trim
 /// code of DST and TAP files, and the needles of a multi-needle machine
 /// with no pins).
+/// The stitches of a machine file, or the records of the stitch objects
+/// of a design (ADR 0172), for the check and the fix of a machine file.
+pub fn file_stitches(input: &Input) -> Result<StitchDesign, String> {
+    match input {
+        Input::Stitches(s) => Ok(s.clone()),
+        Input::Design(d) => {
+            let ids: Vec<emb_model::ObjectId> = d
+                .objects()
+                .iter()
+                .filter(|o| matches!(o.kind, emb_model::ObjectKind::Stitches { .. }))
+                .map(|o| o.id)
+                .collect();
+            if ids.is_empty() {
+                return Err("the design has no stitch objects (a machine file opened as stitches)".into());
+            }
+            Ok(emb_model::records_of_stitch_objects(d, &ids).0)
+        }
+    }
+}
+
+/// The stitch lengths and the trim distance of the machine `machine` (an
+/// id of the built-in machines), or the defaults of the stitch plan.
+pub fn plan_options_for(machine: Option<&str>) -> Result<emb_stitch::PlanOptions, String> {
+    match machine {
+        None => Ok(emb_stitch::PlanOptions::default()),
+        Some(id) => {
+            let catalog = emb_model::MachineCatalog::builtin();
+            let m = catalog.get(id).ok_or_else(|| format!("unknown machine {id:?}"))?;
+            Ok(emb_stitch::PlanOptions::for_machine(m))
+        }
+    }
+}
+
+/// The fixes of a list such as `join,short,long,jumps,locks`.
+pub fn parse_fixes(list: &str) -> Result<emb_art::file_check::Fixes, String> {
+    let mut f = emb_art::file_check::Fixes {
+        join: false,
+        short: false,
+        long: false,
+        jumps: false,
+        locks: false,
+    };
+    for name in list.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+        match name {
+            "join" => f.join = true,
+            "short" => f.short = true,
+            "long" => f.long = true,
+            "jumps" => f.jumps = true,
+            "locks" => f.locks = true,
+            other => return Err(format!("unknown fix {other:?} (join, short, long, jumps, locks)")),
+        }
+    }
+    Ok(f)
+}
+
+/// The text of a check of a machine file (ADR 0172): for each fault, its
+/// number, its name and its first places (mm).
+pub fn check_report(c: &emb_art::file_check::FileCheck) -> String {
+    use emb_art::file_check::Fault;
+    if c.is_empty() {
+        return "no faults\n".into();
+    }
+    let mut out = String::new();
+    for f in Fault::ALL {
+        let found: Vec<_> = c.found.iter().filter(|x| x.fault == f).collect();
+        if found.is_empty() {
+            continue;
+        }
+        out.push_str(&format!("{}: {} ({})\n", f.key(), found.len(), f.cli_text()));
+        for x in found.iter().take(5) {
+            if x.length_mm > 0.0 {
+                out.push_str(&format!("  at {:.1}, {:.1}: {:.2} mm\n", x.at.x, x.at.y, x.length_mm));
+            } else {
+                out.push_str(&format!("  at {:.1}, {:.1}\n", x.at.x, x.at.y));
+            }
+        }
+        if found.len() > 5 {
+            out.push_str(&format!("  and {} more\n", found.len() - 5));
+        }
+    }
+    out
+}
+
 pub fn write_output_for(
     s: &StitchDesign,
     path: &Path,

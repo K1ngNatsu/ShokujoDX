@@ -11,10 +11,16 @@
 //!   are in the file.
 //! - A file with fewer threads than color blocks (DST has none) gets
 //!   default colors.
+//!
+//! [`records_of_stitch_objects`] goes the other way (P22 Milestone 5,
+//! ADR 0172): the records of stitch objects as a machine file has them,
+//! for the check and the fix of a machine file.
 
 use emb_geom::{Path, Point};
 
-use crate::{Design, Functions, ObjectKind, Rgb, StitchDesign, StitchKind, TrimMode};
+use crate::{
+    Design, Functions, ObjectId, ObjectKind, Rgb, StitchDesign, StitchKind, StitchRecord, Thread, ThreadId, TrimMode,
+};
 
 /// Colors for files without thread colors.
 const DEFAULT_COLORS: [(u8, u8, u8); 8] = [
@@ -76,8 +82,40 @@ impl Block {
 /// Makes a design with one stitch object per color block (see the module notes).
 pub fn design_from_stitches(sd: &StitchDesign, name: &str) -> Design {
     let mut design = Design::new(name);
-    let mut thread = 0usize;
+    let objects = objects_from_stitches(sd);
     let mut thread_ids = Vec::new();
+    let blocks = objects.iter().map(|o| o.0 + 1).max().unwrap_or(0).max(sd.threads.len());
+    for i in 0..blocks {
+        let id = match sd.threads.get(i) {
+            Some(t) => {
+                let id = design.add_thread(t.name.clone(), t.color);
+                if let Some(x) = design.threads.iter_mut().find(|x| x.id == id) {
+                    x.brand.clone_from(&t.brand);
+                    x.code.clone_from(&t.code);
+                }
+                id
+            }
+            None => {
+                let (r, g, b) = DEFAULT_COLORS[i % DEFAULT_COLORS.len()];
+                design.add_thread(format!("Color {}", i + 1), Rgb(r, g, b))
+            }
+        };
+        thread_ids.push(id);
+    }
+    for (t, kind, functions) in objects {
+        let id = design.add_object(thread_ids[t], kind);
+        if let Some(o) = design.object_mut(id) {
+            o.functions = functions;
+        }
+    }
+    design
+}
+
+/// The stitch objects of the records of `sd` (see the module notes): for
+/// each, the number of its color block (its thread in `sd.threads`), its
+/// kind and its functions.
+pub fn objects_from_stitches(sd: &StitchDesign) -> Vec<(usize, ObjectKind, Functions)> {
+    let mut thread = 0usize;
     let mut block = Block::default();
     // Objects: (thread index, kind, stop after, trim after, slow).
     let mut objects: Vec<(usize, ObjectKind, bool, TrimMode, bool)> = Vec::new();
@@ -122,38 +160,123 @@ pub fn design_from_stitches(sd: &StitchDesign, name: &str) -> Design {
         }
     }
     finish(&mut block, &mut objects, thread, false, slow);
+    objects
+        .into_iter()
+        .map(|(t, kind, stop, trim, slow)| {
+            (
+                t,
+                kind,
+                Functions {
+                    tie_in: false,
+                    tie_off: false,
+                    trim,
+                    stop,
+                    slow,
+                },
+            )
+        })
+        .collect()
+}
 
-    let blocks = objects.iter().map(|o| o.0 + 1).max().unwrap_or(0).max(sd.threads.len());
-    for i in 0..blocks {
-        let id = match sd.threads.get(i) {
-            Some(t) => {
-                let id = design.add_thread(t.name.clone(), t.color);
-                if let Some(x) = design.threads.iter_mut().find(|x| x.id == id) {
-                    x.brand.clone_from(&t.brand);
-                    x.code.clone_from(&t.code);
-                }
-                id
-            }
-            None => {
-                let (r, g, b) = DEFAULT_COLORS[i % DEFAULT_COLORS.len()];
-                design.add_thread(format!("Color {}", i + 1), Rgb(r, g, b))
-            }
+/// The records of the stitch objects `ids` of `d`, in this order, as a
+/// machine file has them: the reverse of [`objects_from_stitches`]. Where
+/// the thread changes, a trim and a color change; before each part of an
+/// object, a jump (and a trim if the part is in `trims`); the trim before
+/// a stop, the stops and the speed changes; an end. The threads are the
+/// threads of the color blocks (with their ids in `d`). Also, for each
+/// record, the number of its object in `ids`. The objects that are not
+/// stitch objects are left out.
+pub fn records_of_stitch_objects(d: &Design, ids: &[ObjectId]) -> (StitchDesign, Vec<usize>) {
+    let mut sd = StitchDesign::default();
+    let mut owner = Vec::new();
+    let mut push = |sd: &mut StitchDesign, k: usize, kind: StitchKind, pos: Point| {
+        sd.records.push(StitchRecord::new(pos, kind));
+        owner.push(k);
+    };
+    let thread_of = |id: ThreadId| {
+        d.thread(id).cloned().unwrap_or_else(|| Thread {
+            id,
+            ..Default::default()
+        })
+    };
+    let mut needle = Point::ZERO;
+    let mut thread: Option<ThreadId> = None;
+    let mut slow = false;
+    let mut last = 0;
+    for (k, id) in ids.iter().enumerate() {
+        let Some(o) = d.object(*id) else { continue };
+        let ObjectKind::Stitches { path, trims } = &o.kind else {
+            continue;
         };
-        thread_ids.push(id);
-    }
-    for (t, kind, stop, trim, slow) in objects {
-        let id = design.add_object(thread_ids[t], kind);
-        if let Some(o) = design.object_mut(id) {
-            o.functions = Functions {
-                tie_in: false,
-                tie_off: false,
-                trim,
-                stop,
-                slow,
+        let parts = stitch_parts(path);
+        if parts.iter().all(Vec::is_empty) {
+            continue;
+        }
+        match thread {
+            None => sd.threads.push(thread_of(o.thread)),
+            Some(t) if t != o.thread => {
+                if sd.records.last().is_none_or(|r| r.kind != StitchKind::Trim) {
+                    push(&mut sd, k, StitchKind::Trim, needle);
+                }
+                push(&mut sd, k, StitchKind::ColorChange, needle);
+                sd.threads.push(thread_of(o.thread));
+            }
+            Some(_) => {}
+        }
+        thread = Some(o.thread);
+        if o.functions.slow != slow {
+            slow = o.functions.slow;
+            let kind = if slow { StitchKind::Slow } else { StitchKind::Fast };
+            push(&mut sd, k, kind, needle);
+        }
+        for (i, part) in parts.iter().enumerate() {
+            let Some((&first, rest)) = part.split_first() else {
+                continue;
             };
+            if i > 0 && trims.contains(&i) {
+                push(&mut sd, k, StitchKind::Trim, needle);
+            }
+            push(&mut sd, k, StitchKind::Jump, first);
+            push(&mut sd, k, StitchKind::Stitch, first);
+            for &p in rest {
+                push(&mut sd, k, StitchKind::Stitch, p);
+            }
+            needle = *part.last().unwrap_or(&first);
+        }
+        if o.functions.stop {
+            if o.functions.trim == TrimMode::Always {
+                push(&mut sd, k, StitchKind::Trim, needle);
+            }
+            push(&mut sd, k, StitchKind::Stop, needle);
+        }
+        last = k;
+    }
+    push(&mut sd, last, StitchKind::End, needle);
+    (sd, owner)
+}
+
+/// The parts of a stitch object as needle points (as the stitch engine
+/// reads them: all points stay; a curve counts as its end point).
+fn stitch_parts(path: &Path) -> Vec<Vec<Point>> {
+    use emb_geom::path::PathCmd;
+    let mut out: Vec<Vec<Point>> = Vec::new();
+    for cmd in &path.cmds {
+        match *cmd {
+            PathCmd::MoveTo(p) => out.push(vec![p]),
+            PathCmd::LineTo(p) | PathCmd::CubicTo(_, _, p) => match out.last_mut() {
+                Some(s) => s.push(p),
+                None => out.push(vec![p]),
+            },
+            PathCmd::Close => {
+                if let Some(s) = out.last_mut()
+                    && let Some(&first) = s.first()
+                {
+                    s.push(first);
+                }
+            }
         }
     }
-    design
+    out
 }
 
 #[cfg(test)]
@@ -230,6 +353,56 @@ mod tests {
         let f = d.objects()[0].functions;
         assert!(f.stop && f.trim == TrimMode::Always);
         assert_eq!(d.objects()[1].functions.trim, TrimMode::Auto);
+    }
+
+    /// The records of the stitch objects of a file make the same objects
+    /// again (ADR 0172).
+    #[test]
+    fn the_records_of_stitch_objects_make_the_same_objects() {
+        let sd = StitchDesign {
+            threads: Vec::new(),
+            records: vec![
+                rec(0.0, 0.0, StitchKind::Jump),
+                rec(0.0, 0.0, StitchKind::Stitch),
+                rec(2.0, 0.0, StitchKind::Stitch),
+                rec(2.0, 0.0, StitchKind::Trim),
+                rec(9.0, 0.0, StitchKind::Jump),
+                rec(9.0, 0.0, StitchKind::Stitch),
+                rec(9.0, 2.0, StitchKind::Stitch),
+                rec(12.0, 2.0, StitchKind::Jump),
+                rec(12.0, 2.0, StitchKind::Stitch),
+                rec(13.0, 2.0, StitchKind::Stitch),
+                rec(13.0, 2.0, StitchKind::Trim),
+                rec(13.0, 2.0, StitchKind::Stop),
+                rec(14.0, 2.0, StitchKind::Stitch),
+                rec(15.0, 2.0, StitchKind::Stitch),
+                rec(15.0, 2.0, StitchKind::Trim),
+                rec(15.0, 2.0, StitchKind::ColorChange),
+                rec(15.0, 2.0, StitchKind::Slow),
+                rec(20.0, 0.0, StitchKind::Jump),
+                rec(20.0, 0.0, StitchKind::Stitch),
+                rec(21.0, 0.0, StitchKind::Stitch),
+                rec(21.0, 0.0, StitchKind::End),
+            ],
+        };
+        let d = design_from_stitches(&sd, "x");
+        let ids: Vec<ObjectId> = d.objects().iter().map(|o| o.id).collect();
+        let (again, owner) = records_of_stitch_objects(&d, &ids);
+        assert_eq!(owner.len(), again.records.len());
+        assert_eq!(again.threads.len(), 2);
+        assert_eq!(again.threads[1].id, d.objects()[2].thread);
+        let back = objects_from_stitches(&again);
+        let before = objects_from_stitches(&sd);
+        assert_eq!(back, before);
+        // The needle points are the same, in the same order.
+        let points = |s: &StitchDesign| -> Vec<Point> {
+            s.records
+                .iter()
+                .filter(|r| r.kind == StitchKind::Stitch)
+                .map(|r| r.pos)
+                .collect()
+        };
+        assert_eq!(points(&again), points(&sd));
     }
 
     /// A slow part of a machine file (U01) is an object with Sew slowly.

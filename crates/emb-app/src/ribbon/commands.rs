@@ -466,6 +466,8 @@ pub enum Cmd {
     RippleGuide,
     /// The Bands window: more than one thread across a satin column.
     ColumnBands,
+    /// The Fix Stitches window: the check and the fix of stitch objects.
+    FixStitches,
     Motifs,
     Laydown,
     ClosestJoin,
@@ -1304,6 +1306,13 @@ impl Cmd {
                 tr(
                     "Select a fill and one or more lines: the fill rows follow the lines and change from one to the next (guided fill). \
                  The lines are used up.",
+                ),
+            ),
+            Cmd::FixStitches => (
+                g(ph::FIRST_AID_KIT),
+                tr("Fix Stitches…"),
+                tr(
+                    "Fix the stitch objects of a machine file: join color blocks of the same thread, remove short stitches, split long stitches, trim long jumps and add lock stitches. The other needle points stay.",
                 ),
             ),
             Cmd::ColumnBands => (

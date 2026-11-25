@@ -108,6 +108,7 @@ impl AppState {
             Cmd::Motifs | Cmd::Borders | Cmd::Buttonholes | Cmd::Blends => true,
             Cmd::SplitLines | Cmd::GuideLines => s.fills == 1 && s.lines > 0 && s.n == 1 + s.lines,
             Cmd::Tartan | Cmd::Gradient | Cmd::ColumnBands => true,
+            Cmd::FixStitches => d.objects().iter().any(|o| matches!(o.kind, ObjectKind::Stitches { .. })),
             Cmd::RippleGuide => s.n == 2 && s.lines == 2,
             Cmd::Redwork | Cmd::Branching => s.lines > 0,
             Cmd::LetteringOnLine => {
@@ -458,6 +459,7 @@ impl AppState {
                 crate::stitch_types::guide_lines(self);
             }
             Cmd::ColumnBands => self.column_bands.open = true,
+            Cmd::FixStitches => self.fix_stitches.open = true,
             Cmd::RippleGuide => {
                 crate::stitch_types::ripple_guide(self);
             }

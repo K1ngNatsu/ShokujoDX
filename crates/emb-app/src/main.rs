@@ -39,6 +39,7 @@ mod export;
 mod families;
 mod file;
 mod first_start;
+mod fix_stitches;
 mod font_sheet;
 mod fonts;
 mod functions;

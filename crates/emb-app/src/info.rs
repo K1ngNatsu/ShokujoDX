@@ -7,6 +7,8 @@
 //! - The checks look at each object: stitches outside the hoop field or the
 //!   safety margin, density too high, stitches too short, many trims, no
 //!   stitches. A click on a warning selects the object and shows it.
+//! - The stitch objects (a machine file opened as stitches) also get the
+//!   checks of a machine file (P22 Milestone 5, ADR 0172; `fix_stitches`).
 
 use std::sync::Arc;
 
@@ -135,6 +137,8 @@ impl AppState {
     }
 
     fn compute_info(&mut self) -> DesignInfo {
+        let file_checks = self.stitch_checks();
+        let file_opts = self.file_check_options();
         let opts = self.plan_options();
         let plan = self.shown_plan().plan.clone();
         let density = self.density_map();
@@ -373,6 +377,7 @@ impl AppState {
                 }
             }
         }
+        stitch_object_issues(&mut info, &file_checks, &file_opts);
         for w in &plan.warnings {
             let at = w.object.and_then(|id| d.bbox_of(&[id])).map(|b| b.center());
             info.issues.push(Issue {
@@ -447,6 +452,68 @@ impl AppState {
             self.zoom_to_selection();
         } else if let Some(p) = issue.at {
             self.zoom_to = Some(BBox::from_center_size(p, 30.0, 30.0));
+        }
+    }
+}
+
+/// The warnings of the checks of a machine file for the stitch objects
+/// (ADR 0172): for each object and fault, the number and the first place.
+/// Short stitches are in the checks of each object.
+fn stitch_object_issues(
+    info: &mut DesignInfo,
+    checks: &[crate::fix_stitches::RunCheck],
+    opts: &emb_stitch::PlanOptions,
+) {
+    use emb_art::file_check::Fault;
+    for run in checks {
+        // (object, kind of warning) -> (number, length, first place)
+        let mut groups: std::collections::BTreeMap<(ObjectId, u8), (usize, f64, Point)> = Default::default();
+        for f in &run.check.found {
+            let kind = match f.fault {
+                Fault::Short => continue,
+                Fault::Long => 0,
+                Fault::SameThread => 1,
+                Fault::LongJump => 2,
+                Fault::ShortPiece => 3,
+                Fault::NoLockStart | Fault::NoLockEnd => 4,
+                Fault::TravelShows => 5,
+            };
+            let Some(id) = run.object(f.record) else { continue };
+            let g = groups.entry((id, kind)).or_insert((0, 0.0, f.at));
+            g.0 += 1;
+            g.1 += f.length_mm;
+        }
+        for ((id, kind), (n, length, at)) in groups {
+            let text = match kind {
+                0 => fill(
+                    "Stitches longer than {} mm: {} (Edit > Fix Stitches splits them)",
+                    &[&format!("{:.1}", opts.max_stitch_mm), &n],
+                ),
+                1 => tr("A color change to the same thread (Edit > Fix Stitches joins the blocks)").into(),
+                2 => fill(
+                    "Jumps longer than {} mm with no trim: {} (Edit > Fix Stitches trims them)",
+                    &[&format!("{:.1}", opts.trim_mm), &n],
+                ),
+                3 => fill(
+                    "Pieces too short for the trimmer: {} (the stitches can pull out)",
+                    &[&n],
+                ),
+                4 => fill(
+                    "Starts and ends with no lock stitches: {} (Edit > Fix Stitches adds them)",
+                    &[&n],
+                ),
+                _ if length >= TRAVEL_ON_STITCHES_MM => fill(
+                    "Travel in the stitches of the file shows on top of sewn stitches: {} mm",
+                    &[&format!("{length:.0}")],
+                ),
+                _ => continue,
+            };
+            info.issues.push(Issue {
+                severity: Severity::Warning,
+                object: Some(id),
+                text,
+                at: Some(at),
+            });
         }
     }
 }

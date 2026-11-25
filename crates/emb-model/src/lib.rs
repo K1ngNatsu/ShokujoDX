@@ -89,7 +89,7 @@ pub use fabric::{Fabric, FabricCatalog, FabricChange, UnderlayWeight, Weave};
 pub use history::{Document, MergeKey};
 pub use hoop::{HoopCatalog, HoopPosition, HoopPreset, HoopShape};
 pub use hooping::{Hooping, HoopingLayout, HoopingOut};
-pub use import::design_from_stitches;
+pub use import::{design_from_stitches, objects_from_stitches, records_of_stitch_objects};
 pub use keyboard::{KeyDesign, KeyObject, KeyboardCollection};
 pub use lettering::{
     CutArea, FontKind, FontRef, Justify, Knockout, Letter, LetterConnection, LetterEdit, LetterOrder, LetterShape,

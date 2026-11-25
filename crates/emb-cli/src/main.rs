@@ -142,8 +142,21 @@ Usage:
       ids of --objects) for each value from --from to --to in equal steps
       (--copies, 5 by default), in a grid that fits the hoop of the design,
       each with its value under it. The setting is spacing, stitch-length,
-      pull-compensation, width, angle (degrees) or underlay (none, light,
-      auto, heavy, double; --from and --to are not needed). Lengths in mm.
+      pull-compensation, width, angle (degrees), underlay (none, light,
+      auto, heavy, double; --from and --to are not needed), lean (degrees)
+      or band-overlap (ADR 0171). Lengths in mm.
+  emb-cli check <file> [--machine <id>]
+      Check the stitches of a machine file, or of the stitch objects of a
+      design (ADR 0172): stitches shorter or longer than the machine sews,
+      color changes to the same thread, long jumps with no trim, pieces too
+      short for the trimmer, starts and ends with no lock stitches, and
+      travel that shows on top of sewn stitches. It prints the number of
+      each fault and its first places (mm).
+  emb-cli fix <file> <out> [--machine <id>] [--fixes join,short,long,jumps,locks]
+      Fix the stitches of a machine file (ADR 0172): join the color blocks
+      of the same thread, remove the short stitches, split the long
+      stitches, trim the long jumps and add lock stitches (all, or the
+      fixes of --fixes); the other needle points stay. Then write <out>.
   emb-cli font-audit <font.embfont> [--source <font.ttf>] [--chars ...]
                      [--sizes <mm>,...] [--corrections <file>] [--proof <out.json>]
                      [--text <text>] [--weight <n>]
@@ -346,6 +359,7 @@ fn run(args: &[String]) -> Result<(), String> {
     let mut swatch_setting: Option<emb_letter::swatch::SwatchSetting> = None;
     let (mut swatch_from, mut swatch_to, mut swatch_copies) = (None::<f64>, None::<f64>, 5usize);
     let mut swatch_objects: Vec<u64> = Vec::new();
+    let mut fixes = emb_art::file_check::Fixes::ALL;
     let mut rest = Vec::new();
     let mut it = args.iter();
     while let Some(a) = it.next() {
@@ -534,6 +548,10 @@ fn run(args: &[String]) -> Result<(), String> {
                     .and_then(|v| v.parse::<usize>().ok())
                     .filter(|v| (1..=emb_letter::swatch::MAX_COPIES).contains(v))
                     .ok_or("--copies needs a number from 1 to 24")?;
+            }
+            "--fixes" => {
+                let list = it.next().ok_or("--fixes needs a list: join,short,long,jumps,locks")?;
+                fixes = emb_cli::parse_fixes(list)?;
             }
             "--objects" => {
                 swatch_objects = it
@@ -975,6 +993,25 @@ fn run(args: &[String]) -> Result<(), String> {
                 made.size.0,
                 made.size.1,
                 if made.fits { "" } else { " (larger than the hoop)" }
+            );
+            Ok(())
+        }
+        ["check", input] => {
+            let s = emb_cli::file_stitches(&read_input(Path::new(input))?)?;
+            let opts = emb_cli::plan_options_for(machine)?;
+            let c = emb_art::file_check::check(&s, &opts);
+            print!("{}", emb_cli::check_report(&c));
+            Ok(())
+        }
+        ["fix", input, output] => {
+            let s = emb_cli::file_stitches(&read_input(Path::new(input))?)?;
+            let opts = emb_cli::plan_options_for(machine)?;
+            let (fixed, n) = emb_art::file_check::fix(&s, &opts, fixes);
+            let catalog = emb_model::MachineCatalog::builtin();
+            emb_cli::write_output_for(&fixed, Path::new(output), machine.and_then(|m| catalog.get(m)))?;
+            println!(
+                "wrote {output}: {} color changes joined, {} short stitches removed, {} long stitches split, {} long jumps trimmed, {} lock stitches added",
+                n.joined, n.removed, n.split, n.trimmed, n.locked
             );
             Ok(())
         }
