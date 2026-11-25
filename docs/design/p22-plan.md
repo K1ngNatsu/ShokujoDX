@@ -8,6 +8,9 @@ faults that it found are fixed (ADR 0168). Milestone 2 is made (ADR
 open. Milestone 4 is made in the software (ADR 0171); its sew-out is
 open. Milestone 5 is made (ADR 0172). Milestone 6 is made (ADR 0173),
 and the owner agrees with the 50 judged letters that the owner looked at.
+Milestone 7 (the trial of overlapped strokes) is measured, and the owner
+chose the way of today (ADR 0174); the trial is on the branch
+`trial/overlapped-strokes`.
 
 ## Goal
 
@@ -468,7 +471,13 @@ The proof pictures of twelve letters in the three ways are in
 three ways look almost the same.
 
 The trial does not win: no more clean letters (two fewer), and half
-again or more thread at the joints. The owner chooses.
+again or more thread at the joints.
+
+**The owner's choice (2026-11-25): keep the way of today** (ADR 0174).
+The trial stays on the branch `trial/overlapped-strokes`; the main
+branch keeps its measures (`Faults::two_layers`, `eye_summary`). No
+change of the fonts or of the snapshot of the fault bench. The exit test
+is met.
 
 ## Milestone 8: the open tabs come back, and one program (M)
 
