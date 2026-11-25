@@ -98,8 +98,11 @@ trim takes time.
   value, and with it off the machine decides) and **Fewer color changes**.
   A table shows the threads, color changes, trims, stitches, sew time and
   the travel that shows, before and after, and the canvas marks the
-  travel that shows. **OK** keeps the result as one step that you can
-  undo; **Cancel** goes back.
+  travel that shows. **Standard** sets the values of the first open.
+  **Remove small details** also leaves locked objects, and the objects
+  of border traces, linked shapes, buttonholes, appliqué and sketches.
+  **OK**
+  keeps the result as one step that you can undo; **Cancel** goes back.
 
 ## Caps
 

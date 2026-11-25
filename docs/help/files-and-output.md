@@ -2,7 +2,7 @@
 id: files-and-output
 title: Files and output
 group: production
-keywords: open, save, project, embproj, backup, recover, crash, import, export, machine file, format, dst, pes, vp3, usb, stick, send, email, zip, output design, worksheet, approval sheet, pdf, print, picture, png, svg, csv, barcode, thread color files, inf, edr, col, batch, queue, exports, thumbnail, icon, explorer, finder
+keywords: open, save, project, embproj, backup, recover, crash, import, export, machine file, format, dst, pes, vp3, usb, stick, send, email, zip, output design, worksheet, approval sheet, pdf, print, picture, png, svg, csv, barcode, thread color files, inf, edr, col, batch, queue, exports, thumbnail, icon, explorer, finder, open tabs, restore tabs, one program, new window
 ---
 # Files and output
 

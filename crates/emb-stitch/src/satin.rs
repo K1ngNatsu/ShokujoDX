@@ -739,9 +739,9 @@ pub(crate) fn satin_with(
     }
     // A band of the width (P22 Milestone 4): its top stitches sew only the
     // band, and the first band sews the underlay of the whole column.
-    let band = p.band.filter(|b| b.count > 1);
+    let band = p.active_band();
     let layers = match band {
-        Some(b) if b.index > 0 => Vec::new(),
+        Some(b) if !b.sews_underlay() => Vec::new(),
         _ => underlay_layers(&p.underlay, col.mean_width()),
     };
     let mut out: Vec<Point> = Vec::new();

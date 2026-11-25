@@ -151,11 +151,14 @@ Usage:
       color changes to the same thread, long jumps with no trim, pieces too
       short for the trimmer, starts and ends with no lock stitches, and
       travel that shows on top of sewn stitches. It prints the number of
-      each fault and its first places (mm).
+      each fault and its first places (mm). The stitch lengths are of
+      --machine, else of the machine of a design; the trim distance of a
+      design wins.
   emb-cli fix <file> <out> [--machine <id>] [--fixes join,short,long,jumps,locks]
       Fix the stitches of a machine file (ADR 0172): join the color blocks
       of the same thread, remove the short stitches, split the long
-      stitches, trim the long jumps and add lock stitches (all, or the
+      stitches (up to 60 mm; a longer one is a jump of a damaged file, and
+      it stays), trim the long jumps and add lock stitches (all, or the
       fixes of --fixes); the other needle points stay. Then write <out>.
   emb-cli font-audit <font.embfont> [--source <font.ttf>] [--chars ...]
                      [--sizes <mm>,...] [--corrections <file>] [--proof <out.json>]
@@ -359,7 +362,8 @@ fn run(args: &[String]) -> Result<(), String> {
     let mut sheet: Option<PathBuf> = None;
     let mut script_inputs = std::collections::BTreeMap::new();
     let mut swatch_setting: Option<emb_letter::swatch::SwatchSetting> = None;
-    let (mut swatch_from, mut swatch_to, mut swatch_copies) = (None::<f64>, None::<f64>, 5usize);
+    let (mut swatch_from, mut swatch_to, mut swatch_copies) =
+        (None::<f64>, None::<f64>, emb_letter::swatch::DEFAULT_COPIES);
     let mut swatch_objects: Vec<u64> = Vec::new();
     let mut fixes = emb_art::file_check::Fixes::ALL;
     let mut judged: Option<PathBuf> = None;
@@ -551,7 +555,7 @@ fn run(args: &[String]) -> Result<(), String> {
                     .next()
                     .and_then(|v| v.parse::<usize>().ok())
                     .filter(|v| (1..=emb_letter::swatch::MAX_COPIES).contains(v))
-                    .ok_or("--copies needs a number from 1 to 24")?;
+                    .ok_or_else(|| format!("--copies needs a number from 1 to {}", emb_letter::swatch::MAX_COPIES))?;
             }
             "--fixes" => {
                 let list = it.next().ok_or("--fixes needs a list: join,short,long,jumps,locks")?;
@@ -926,7 +930,7 @@ fn run(args: &[String]) -> Result<(), String> {
                 Box::new(f)
             };
             let family = source.font_ref().family.clone();
-            let label = emb_letter::bundled::embroidery("Atkinson Hyperlegible");
+            let label = emb_letter::bundled::embroidery(emb_letter::sheet::LABEL_FONT);
             let sizes = if sheet_sizes.is_empty() {
                 emb_letter::sheet::sizes(source.size_range(emb_model::LetterStitch::Satin)).to_vec()
             } else {
@@ -980,7 +984,7 @@ fn run(args: &[String]) -> Result<(), String> {
                 copies: swatch_copies,
                 field,
             };
-            let label = emb_letter::bundled::embroidery("Atkinson Hyperlegible");
+            let label = emb_letter::bundled::embroidery(emb_letter::sheet::LABEL_FONT);
             let made = swatches(
                 &design,
                 &ids,
@@ -1001,15 +1005,17 @@ fn run(args: &[String]) -> Result<(), String> {
             Ok(())
         }
         ["check", input] => {
-            let s = emb_cli::file_stitches(&read_input(Path::new(input))?)?;
-            let opts = emb_cli::plan_options_for(machine)?;
+            let input = read_input(Path::new(input))?;
+            let s = emb_cli::file_stitches(&input)?;
+            let opts = emb_cli::file_check_options(&input, machine)?;
             let c = emb_art::file_check::check(&s, &opts);
             print!("{}", emb_cli::check_report(&c));
             Ok(())
         }
         ["fix", input, output] => {
-            let s = emb_cli::file_stitches(&read_input(Path::new(input))?)?;
-            let opts = emb_cli::plan_options_for(machine)?;
+            let input = read_input(Path::new(input))?;
+            let s = emb_cli::file_stitches(&input)?;
+            let opts = emb_cli::file_check_options(&input, machine)?;
             let (fixed, n) = emb_art::file_check::fix(&s, &opts, fixes);
             let catalog = emb_model::MachineCatalog::builtin();
             emb_cli::write_output_for(&fixed, Path::new(output), machine.and_then(|m| catalog.get(m)))?;

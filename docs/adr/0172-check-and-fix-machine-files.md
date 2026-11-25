@@ -18,28 +18,41 @@ readers.
 - **The engine** is `emb_art::file_check` (in `emb-art`: the travel
   check uses `emb_art::parts`). It reads the records as a machine sews
   them: a **piece** is the needle points between two cuts (a trim, a
-  color change, the end); a jump with no trim does not cut. `check` finds,
-  with the stitch lengths and the trim distance of `PlanOptions`:
-  stitches shorter or longer than the machine sews (with a margin of
-  0.05 mm for the 0.1 mm grid of the files; a stitch in the same needle
-  hole is not counted), color changes to the same thread (color, brand
-  and code), jumps longer than the trim distance with no trim, pieces
-  with fewer than three needle holes (too short for the trimmer), starts
-  and ends with no lock stitches in their seven first or last needle
-  points (a needle point back in the hole of the needle point two before
-  it, or three stitches of 0.7 mm or less), and travel that shows. The
-  travel of a file is a run part between two other parts of one chain
-  that goes almost straight (at most 60 mm, and at most 1.6 times the
-  distance between its ends plus 2 mm: the curved rows of a spiral fill
-  are runs too); `emb_stitch::shown_travel` (ADR 0167) measures it.
-- `fix` makes the fixes that are on, in this order: join the color
-  blocks of the same thread (a trim stays where the move to the next
-  block is longer than the trim distance), remove the short stitches
-  (the next stitch starts at the needle point before), split the long
-  stitches into equal stitches, put a trim before each long jump, and
-  add lock stitches (forward and back twice, as the stitch plan) at the
-  starts and ends with no lock. The other needle points do not move.
-  Pieces too short for the trimmer and travel that shows have no fix.
+  color change, the end); a jump with no trim does not cut. Two needle
+  points 0.15 mm apart or less are one needle hole (`HOLE_MM`). `check`
+  finds these faults, with the stitch lengths and the trim distance of
+  `PlanOptions`:
+  - stitches shorter or longer than the machine sews, with a margin of
+    0.05 mm for the 0.1 mm grid of the files (a stitch in the same needle
+    hole is not counted);
+  - color changes to the same thread (color, brand and code);
+  - jumps longer than the trim distance with no trim;
+  - pieces with fewer than three needle holes (too short for the
+    trimmer);
+  - starts and ends with no lock stitches in their seven first or last
+    needle points: a lock is a needle point back in the hole of the
+    needle point two before it, or three stitches of 0.7 mm or less;
+  - travel that shows on top of sewn stitches, 1 mm or more in one run
+    (`SHOWS_MM`). The travel of a file is a run part between two other
+    parts of one chain that goes almost straight: at most 60 mm, and at
+    most 1.6 times the distance between its ends plus 2 mm (the curved
+    rows of a spiral fill are runs too). `emb_stitch::shown_travel`
+    (ADR 0167) measures it. Travel on the fabric is not a fault of a
+    file.
+- `fix` makes the fixes that are on, in this order:
+  1. Join the color blocks of the same thread. A trim stays where the
+     move to the next block is longer than the trim distance.
+  2. Remove the short stitches: the next stitch starts at the needle
+     point before.
+  3. Split the long stitches into equal stitches. A stitch longer than
+     60 mm (`MAX_SPLIT_MM`, the audit of P22) is a jump that a damaged
+     file keeps as a stitch: it stays, and the check shows it.
+  4. Put a trim before each long jump.
+  5. Add lock stitches at the starts and ends with no lock: forward and
+     back twice, with `emb_stitch::lock_points` of the stitch plan.
+
+  The other needle points do not move. Pieces too short for the trimmer
+  and travel that shows have no fix.
 - **Stitch objects as a file.** `emb_model::records_of_stitch_objects`
   is the reverse of the import of a machine file: the records of stitch
   objects, with their threads (and ids) and the object of each record.

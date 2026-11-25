@@ -136,9 +136,6 @@ pub fn write_output(s: &StitchDesign, path: &Path) -> Result<(), String> {
     write_output_for(s, path, None)
 }
 
-/// As [`write_output`], with the encoding settings of the machine (the trim
-/// code of DST and TAP files, and the needles of a multi-needle machine
-/// with no pins).
 /// The stitches of a machine file, or the records of the stitch objects
 /// of a design (ADR 0172), for the check and the fix of a machine file.
 pub fn file_stitches(input: &Input) -> Result<StitchDesign, String> {
@@ -159,28 +156,20 @@ pub fn file_stitches(input: &Input) -> Result<StitchDesign, String> {
     }
 }
 
-/// The stitch lengths and the trim distance of the machine `machine` (an
-/// id of the built-in machines), or the defaults of the stitch plan.
-pub fn plan_options_for(machine: Option<&str>) -> Result<emb_stitch::PlanOptions, String> {
-    match machine {
-        None => Ok(emb_stitch::PlanOptions::default()),
-        Some(id) => {
-            let catalog = emb_model::MachineCatalog::builtin();
-            let m = catalog.get(id).ok_or_else(|| format!("unknown machine {id:?}"))?;
-            Ok(emb_stitch::PlanOptions::for_machine(m))
-        }
+/// The stitch lengths and the trim distance for the check and the fix of
+/// `input`: of the machine `machine` (an id of the built-in machines), else
+/// of the machine of a design, else the defaults of the stitch plan; with
+/// the trim distance of a design, as the program checks stitch objects.
+pub fn file_check_options(input: &Input, machine: Option<&str>) -> Result<emb_stitch::PlanOptions, String> {
+    match input {
+        Input::Design(d) => Ok(plan_options(d, machine)?.for_design(d)),
+        Input::Stitches(_) => plan_options(&Design::new(""), machine),
     }
 }
 
 /// The fixes of a list such as `join,short,long,jumps,locks`.
 pub fn parse_fixes(list: &str) -> Result<emb_art::file_check::Fixes, String> {
-    let mut f = emb_art::file_check::Fixes {
-        join: false,
-        short: false,
-        long: false,
-        jumps: false,
-        locks: false,
-    };
+    let mut f = emb_art::file_check::Fixes::NONE;
     for name in list.split(',').map(str::trim).filter(|s| !s.is_empty()) {
         match name {
             "join" => f.join = true,
@@ -222,6 +211,9 @@ pub fn check_report(c: &emb_art::file_check::FileCheck) -> String {
     out
 }
 
+/// As [`write_output`], with the encoding settings of the machine (the trim
+/// code of DST and TAP files, and the needles of a multi-needle machine
+/// with no pins).
 pub fn write_output_for(
     s: &StitchDesign,
     path: &Path,

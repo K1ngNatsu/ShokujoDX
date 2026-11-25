@@ -6,14 +6,12 @@
 //! more hoopings (ADR 0032).
 
 use eframe::egui;
+use emb_letter::sheet::LABEL_FONT;
 use emb_letter::swatch::{self, SwatchSetting, SwatchSpec};
 use emb_model::{FontRef, HoopSelection, ObjectId};
 
 use crate::app::AppState;
 use crate::i18n::{fill, tr};
-
-/// The font of the labels: a bundled font for small text.
-const LABEL_FONT: &str = "Atkinson Hyperlegible";
 
 /// The Test Swatches window.
 #[derive(Debug, Clone, Default)]
@@ -63,20 +61,17 @@ fn start_values(setting: SwatchSetting, v: f64) -> (f64, f64) {
     }
 }
 
-impl AppState {
-    /// The field of the hoop of the design (width, height), if it has a hoop.
-    fn swatch_field(&self) -> Option<(f64, f64)> {
-        match &self.doc.design().hoop.selection {
-            HoopSelection::Preset { id } => self.hoops.get(id).map(|h| (h.width_mm, h.height_mm)),
-            HoopSelection::OpenField => None,
-        }
-    }
+/// The settings that the selection has, in the order of the list.
+fn settings_of_selection(st: &AppState) -> Vec<SwatchSetting> {
+    SwatchSetting::ALL
+        .into_iter()
+        .filter(|s| current(st, *s).is_some())
+        .collect()
+}
 
+impl AppState {
     pub fn open_test_swatches(&mut self) {
-        let settings: Vec<SwatchSetting> = SwatchSetting::ALL
-            .into_iter()
-            .filter(|s| current(self, *s).is_some())
-            .collect();
+        let settings = settings_of_selection(self);
         let Some(&first) = settings.first() else {
             self.message = tr("Select fills, satin columns, lines or lettering.").into();
             return;
@@ -89,7 +84,7 @@ impl AppState {
         };
         self.set_swatch_setting(setting);
         self.swatch_window.copies = if self.swatch_window.copies == 0 {
-            5
+            swatch::DEFAULT_COPIES
         } else {
             self.swatch_window.copies
         };
@@ -108,7 +103,7 @@ impl AppState {
 
     /// Makes the swatches as a new design tab.
     pub fn make_test_swatches(&mut self) -> Result<(), String> {
-        let field = self.swatch_field();
+        let field = self.hoop_field();
         let spec = self.swatch_window.spec(field);
         let label = self.fonts.get(&FontRef::embroidery(LABEL_FONT, ""));
         let units = self.settings.units;
@@ -152,17 +147,14 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
     if !st.swatch_window.open {
         return;
     }
-    let settings: Vec<SwatchSetting> = SwatchSetting::ALL
-        .into_iter()
-        .filter(|s| current(st, *s).is_some())
-        .collect();
+    let settings = settings_of_selection(st);
     if settings.is_empty() {
         st.swatch_window.open = false;
         return;
     }
     // The grid of the settings now (no labels; their height is about the
     // same for each value).
-    let field = st.swatch_field();
+    let field = st.hoop_field();
     let key: PreviewKey = {
         let w = &st.swatch_window;
         (

@@ -76,7 +76,8 @@ advertencia para seleccionar el objeto. El programa avisa de:
   puntadas más largas de lo que cose la máquina, cambios de color al
   mismo hilo, saltos largos sin corte, tramos demasiado cortos para el
   cortahilos, inicios y finales sin puntadas de remate, y desplazamiento
-  del archivo que se ve. **Reparar puntadas** repara la mayoría.
+  del archivo que se ve sobre puntadas cosidas (1 mm o más en un tramo).
+  **Reparar puntadas** repara la mayoría.
 
 ## El mapa de densidad
 

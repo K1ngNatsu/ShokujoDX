@@ -25,15 +25,20 @@ the ends, and the route sews a column that ends in another first.
 `EMB_OVERLAP_TRIAL=1` turned it on for Latin letters; `=2` also took the
 ends at cuts from notches.
 
-The measure (the letter fault bench in TrueType lettering with the
-limits of the eye of ADR 0173; the numbers are in the plan): 238 letters
-of 248 clean to the eye in both ways of the trial, against 240 today;
-the same open area (the joints of this kind are covered today already;
-the open areas that the eye sees are at other joints); the same trims;
-51 % and 64 % more area with two layers of thread (thicker, stiffer
-joints); bulges of 3.0 to 3.5 mm in three letters. In the flat proof
-pictures the ways look almost the same. The owner chose the way of
-today.
+The measure is the letter fault bench in TrueType lettering, with the
+limits of the eye of ADR 0173 (the numbers are in the plan):
+
+- 238 letters of 248 are clean to the eye in both ways of the trial,
+  against 240 today.
+- The open area is the same: the joints of this kind are covered today
+  already, and the open areas that the eye sees are at other joints.
+- The trims are the same.
+- The area with two layers of thread is 51 % and 64 % larger (thicker,
+  stiffer joints).
+- Three letters have bulges of 3.0 to 3.5 mm.
+
+In the flat proof pictures the ways look almost the same. The owner
+chose the way of today.
 
 The main branch keeps the measures of the trial: `Faults::two_layers`
 and `letter_faults::eye_summary` (`emb-cli letter-faults --judged`).

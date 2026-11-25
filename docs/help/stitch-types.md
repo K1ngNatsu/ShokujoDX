@@ -2,7 +2,7 @@
 id: stitch-types
 title: Stitch types
 group: design
-keywords: stitch type, outline type, fill type, column type, satin, zigzag, e stitch, blanket, raised, tatami, square, coil, contour, string, motif, program split, flexi split, user split, offset, spiral, island coil, radial, maze, florentine, guide line, stipple, cross stitch, laydown, tartan, plaid, sett, gradient, meander, circular, guided, ripple, mesh, motifs, run types, backstitch, stem stitch, sculpture, blends, borders, buttonholes, carving, stamp
+keywords: stitch type, outline type, fill type, column type, satin, zigzag, e stitch, blanket, raised, tatami, square, coil, contour, string, motif, program split, flexi split, user split, offset, spiral, island coil, radial, maze, florentine, guide line, stipple, cross stitch, laydown, tartan, plaid, sett, gradient, meander, circular, guided, ripple, mesh, motifs, run types, backstitch, stem stitch, sculpture, blends, borders, buttonholes, carving, stamp, lean, bands, column bands, band overlap
 ---
 # Stitch types
 

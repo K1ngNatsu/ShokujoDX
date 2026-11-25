@@ -2,7 +2,7 @@
 id: fabrics-and-styles
 title: Stoffe, Stile und Vorlagen
 group: production
-keywords: stoff, stickvlies, deckvlies, unterlage, strickstoff, t-shirt, polo, fleece, handtuch, denim, filz, leder, seide, kappe, spitze, stil, bereich stile, favorit, aktuelle eigenschaften, aktuell machen, aktuelle anwenden, vorlage, neu aus vorlage, als vorlage speichern, meine ressourcen, paket, teilen
+keywords: stoff, stickvlies, deckvlies, unterlage, strickstoff, t-shirt, polo, fleece, handtuch, denim, filz, leder, seide, kappe, spitze, stil, bereich stile, favorit, aktuelle eigenschaften, aktuell machen, aktuelle anwenden, vorlage, neu aus vorlage, als vorlage speichern, meine ressourcen, paket, teilen, testmuster, muster, probestickerei, einstellungen für einen stoff
 ---
 # Stoffe, Stile und Vorlagen
 
@@ -42,7 +42,8 @@ ein Objekt aus (eine Füllung, eine Satinsäule, eine Linie oder einen
 Schriftzug) und klicken Sie auf **Design > Ausgabe > Testmuster**.
 
 - **Einstellung**: die Einstellung, die sich von Kopie zu Kopie ändert:
-  Abstand, Stichlänge, Zugausgleich, Breite, Winkel oder Unterlage. Die
+  Abstand, Stichlänge, Zugausgleich, Breite, Winkel, Unterlage, Neigung
+  oder Bandüberlappung. Die
   Liste zeigt nur die Einstellungen, die die ausgewählten Objekte haben.
 - **Ab**, **Bis** und **Kopien**: die Werte der ersten und der letzten
   Kopie und die Zahl der Kopien. Die Stufen dazwischen sind gleich. Für

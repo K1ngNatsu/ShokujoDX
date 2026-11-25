@@ -16,7 +16,8 @@ kits of the project are made by Python tools. The idea is from zigzag
 - **`emb_letter::swatch`** (in `emb-letter`, not in `emb-model` as the
   plan said: the labels are lettering, laid out with `layout::relayout`).
   `SwatchSetting` is spacing, stitch length, pull compensation, width,
-  angle or underlay; `value_in` and `set` read and change it for the kinds
+  angle or underlay (ADR 0171 added lean and band overlap, and a copy of
+  a group is a new group); `value_in` and `set` read and change it for the kinds
   that have it (fills; satin columns; lines, and lines with a border for
   the column settings; lettering for spacing, pull compensation and
   underlay, with `Lettering::apply_params`). The width of a satin column
@@ -24,13 +25,14 @@ kits of the project are made by Python tools. The idea is from zigzag
   middle between it and the other rail; the mean width is `satin_width`).
   For underlay, there is one copy for each of none, light, auto, heavy and
   double.
-- `swatches` makes a new design: the threads, machine, hoop and fabric of
-  the design; for each value a copy of the selected objects (the objects
-  that do not have the setting stay as they are), in a grid round the
-  center of the hoop with as many columns as fit the field of the hoop,
-  and the value under each copy as lettering in the bundled font for small
-  text (Atkinson Hyperlegible, 5 mm or its smallest size). The copies do
-  not overlap, so their colors sew together
+- `swatches` makes a new design with the threads, machine, hoop and
+  fabric of the design. For each value it has a copy of the selected
+  objects (the objects that do not have the setting stay as they are).
+  The copies are in a grid round the center of the hoop, with as many
+  columns as fit the field of the hoop. Under each copy is its value, as
+  lettering in the bundled font for small text (`sheet::LABEL_FONT`,
+  Atkinson Hyperlegible, 5 mm or its smallest size). The copies do not
+  overlap, so their colors sew together
   (`Design::optimize_color_changes`).
 - **The window** Design > Output > Test Swatches… (`test_swatches.rs`)
   lists only the settings that the selection has, with From, To and
@@ -42,6 +44,14 @@ kits of the project are made by Python tools. The idea is from zigzag
   more (`Units::fmt_fine`), so that 0.30 and 0.35 mm do not look the same.
 - **`emb-cli swatch`** makes the same swatches from a project file, for the
   tools that make sew-out kits.
+
+## The audit of P22
+
+The values of the copies stay in the range of the setting
+(`SwatchSetting::range`; a value that is not a number is the start of the
+range): a pull compensation that was not a number gave stitches that were
+not numbers, and a width of 1e9 mm a design out of the range of a
+project.
 
 ## Consequences
 

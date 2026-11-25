@@ -3,7 +3,7 @@
 //! sew and to look at. The engine part is `emb_letter::sheet`.
 
 use eframe::egui;
-use emb_letter::sheet::{self, Characters};
+use emb_letter::sheet::{self, Characters, LABEL_FONT};
 use emb_model::{FontRef, HoopSelection, LetterStitch};
 
 use crate::app::AppState;
@@ -16,8 +16,6 @@ const OPEN_WIDTH_MM: f64 = 180.0;
 /// With no hoop, the sizes that are on at the start give a sheet that is
 /// not higher than this, in mm.
 const OPEN_HEIGHT_MM: f64 = 300.0;
-/// The font of the labels: a bundled font for small text.
-const LABEL_FONT: &str = "Atkinson Hyperlegible";
 
 /// The characters of the sheet (see `emb_letter::sheet::Characters`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -124,8 +122,9 @@ impl FontSheetWindow {
 }
 
 impl AppState {
-    /// The sewing field of the hoop of the design (width, height), in mm.
-    fn sheet_hoop(&self) -> Option<(f64, f64)> {
+    /// The sewing field of the hoop of the design (width, height), in mm,
+    /// if it has a hoop (the font test sheet and the test swatches).
+    pub(crate) fn hoop_field(&self) -> Option<(f64, f64)> {
         match &self.doc.design().hoop.selection {
             HoopSelection::Preset { id } => self.hoops.get(id).map(|h| (h.width_mm, h.height_mm)),
             HoopSelection::OpenField => None,
@@ -136,7 +135,7 @@ impl AppState {
     /// new lettering), with rows that fit the hoop.
     pub fn open_font_sheet(&mut self, font: Option<FontRef>) {
         let width = self
-            .sheet_hoop()
+            .hoop_field()
             .map_or(OPEN_WIDTH_MM, |(w, _)| (w - 2.0 * MARGIN_MM).max(20.0));
         let w = &mut self.font_sheet_window;
         w.font = font.unwrap_or_else(|| self.letter_font.clone());
@@ -160,7 +159,7 @@ impl AppState {
         };
         let range = self.fonts.get(&font).and_then(|f| f.source().size_range(stitch));
         let s = sheet::sizes(range);
-        let limit = self.sheet_hoop().map_or(OPEN_HEIGHT_MM, |(_, h)| h);
+        let limit = self.hoop_field().map_or(OPEN_HEIGHT_MM, |(_, h)| h);
         let mut on = vec![s[0]];
         for size in [s[1], s[2]] {
             let mut with = on.clone();
@@ -263,7 +262,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         });
         st.font_sheet_window.info = Some((key, info));
     }
-    let hoop = st.sheet_hoop();
+    let hoop = st.hoop_field();
     let mut w = st.font_sheet_window.clone();
     let info = w.info.as_ref().map(|(_, i)| i.clone());
     let (mut open, mut make) = (true, false);
@@ -429,7 +428,7 @@ mod tests {
         };
         assert!(info.groups.iter().all(Option::is_some), "the area of each size");
         assert!(info.width_mm <= w.width_mm + 1e-6);
-        let (_, hoop_height) = st.sheet_hoop().expect("a hoop");
+        let (_, hoop_height) = st.hoop_field().expect("a hoop");
         assert!(info.height_mm <= hoop_height, "the sheet fits the hoop at the start");
         // The smallest size only: a design with a label and the letters.
         st.font_sheet_window.sizes[1].0 = false;

@@ -63,4 +63,5 @@ In a fill, the travel goes along the rows where it can.
   thread, and the stitches of each object are kept, so only a changed
   object is sewn again.
 - Other fill patterns that do not use `sew_tatami` keep the travel of
-  before.
+  before. (Changed by ADR 0168: only fills with tatami rows travel along
+  their rows, and circular and guided fills go round their sewn rows.)

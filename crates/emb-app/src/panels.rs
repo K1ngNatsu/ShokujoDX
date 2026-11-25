@@ -790,7 +790,7 @@ fn column_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &S
     ) {
         lean_slider(ui, st, id, params.lean_deg);
     }
-    if let Some(b) = params.band.filter(|b| b.count > 1) {
+    if let Some(b) = params.active_band() {
         ui.weak(crate::i18n::fill("Band {} of {}", &[&(b.index + 1), &b.count]))
             .on_hover_text(tr(
                 "This column sews one band of the width. Edit > Stitch Types > Bands changes the bands.",
@@ -897,7 +897,7 @@ fn column_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &S
         }
     }
     crate::effects_ui::column_effects(ui, st, id, params);
-    if params.band.is_some_and(|b| b.count > 1 && b.index > 0) {
+    if params.active_band().is_some_and(|b| !b.sews_underlay()) {
         ui.weak(tr("The first band sews the underlay of the whole column."));
     } else {
         underlay_ui(ui, st, id, &params.underlay);

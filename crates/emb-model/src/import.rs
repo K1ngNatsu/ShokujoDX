@@ -208,7 +208,7 @@ pub fn records_of_stitch_objects(d: &Design, ids: &[ObjectId]) -> (StitchDesign,
         let ObjectKind::Stitches { path, trims } = &o.kind else {
             continue;
         };
-        let parts = stitch_parts(path);
+        let parts = stitch_subpaths(path);
         if parts.iter().all(Vec::is_empty) {
             continue;
         }
@@ -255,9 +255,10 @@ pub fn records_of_stitch_objects(d: &Design, ids: &[ObjectId]) -> (StitchDesign,
     (sd, owner)
 }
 
-/// The parts of a stitch object as needle points (as the stitch engine
-/// reads them: all points stay; a curve counts as its end point).
-fn stitch_parts(path: &Path) -> Vec<Vec<Point>> {
+/// The subpaths of a stitch object as needle points. All points stay, also
+/// repeated ones; curves count as their end points (the stitch engine
+/// sews them so: `emb_stitch::stitch_subpaths` is this function).
+pub fn stitch_subpaths(path: &Path) -> Vec<Vec<Point>> {
     use emb_geom::path::PathCmd;
     let mut out: Vec<Vec<Point>> = Vec::new();
     for cmd in &path.cmds {

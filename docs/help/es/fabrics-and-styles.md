@@ -2,7 +2,7 @@
 id: fabrics-and-styles
 title: Telas, estilos y plantillas
 group: production
-keywords: tela, entretela, recubrimiento, refuerzo, punto, camiseta, polo, forro polar, toalla, vaquero, fieltro, cuero, seda, gorra, encaje, estilo, panel estilos, favorito, propiedades actuales, hacer actual, aplicar actual, plantilla, nuevo a partir de plantilla, guardar como plantilla, mis recursos, paquete, compartir
+keywords: tela, entretela, recubrimiento, refuerzo, punto, camiseta, polo, forro polar, toalla, vaquero, fieltro, cuero, seda, gorra, encaje, estilo, panel estilos, favorito, propiedades actuales, hacer actual, aplicar actual, plantilla, nuevo a partir de plantilla, guardar como plantilla, mis recursos, paquete, compartir, muestras de prueba, muestra, prueba de bordado, ajustes para una tela
 ---
 # Telas, estilos y plantillas
 
@@ -41,7 +41,8 @@ relleno, una columna de satén, una línea o letras) y haga clic en
 **Diseño > Producción > Muestras de prueba**.
 
 - **Ajuste**: el ajuste que cambia de una copia a otra: espaciado, largo
-  de puntada, compensación de tiro, ancho, ángulo o base. La lista
+  de puntada, compensación de tiro, ancho, ángulo, base, inclinación o
+  superposición de bandas. La lista
   muestra solo los ajustes que tienen los objetos seleccionados.
 - **Desde**, **Hasta** y **Copias**: los valores de la primera y de la
   última copia, y el número de copias. Los pasos entre ellas son iguales.

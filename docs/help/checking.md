@@ -2,7 +2,7 @@
 id: checking
 title: Checking a design
 group: production
-keywords: check, preview, stitch player, play, sew-out, simulate, stitch cursor, travel, stitch list, functions, design info, warnings, density map, layers, build up, thread look, 3d, light, light presets, tilt, tilt view, turn, magnifier, compare, before and after, show through, gaps, high thread, thread breaks, needle points, jumps, trims, product, t-shirt, mockup, repeats, continuous, approval, sew time, stitch count
+keywords: check, preview, stitch player, play, sew-out, simulate, stitch cursor, travel, stitch list, functions, design info, warnings, density map, layers, build up, thread look, 3d, light, light presets, tilt, tilt view, turn, magnifier, compare, before and after, show through, gaps, high thread, thread breaks, needle points, jumps, trims, product, t-shirt, mockup, repeats, continuous, approval, sew time, stitch count, travel that shows, fix stitches, machine file check
 ---
 # Checking a design
 
@@ -73,7 +73,8 @@ object. The program warns about:
 - in stitch objects (a machine file opened as stitches): stitches longer
   than the machine sews, color changes to the same thread, long jumps
   with no trim, pieces too short for the trimmer, starts and ends with
-  no lock stitches, and travel of the file that shows. **Fix Stitches**
+  no lock stitches, and travel of the file that shows on top of sewn
+  stitches (1 mm or more in one run). **Fix Stitches**
   fixes most of them.
 
 ## The density map

@@ -22,7 +22,8 @@ those fields.
   `backups/<process id>-<start time>/` next to the settings file. It writes
   each design with unsaved changes there every few minutes, and
   `session.json` (the open backups and the time) about every 30 seconds. A
-  normal exit deletes the folder. At start, a session with a heartbeat
+  normal exit deletes the folder (changed by ADR 0175: with Options > Open
+  tabs, a quit keeps the folder with the tabs for the next start). At start, a session with a heartbeat
   older than 2 minutes has stopped, and its designs can be recovered.
 - A heartbeat needs no platform code (no check of process ids), and two
   apps that run at the same time do not take each other's backups.

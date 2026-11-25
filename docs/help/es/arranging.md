@@ -2,7 +2,7 @@
 id: arranging
 title: Organizar y el orden de bordado
 group: design
-keywords: organizar, girar, rotar, reflejar, voltear, sesgar, inclinar, puntos de referencia, centrar, alinear, espaciar por igual, distribuir, mismo tamaño, copias, disposición, espejo combinado, matriz, corona, caleidoscopio, reflejar, agrupar, desagrupar, bloquear, desbloquear, orden de bordado, secuencia, cambios de color, orden más corto, orden para gorras, unión más cercana, orden de clic
+keywords: organizar, girar, rotar, reflejar, voltear, sesgar, inclinar, puntos de referencia, centrar, alinear, espaciar por igual, distribuir, mismo tamaño, copias, disposición, espejo combinado, matriz, corona, caleidoscopio, reflejar, agrupar, desagrupar, bloquear, desbloquear, orden de bordado, secuencia, cambios de color, orden más corto, orden para gorras, unión más cercana, orden de clic, bordar más rápido, unir hilos, detalles pequeños, distancia de corte, huecos
 ---
 # Organizar y el orden de bordado
 
@@ -106,7 +106,10 @@ cuesta tiempo.
   guarda este valor, y si está desactivado decide la máquina) y **Menos
   cambios de color**. Una tabla muestra los hilos, cambios de color,
   cortes, puntadas, el tiempo de bordado y el desplazamiento visible,
-  antes y después, y el lienzo marca el desplazamiento visible. **Aceptar**
+  antes y después, y el lienzo marca el desplazamiento visible.
+  **Estándar** pone los valores de la primera apertura. **Quitar detalles
+  pequeños** también deja los objetos bloqueados y los objetos de
+  contornos, formas enlazadas, ojales, aplicaciones y bocetos. **Aceptar**
   guarda el resultado como un paso que puede deshacer; **Cancelar**
   vuelve atrás.
 

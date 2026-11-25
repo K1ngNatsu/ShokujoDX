@@ -22,6 +22,8 @@
 //! The first and the last [`END_MM`] of each travel run join the stitches
 //! before and after it, and are not measured.
 
+use std::collections::HashMap;
+
 use emb_geom::Point;
 use emb_model::{ObjectId, StitchKind};
 
@@ -66,6 +68,8 @@ pub struct ShownPiece {
     pub shows: Shows,
     /// The object that the travel stitch is a part of.
     pub object: Option<ObjectId>,
+    /// The record of the travel stitch where the piece starts.
+    pub record: usize,
 }
 
 impl ShownPiece {
@@ -101,26 +105,50 @@ impl ShownTravel {
             .fold(0.0, |a, b| a + b)
     }
 
-    /// For each object with travel that shows: the length on top of sewn
-    /// stitches and on the fabric, mm, in the order of the plan.
-    pub fn by_object(&self) -> Vec<(ObjectId, f64, f64)> {
-        let mut out: Vec<(ObjectId, f64, f64)> = Vec::new();
-        for p in &self.pieces {
+    /// The travel that shows of each object with travel that shows, in the
+    /// order of the plan (one pass over the pieces).
+    pub fn by_object(&self) -> Vec<ObjectTravel> {
+        let mut out: Vec<ObjectTravel> = Vec::new();
+        let mut index: HashMap<ObjectId, usize> = HashMap::new();
+        for (i, p) in self.pieces.iter().enumerate() {
             let Some(id) = p.object else { continue };
-            let k = match out.iter().position(|o| o.0 == id) {
-                Some(k) => k,
-                None => {
-                    out.push((id, 0.0, 0.0));
-                    out.len() - 1
+            let k = *index.entry(id).or_insert_with(|| {
+                out.push(ObjectTravel {
+                    object: id,
+                    on_stitches_mm: 0.0,
+                    longest_on_stitches: None,
+                    longest_on_fabric: None,
+                });
+                out.len() - 1
+            });
+            let o = &mut out[k];
+            let len = p.length();
+            let longest = match p.shows {
+                Shows::OnStitches => {
+                    o.on_stitches_mm += len;
+                    &mut o.longest_on_stitches
                 }
+                Shows::OnFabric => &mut o.longest_on_fabric,
             };
-            match p.shows {
-                Shows::OnStitches => out[k].1 += p.length(),
-                Shows::OnFabric => out[k].2 += p.length(),
+            // The last of the longest pieces, as `Iterator::max_by`.
+            if longest.is_none_or(|j| self.pieces[j].length() <= len) {
+                *longest = Some(i);
             }
         }
         out
     }
+}
+
+/// The travel that shows of one object (see [`ShownTravel::by_object`]).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ObjectTravel {
+    pub object: ObjectId,
+    /// The length on top of sewn stitches, mm.
+    pub on_stitches_mm: f64,
+    /// The longest piece on top of sewn stitches and on the fabric (indices
+    /// in [`ShownTravel::pieces`]).
+    pub longest_on_stitches: Option<usize>,
+    pub longest_on_fabric: Option<usize>,
 }
 
 /// One stitch of the plan: from the needle to the record, at the place of
@@ -199,12 +227,11 @@ pub fn shown_travel(plan: &StitchPlan) -> ShownTravel {
     // turns of the needle path near them. A cell is on a stitch if its
     // middle is this near to it.
     let on = CELL_MM * std::f64::consts::FRAC_1_SQRT_2;
-    let all_travel = || runs.iter().flatten();
-    let mut wanted = CellMap::new(CELL_MM, all_travel(), 2);
+    let mut wanted = CellMap::new(CELL_MM);
     // The cells of the turns: as far as [`EDGE_MM`] (two cells) round the
     // cells of the travel.
-    let mut turn_cells = CellMap::new(CELL_MM, all_travel(), TURN_REACH + 2);
-    for t in all_travel() {
+    let mut turn_cells = CellMap::new(CELL_MM);
+    for t in runs.iter().flatten() {
         for c in wanted.cells_of(t.a, t.b, 0.0) {
             if wanted.middle(c).distance_to_segment(t.a, t.b) <= on {
                 wanted.mark(c);
@@ -216,23 +243,17 @@ pub fn shown_travel(plan: &StitchPlan) -> ShownTravel {
             }
         }
     }
-    // Most stitches are far from all travel: the sums of the marked cells
+    // Most stitches are far from all travel: the blocks of the marked cells
     // leave them out with one look.
-    let sums = wanted.sums();
     let mut grid: Vec<Vec<u32>> = vec![Vec::new(); wanted.count];
     let mut turns: Vec<Vec<Point>> = vec![Vec::new(); turn_cells.count];
     let reach = GROOVE_MM + on;
     for (k, s) in stitches.iter().enumerate() {
-        let near_travel = wanted.any_in(&sums, s.a, s.b, GROOVE_MM);
-        if near_travel {
-            for c in wanted.cells_of(s.a, s.b, GROOVE_MM) {
-                if let Some(slot) = wanted.slot(c)
-                    && wanted.middle(c).distance_to_segment(s.a, s.b) <= reach
-                {
-                    grid[slot].push(k as u32);
-                }
+        wanted.each_marked_in(s.a, s.b, GROOVE_MM, |c, slot| {
+            if wanted.middle(c).distance_to_segment(s.a, s.b) <= reach {
+                grid[slot].push(k as u32);
             }
-        }
+        });
         for (turn, q) in [(s.turn_a, s.a), (s.turn_b, s.b)] {
             if turn && let Some(slot) = turn_cells.slot(turn_cells.cell(q)) {
                 turns[slot].push(q);
@@ -277,6 +298,7 @@ pub fn shown_travel(plan: &StitchPlan) -> ShownTravel {
                         to,
                         shows,
                         object,
+                        record: t.record,
                     }),
                 }
             }
@@ -286,37 +308,68 @@ pub fn shown_travel(plan: &StitchPlan) -> ShownTravel {
     ShownTravel { pieces, travel_mm }
 }
 
-/// A map of square cells over the travel and round it. A marked cell has
-/// a number (its slot), from 0 to `count`.
+/// A map of square cells of `size` mm with marked cells. A marked cell
+/// has a number (its slot), from 0 to `count`. The map keeps only the
+/// blocks of cells that have a marked cell (the audit of P22: a map of all
+/// the cells of the box of the travel needed 10^10 cells for travel 100 m
+/// apart, and design info makes this measure for each design).
 struct CellMap {
     size: f64,
-    origin: (i64, i64),
-    cols: i64,
-    rows: i64,
-    slots: Vec<u32>,
+    /// The blocks of [`BLOCK`] × [`BLOCK`] cells with a marked cell: the
+    /// slot of each cell of the block, or `u32::MAX`.
+    blocks: HashMap<(i64, i64), Box<[u32; CELLS_IN_BLOCK]>, Cells>,
+    /// The first and the last cell of the box of the marked cells.
+    bounds: ((i64, i64), (i64, i64)),
     count: usize,
 }
 
-impl CellMap {
-    /// A map with cells of `size` mm over the travel `segs` and `margin`
-    /// more cells on each side.
-    fn new<'a>(size: f64, segs: impl Iterator<Item = &'a Seg>, margin: i64) -> CellMap {
-        let at = |p: Point| ((p.x / size).floor() as i64, (p.y / size).floor() as i64);
-        let (mut lo, mut hi) = ((i64::MAX, i64::MAX), (i64::MIN, i64::MIN));
-        for s in segs {
-            for c in [at(s.a), at(s.b)] {
-                lo = (lo.0.min(c.0), lo.1.min(c.1));
-                hi = (hi.0.max(c.0), hi.1.max(c.1));
-            }
+/// The cells of a block of [`CellMap`].
+const CELLS_IN_BLOCK: usize = (BLOCK * BLOCK) as usize;
+
+/// A quick hash for the cells of a [`CellMap`] (two whole numbers; the
+/// hash of the standard library is made for keys from outside).
+#[derive(Clone, Copy, Default)]
+struct Cells;
+
+impl std::hash::BuildHasher for Cells {
+    type Hasher = CellHasher;
+    fn build_hasher(&self) -> CellHasher {
+        CellHasher(0)
+    }
+}
+
+#[derive(Clone, Copy)]
+struct CellHasher(u64);
+
+impl std::hash::Hasher for CellHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        for b in bytes {
+            self.write_u64(u64::from(*b));
         }
-        let origin = (lo.0 - margin, lo.1 - margin);
-        let (cols, rows) = (hi.0 - lo.0 + 1 + 2 * margin, hi.1 - lo.1 + 1 + 2 * margin);
+    }
+
+    fn write_i64(&mut self, v: i64) {
+        self.write_u64(v as u64);
+    }
+
+    fn write_u64(&mut self, v: u64) {
+        self.0 = (self.0.rotate_left(26) ^ v).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+    }
+}
+
+/// The side of a block of [`CellMap`], cells.
+const BLOCK: i64 = 16;
+
+impl CellMap {
+    fn new(size: f64) -> CellMap {
         CellMap {
             size,
-            origin,
-            cols,
-            rows,
-            slots: vec![u32::MAX; (cols * rows).max(0) as usize],
+            blocks: HashMap::default(),
+            bounds: ((i64::MAX, i64::MAX), (i64::MIN, i64::MIN)),
             count: 0,
         }
     }
@@ -330,69 +383,91 @@ impl CellMap {
         Point::new((c.0 as f64 + 0.5) * self.size, (c.1 as f64 + 0.5) * self.size)
     }
 
-    /// The cells of the box of `a` and `b`, larger by `grow` mm, in the map.
+    /// The cells of the box of `a` and `b`, larger by `grow` mm.
     fn cells_of(&self, a: Point, b: Point, grow: f64) -> impl Iterator<Item = (i64, i64)> + use<> {
-        let lo = self.cell(Point::new(a.x.min(b.x) - grow, a.y.min(b.y) - grow));
-        let hi = self.cell(Point::new(a.x.max(b.x) + grow, a.y.max(b.y) + grow));
-        let (x0, y0) = (lo.0.max(self.origin.0), lo.1.max(self.origin.1));
-        let (x1, y1) = (
-            hi.0.min(self.origin.0 + self.cols - 1),
-            hi.1.min(self.origin.1 + self.rows - 1),
-        );
-        (x0..=x1).flat_map(move |x| (y0..=y1).map(move |y| (x, y)))
+        let (lo, hi) = self.box_of(a, b, grow);
+        (lo.0..=hi.0).flat_map(move |x| (lo.1..=hi.1).map(move |y| (x, y)))
     }
 
-    fn index(&self, c: (i64, i64)) -> Option<usize> {
-        let (i, j) = (c.0 - self.origin.0, c.1 - self.origin.1);
-        (i >= 0 && j >= 0 && i < self.cols && j < self.rows).then(|| (j * self.cols + i) as usize)
+    /// The first and the last cell of the box of `a` and `b`, larger by
+    /// `grow` mm.
+    fn box_of(&self, a: Point, b: Point, grow: f64) -> ((i64, i64), (i64, i64)) {
+        let lo = self.cell(Point::new(a.x.min(b.x) - grow, a.y.min(b.y) - grow));
+        let hi = self.cell(Point::new(a.x.max(b.x) + grow, a.y.max(b.y) + grow));
+        (lo, hi)
+    }
+
+    /// The block of the cell `c`, and the place of the cell in it.
+    fn in_block(c: (i64, i64)) -> ((i64, i64), usize) {
+        let block = (c.0.div_euclid(BLOCK), c.1.div_euclid(BLOCK));
+        (block, (c.1.rem_euclid(BLOCK) * BLOCK + c.0.rem_euclid(BLOCK)) as usize)
     }
 
     fn mark(&mut self, c: (i64, i64)) {
-        if let Some(k) = self.index(c)
-            && self.slots[k] == u32::MAX
-        {
-            self.slots[k] = self.count as u32;
+        let (block, i) = Self::in_block(c);
+        let cells = self
+            .blocks
+            .entry(block)
+            .or_insert_with(|| Box::new([u32::MAX; CELLS_IN_BLOCK]));
+        if cells[i] == u32::MAX {
+            cells[i] = self.count as u32;
             self.count += 1;
+            let (lo, hi) = &mut self.bounds;
+            *lo = (lo.0.min(c.0), lo.1.min(c.1));
+            *hi = (hi.0.max(c.0), hi.1.max(c.1));
         }
     }
 
     fn slot(&self, c: (i64, i64)) -> Option<usize> {
-        self.index(c)
-            .map(|k| self.slots[k])
-            .filter(|s| *s != u32::MAX)
-            .map(|s| s as usize)
+        let ((x0, y0), (x1, y1)) = self.bounds;
+        if c.0 < x0 || c.0 > x1 || c.1 < y0 || c.1 > y1 {
+            return None;
+        }
+        let (block, i) = Self::in_block(c);
+        let s = self.blocks.get(&block)?[i];
+        (s != u32::MAX).then_some(s as usize)
     }
 
-    /// The sums of the marked cells: `sums[(j * (cols + 1)) + i]` counts the
-    /// marked cells left of column `i` and above row `j`.
-    fn sums(&self) -> Vec<u32> {
-        let w = self.cols as usize + 1;
-        let mut sums = vec![0u32; w * (self.rows as usize + 1)];
-        for j in 0..self.rows as usize {
-            let mut row = 0;
-            for i in 0..self.cols as usize {
-                row += u32::from(self.slots[j * self.cols as usize + i] != u32::MAX);
-                sums[(j + 1) * w + i + 1] = sums[j * w + i + 1] + row;
+    /// Calls `f` for each marked cell of the box of `a` and `b`, larger by
+    /// `grow` mm, with its slot: through the blocks of the box, or through
+    /// all the blocks when the box has more.
+    fn each_marked_in(&self, a: Point, b: Point, grow: f64, mut f: impl FnMut((i64, i64), usize)) {
+        let (mut lo, mut hi) = self.box_of(a, b, grow);
+        // Most stitches are far from all travel.
+        lo = (lo.0.max(self.bounds.0.0), lo.1.max(self.bounds.0.1));
+        hi = (hi.0.min(self.bounds.1.0), hi.1.min(self.bounds.1.1));
+        if lo.0 > hi.0 || lo.1 > hi.1 {
+            return;
+        }
+        let (b0, b1) = (
+            (lo.0.div_euclid(BLOCK), lo.1.div_euclid(BLOCK)),
+            (hi.0.div_euclid(BLOCK), hi.1.div_euclid(BLOCK)),
+        );
+        let mut in_block = |block: (i64, i64), cells: &[u32; CELLS_IN_BLOCK]| {
+            let (x0, y0) = (block.0 * BLOCK, block.1 * BLOCK);
+            for y in lo.1.max(y0)..=hi.1.min(y0 + BLOCK - 1) {
+                for x in lo.0.max(x0)..=hi.0.min(x0 + BLOCK - 1) {
+                    let s = cells[((y - y0) * BLOCK + (x - x0)) as usize];
+                    if s != u32::MAX {
+                        f((x, y), s as usize);
+                    }
+                }
+            }
+        };
+        let in_box = (b1.0 - b0.0 + 1).saturating_mul(b1.1 - b0.1 + 1);
+        if in_box <= self.blocks.len() as i64 {
+            for bx in b0.0..=b1.0 {
+                for by in b0.1..=b1.1 {
+                    if let Some(cells) = self.blocks.get(&(bx, by)) {
+                        in_block((bx, by), cells);
+                    }
+                }
+            }
+        } else {
+            for (block, cells) in &self.blocks {
+                in_block(*block, cells);
             }
         }
-        sums
-    }
-
-    /// A cell of the box of `a` and `b`, larger by `grow` mm, is marked.
-    fn any_in(&self, sums: &[u32], a: Point, b: Point, grow: f64) -> bool {
-        let lo = self.cell(Point::new(a.x.min(b.x) - grow, a.y.min(b.y) - grow));
-        let hi = self.cell(Point::new(a.x.max(b.x) + grow, a.y.max(b.y) + grow));
-        let (x0, y0) = ((lo.0 - self.origin.0).max(0), (lo.1 - self.origin.1).max(0));
-        let (x1, y1) = (
-            (hi.0 - self.origin.0 + 1).min(self.cols),
-            (hi.1 - self.origin.1 + 1).min(self.rows),
-        );
-        if x0 >= x1 || y0 >= y1 {
-            return false;
-        }
-        let w = self.cols as usize + 1;
-        let at = |i: i64, j: i64| sums[j as usize * w + i as usize];
-        at(x1, y1) + at(x0, y0) > at(x0, y1) + at(x1, y0)
     }
 }
 

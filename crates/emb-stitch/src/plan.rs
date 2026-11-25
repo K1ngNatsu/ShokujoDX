@@ -20,8 +20,29 @@ use crate::running;
 /// the shortest stitch of the machine).
 const MIN_LOCK_MM: f64 = 0.1;
 /// A tie-off looks back at most this many needle points for a point far
-/// enough for its lock stitches.
-const LOCK_LOOK_BACK: usize = 12;
+/// enough for its lock stitches (the plan and the fix of machine files).
+pub const LOCK_LOOK_BACK: usize = 12;
+
+/// The shortest lock stitch of `opts`, mm: [`MIN_LOCK_MM`] or the shortest
+/// stitch of the machine.
+pub fn min_lock_mm(opts: &PlanOptions) -> f64 {
+    opts.min_stitch_mm.max(MIN_LOCK_MM)
+}
+
+/// A lock at `at`: two short stitches forward toward `toward` and back,
+/// ending where they started. `None` if the stitches would be shorter than
+/// [`min_lock_mm`]: shorter lock stitches hold nothing, break the thread,
+/// and a machine file (0.1 mm steps) puts them all on one point. The plan
+/// and the fix of machine files make their locks with it.
+pub fn lock_points(at: Point, toward: Point, opts: &PlanOptions) -> Option<[Point; 4]> {
+    let u = (toward - at).normalized()?;
+    let len = opts.lock_mm.min(at.distance(toward) / 2.0);
+    if len < min_lock_mm(opts) {
+        return None;
+    }
+    let q = at + u * len;
+    Some([q, at, q, at])
+}
 
 /// A run that starts nearer than this to the needle starts where the
 /// needle is, in mm: a travel stitch to it is not made. The unit of the
@@ -54,6 +75,16 @@ impl Default for PlanOptions {
 }
 
 impl PlanOptions {
+    /// These options with the trim distance of `design`, if it has one: it
+    /// wins over the one of the machine (P22 Milestone 2, ADR 0169). The
+    /// plan, the check of stitch objects and `emb-cli check` use it.
+    pub fn for_design(&self, design: &Design) -> PlanOptions {
+        PlanOptions {
+            trim_mm: design.trim_gap_mm.unwrap_or(self.trim_mm),
+            ..self.clone()
+        }
+    }
+
     pub fn for_machine(m: &MachineProfile) -> Self {
         let d = Self::default();
         Self {
@@ -136,19 +167,8 @@ pub fn build_plan_until(
 ) -> Option<StitchPlan> {
     let to_out = design.output_transform();
     let to_design = to_out.inverse().unwrap_or(Transform::IDENTITY);
-    // The trim distance of the design wins over the one of the machine
-    // (P22 Milestone 2, ADR 0169).
-    let with_gap;
-    let opts = match design.trim_gap_mm {
-        Some(g) => {
-            with_gap = PlanOptions {
-                trim_mm: g,
-                ..opts.clone()
-            };
-            &with_gap
-        }
-        None => opts,
-    };
+    // The trim distance of the design wins over the one of the machine.
+    let opts = &opts.for_design(design);
     let mut b = Builder::new(opts);
     // Auto start (ADR 0032): the needle goes to the start point first, so
     // the first object starts from there.
@@ -565,21 +585,16 @@ impl<'a> Builder<'a> {
     /// shorter one breaks the thread, and Design Info warns of it), at
     /// least [`MIN_LOCK_MM`].
     fn min_lock(&self) -> f64 {
-        self.opts.min_stitch_mm.max(MIN_LOCK_MM)
+        min_lock_mm(self.opts)
     }
 
-    /// Two short stitches forward and back toward `toward`, ending where they started.
+    /// Two short stitches forward and back toward `toward`, ending where
+    /// they started ([`lock_points`]).
     fn lock(&mut self, toward: Point) {
-        let at = self.needle;
-        let Some(u) = (toward - at).normalized() else { return };
-        let len = self.opts.lock_mm.min(at.distance(toward) / 2.0);
-        // Shorter lock stitches hold nothing, break the thread, and a
-        // machine file (0.1 mm steps) puts them all on one point.
-        if len < self.min_lock() {
+        let Some(points) = lock_points(self.needle, toward, self.opts) else {
             return;
-        }
-        let q = at + u * len;
-        for p in [q, at, q, at] {
+        };
+        for p in points {
             self.stitch(p, true);
         }
     }

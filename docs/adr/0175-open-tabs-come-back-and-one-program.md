@@ -56,6 +56,12 @@ has no network code and no sockets (ADR 0109).
   before, and a closed session is not offered).
 - A program whose heartbeat is older than two minutes (it hangs) does
   not get files; the new process starts a program of its own.
+- The audit of P22: the heartbeat of a program that stopped (a crash) is
+  new for up to two minutes, and nothing reads its inbox. So a start
+  waits up to 2.5 s (`TAKE_WAIT`) for the program to take its file; if
+  the entry is still there, it goes, and the start opens the file
+  itself. A view of a tab from a damaged session file (a zoom of 0, a
+  center far out) is not used.
 - On macOS the system sends a file to the program that runs as an event,
   not as a new process; the program does not read such events (as
   before).

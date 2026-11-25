@@ -41,8 +41,8 @@ program under Apache-2.0); the code is our own.
 - **The limits of the eye** (`EYE_*`, `eye_faults`): an open patch of
   0.38 mm² or more (the faulty letters have 0.41 mm² or more, the clean
   ones 0.35 mm² or less), open area at the convex corners of 0.5 mm² or
-  more (0.54 or more against 0.45 or less), a needle point 0.6 mm out, a
-  bulge over 3 mm, five crossing pairs. The last three have no faulty
+  more (0.54 or more against 0.45 or less), a needle point 0.6 mm out or
+  more, a bulge of 3 mm or more, five crossing pairs or more. The last three have no faulty
   letter in the set, so the eye does not test them yet.
 - `emb-cli letter-faults --judged <file>` (`compare`) gives the
   agreement, the letters where the measures and the eye do not agree,

@@ -38,7 +38,8 @@ zigzag (an open-source program under Apache-2.0); the code is our own.
 - **The window** (`emb-app/src/quicker.rs`; Arrange > Sew Order > Quicker
   to Sew…) works as Clean Up: each change of a value applies the settings
   to the design as it was when the window opened, as one merged edit; OK
-  keeps it as one undo step, Cancel undoes it. A table shows the threads,
+  keeps it as one undo step, Cancel undoes it, and Standard sets the
+  values of the first open (`QuickerToSew::STANDARD`). A table shows the threads,
   color changes, trims, stitches, sew time and the travel that shows (ADR
   0167) before and after; "after" shows when the plan of the new state is
   made (the plan thread), else "…". While the window is open, the canvas

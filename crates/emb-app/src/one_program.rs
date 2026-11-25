@@ -22,6 +22,11 @@ pub const POLL: Duration = Duration::from_secs(1);
 pub const NEW_WINDOW: &str = "--new-window";
 /// The extension of a file in the inbox (one path in it).
 const ENTRY: &str = "path";
+/// How long a start waits for the program that runs to take its file: it
+/// reads its inbox each [`POLL`]. The heartbeat of a program that stopped
+/// (a crash) is new for up to `STALE_S`, and nothing reads its inbox: the
+/// start then opens the file itself (the audit of P22).
+pub const TAKE_WAIT: Duration = Duration::from_millis(2_500);
 
 /// The file of the arguments of a start, if the start can give it to a
 /// program that runs: the first argument that is not an option. A start
@@ -45,30 +50,55 @@ pub fn file_of_args(args: &[String]) -> Option<PathBuf> {
 }
 
 /// Gives `file` to a program that runs: writes its path (made absolute)
-/// in the inbox of the running session in `root` with the newest
-/// heartbeat at `now`. `false`: no program runs, or no inbox can be
-/// written.
+/// in the inbox of a running session in `root` (the newest heartbeat at
+/// `now` first), and waits [`TAKE_WAIT`] for that program to take it.
+/// `false`: no program runs and takes it, or no inbox can be written.
 pub fn hand_over(root: &Path, file: &Path, now: u64) -> bool {
+    hand_over_within(root, file, now, TAKE_WAIT)
+}
+
+/// As [`hand_over`], with the time to wait for each session.
+fn hand_over_within(root: &Path, file: &Path, now: u64, wait: Duration) -> bool {
     let file = std::path::absolute(file).unwrap_or_else(|_| file.to_path_buf());
+    for dir in crate::backup::running_sessions(root, now) {
+        let Some(entry) = give(&dir, &file) else { continue };
+        if taken(&entry, wait) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Writes the path `file` in the inbox of the session folder `dir`: the
+/// entry, or `None` if it cannot be written.
+fn give(dir: &Path, file: &Path) -> Option<PathBuf> {
+    let inbox = dir.join(INBOX);
+    std::fs::create_dir_all(&inbox).ok()?;
     let millis = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_millis());
-    for dir in crate::backup::running_sessions(root, now) {
-        let inbox = dir.join(INBOX);
-        if std::fs::create_dir_all(&inbox).is_err() {
-            continue;
-        }
-        let name = format!("{millis}-{}", std::process::id());
-        let tmp = inbox.join(format!("{name}.tmp"));
-        // Written, then renamed: the program never reads half a path.
-        if std::fs::write(&tmp, file.to_string_lossy().as_bytes()).is_ok()
-            && std::fs::rename(&tmp, inbox.join(format!("{name}.{ENTRY}"))).is_ok()
-        {
+    let name = format!("{millis}-{}", std::process::id());
+    let tmp = inbox.join(format!("{name}.tmp"));
+    let entry = inbox.join(format!("{name}.{ENTRY}"));
+    // Written, then renamed: the program never reads half a path.
+    if std::fs::write(&tmp, file.to_string_lossy().as_bytes()).is_ok() && std::fs::rename(&tmp, &entry).is_ok() {
+        return Some(entry);
+    }
+    std::fs::remove_file(&tmp).ok();
+    None
+}
+
+/// The program took the inbox `entry` in `wait`. If not, the entry goes,
+/// unless the program takes it just then.
+fn taken(entry: &Path, wait: Duration) -> bool {
+    let start = Instant::now();
+    while start.elapsed() < wait {
+        if !entry.exists() {
             return true;
         }
-        std::fs::remove_file(&tmp).ok();
+        std::thread::sleep(Duration::from_millis(50));
     }
-    false
+    matches!(std::fs::remove_file(entry), Err(e) if e.kind() == std::io::ErrorKind::NotFound)
 }
 
 /// The paths in the inbox folder `inbox`, the oldest first; the entries
@@ -144,6 +174,40 @@ mod tests {
         assert_eq!(file_of_args(&a(&[])), None);
     }
 
+    /// What another process can put in the inbox: an empty entry, text that
+    /// is not a path, a path that is not there, a folder, a very long line,
+    /// and entries of other kinds. The program opens nothing and stops at
+    /// nothing; the entries go.
+    #[test]
+    fn the_inbox_takes_junk_and_opens_nothing() {
+        let r = root("junk");
+        let mut h = Harness::empty();
+        h.st.backups = crate::backup::Backups::new(Some(r.clone()));
+        h.st.write_backups(crate::backup::unix_now()).unwrap();
+        let inbox = h.st.backups.session_dir().unwrap().join(INBOX);
+        std::fs::create_dir_all(&inbox).unwrap();
+        let entry = |name: &str, text: &[u8]| std::fs::write(inbox.join(name), text).unwrap();
+        entry("1.path", b"");
+        entry("2.path", &[0xff, 0xfe, 0x00, 0x41]);
+        entry("3.path", b"Z:/not/there.embproj");
+        entry("4.path", r.to_string_lossy().as_bytes());
+        entry("5.path", "x".repeat(5_000_000).as_bytes());
+        entry("6.tmp", b"half");
+        let tabs = h.st.tab_count();
+        let objects = h.st.doc.design().objects().len();
+        h.st.read_inbox(Instant::now());
+        h.frame(vec![]);
+        assert_eq!(h.st.tab_count(), tabs);
+        assert_eq!(h.st.doc.design().objects().len(), objects);
+        let left: Vec<_> = std::fs::read_dir(&inbox)
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name())
+            .collect();
+        assert_eq!(left, ["6.tmp"], "the entries went; a file that is still written stays");
+        std::fs::remove_dir_all(&r).ok();
+    }
+
     /// A file given to the program that runs opens in a tab of it; a
     /// session that stopped or quit gets nothing.
     #[test]
@@ -166,12 +230,19 @@ mod tests {
         );
         emb_model::project::save(&d, &file).unwrap();
         let now = crate::backup::unix_now();
-        assert!(!hand_over(&r, &file, now));
-        // The program writes its heartbeat; then a second process gives it the file.
+        let wait = Duration::from_millis(100);
+        assert!(!hand_over_within(&r, &file, now, wait));
+        // The program writes its heartbeat. A start that gives it the file
+        // and finds it not taken (this program reads its inbox below) takes
+        // the entry back: as for a program that stopped.
         h.st.write_backups(now).unwrap();
-        assert!(hand_over(&r, &file, now));
+        assert!(!hand_over_within(&r, &file, now, wait));
+        let dir = crate::backup::running_sessions(&r, now)[0].clone();
+        assert!(take_inbox(&dir.join(INBOX)).is_empty(), "the entry went");
         // An old heartbeat is a program that stopped.
-        assert!(!hand_over(&r, &file, now + crate::backup::STALE_S + 1));
+        assert!(!hand_over_within(&r, &file, now + crate::backup::STALE_S + 1, wait));
+        // A second process gives the file (the entry, as `give` writes it).
+        assert!(give(&dir, &std::path::absolute(&file).unwrap()).is_some());
         let tabs = h.st.tab_count();
         assert!(h.st.read_inbox(Instant::now()));
         assert_eq!(h.st.file_path.as_deref(), Some(file.as_path()));

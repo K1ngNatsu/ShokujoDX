@@ -38,4 +38,7 @@ pub use object::{
     MAX_OBJECT_MM, ObjectStitches, Run, RunLink, StitchCache, StitchError, StopReason, is_puff, stitch_object,
     stitch_subpaths, too_large,
 };
-pub use plan::{ObjectSpan, PlanOptions, PlanStop, PlanWarning, StitchPlan, build_plan, build_plan_until};
+pub use plan::{
+    LOCK_LOOK_BACK, ObjectSpan, PlanOptions, PlanStop, PlanWarning, StitchPlan, build_plan, build_plan_until,
+    lock_points, min_lock_mm,
+};

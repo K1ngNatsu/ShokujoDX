@@ -82,7 +82,8 @@ das Objekt auszuwählen. Das Programm warnt vor:
   die länger sind, als die Maschine näht, Farbwechseln zum selben Garn,
   langen Sprüngen ohne Fadenschnitt, Stücken, die zu kurz für den
   Fadenschneider sind, Anfängen und Enden ohne Vernähstiche und
-  sichtbaren Verbindungsstichen der Datei. **Stiche reparieren**
+  Verbindungsstichen der Datei, die auf gestickten Stichen sichtbar sind
+  (1 mm oder mehr in einem Lauf). **Stiche reparieren**
   repariert die meisten davon.
 
 ## Die Dichtekarte

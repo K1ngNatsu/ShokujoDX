@@ -138,36 +138,46 @@ impl Backups {
     fn write_session(&self, now: u64) -> Result<(), String> {
         let Some(dir) = self.session_dir() else { return Ok(()) };
         std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-        let s = SessionFile {
-            heartbeat: now,
-            docs: self.written.values().map(|(_, e)| e.clone()).collect(),
-            closed: None,
-        };
-        let json = serde_json::to_string_pretty(&s).map_err(|e| e.to_string())?;
-        let path = dir.join(SESSION_FILE);
-        std::fs::write(&path, json).map_err(|e| format!("{}: {e}", path.display()))
+        write_session_file(
+            &dir,
+            &SessionFile {
+                heartbeat: now,
+                docs: self.written.values().map(|(_, e)| e.clone()).collect(),
+                closed: None,
+            },
+        )
     }
+}
+
+/// Writes `s` as the session file of the session folder `dir`.
+fn write_session_file(dir: &Path, s: &SessionFile) -> Result<(), String> {
+    let json = serde_json::to_string_pretty(s).map_err(|e| e.to_string())?;
+    let path = dir.join(SESSION_FILE);
+    std::fs::write(&path, json).map_err(|e| format!("{}: {e}", path.display()))
+}
+
+/// The session folders in `root` (other than `own`) that have a session
+/// file that can be read, with it.
+fn sessions(root: &Path, own: Option<&Path>) -> impl Iterator<Item = (PathBuf, SessionFile)> {
+    let own = own.map(Path::to_path_buf);
+    std::fs::read_dir(root)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .filter(move |d| d.is_dir() && Some(d) != own.as_ref())
+        .filter_map(|d| {
+            let s = std::fs::read_to_string(d.join(SESSION_FILE)).ok()?;
+            let s = serde_json::from_str::<SessionFile>(&s).ok()?;
+            Some((d, s))
+        })
 }
 
 /// The designs of sessions in `root` (other than `own`) whose heartbeat is
 /// older than [`STALE_S`] at `now`.
 pub fn find_recoverable(root: &Path, own: Option<&Path>, now: u64) -> Vec<Recovered> {
     let mut out = Vec::new();
-    for dir in std::fs::read_dir(root)
-        .into_iter()
-        .flatten()
-        .flatten()
-        .map(|e| e.path())
-    {
-        if !dir.is_dir() || Some(dir.as_path()) == own {
-            continue;
-        }
-        let Some(s) = std::fs::read_to_string(dir.join(SESSION_FILE))
-            .ok()
-            .and_then(|s| serde_json::from_str::<SessionFile>(&s).ok())
-        else {
-            continue;
-        };
+    for (dir, s) in sessions(root, own) {
         // A normal quit that kept its tabs is not a crash.
         if s.closed.is_some() || now.saturating_sub(s.heartbeat) <= STALE_S {
             continue;
@@ -190,18 +200,7 @@ pub fn find_recoverable(root: &Path, own: Option<&Path>, now: u64) -> Vec<Recove
 /// The sessions in `root` (other than `own`) of a normal quit that kept
 /// its tabs, the oldest first.
 pub fn find_closed(root: &Path, own: Option<&Path>) -> Vec<(PathBuf, Closed)> {
-    let mut out: Vec<(PathBuf, Closed)> = std::fs::read_dir(root)
-        .into_iter()
-        .flatten()
-        .flatten()
-        .map(|e| e.path())
-        .filter(|d| d.is_dir() && Some(d.as_path()) != own)
-        .filter_map(|d| {
-            let s = std::fs::read_to_string(d.join(SESSION_FILE)).ok()?;
-            let s: SessionFile = serde_json::from_str(&s).ok()?;
-            Some((d, s.closed?))
-        })
-        .collect();
+    let mut out: Vec<(PathBuf, Closed)> = sessions(root, own).filter_map(|(d, s)| Some((d, s.closed?))).collect();
     out.sort_by_key(|(_, c)| c.at);
     out
 }
@@ -210,17 +209,9 @@ pub fn find_closed(root: &Path, own: Option<&Path>) -> Vec<(PathBuf, Closed)> {
 /// than [`STALE_S`] at `now` and no normal quit, the newest heartbeat
 /// first (P22 Milestone 8: one program).
 pub fn running_sessions(root: &Path, now: u64) -> Vec<PathBuf> {
-    let mut out: Vec<(u64, PathBuf)> = std::fs::read_dir(root)
-        .into_iter()
-        .flatten()
-        .flatten()
-        .map(|e| e.path())
-        .filter(|d| d.is_dir())
-        .filter_map(|d| {
-            let s = std::fs::read_to_string(d.join(SESSION_FILE)).ok()?;
-            let s: SessionFile = serde_json::from_str(&s).ok()?;
-            (s.closed.is_none() && now.saturating_sub(s.heartbeat) <= STALE_S).then_some((s.heartbeat, d))
-        })
+    let mut out: Vec<(u64, PathBuf)> = sessions(root, None)
+        .filter(|(_, s)| s.closed.is_none() && now.saturating_sub(s.heartbeat) <= STALE_S)
+        .map(|(d, s)| (s.heartbeat, d))
         .collect();
     out.sort_by_key(|(h, _)| std::cmp::Reverse(*h));
     out.into_iter().map(|(_, d)| d).collect()
@@ -361,7 +352,10 @@ impl AppState {
                 continue;
             }
             let backup = if changed || file.is_none() {
-                let path = dir.join(format!("{id}.{}", project::FILE_EXTENSION));
+                let path = self
+                    .backups
+                    .file_of(id)
+                    .ok_or_else(|| tr("no folder for the backups").to_string())?;
                 project::save(doc.design(), &path).map_err(|e| e.to_string())?;
                 Some(id)
             } else {
@@ -396,9 +390,7 @@ impl AppState {
             docs: Vec::new(),
             closed: Some(Closed { at: now, tabs, front }),
         };
-        let json = serde_json::to_string_pretty(&s).map_err(|e| e.to_string())?;
-        let path = dir.join(SESSION_FILE);
-        std::fs::write(&path, json).map_err(|e| format!("{}: {e}", path.display()))
+        write_session_file(&dir, &s)
     }
 
     /// Opens the tabs of the normal quits before again (ADR 0175), and
@@ -436,10 +428,17 @@ impl AppState {
                     continue;
                 }
                 count += 1;
-                self.view = crate::canvas::CanvasView {
-                    center: emb_geom::Point::new(t.view.0, t.view.1),
-                    zoom: t.view.2,
-                };
+                // A view of a damaged session file (a zoom of 0, a center
+                // that is not a number or far out) is the view of the design.
+                let m = project::MAX_COORD_MM;
+                let center = emb_geom::Point::new(t.view.0, t.view.1);
+                let good = center.x.abs() <= m && center.y.abs() <= m && t.view.2.is_finite();
+                if good {
+                    self.view = crate::canvas::CanvasView {
+                        center,
+                        zoom: t.view.2.clamp(crate::canvas::MIN_ZOOM, crate::canvas::MAX_ZOOM),
+                    };
+                }
                 self.fit_requested = false;
                 if k == closed.front {
                     front = Some(self.active_tab);
@@ -604,6 +603,47 @@ mod tests {
     /// (one with changes that are not saved) gives the three tabs, the
     /// changes, the views and the same tab in front at the next start,
     /// with no question; it is not a crash.
+    #[test]
+    fn damaged_session_files_are_left_out() {
+        let r = root("damaged");
+        std::fs::create_dir_all(&r).unwrap();
+        let file = r.join("one.embproj");
+        project::save(&small("One"), &file).unwrap();
+        let session = |name: &str, text: String| {
+            let d = r.join(name);
+            std::fs::create_dir_all(&d).unwrap();
+            std::fs::write(d.join(SESSION_FILE), text).unwrap();
+        };
+        session("empty", String::new());
+        session("half", "{\"heartbeat\": 1, \"docs\": [".into());
+        session("types", "{\"heartbeat\": \"no\", \"docs\": 5}".into());
+        // A quit with tabs: a file that is not there, a backup that is not
+        // there, and a view with a zoom of 0 and a center far out.
+        let tab = |file: &str, backup: &str, view: &str| {
+            format!("{{\"name\": \"T\", \"file\": {file}, \"backup\": {backup}, \"changed\": false, \"view\": {view}}}")
+        };
+        let file_json = serde_json::to_string(&file).unwrap();
+        let tabs = [
+            tab("\"Z:/not/there.embproj\"", "null", "[0.0, 0.0, 1.0]"),
+            tab("null", "77", "[0.0, 0.0, 1.0]"),
+            tab(&file_json, "null", "[1e300, -1e300, 0.0]"),
+        ]
+        .join(", ");
+        session(
+            "closed",
+            format!("{{\"heartbeat\": 1, \"docs\": [], \"closed\": {{\"at\": 1, \"tabs\": [{tabs}], \"front\": 99}}}}"),
+        );
+        assert_eq!(find_recoverable(&r, None, unix_now()).len(), 0);
+        assert_eq!(running_sessions(&r, unix_now()).len(), 0);
+        let mut h = blank_with_backups(&r);
+        assert_eq!(h.st.restore_tabs(), 1, "the one tab whose file is there");
+        assert_eq!(h.st.file_path.as_deref(), Some(file.as_path()));
+        let v = h.st.view;
+        assert!(v.zoom >= crate::canvas::MIN_ZOOM && v.center.x.abs() < 1e6, "{v:?}");
+        h.frame(vec![]);
+        std::fs::remove_dir_all(&r).ok();
+    }
+
     #[test]
     fn a_quit_keeps_the_tabs_and_the_next_start_opens_them() {
         let r = root("tabs");

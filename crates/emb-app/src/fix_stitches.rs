@@ -83,20 +83,24 @@ pub fn check_design(d: &Design, opts: &PlanOptions) -> Vec<RunCheck> {
         .into_iter()
         .map(|ids| {
             let (s, owner) = emb_model::records_of_stitch_objects(d, &ids);
-            let mut check = emb_art::file_check::check(&s, opts);
-            let functions = |record: usize| {
-                owner
-                    .get(record)
-                    .and_then(|&k| ids.get(k))
-                    .and_then(|id| d.object(*id))
-                    .map(|o| o.functions)
+            let check = emb_art::file_check::check(&s, opts);
+            let mut run = RunCheck {
+                ids,
+                owner,
+                check: FileCheck::default(),
             };
-            check.found.retain(|f| match f.fault {
-                Fault::NoLockStart => !functions(f.record).is_some_and(|x| x.tie_in),
-                Fault::NoLockEnd => !functions(f.record).is_some_and(|x| x.tie_off),
-                _ => true,
-            });
-            RunCheck { ids, owner, check }
+            let functions = |record: usize| run.object(record).and_then(|id| d.object(id)).map(|o| o.functions);
+            let found = check
+                .found
+                .into_iter()
+                .filter(|f| match f.fault {
+                    Fault::NoLockStart => !functions(f.record).is_some_and(|x| x.tie_in),
+                    Fault::NoLockEnd => !functions(f.record).is_some_and(|x| x.tie_off),
+                    _ => true,
+                })
+                .collect();
+            run.check.found = found;
+            run
         })
         .collect()
 }
@@ -152,11 +156,7 @@ impl AppState {
     /// The stitch lengths of the machine of the design and the trim
     /// distance of the design, for the check of stitch objects.
     pub fn file_check_options(&self) -> PlanOptions {
-        let mut opts = self.plan_options();
-        if let Some(t) = self.doc.design().trim_gap_mm {
-            opts.trim_mm = t;
-        }
-        opts
+        self.plan_options().for_design(self.doc.design())
     }
 
     /// The checks of the stitch objects of the design (cached for the

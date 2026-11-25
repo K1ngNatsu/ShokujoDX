@@ -262,6 +262,8 @@ batch work. Build it with `cargo build --release -p emb-cli`.
 | `cutter`, `bling`, `chart` | Appliqué cutter files, rhinestone templates, cross-stitch charts |
 | `font <font.ttf> <out.embfont>` | Make an embroidery font from a TrueType font |
 | `quote <in>` | The price and the run time of an order |
+| `swatch <in> <out> --setting <name>` | Test swatches: copies of objects with a setting in steps, each with its value |
+| `check <file>`, `fix <file> <out>` | Check the stitches of a machine file, and fix what can be fixed |
 | `script <script.rhai> <in>...` | Run a script on designs |
 
 `emb-cli --help` lists all commands and options.

@@ -61,11 +61,6 @@ pub const MAX_TRAVEL_MM: f64 = 60.0;
 /// A travel run is at most this many times as long as the distance
 /// between its ends (and 2 mm).
 pub const DIRECT: f64 = 1.6;
-/// The shortest lock stitch, mm (as the stitch plan).
-const MIN_LOCK_MM: f64 = 0.1;
-/// A tie-off looks back at most this many needle points for a point far
-/// enough for its lock stitches (as the stitch plan).
-const LOCK_LOOK_BACK: usize = 12;
 
 /// A kind of fault.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -153,7 +148,7 @@ impl FileCheck {
 }
 
 /// The two threads are the same thread: color, brand and code.
-pub fn same_thread(a: &Thread, b: &Thread) -> bool {
+fn same_thread(a: &Thread, b: &Thread) -> bool {
     a.color == b.color && a.brand == b.brand && a.code == b.code
 }
 
@@ -199,18 +194,19 @@ fn pieces(recs: &[StitchRecord]) -> Vec<Vec<usize>> {
     out
 }
 
-/// The number of needle holes of `points`, at most `most`.
-fn holes(points: &[Point], most: usize) -> usize {
-    let mut seen: Vec<Point> = Vec::with_capacity(most);
+/// The needle points `points` have [`MIN_PIECE_HOLES`] needle holes or
+/// more: a piece that sews.
+fn enough_holes(points: &[Point]) -> bool {
+    let mut seen: Vec<Point> = Vec::with_capacity(MIN_PIECE_HOLES);
     for &p in points {
         if !seen.iter().any(|q| q.distance(p) <= HOLE_MM) {
             seen.push(p);
-            if seen.len() >= most {
-                break;
+            if seen.len() >= MIN_PIECE_HOLES {
+                return true;
             }
         }
     }
-    seen.len()
+    false
 }
 
 /// The first needle points of a start (or the last ones of an end, in
@@ -331,20 +327,16 @@ fn travel_that_shows(s: &StitchDesign) -> Vec<(Range<usize>, f64)> {
         travel: runs.clone(),
     };
     let shown = shown_travel(&plan);
-    let recs = &s.records;
-    // The run of each piece: a piece lies on a stitch of its run.
-    let on = |run: &Range<usize>, p: Point| {
-        run.clone().filter(|&i| i > 0).any(|i| {
-            let (a, b) = (recs[i - 1].pos, recs[i].pos);
-            p.nearest_on_segment(a, b).distance(p) < 1e-6
-        })
-    };
+    // The run of each piece: the run of the record where it starts (the
+    // runs are in the order of the records). A search of all the runs for
+    // each piece took seconds for a file with many runs (the audit of P22).
     let mut length = vec![0.0; runs.len()];
-    let mut k = 0;
     for piece in shown.pieces.iter().filter(|p| p.shows == Shows::OnStitches) {
-        if let Some(j) = (k..runs.len()).chain(0..k).find(|&j| on(&runs[j], piece.from)) {
+        let j = runs.partition_point(|r| r.start <= piece.record);
+        if let Some(j) = j.checked_sub(1)
+            && runs[j].contains(&piece.record)
+        {
             length[j] += piece.length();
-            k = j;
         }
     }
     runs.into_iter().zip(length).filter(|(_, l)| *l >= SHOWS_MM).collect()
@@ -386,20 +378,20 @@ pub fn check(s: &StitchDesign, opts: &PlanOptions) -> FileCheck {
     let all = pieces(recs);
     for piece in &all {
         let points: Vec<Point> = piece.iter().map(|&i| recs[i].pos).collect();
-        if holes(&points, MIN_PIECE_HOLES) < MIN_PIECE_HOLES {
+        if !enough_holes(&points) {
             add(Fault::ShortPiece, piece[0], 0.0);
         }
     }
     for piece in &all {
         let points: Vec<Point> = piece.iter().map(|&i| recs[i].pos).collect();
-        if holes(&points, MIN_PIECE_HOLES) >= MIN_PIECE_HOLES && !locks(&points) {
+        if enough_holes(&points) && !locks(&points) {
             add(Fault::NoLockStart, piece[0], 0.0);
         }
     }
     for piece in &all {
         let mut points: Vec<Point> = piece.iter().map(|&i| recs[i].pos).collect();
         points.reverse();
-        if holes(&points, MIN_PIECE_HOLES) >= MIN_PIECE_HOLES && !locks(&points) {
+        if enough_holes(&points) && !locks(&points) {
             add(Fault::NoLockEnd, piece[piece.len() - 1], 0.0);
         }
     }
@@ -444,12 +436,13 @@ impl Fixes {
         jumps: true,
         locks: true,
     };
-}
-
-impl Default for Fixes {
-    fn default() -> Self {
-        Fixes::ALL
-    }
+    pub const NONE: Fixes = Fixes {
+        join: false,
+        short: false,
+        long: false,
+        jumps: false,
+        locks: false,
+    };
 }
 
 /// What a fix did.
@@ -573,7 +566,13 @@ fn remove_short(recs: &mut Vec<StitchRecord>, opts: &PlanOptions) -> usize {
     removed
 }
 
-/// Splits the long stitches into equal stitches.
+/// A long stitch up to this length is split. A longer one is a jump that
+/// the file keeps as a stitch (a damaged file): the fix leaves it, and the
+/// check shows it (the audit of P22: a file of 1,000 stitches of 1 km
+/// became 78 million stitches).
+pub const MAX_SPLIT_MM: f64 = 60.0;
+
+/// Splits the long stitches into equal stitches (up to [`MAX_SPLIT_MM`]).
 fn split_long(recs: &mut Vec<StitchRecord>, opts: &PlanOptions) -> usize {
     let mut out = Vec::with_capacity(recs.len());
     let mut before: Option<Point> = None;
@@ -584,7 +583,7 @@ fn split_long(recs: &mut Vec<StitchRecord>, opts: &PlanOptions) -> usize {
             StitchKind::Stitch => {
                 if let Some(b) = before {
                     let len = b.distance(r.pos);
-                    if is_long(len, opts) {
+                    if is_long(len, opts) && len <= MAX_SPLIT_MM {
                         let n = (len / max).ceil() as usize;
                         for k in 1..n {
                             out.push(StitchRecord::new(
@@ -616,27 +615,14 @@ fn trim_jumps(recs: &mut Vec<StitchRecord>, opts: &PlanOptions) -> usize {
     jumps.len()
 }
 
-/// Lock stitches forward and back twice from the needle point `at` toward
-/// `toward`, as the stitch plan makes them; none if they would be shorter
-/// than the shortest stitch.
-fn lock_points(at: Point, toward: Point, opts: &PlanOptions) -> Option<[Point; 4]> {
-    let u = (toward - at).normalized()?;
-    let len = opts.lock_mm.min(at.distance(toward) / 2.0);
-    if len < opts.min_stitch_mm.max(MIN_LOCK_MM) {
-        return None;
-    }
-    let q = at + u * len;
-    Some([q, at, q, at])
-}
-
 /// Adds lock stitches at the starts and ends of the pieces with no lock.
 fn add_locks(recs: &mut Vec<StitchRecord>, opts: &PlanOptions) -> usize {
-    let far = 2.0 * opts.min_stitch_mm.max(MIN_LOCK_MM);
+    let far = 2.0 * emb_stitch::min_lock_mm(opts);
     // (the record after which the lock goes, its points), in order.
     let mut inserts: Vec<(usize, [Point; 4])> = Vec::new();
     for piece in pieces(recs) {
         let points: Vec<Point> = piece.iter().map(|&i| recs[i].pos).collect();
-        if holes(&points, MIN_PIECE_HOLES) < MIN_PIECE_HOLES {
+        if !enough_holes(&points) {
             continue;
         }
         if !locks(&points) {
@@ -646,7 +632,7 @@ fn add_locks(recs: &mut Vec<StitchRecord>, opts: &PlanOptions) -> usize {
                 .find(|p| p.distance(at) >= far)
                 .or(points.get(1))
                 .copied();
-            if let Some(l) = toward.and_then(|t| lock_points(at, t, opts)) {
+            if let Some(l) = toward.and_then(|t| emb_stitch::lock_points(at, t, opts)) {
                 inserts.push((piece[0], l));
             }
         }
@@ -656,11 +642,11 @@ fn add_locks(recs: &mut Vec<StitchRecord>, opts: &PlanOptions) -> usize {
             let at = back[0];
             let toward = back[1..]
                 .iter()
-                .take(LOCK_LOOK_BACK)
+                .take(emb_stitch::LOCK_LOOK_BACK)
                 .find(|p| p.distance(at) >= far)
                 .or(back.get(1))
                 .copied();
-            if let Some(l) = toward.and_then(|t| lock_points(at, t, opts)) {
+            if let Some(l) = toward.and_then(|t| emb_stitch::lock_points(at, t, opts)) {
                 inserts.push((piece[piece.len() - 1], l));
             }
         }
@@ -842,13 +828,7 @@ mod tests {
     fn each_fix_alone_does_only_its_fix() {
         let s = faulty();
         let one = |which: Fixes| fix(&s, &opts(), which).1;
-        let none = Fixes {
-            join: false,
-            short: false,
-            long: false,
-            jumps: false,
-            locks: false,
-        };
+        let none = Fixes::NONE;
         assert_eq!(one(none), Fixed::default());
         assert_eq!(one(Fixes { join: true, ..none }).total(), 1);
         assert_eq!(one(Fixes { short: true, ..none }).removed, 1);
@@ -905,6 +885,33 @@ mod tests {
     }
 
     /// The color changes of two blocks of different threads stay.
+    /// A stitch of 100 mm (a jump that a damaged file keeps as a stitch)
+    /// stays one stitch, and the check still shows it; a stitch of 30 mm is
+    /// split.
+    #[test]
+    fn a_stitch_longer_than_the_split_limit_stays() {
+        let file = |len: f64| StitchDesign {
+            threads: vec![thread(200)],
+            records: [
+                locked_run(0.0, 10.0, 0.0),
+                vec![st(10.0 + len, 0.0)],
+                locked_run(10.0 + len, 20.0 + len, 0.0),
+            ]
+            .concat(),
+        };
+        let long = Fixes {
+            long: true,
+            ..Fixes::NONE
+        };
+        let (fixed, did) = fix(&file(100.0), &opts(), long);
+        assert_eq!(did.split, 0);
+        assert_eq!(fixed, file(100.0));
+        assert_eq!(check(&fixed, &opts()).count(Fault::Long), 1);
+        let (fixed, did) = fix(&file(30.0), &opts(), long);
+        assert_eq!(did.split, 1);
+        assert_eq!(check(&fixed, &opts()).count(Fault::Long), 0);
+    }
+
     #[test]
     fn different_threads_are_not_joined() {
         let mut s = faulty();

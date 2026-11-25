@@ -600,7 +600,8 @@ fn open_area(o: &Outline, covers: &[Cover], f: &mut Faults) -> (Vec<[f64; 2]>, V
 /// `cells` (`w` by `h`) after an erosion of `r` cells: a cell stays if all
 /// cells within `r` of it (a square) are in `cells`.
 pub fn largest_patch(cells: &[bool], w: usize, h: usize, r: usize) -> usize {
-    // The cells in each row and column within r of a cell, with sums.
+    // A cell stays if each cell of the square of side 2r + 1 round it is
+    // in `cells`.
     let at = |i: usize, j: usize| cells[j * w + i];
     let mut kept = vec![false; w * h];
     for j in r..h.saturating_sub(r) {

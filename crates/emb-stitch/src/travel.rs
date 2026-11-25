@@ -265,7 +265,7 @@ const EDGE_BAND_MM: f64 = 1.0;
 /// The cells that the stitches sewn so far go through (see
 /// [`Sewer::track_sewn`]).
 #[derive(Debug, Clone)]
-pub struct Sewn {
+pub(crate) struct Sewn {
     origin: Point,
     nx: usize,
     ny: usize,
@@ -294,6 +294,11 @@ impl Sewn {
             .then(|| y as usize * self.nx + x as usize)
     }
 
+    /// The cell of `p` has sewn stitches.
+    fn hit(&self, p: Point) -> bool {
+        self.index(p).is_some_and(|i| self.cells[i])
+    }
+
     /// Marks the cells of the stitch from `a` to `b`.
     fn mark(&mut self, a: Point, b: Point) {
         let n = (a.distance(b) / (Sewn::CELL / 2.0)).ceil() as usize;
@@ -309,10 +314,7 @@ impl Sewn {
         let len = a.distance(b);
         let n = (len / (Sewn::CELL / 2.0)).ceil().max(1.0) as usize;
         let hits = (0..n)
-            .filter(|&k| {
-                self.index(a.lerp(b, (k as f64 + 0.5) / n as f64))
-                    .is_some_and(|i| self.cells[i])
-            })
+            .filter(|&k| self.hit(a.lerp(b, (k as f64 + 0.5) / n as f64)))
             .count();
         len * hits as f64 / n as f64
     }
@@ -443,16 +445,9 @@ impl Travel {
         self.search(a, b, INTERIOR_COST, None, None)
     }
 
-    /// As [`Travel::edge_path`], in a fill with rows in the direction
-    /// `rows` (a unit vector): a step along the rows costs as much as a step
-    /// along the edge, and the search can go from `a` and to `b` along the
-    /// rows as far as the edge. Travel between the sections of a fill with a
-    /// hole then goes along the line between two sections, not across the
-    /// rows (on top of rows that are sewn, or as a ridge under rows that
-    /// are not).
     /// As [`Travel::edge_path`], with a step across the inside costing
     /// more where it lies on stitches that are sewn ([`OVER_SEWN_COST`]).
-    pub fn edge_path_sewn(&self, a: Point, b: Point, sewn: &Sewn) -> Option<Vec<Point>> {
+    pub(crate) fn edge_path_sewn(&self, a: Point, b: Point, sewn: &Sewn) -> Option<Vec<Point>> {
         if self.visible(a, b) && sewn.over(a, b) == 0.0 {
             return Some(vec![a, b]);
         }
@@ -461,15 +456,14 @@ impl Travel {
 
     /// The length of `path` that lies on the stitches of `sewn` and farther
     /// than [`EDGE_BAND_MM`] from the edge, mm.
-    pub fn over_sewn(&self, path: &[Point], sewn: &Sewn) -> f64 {
+    pub(crate) fn over_sewn(&self, path: &[Point], sewn: &Sewn) -> f64 {
         let mut total = 0.0;
         for w in path.windows(2) {
             let n = (w[0].distance(w[1]) / (Sewn::CELL / 2.0)).ceil().max(1.0) as usize;
             let step = w[0].distance(w[1]) / n as f64;
             for k in 0..n {
                 let m = w[0].lerp(w[1], (k as f64 + 0.5) / n as f64);
-                let sewn_here = sewn.index(m).is_some_and(|i| sewn.cells[i]);
-                if sewn_here && !self.near_edge(m, EDGE_BAND_MM) {
+                if sewn.hit(m) && !self.near_edge(m, EDGE_BAND_MM) {
                     total += step;
                 }
             }
@@ -486,6 +480,13 @@ impl Travel {
         })
     }
 
+    /// As [`Travel::edge_path`], in a fill with rows in the direction
+    /// `rows` (a unit vector): a step along the rows costs as much as a step
+    /// along the edge, and the search can go from `a` and to `b` along the
+    /// rows as far as the edge. Travel between the sections of a fill with a
+    /// hole then goes along the line between two sections, not across the
+    /// rows (on top of rows that are sewn, or as a ridge under rows that
+    /// are not).
     pub fn edge_path_rows(&self, a: Point, b: Point, rows: Point) -> Option<Vec<Point>> {
         self.search(a, b, INTERIOR_COST, Some(rows), None)
     }

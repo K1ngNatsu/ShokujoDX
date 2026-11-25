@@ -344,16 +344,17 @@ impl AppState {
         info.travel = emb_stitch::shown_travel::shown_travel(&plan);
         if !emb_stitch::lace::is_lace(d, &self.fabrics) {
             use emb_stitch::shown_travel::Shows;
-            for (id, on_stitches, _) in info.travel.by_object() {
+            for o in info.travel.by_object() {
+                let (id, on_stitches) = (o.object, o.on_stitches_mm);
                 let longest = |shows: Shows| {
-                    info.travel
-                        .pieces
-                        .iter()
-                        .filter(|p| p.object == Some(id) && p.shows == shows)
-                        .max_by(|a, b| a.length().total_cmp(&b.length()))
+                    match shows {
+                        Shows::OnStitches => o.longest_on_stitches,
+                        Shows::OnFabric => o.longest_on_fabric,
+                    }
+                    .map(|i| &info.travel.pieces[i])
                 };
                 let at = |p: &emb_stitch::shown_travel::ShownPiece| Some(back.apply(p.from.lerp(p.to, 0.5)));
-                if on_stitches >= TRAVEL_ON_STITCHES_MM {
+                if on_stitches > TRAVEL_ON_STITCHES_MM {
                     info.issues.push(Issue {
                         severity: Severity::Warning,
                         object: Some(id),
@@ -502,11 +503,12 @@ fn stitch_object_issues(
                     "Starts and ends with no lock stitches: {} (Edit > Fix Stitches adds them)",
                     &[&n],
                 ),
-                _ if length >= TRAVEL_ON_STITCHES_MM => fill(
+                // Each travel run that the check finds (`file_check::SHOWS_MM`
+                // or more): Fix Stitches lists the same.
+                _ => fill(
                     "Travel in the stitches of the file shows on top of sewn stitches: {} mm",
                     &[&format!("{length:.0}")],
                 ),
-                _ => continue,
             };
             info.issues.push(Issue {
                 severity: Severity::Warning,

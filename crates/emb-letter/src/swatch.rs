@@ -18,10 +18,10 @@ use crate::source::LetterSource;
 pub const GAP_MM: f64 = 8.0;
 /// The space between a copy and its label, mm.
 const LABEL_GAP_MM: f64 = 3.0;
-/// The capital height of the labels, at least, mm.
-pub const LABEL_MM: f64 = 5.0;
 /// The most copies.
 pub const MAX_COPIES: usize = 24;
+/// The copies of new swatches.
+pub const DEFAULT_COPIES: usize = 5;
 
 /// The setting that changes from copy to copy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -208,7 +208,7 @@ fn underlay_index(u: &Underlay) -> Option<f64> {
 
 /// The mean width of a satin column: the mean distance from the points of
 /// one rail to the other rail.
-pub fn satin_width(g: &SatinGeometry) -> Option<f64> {
+fn satin_width(g: &SatinGeometry) -> Option<f64> {
     let a: Vec<Point> = g.rail_a.flatten(0.1).into_iter().flat_map(|p| p.points).collect();
     let b: Vec<Polyline> = g.rail_b.flatten(0.1);
     if a.is_empty() || b.is_empty() {
@@ -238,7 +238,7 @@ fn nearest(lines: &[Polyline], p: Point) -> Point {
 
 /// The column `g` with its width times `k`: each point of a rail moves
 /// from the middle between it and the other rail.
-pub fn widened(g: &SatinGeometry, k: f64) -> SatinGeometry {
+fn widened(g: &SatinGeometry, k: f64) -> SatinGeometry {
     let (fa, fb) = (g.rail_a.flatten(0.1), g.rail_b.flatten(0.1));
     let from = |p: Point, other: &[Polyline]| {
         let m = p.midpoint(nearest(other, p));
@@ -285,18 +285,23 @@ pub struct SwatchSpec {
 }
 
 impl SwatchSpec {
-    /// The value of each copy, in equal steps.
+    /// The value of each copy, in equal steps, in the range of the setting
+    /// (the audit of P22: a pull compensation that was not a number gave
+    /// stitches that were not numbers, and a width of 1e9 mm a design out
+    /// of the range of a project). A value that is not a number is the
+    /// start of the range.
     pub fn values(&self) -> Vec<f64> {
         if self.setting == SwatchSetting::Underlay {
             return (0..UNDERLAYS.len()).map(|i| i as f64).collect();
         }
+        let (lo, hi) = self.setting.range();
+        let in_range = |v: f64| if v.is_nan() { lo } else { v.clamp(lo, hi) };
+        let (from, to) = (in_range(self.from), in_range(self.to));
         let n = self.copies.clamp(1, MAX_COPIES);
         if n == 1 {
-            return vec![self.from];
+            return vec![from];
         }
-        (0..n)
-            .map(|i| self.from + (self.to - self.from) * i as f64 / (n - 1) as f64)
-            .collect()
+        (0..n).map(|i| from + (to - from) * i as f64 / (n - 1) as f64).collect()
     }
 }
 
@@ -365,9 +370,9 @@ pub fn swatches(
         .ok_or_else(|| text::tr("The objects have no size.").to_string())?;
     let values = spec.values();
     // The labels first: their sizes make the cells.
-    let label_height = label.map_or(LABEL_MM, |src| {
+    let label_height = label.map_or(crate::sheet::LABEL_MM, |src| {
         src.size_range(LetterStitch::Satin)
-            .map_or(LABEL_MM, |(min, _)| min.max(LABEL_MM))
+            .map_or(crate::sheet::LABEL_MM, |(min, _)| min.max(crate::sheet::LABEL_MM))
     });
     let labels: Vec<Option<Lettering>> = values
         .iter()
@@ -492,8 +497,31 @@ mod tests {
         format!("{v:.2} mm")
     }
 
+    /// The values of the copies stay in the range of the setting; a value
+    /// that is not a number is the start of the range.
+    #[test]
+    fn the_values_stay_in_the_range_of_the_setting() {
+        let spec = |setting, from, to| SwatchSpec {
+            setting,
+            from,
+            to,
+            copies: 3,
+            field: None,
+        };
+        assert_eq!(spec(SwatchSetting::Width, 1e9, -1e9).values(), [12.0, 6.25, 0.5]);
+        assert_eq!(
+            spec(SwatchSetting::PullCompensation, f64::NAN, 1.0).values(),
+            [0.0, 0.5, 1.0]
+        );
+        assert_eq!(
+            spec(SwatchSetting::Lean, f64::NEG_INFINITY, 0.0).values(),
+            [-45.0, -22.5, 0.0]
+        );
+        assert_eq!(spec(SwatchSetting::Spacing, 0.4, 0.4).values(), [0.4, 0.4, 0.4]);
+    }
+
     fn label_font() -> crate::embfont::EmbFont {
-        crate::bundled::embroidery("Atkinson Hyperlegible").expect("a bundled font for small text")
+        crate::bundled::embroidery(crate::sheet::LABEL_FONT).expect("a bundled font for small text")
     }
 
     fn satin() -> (Design, ObjectId) {

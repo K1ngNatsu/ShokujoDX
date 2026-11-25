@@ -80,19 +80,9 @@ impl AppState {
 
     /// The other columns of the group of `id` that are bands.
     fn band_layers(&self, id: ObjectId) -> Vec<ObjectId> {
-        let d = self.doc.design();
-        let Some(o) = d.object(id) else { return Vec::new() };
-        let (Some(g), ObjectKind::Satin { params, .. }) = (o.group, &o.kind) else {
-            return Vec::new();
-        };
-        if params.band.is_none() {
-            return Vec::new();
-        }
-        d.objects()
-            .iter()
-            .filter(|x| x.id != id && x.group == Some(g))
-            .filter(|x| matches!(&x.kind, ObjectKind::Satin { params, .. } if params.band.is_some()))
-            .map(|x| x.id)
+        bands_of(self.doc.design(), id)
+            .into_iter()
+            .filter(|x| *x != id)
             .collect()
     }
 

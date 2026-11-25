@@ -44,16 +44,28 @@ which stitches are travel.
   between the top rows, over the underlay). The rule of the top stitch
   and the turns of the needle path took these away.
 - **In the program.** Design info shows the travel that shows on
-  stitches and on the fabric, and a warning for each object with more
-  than 2 mm on top of sewn stitches or a piece of 4 mm or more on the
-  fabric (a short travel stitch to the next part is normal: about 3 mm
+  stitches and on the fabric. An object gets a warning for more than
+  2 mm on top of sewn stitches, or for a piece of 4 mm or more on the
+  fabric. A short travel stitch to the next part is normal: about 3 mm
   between the parts of 5 mm letters in the tutorial of Japanese
-  lettering), not in lace
-  (lace is all thread). View > Check > Travel That Shows draws the
-  pieces: red on sewn stitches, blue on the fabric.
+  lettering. Lace gets no warning (lace is all thread). View > Check >
+  Travel That Shows draws the pieces: red on sewn stitches, blue on the
+  fabric.
 - **The corpus snapshot** `crates/emb-cli/tests/travel_shows.rs` keeps the
   numbers of each corpus design; a change of the travel shows there. The
   golden snapshots do not change.
+
+## The audit of P22
+
+The maps of the measure had a cell of 1 mm for each place of the box of
+all the travel of a plan: travel at two places 100 m apart needed 10^10
+cells, more memory than a computer has, and design info makes the measure
+for each design. The maps keep only the blocks of 16 × 16 cells with
+travel now (`CellMap`): the results are the same (the corpus snapshot),
+the measure of the corpus takes 38 ms in place of 31 ms, and travel
+1.8 km apart takes 2 ms. Each piece has the record where it starts
+(`ShownPiece::record`), and `ShownTravel::by_object` gives the length on
+sewn stitches and the longest pieces of each object in one pass.
 
 ## Consequences
 

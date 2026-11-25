@@ -2,7 +2,7 @@
 id: arranging
 title: Anordnen und die Stickreihenfolge
 group: design
-keywords: anordnen, drehen, wenden, spiegeln, umdrehen, neigen, schräg, bezugspunkte, zentrieren, ausrichten, gleichmäßig verteilen, verteilen, gleiche größe, kopien, anordnung, spiegeln und verbinden, raster, kranz, kaleidoskop, spiegeln, gruppieren, gruppierung aufheben, sperren, entsperren, stickreihenfolge, reihenfolge, farbwechsel, kürzeste reihenfolge, kappenreihenfolge, nächste verbindung, klickreihenfolge
+keywords: anordnen, drehen, wenden, spiegeln, umdrehen, neigen, schräg, bezugspunkte, zentrieren, ausrichten, gleichmäßig verteilen, verteilen, gleiche größe, kopien, anordnung, spiegeln und verbinden, raster, kranz, kaleidoskop, spiegeln, gruppieren, gruppierung aufheben, sperren, entsperren, stickreihenfolge, reihenfolge, farbwechsel, kürzeste reihenfolge, kappenreihenfolge, nächste verbindung, klickreihenfolge, schneller sticken, ähnliche garne, kleine details, fadenschnittabstand, lücken
 ---
 # Anordnen und die Stickreihenfolge
 
@@ -110,8 +110,11 @@ jeder Fadenschnitt kostet Zeit.
   **Weniger Farbwechsel**. Eine Tabelle zeigt die Garne, Farbwechsel,
   Fadenschnitte, Stiche, die Stickzeit und die sichtbaren
   Verbindungsstiche vorher und nachher, und die Arbeitsfläche markiert die
-  sichtbaren Verbindungsstiche. **OK** behält das Ergebnis als einen
-  Schritt, den Sie rückgängig machen können; **Abbrechen** geht zurück.
+  sichtbaren Verbindungsstiche. **Standard** setzt die Werte des ersten
+  Öffnens. **Kleine Details entfernen** lässt auch gesperrte Objekte und
+  die Objekte von Konturen, verknüpften Formen, Knopflöchern,
+  Applikationen und Skizzen. **OK** behält das Ergebnis als einen Schritt, den Sie
+  rückgängig machen können; **Abbrechen** geht zurück.
 
 ## Kappen
 

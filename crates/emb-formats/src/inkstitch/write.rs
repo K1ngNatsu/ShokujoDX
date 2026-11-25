@@ -670,7 +670,7 @@ impl Writer<'_> {
     ) -> Vec<String> {
         // A band of a column (P22 Milestone 4) is a column with the rails
         // of its band.
-        let band = p.band.filter(|b| b.count > 1);
+        let band = p.active_band();
         let band_geometry = band.and_then(|b| g.band(&b));
         let band_params = band.map(|b| p.banded(&b));
         let g = band_geometry.as_ref().unwrap_or(g);

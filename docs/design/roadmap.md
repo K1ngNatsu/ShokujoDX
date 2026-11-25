@@ -48,7 +48,7 @@ Sizes are relative effort: S (days), M (one to two weeks), L (a month), XL (seve
 | 19. Help and tutorials | Proposed (2026-11-18): nine milestones (pictures in the help, Show Me, guided lessons, the sew-out doctor, samples, ways to start, the help on the web, moving pictures, better answers); the owner selects them. See `docs/design/p19-plan.md`. |
 | 20. Japanese lettering | Accepted (owner, 2026-11-20, before v0.4.0); Milestone 1 (the Japanese reference set and the lettering bench, a test font from Noto Sans JP, and font outlines with the nonzero rule) done (ADR 0141); Milestone 2 (the stitch of each column in Auto: satin to 12 mm with split stitches, tatami columns above, the width of a column between its sides) done (ADR 0142). Milestone 3 (one stitch for the text, crossings cut, no bulges, ends cut back in other columns, stroke ends to their corners; two layers 6.3 % to 1.4 %, each character covered 95 % or more) made, the sew-out of the owner is open (ADR 0143, `tools/make-sewout-kit-p20.py`). Milestone 4 (routes for the letters of TrueType fonts, made in the background in the app; 刺繍東京 at 20 mm 48 to 23 trims) done (ADR 0144). Milestone 5 (the height of Japanese text is the height of its characters, thin strokes sew as runs, the smallest size of a text in the Lettering window) done (ADR 0145). Milestone 6 (two Japanese embroidery fonts with the 2,136 jōyō kanji in a font package, scores 89 and 88) made, its sew-out is open (ADR 0146). Audit in "Audit of P20" (2026-11-20): the route of letters with 32 to 64 parts, a size limit for the grids of the stroke finder, layouts while routes come; the fonts and the sew-out kit made again. The open work of the whole project is `docs/design/open-work.md`. Six milestones (a Japanese reference set and its measure, the stitch of each column, crossings and junctions, routes for the fonts of the computer, sizes and thin strokes, a Japanese embroidery font); the owner accepts them. The measures of 2026-11-20 (the fonts of the owner's computer): a character becomes all tatami when one column is wider than 8 mm (128 of 149 characters in Yu Gothic Bold at 50 mm), crossings have two layers on 10 % to 16 % of a kanji, and the letters of a font of the computer have no route (twice the trims). See `docs/design/p20-plan.md`. |
 | 21. Letter shapes | Done in software (2026-11-24), the sew-out is open (audit: "Audit of P21"). Accepted by the owner on 2026-11-23: the causes of spikes, bulges, a bad sew order, open areas and open corners in the letters of the stroke finder. Six milestones in the owner's order (the outline is the edge of a column, one way to end a column, the middle line, the needle points decide, the sew order at joints, one way for all letters and new fonts). The measure is the letter fault bench (`emb-cli letter-faults`). Milestone 1 (the outline is the edge of a column) made (ADR 0147): no rail point out of the outline in the middle of a column, fewer spikes and open corners; the faults at the ends of columns go to Milestone 2. Milestone 2 (free ends along the outline, mitres at corners) made (ADR 0148): spikes 33 % to 83 % of before P21, open area down by 14 % to 54 %; its exit test is met in part (sharp joints and short arms are left for Milestones 3 and 5). Milestone 3 (the middle line: side branches by the width of their stroke, shorter held ends) made (ADR 0149): open area 0.47 % to 1.66 %; its exit test is met in part. Milestone 4 (the needle points in the letter score, the fault bench in CI) done (ADR 0150). Milestone 7 (a middle line from a Voronoi diagram, a trial before Milestone 6) added by the owner (2026-11-23) and made: better on round strokes (Pacifico), worse at square ends and sharp corners, so the grid stays (ADR 0151; the code is on the branch `trial/voronoi-middle-line`). Milestone 8 (strokes from a split of the outline at its concave corners, a trial) added by the owner (2026-11-23) and made first: Latin letters get the split (spikes 17 to 2, 44 to 23, 37 to 25, 15 to 0; open corners less in each font); kana and kanji have 19 to 4 characters over 3 % with two layers but up to 2 more trims in the eight words. The owner chose the split for both (ADR 0152); Milestones 5 and 6 are updated for it. Milestone 5 (the sew order at joints) made (ADR 0153): columns on top 16 to 5, 29 to 11, 19 to 10, 85 to 51; runs out of the outline 0.2 mm or less; the trims of the Japanese words back; Arabic letters routed from the right; its exit test is met in part (columns on top over 5 %). Milestone 6 (one way for all letters, the fonts made again) made (ADR 0154): the mean score of the fonts of the program 78.9 to 85.5 (the score of today); the embroidery fonts as good as lettering; the sew-out of the kit (`tools/make-sewout-kit-p21.py`) is open. Milestone 9 (the joints of serif fonts, the owner's request) made (ADR 0155): bridges to curves; Friendly Serif "MNVXYn" with no spikes and the same joints on the two sides; the fonts made again (mean score 85.5 to 84.8, the narrow point of a fork). Milestone 10 (the work areas of the font packages, the owner's request) made (ADR 0156): corrections for 17 characters of seven fonts of the packages, a run of the route across columns that touch (266 fewer trims in the fonts), the pointed ends of columns not in the narrow measure of the score (mean score of the fonts of the program 84.8 to 94.2; 58 fonts of the packages with 85 or more, 18 before); longer bridges and a step for balls were tried and left out. Milestone 11 (column ends on the outline, and balls; the owner's request) made (ADR 0157): the middle line ends on the outline (spikes in the fault bench Anton 16 to 3, Pacifico 28 to 3), balls are cut from their strokes and sew on in the direction of the stroke, five corrections go; the size range keeps the pointed ends. Milestone 12 (the largest faults of Latin letters, ranked by a survey of 127 fonts; the owner's request) made (ADR 0158): rails follow a side that swells (open area 39 % less) and the columns have no crossing stitches (82 % fewer crossing pairs). Milestone 13 (cuts at elbows; the owner's request) made (ADR 0159): where two strokes meet at a corner and both end there, the split cuts a butt joint if the columns sew no worse (open area 12 % less, two layers 8 % less). Milestone 14 (cuts that stay in the letter; the owner's request) made (ADR 0160): a cut along a stroke is optional, and the pieces of a split stay in the letter (80 % fewer needle points out of the outline, 12 % less area with two layers). Made (2026-11-24): fourteen milestones; released in v0.5.0 (2026-11-24); the sew-out kit (`tools/make-sewout-kit-p21.py`) made again with the fonts of Milestone 14, with a group for Milestones 11 to 14; its sew-out is open. See `docs/design/p21-plan.md`. |
-| 22. Checks, swatches and agents | Accepted (owner, 2026-11-25); Milestone 1 (travel that shows: the plan marks its travel, a measure, warnings in Design info and View > Check > Travel That Shows, a corpus snapshot) made (ADR 0167), and the travel faults that it found fixed (ADR 0168); Milestone 2 (the trim distance of a design, Quicker to Sew with the numbers before and after) made (ADR 0169); Milestone 3 (test swatches: the window, `emb-cli swatch`) made in the software, its sew-out open (ADR 0170); Milestone 4 (satin lean, bands of threads across a column) made in the software, its sew-out open (ADR 0171); Milestone 5 (machine files: check, Fix Stitches, `emb-cli check` and `fix`, the cross-check with pyembroidery: 870 files the same) made (ADR 0172); Milestone 6 (letter measures against the eye: a judged set of 496 letters, the open patch measure, 100 % agreement; the owner agrees with 50 of the letters) made (ADR 0173); Milestone 7 (overlapped strokes, a trial) measured and not adopted, the owner's choice (ADR 0174; branch `trial/overlapped-strokes`); Milestone 8 (the open tabs come back, one program through an inbox folder) made (ADR 0175): the ideas of the comparison with zigzag, an open-source embroidery program, that are worth adding. Nine milestones, in an order where each uses the work before it: travel that shows; live numbers and Quicker to Sew; test swatches; satin lean and bands of threads; machine files: check, fix and cross-check; letter measures against the eye; overlapped strokes (a trial); the open tabs come back and one program; agents through MCP (`emb-cli mcp`, no network code). See `docs/design/p22-plan.md`. |
+| 22. Checks, swatches and agents | Accepted (owner, 2026-11-25); Milestone 1 (travel that shows: the plan marks its travel, a measure, warnings in Design info and View > Check > Travel That Shows, a corpus snapshot) made (ADR 0167), and the travel faults that it found fixed (ADR 0168); Milestone 2 (the trim distance of a design, Quicker to Sew with the numbers before and after) made (ADR 0169); Milestone 3 (test swatches: the window, `emb-cli swatch`) made in the software, its sew-out open (ADR 0170); Milestone 4 (satin lean, bands of threads across a column) made in the software, its sew-out open (ADR 0171); Milestone 5 (machine files: check, Fix Stitches, `emb-cli check` and `fix`, the cross-check with pyembroidery: 870 files the same) made (ADR 0172); Milestone 6 (letter measures against the eye: a judged set of 496 letters, the open patch measure, 100 % agreement; the owner agrees with 50 of the letters) made (ADR 0173); Milestone 7 (overlapped strokes, a trial) measured and not adopted, the owner's choice (ADR 0174; branch `trial/overlapped-strokes`); Milestone 8 (the open tabs come back, one program through an inbox folder) made (ADR 0175); Milestones 1 to 8 audited ("Audit of P22"): the ideas of the comparison with zigzag, an open-source embroidery program, that are worth adding. Nine milestones, in an order where each uses the work before it: travel that shows; live numbers and Quicker to Sew; test swatches; satin lean and bands of threads; machine files: check, fix and cross-check; letter measures against the eye; overlapped strokes (a trial); the open tabs come back and one program; agents through MCP (`emb-cli mcp`, no network code). See `docs/design/p22-plan.md`. |
 | 15. Browser version | Later (owner decision, 2026-11-16): not started. Start after the first feedback of users on the desktop program (about v0.4). See "P15. Browser version" below. |
 
 ## Releases
@@ -160,6 +160,160 @@ The audit of Stages 1 to 6 and the IP review of the release (the rules of the re
 - Docs: the README has the v0.3 features, the upgrade and start notes and a repaired install table; the spec has the machine library and a roadmap row for this work.
 - Open: the start test on the PC of the owner's friends. Passed (owner, 2026-11-16): endless pan with a real mouse, the My Machines window. The installer removes the older version before it asks to close a running ShokujoDX, so a Cancel at that question leaves no version installed (install again to fix).
 
+
+## Audit of P22 (2026-11-25)
+
+After Milestones 1 to 8, a check of the code and the documents: probes
+with hard and wrong input for the new code of the phase
+(`crates/emb-cli/tests/p22_probe.rs`;
+`cargo test --release -p emb-cli --test p22_probe -- --ignored --nocapture probe_p22`,
+each case in a process of its own), tests with damaged session files and
+with junk in the inbox of one program, code that is not needed, the
+rules of the spec, the documents against the code, the translations, the
+help and the pictures of the windows. Milestone 9 (agents through MCP) is
+not made yet.
+
+**Fixed.**
+
+- **Travel far apart could stop the program.** The measure of the travel
+  that shows (Milestone 1) kept a map with a cell of 1 mm for each place
+  of the box of all the travel of a plan. Travel at two places 100 m
+  apart needed 10^10 cells (40 GB), and at two corners of the range of a
+  project 3 × 10^12. Design info makes the measure for each design, so
+  such a project file stopped the program when it opened. The maps keep
+  only the blocks of cells with travel now (`CellMap`). The numbers of
+  the corpus are the same; the measure of the corpus takes 38 ms in place
+  of 31 ms, and travel 1.8 km apart takes 2 ms. Design info also searched
+  all the pieces of travel for each object; one pass now
+  (`ShownTravel::by_object`).
+- **The check of a large machine file was slow.** The check found the
+  travel run of each piece of travel that shows with a search of all the
+  runs: 0.8 s for a file of 60,000 stitches, 4 s for 240,000. A piece
+  has the record where it starts now (`ShownPiece::record`), and a binary
+  search finds its run. The fix split a stitch of any length: a damaged
+  file with 1,000 stitches of 1 km became 78 million stitches, and the
+  probe did not end in 3 minutes. A stitch longer than 60 mm is a jump
+  that the file keeps as a stitch: the fix leaves it, and the check shows
+  it (`file_check::MAX_SPLIT_MM`). The probe of 400,000 random stitches
+  took 114 s, and takes 3.8 s now.
+- **Test swatches out of range.** A value that was not a number (only
+  `emb-cli swatch` can give one) made stitches that were not numbers, and
+  a width of 1e9 mm made a design out of the range of a project. The
+  values stay in the range of the setting now (`SwatchSpec::values`).
+- **A file given to a program that stopped was lost.** After a crash, the
+  heartbeat of the session is new for up to two minutes. A file that the
+  user opened then went to the inbox of the stopped program, and nothing
+  opened. A start waits up to 2.5 s for the program to take the file
+  (`one_program::TAKE_WAIT`; the program reads its inbox each second),
+  else it takes the entry back and opens the file itself. The test with
+  two processes has a reader of the inbox now; the second process stops
+  in about 1 s.
+- **A damaged session file.** The view of a tab (a zoom of 0, a center
+  far out) went to the canvas as it was; it is not used now. New tests:
+  damaged session files (empty, half, wrong types, tabs with no file and
+  no backup) and junk in the inbox (no path, bytes that are not text, a
+  folder, a path that is not there, a line of 5 MB). Nothing opens and
+  nothing stops.
+- **A band of a very long column** made an Ink/Stitch file of 120 MB (the
+  stitch engine refuses the column; the writer did not). The rails of a
+  band have at most about 20,000 pairs now (0.8 MB).
+- **Fix Stitches and Design info did not agree.** Fix Stitches listed the
+  travel of a file from 1 mm and said that Design info shows where it is;
+  Design info warned from 2 mm. Design info shows each travel fault of
+  the check now. The warning for travel in a design is for more than
+  2 mm, as the help says (the code had 2 mm or more).
+- **`emb-cli check` and `fix`** used the defaults with no `--machine`,
+  not the machine of a design, and not its trim distance. They use the
+  options of the program now (`emb_cli::file_check_options`,
+  `PlanOptions::for_design`).
+- **Code that is not needed or is written two times.** One function each
+  for the subpaths of a stitch object (`emb_model::stitch_subpaths`;
+  `emb-stitch` uses it), the lock stitches of the plan and of the fix
+  (`emb_stitch::lock_points`, `min_lock_mm`, `LOCK_LOOK_BACK`), the trim
+  distance of a design (`PlanOptions::for_design`: the plan, the check of
+  stitch objects and the CLI), the band rules
+  (`SatinParams::active_band`, `ColumnBand::sews_underlay`: five places),
+  the field of the hoop (`AppState::hoop_field`), the label font and
+  height of the sheets and the swatches (`sheet::LABEL_FONT`,
+  `sheet::LABEL_MM`), the scan of the session folders and the write of a
+  session file (`backup.rs`), and the settings of the selection (Test
+  Swatches). Also: `Fixes::NONE` in place of a `Default` that nothing
+  used; a test of needle holes with its one limit (`enough_holes`); no
+  third value of `by_object` (nothing read it); the other bands of a
+  column through `bands_of`; the standard values of Quicker to Sew from
+  `QuickerToSew::STANDARD`; the most copies of the CLI text from
+  `MAX_COPIES`; the default number of copies in one constant
+  (`swatch::DEFAULT_COPIES`). Eight items that only their own crate uses
+  are not public now. Three doc comments were on the wrong function, or
+  told of an earlier version.
+- **The documents.** `CLAUDE.md` named `emb_model::swatch` (it is
+  `emb_letter::swatch`). The inventory said that lettering has a Lean
+  field (it has the setting, with no field). The plan had 0.1 mm for the
+  cross-check with pyembroidery (the tool and ADR 0172 have 0.15 mm) and
+  PEC for the files with one palette color (PES and PEC). ADR 0173 had
+  "over 3 mm" for a limit of 3 mm or more. Four earlier ADRs have a note
+  of the ADR of P22 that changed them (0013, 0134, 0166, 0170). ADR 0171
+  gives the range of the lean (−45° to 45°) and its sign; ADR 0172 the
+  needle hole (0.15 mm) and the limit of the travel of a file (1 mm).
+  Five long sentences in ADR 0167, 0170, 0172 and 0174 are lists now. The
+  help, in four languages: the Test Swatches topic has lean and band
+  overlap; Quicker to Sew has Standard and what Remove Small Details
+  keeps; the check of stitch objects has the limit of travel; new
+  keywords. The README lists `swatch`, `check` and `fix`.
+
+**Left as it is.**
+
+- The report of `quicker::apply` (the threads merged, the objects
+  removed) is read only by tests; the window shows the live numbers. It
+  stays as the result of the engine.
+- `Swatches::copies` and `labels` (the boxes) are read only by the exit
+  test of Milestone 3; at most 24 of each.
+- `swatch::satin_width` measures the width of a column in its own way
+  (`Column::mean_width` is there too); one function can change the values
+  of the swatches of the corpus, so it needs a sew-out.
+- The three loops over half cells in `travel.rs` (they use one test of a
+  cell now): one function for the samples can change the plans by a
+  rounding.
+- A band with an overlap of 1e300 mm sews nothing: the stitch engine
+  refuses an object larger than 3 m with its settings (`too_large`), as
+  for any wrong size.
+
+**Checked, no change.**
+
+- The probes, after the fixes: travel 1 m to 1.8 km apart (2 ms each);
+  1,000 to 20,000 fills in a row (the measure 4 ms for 20,000); Quicker to
+  Sew with settings that are not numbers, below 0 and very large on 400
+  threads (a trim distance that is not a number is refused by the range
+  check of a project, as the app applies it); test swatches of the eight
+  settings with six wrong ranges each; lean and bands with wrong numbers
+  (a lean of ±1e300 or not a number, band 5 of 0, band 1 of 4 × 10^9, an
+  overlap that is not a number); ten machine files (empty, an end only,
+  jumps only, color changes only, 400,000 stitches at one point and in a
+  square, 100,000 color changes, 200,000 trims, stitches of 1 km, travel
+  1.8 km apart). No panic, no stitch out of the range of a project, a
+  second fix fixes nothing, and no case takes more than 4 s.
+- Rules 3, 5 and 9: the code and the documents of the phase name no
+  closed-source program; no `unsafe` code; no new dependency (the phase
+  changed no `Cargo.toml` on the main branch); the trigonometry of the
+  engine code is `emb_geom::math`.
+- The documents against the code: about 120 names and 34 values of ADR
+  0167 to 0175, the plan, `CLAUDE.md`, the help and the inventory are in
+  the code with the quoted values (the exceptions are above). The
+  numbers that two documents share agree. `CLAUDE.md` and the spec have
+  the same rules. The help in four languages has the same blocks.
+- The pictures of the windows (117 s): 420 scenes in four languages, 680
+  pictures, no error, and each window fits a screen of 1366 × 768. 611
+  pictures changed since the last full run: the windows of the phase,
+  the Edit Nodes button of Object Properties, and the windows that the
+  tutorials of P19 Part 2 changed. The texts that do not fit are the
+  titles of dock tabs and the lists of styles in Spanish and Japanese, as
+  before. The View Options window is wider in German and Spanish than in
+  English; it fits the screen.
+
+**Exit tests.** Milestones 1, 2, 5, 6 and 8 are met. Milestones 3 and 4
+are made in the software; their sew-outs are open. Milestone 7 was
+measured, and the owner kept the way of today. Milestone 9 is not
+started.
 
 ## Audit of P21 (2026-11-24)
 
@@ -2136,7 +2290,7 @@ bulges, open area and open corners, columns on top at joints); the
 owner's sew-out of the test sheets shows no spikes, bulges or open
 corners.
 
-### P22. Checks, swatches and agents (L) — accepted, Milestones 1 to 8 done (`docs/design/p22-plan.md`)
+### P22. Checks, swatches and agents (L) — accepted, Milestones 1 to 8 done (audit: "Audit of P22") (`docs/design/p22-plan.md`)
 
 The ideas of the comparison with zigzag (2026-11-25) that are worth
 adding: a warning for travel that shows, and live numbers for the

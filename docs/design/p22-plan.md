@@ -10,7 +10,8 @@ open. Milestone 5 is made (ADR 0172). Milestone 6 is made (ADR 0173),
 and the owner agrees with the 50 judged letters that the owner looked at.
 Milestone 7 (the trial of overlapped strokes) is measured, and the owner
 chose the way of today (ADR 0174); the trial is on the branch
-`trial/overlapped-strokes`. Milestone 8 is made (ADR 0175).
+`trial/overlapped-strokes`. Milestone 8 is made (ADR 0175). The audit
+of Milestones 1 to 8 is "Audit of P22" in the roadmap.
 
 ## Goal
 
@@ -347,7 +348,10 @@ files of the corpus (87 designs, 10 formats) read back with the same
 needle points and the same color changes and stops; the report gives
 the reason of the 24 files where the commands have the other kind (a
 stop as a color change in formats with no stop, the stops of JEF as
-pyembroidery writes them, color changes to one palette color in PEC).
+pyembroidery writes them, color changes to one palette color in PES
+and PEC). The needle points agree to 0.15 mm (`TOLERANCE_MM` of the tool:
+the grid of 0.1 mm of the files, and the rounding of each reader), not to
+the 0.1 mm of the exit test.
 
 ## Milestone 6: letter measures against the eye (S)
 
@@ -448,7 +452,8 @@ trial) with the limits of the eye of Milestone 6
 Of each font (today / bridges / bridges and notches): clean letters
 Block Sans 61 / 61 / 61, Anton 57 / 57 / 56, Pacifico 61 / 59 / 59,
 Varsity 61 / 61 / 62; two layers Block Sans 213 / 350 / 401, Anton
-279 / 327 / 355, Pacifico 254 / 289 / 297, Varsity 243 / 525 / 574 mm2.
+279 / 327 / 355, Pacifico 254 / 289 / 297, Varsity 243 / 525 / 574 mm2
+(each rounded; the sum of the third way is 1,625).
 
 - The open area does not change: the end of a piece goes 10 % of its
   bridge into the other stroke today (`BRIDGE_OVERLAP`), so the joints of

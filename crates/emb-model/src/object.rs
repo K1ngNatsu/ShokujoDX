@@ -311,14 +311,9 @@ impl SatinGeometry {
         }
         // A rung every few pairs keeps the stitch direction.
         let rungs = (0..pairs.len()).step_by(4).skip(1).map(|i| (a[i], b[i])).collect();
-        let open = |pts: &[Point]| {
-            pts[1..]
-                .iter()
-                .fold(Path::new().move_to(pts[0]), |path, &p| path.line_to(p))
-        };
         Some(SatinGeometry {
-            rail_a: open(&a),
-            rail_b: open(&b),
+            rail_a: polyline_path(&a),
+            rail_b: polyline_path(&b),
             rungs,
         })
     }
@@ -344,6 +339,9 @@ impl SatinGeometry {
         if ta <= 0.0 || tb <= 0.0 {
             return None;
         }
+        // At most about MAX_PAIRS pairs (the audit of P22: a column of
+        // 1.5 km gave 3 million, and an Ink/Stitch file of 120 MB).
+        let step = step.max((ta + tb) / 2.0 / MAX_PAIRS);
         let at = |r: &[Point], l: &[f64], s: f64| {
             let i = l.partition_point(|&x| x <= s).clamp(1, r.len() - 1);
             let seg = l[i] - l[i - 1];
@@ -486,6 +484,9 @@ impl Ring {
         out
     }
 }
+
+/// The most pairs of [`SatinGeometry::pairs`] (about).
+const MAX_PAIRS: f64 = 20_000.0;
 
 fn polyline_path(pts: &[Point]) -> Path {
     pts[1..]
@@ -966,7 +967,7 @@ pub struct ColumnBand {
 impl ColumnBand {
     /// The part of a stitch across the column that the band sews, for a
     /// stitch of width `w`: from `lo` to `hi` (0 at rail A, 1 at rail B).
-    pub fn fractions(&self, w: f64) -> (f64, f64) {
+    pub(crate) fn fractions(&self, w: f64) -> (f64, f64) {
         let n = f64::from(self.count.max(1));
         let k = f64::from(self.index.min(self.count.max(1) - 1));
         let more = if w > 1e-9 {
@@ -981,8 +982,14 @@ impl ColumnBand {
 
     /// The band has rail A (the first band) and rail B (the last band) of
     /// the column: pull compensation goes only out at these sides.
-    pub fn outer_sides(&self) -> (bool, bool) {
+    pub(crate) fn outer_sides(&self) -> (bool, bool) {
         (self.index == 0, self.index + 1 >= self.count)
+    }
+
+    /// The band sews the underlay of the whole column: the first band does,
+    /// the others have none.
+    pub fn sews_underlay(&self) -> bool {
+        self.index == 0
     }
 }
 
@@ -1188,6 +1195,12 @@ impl Default for SatinParams {
 }
 
 impl SatinParams {
+    /// The band of the column, if the column is one of two or more bands
+    /// (a band of one is the whole column).
+    pub fn active_band(&self) -> Option<ColumnBand> {
+        self.band.filter(|b| b.count > 1)
+    }
+
     /// The settings of the column of the band `band` (P22 Milestone 4,
     /// ADR 0171): pull compensation only out at the sides of the column
     /// (the first band at rail A, the last band at rail B), and no pull in

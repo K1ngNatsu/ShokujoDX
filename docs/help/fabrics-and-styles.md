@@ -39,7 +39,8 @@ a fabric, sew test swatches. Select an object (a fill, a satin column, a
 line or lettering), then click **Design > Output > Test Swatches**.
 
 - **Setting**: the setting that changes from copy to copy: spacing,
-  stitch length, pull compensation, width, angle or underlay. The list
+  stitch length, pull compensation, width, angle, underlay, lean or band
+  overlap. The list
   shows only the settings that the selected objects have.
 - **From**, **To** and **Copies**: the values of the first and the last
   copy, and the number of copies. The steps between them are equal. For

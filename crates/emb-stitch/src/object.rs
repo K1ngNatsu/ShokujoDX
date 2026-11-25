@@ -133,29 +133,9 @@ impl Run {
     }
 }
 
-/// The subpaths of a stitch object as needle points. All points stay, also
-/// repeated ones; curves count as their end points.
-pub fn stitch_subpaths(path: &emb_geom::Path) -> Vec<Vec<Point>> {
-    use emb_geom::path::PathCmd;
-    let mut out: Vec<Vec<Point>> = Vec::new();
-    for cmd in &path.cmds {
-        match *cmd {
-            PathCmd::MoveTo(p) => out.push(vec![p]),
-            PathCmd::LineTo(p) | PathCmd::CubicTo(_, _, p) => match out.last_mut() {
-                Some(s) => s.push(p),
-                None => out.push(vec![p]),
-            },
-            PathCmd::Close => {
-                if let Some(s) = out.last_mut()
-                    && let Some(&first) = s.first()
-                {
-                    s.push(first);
-                }
-            }
-        }
-    }
-    out
-}
+/// The subpaths of a stitch object as needle points (one function for the
+/// stitch engine and for the records of stitch objects).
+pub use emb_model::stitch_subpaths;
 
 /// The stitches of one object: one or more runs in order.
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -1282,7 +1262,9 @@ pub fn underlay_layers(kind: &ObjectKind) -> Option<Vec<UnderlayLayer>> {
         }
         // A band after the first has no underlay (the first band sews the
         // underlay of the whole column).
-        ObjectKind::Satin { params, .. } if params.band.is_some_and(|b| b.count > 1 && b.index > 0) => Some(Vec::new()),
+        ObjectKind::Satin { params, .. } if params.active_band().is_some_and(|b| !b.sews_underlay()) => {
+            Some(Vec::new())
+        }
         ObjectKind::Satin { geometry, params } => {
             let width = crate::satin::Column::new(geometry).map_or(0.0, |c| c.mean_width());
             Some(crate::satin::underlay_layers(&params.underlay, width))

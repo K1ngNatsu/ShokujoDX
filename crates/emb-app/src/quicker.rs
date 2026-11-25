@@ -185,7 +185,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                     tr("Merge similar threads"),
                     tr("Threads whose colors differ by this or less become one thread: the one that sews more. About 2 is the smallest difference that you can see."),
                     1.0..=15.0,
-                    5.0,
+                    QuickerToSew::STANDARD.merge_threads.unwrap_or_default(),
                     "",
                 );
                 optional(
@@ -194,7 +194,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                     tr("Remove small details"),
                     tr("Fills, satin columns and lines smaller than this go (not in groups, such as monograms)."),
                     0.3..=5.0,
-                    1.0,
+                    QuickerToSew::STANDARD.small_details_mm.unwrap_or_default(),
                     " mm",
                 );
                 optional(
@@ -203,7 +203,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                     tr("Sew across gaps up to"),
                     tr("A gap to the next part of the same color up to this length gets a travel stitch, not a trim. Off: the trim distance of the machine."),
                     0.0..=20.0,
-                    3.0,
+                    QuickerToSew::STANDARD.gap_mm.unwrap_or_default(),
                     " mm",
                 );
             });

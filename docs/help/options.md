@@ -2,7 +2,7 @@
 id: options
 title: Options
 group: reference
-keywords: options, settings, preferences, appearance, dark, light, high contrast, text size, language, units, mm, inches, grid, rulers, guides, snap, nudge, arrow keys, backup, hoop margin, safety margin, paste, duplicate offset, zoom step, display colors, density limit, thread price, spool, bobbin, currency, screen calibration, reset, new version, update, check for updates, network, privacy
+keywords: options, settings, preferences, appearance, dark, light, high contrast, text size, language, units, mm, inches, grid, rulers, guides, snap, nudge, arrow keys, backup, hoop margin, safety margin, paste, duplicate offset, zoom step, display colors, density limit, thread price, spool, bobbin, currency, screen calibration, reset, new version, update, check for updates, network, privacy, open tabs, one program
 ---
 # Options
 

@@ -15,9 +15,10 @@ program under Apache-2.0); the code is our own.
 
 ## Decision
 
-- **Lean.** `SatinParams::lean_deg` (0 by default, at most
-  `object::MAX_LEAN_DEG`, 45°): the angle of the top stitches from
-  square. `satin::Column::leaned` makes the pairs of the column about
+- **Lean.** `SatinParams::lean_deg` (0 by default, from −45° to 45°,
+  `object::MAX_LEAN_DEG`; a positive angle moves the end of each top
+  stitch on rail B forward along the column): the angle of the top
+  stitches from square. `satin::Column::leaned` makes the pairs of the column about
   0.5 mm apart along the rails (`LEAN_STEP_MM`), and moves the point of
   each pair on rail B along rail B by the width there times the tangent
   of the lean. The points on rail B increase strictly, and near an end of
@@ -62,6 +63,14 @@ program under Apache-2.0); the code is our own.
   design `satin-lean-bands` has columns with a lean of 0°, 8° and 15° and
   a column of three bands with an overlap of 0.3 mm; it is the start
   design of the sew-out (`emb-cli swatch` on it).
+
+## The audit of P22
+
+The rails of a band have at most about 20,000 pairs (`MAX_PAIRS`): a band
+of a column 1.5 km long (a wrong value; the stitch engine refuses it) made
+an Ink/Stitch file of 120 MB, and makes one of 0.8 MB now. A band
+uses `SatinParams::active_band` and `ColumnBand::sews_underlay` in each
+place that sews or writes it.
 
 ## Consequences
 
