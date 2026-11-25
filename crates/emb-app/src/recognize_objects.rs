@@ -458,22 +458,39 @@ impl AppState {
     /// Asks for a vector file with the outlines of the design and puts them
     /// in the Recognize Objects window.
     fn open_outlines_dialog(&mut self, d: &mut RecognizeDialog) {
-        let Some(p) = crate::dialog::FileDialog::new()
+        let dialog = crate::dialog::FileDialog::new()
             .set_title(tr("Outlines of the design"))
             .add_filter(
                 tr("Vector artwork (SVG, PDF, AI, EPS, EMF, WMF)"),
                 &emb_formats::artwork::ARTWORK_EXTENSIONS,
             )
-            .set_directory(self.dialog_dir())
-            .pick_file()
-        else {
-            return;
-        };
+            .set_directory(self.dialog_dir());
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(p) = dialog.pick_file() {
+            self.open_outlines(d, &p);
+        }
+        // The browser: the file comes in a later frame, when the window
+        // is in its place again.
+        #[cfg(target_arch = "wasm32")]
+        {
+            let _ = d;
+            crate::dialog::open_then(dialog, self, |st, p| {
+                if let Some(mut d) = st.recognize_dialog.take() {
+                    st.open_outlines(&mut d, &p);
+                    st.recognize_dialog = Some(d);
+                }
+            });
+        }
+    }
+
+    /// Puts the outlines of the vector file `p` in the Recognize Objects
+    /// window `d`.
+    fn open_outlines(&mut self, d: &mut RecognizeDialog, p: &std::path::Path) {
         let ext = p
             .extension()
             .map(|e| e.to_string_lossy().to_lowercase())
             .unwrap_or_default();
-        let read = std::fs::read(&p)
+        let read = crate::dialog::read(p)
             .map_err(|e| e.to_string())
             .and_then(|b| emb_formats::artwork::import_artwork(&ext, &b, true).map_err(|e| e.to_string()));
         match read.map(|i| outlines_of(&i)) {

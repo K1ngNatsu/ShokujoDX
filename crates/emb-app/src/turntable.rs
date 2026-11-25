@@ -288,7 +288,7 @@ impl AppState {
         let p = path.clone();
         let handle = crate::background::spawn(move || {
             let bytes = gif_bytes(&views)?;
-            std::fs::write(&p, bytes).map_err(|e| format!("{}: {e}", p.display()))
+            crate::dialog::write(&p, bytes).map_err(|e| format!("{}: {e}", p.display()))
         });
         self.turntable.saving = Some((path, handle));
         self.message = tr("Saving the turn…").into();
@@ -309,7 +309,7 @@ impl AppState {
         };
         self.finish_save(
             &path,
-            std::fs::write(&path, pic.png()).map_err(|e| format!("{}: {e}", path.display())),
+            crate::dialog::write(&path, pic.png()).map_err(|e| format!("{}: {e}", path.display())),
         );
     }
 

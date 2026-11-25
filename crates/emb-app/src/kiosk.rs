@@ -401,12 +401,14 @@ pub fn screen(ui: &mut egui::Ui, st: &mut AppState) {
                     });
                 }
                 step(ui, 2, tr("Text"));
-                ui.add(
+                let _field = ui.add(
                     egui::TextEdit::singleline(&mut c.text)
                         .font(egui::FontId::proportional(26.0))
                         .hint_text(tr("Type the name"))
                         .desired_width(left_w - 20.0),
                 );
+                #[cfg(target_arch = "wasm32")]
+                crate::web::native_text(ui, &_field, &mut c.text, false);
                 ui.horizontal(|ui| {
                     ui.label(big(tr("Size"), 17.0));
                     ui.add(

@@ -422,6 +422,7 @@ pub fn write_files(
     folder: &Path,
     name: &str,
 ) -> Result<Vec<PathBuf>, String> {
+    #[cfg(not(target_arch = "wasm32"))]
     std::fs::create_dir_all(folder).map_err(|e| format!("{}: {e}", folder.display()))?;
     // The order number before the name (an option of the profile).
     let with_order;
@@ -436,7 +437,7 @@ pub fn write_files(
     let mut written = Vec::new();
     let date = local_stamp();
     let write = |path: PathBuf, bytes: &[u8], written: &mut Vec<PathBuf>| -> Result<(), String> {
-        std::fs::write(&path, bytes).map_err(|e| format!("{}: {e}", path.display()))?;
+        crate::dialog::write(&path, bytes).map_err(|e| format!("{}: {e}", path.display()))?;
         written.push(path);
         Ok(())
     };
@@ -586,7 +587,7 @@ impl AppState {
             return;
         };
         let path = path.with_extension("svg");
-        self.message = match std::fs::write(&path, self.design_svg()) {
+        self.message = match crate::dialog::write(&path, self.design_svg()) {
             Ok(()) => format!("Exported {}", path.display()),
             Err(e) => format!("{}: {e}", path.display()),
         };
@@ -618,7 +619,7 @@ impl AppState {
     pub fn export_inkstitch_to(&mut self, path: &Path) {
         let written =
             emb_formats::inkstitch::write::write_inkstitch(self.doc.design(), &emb_stitch::object::underlay_layers);
-        match std::fs::write(path, written.svg) {
+        match crate::dialog::write(path, written.svg) {
             Ok(()) => {
                 self.message = crate::i18n::fill("Written for Ink/Stitch: {}", &[&(path.display())]);
                 if !written.warnings.is_empty() {
@@ -1120,7 +1121,7 @@ fn preview_window(ctx: &egui::Context, st: &mut AppState) {
                         .save_file()
                     {
                         let pdf = emb_render::pdf::write(&pages, &st.doc.design().name);
-                        st.message = match std::fs::write(&path, pdf) {
+                        st.message = match crate::dialog::write(&path, pdf) {
                             Ok(()) => crate::i18n::fill("Saved {}", &[&path.display()]),
                             Err(e) => crate::i18n::fill("Not saved: {}", &[&e]),
                         };

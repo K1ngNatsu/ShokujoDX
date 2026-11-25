@@ -68,6 +68,10 @@ web-sys = { version = "0.3", features = [
     "Touch",
     "TouchEvent",
     "TouchList",
+    "Node",
+    "HtmlTextAreaElement",
+    "CssStyleDeclaration",
+    "FocusOptions",
 ] }
 
 [build-dependencies]

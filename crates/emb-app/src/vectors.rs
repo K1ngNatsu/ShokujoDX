@@ -364,7 +364,7 @@ impl AppState {
         } else {
             svg.into_bytes()
         };
-        match std::fs::write(&p, bytes) {
+        match crate::dialog::write(&p, bytes) {
             Ok(()) => self.message = crate::i18n::fill("Outlines written to {}", &[&(p.display())]),
             Err(e) => {
                 self.notice = Some(Notice {

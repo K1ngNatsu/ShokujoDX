@@ -303,13 +303,13 @@ impl AppState {
             .file_stem()
             .map(|s| s.to_string_lossy().into_owned())
             .unwrap_or_else(|| "Design".into());
-        let read = emb_library::read_machine_file(path);
+        let read = read_stitches(path);
         let problem = match read {
             Ok(s) if s.stitch_count() > 0 => {
                 let mut d = emb_model::design_from_stitches(&s, &stem);
                 // TBF and U01 files have the needle of each color: keep them
                 // as pins (ADR 0063).
-                let needles = std::fs::read(path)
+                let needles = crate::dialog::read(path)
                     .map(|b| emb_formats::read_needles(ext, &b))
                     .unwrap_or_default();
                 d.pin_block_needles(&needles);
@@ -417,17 +417,15 @@ impl AppState {
 
     /// Asks for a machine file and adds its stitch objects to the design.
     pub fn insert_machine_file_dialog(&mut self) {
-        let Some(p) = crate::dialog::FileDialog::new()
+        let dialog = crate::dialog::FileDialog::new()
             .set_title(tr("Insert machine file"))
             .add_filter(tr("Machine files"), &emb_formats::READ_EXTENSIONS)
-            .set_directory(self.dialog_dir())
-            .pick_file()
-        else {
-            return;
-        };
-        if let Some(ext) = machine_ext(&p) {
-            self.insert_machine_file(&p, &ext);
-        }
+            .set_directory(self.dialog_dir());
+        crate::dialog::open_then(dialog, self, |st, p| {
+            if let Some(ext) = machine_ext(&p) {
+                st.insert_machine_file(&p, &ext);
+            }
+        });
     }
 
     /// Adds the stitch objects of a machine file to the design, as one
@@ -531,7 +529,9 @@ impl AppState {
     /// Asks for an SVG file and imports it: as fills and lines, or (`lines`)
     /// every shape as a running-stitch line.
     pub fn import_artwork_dialog(&mut self, mode: ArtworkImport) {
-        let Some(p) = crate::dialog::FileDialog::new()
+        // In the browser the artwork comes as an upload (the owner,
+        // 2026-11-25), as the picture of Picture to Design.
+        let dialog = crate::dialog::FileDialog::new()
             .set_title(match mode {
                 ArtworkImport::Objects => tr("Import Artwork"),
                 ArtworkImport::Lines => tr("Import artwork as lines"),
@@ -542,13 +542,15 @@ impl AppState {
                 &emb_formats::artwork::ARTWORK_EXTENSIONS,
             )
             .add_filter(tr("DXF drawing (opens as a sketch)"), &["dxf"])
-            .set_directory(self.dialog_dir())
-            .pick_file()
-        else {
-            return;
-        };
+            .set_directory(self.dialog_dir());
+        crate::dialog::open_then(dialog, self, move |st, p| st.import_artwork_file(&p, mode));
+    }
+
+    /// Imports the artwork file `p` in the way of `mode` (a DXF drawing
+    /// opens as a sketch).
+    pub fn import_artwork_file(&mut self, p: &Path, mode: ArtworkImport) {
         let dxf = p.extension().is_some_and(|e| e.eq_ignore_ascii_case("dxf"));
-        match std::fs::read(&p) {
+        match crate::dialog::read(p) {
             Ok(bytes) if dxf => self.import_dxf_bytes(&bytes, &p.display().to_string()),
             Ok(bytes) => self.import_svg_as(&bytes, &p.display().to_string(), mode),
             Err(e) => {
@@ -630,6 +632,19 @@ impl AppState {
                 lines,
             });
         }
+    }
+}
+
+/// The stitches of the machine file of a dialog: from the disk (with the
+/// colors of a file next to it), or in the browser from the upload.
+pub fn read_stitches(path: &Path) -> Result<emb_model::StitchDesign, String> {
+    #[cfg(not(target_arch = "wasm32"))]
+    return emb_library::read_machine_file(path);
+    #[cfg(target_arch = "wasm32")]
+    {
+        let ext = machine_ext(path).unwrap_or_default();
+        let bytes = crate::dialog::read(path).map_err(|e| e.to_string())?;
+        emb_formats::read_machine(&ext, &bytes)
     }
 }
 

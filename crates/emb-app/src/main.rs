@@ -81,6 +81,8 @@ mod packaging;
 mod palette;
 mod panels;
 mod parts_view;
+#[cfg(any(target_arch = "wasm32", test))]
+mod pen;
 mod picture;
 #[cfg(test)]
 mod pictures;

@@ -97,6 +97,8 @@ impl AppState {
             .clone()
             .filter(|t| !t.rows.is_empty())
             .ok_or(tr("The list has no names."))?;
+        // A folder of the browser is a zip file: nothing to make.
+        #[cfg(not(target_arch = "wasm32"))]
         std::fs::create_dir_all(folder).map_err(|e| format!("{}: {e}", folder.display()))?;
         let opts = d
             .machine
@@ -147,7 +149,7 @@ impl AppState {
                 )
                 .ok_or_else(|| crate::i18n::fill(".{} cannot be written", &[&ext]))?;
                 let path = folder.join(format!("{name}.{ext}"));
-                std::fs::write(&path, bytes).map_err(|e| format!("{}: {e}", path.display()))?;
+                crate::dialog::write(&path, bytes).map_err(|e| format!("{}: {e}", path.display()))?;
                 written.push(path);
             }
         }
@@ -381,14 +383,12 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
     if add_col && let Some(id) = selected_lettering {
         st.team_add_column(id);
     }
-    if import_file
-        && let Some(p) = crate::dialog::FileDialog::new()
+    if import_file {
+        let dialog = crate::dialog::FileDialog::new()
             .set_title(tr("Import names"))
             .add_filter(tr("Name lists"), &["csv", "txt", "tsv"])
-            .set_directory(st.dialog_dir())
-            .pick_file()
-    {
-        match std::fs::read_to_string(&p) {
+            .set_directory(st.dialog_dir());
+        crate::dialog::open_then(dialog, st, |st, p| match crate::dialog::read_to_string(&p) {
             Ok(text) => {
                 let mut tn = st.doc.design().team_names.clone().unwrap_or_default();
                 let n = tn.import_text(&text, st.team_window.header);
@@ -396,7 +396,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                 st.message = crate::i18n::fill("{} names added from {}", &[&n, &(p.display())]);
             }
             Err(e) => st.message = format!("{}: {e}", p.display()),
-        }
+        });
     }
     if let Some(i) = show
         && let Err(e) = st.team_show_row(i)
@@ -404,10 +404,11 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         st.message = e;
     }
     if save_each
-        && let Some(folder) = crate::dialog::FileDialog::new()
-            .set_title(tr("Save each name: folder"))
-            .set_directory(st.dialog_dir())
-            .pick_folder()
+        && let Some(folder) = crate::dialog::folder_to_write(
+            crate::dialog::FileDialog::new()
+                .set_title(tr("Save each name: folder"))
+                .set_directory(st.dialog_dir()),
+        )
     {
         st.message = match st.team_save_each(&folder) {
             Ok(files) => crate::i18n::fill("Saved {} files in {}", &[&files.len(), &folder.display()]),

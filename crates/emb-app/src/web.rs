@@ -1,9 +1,11 @@
 //! The browser trial (roadmap P15, step 1; branch `trial/browser`): the
 //! program in a web page. The page starts it on its canvas; files come in
 //! by an upload (File > Open; a picture for Picture to Design, Load Picture
-//! and the Backdrop panel) and go out by a download (Save, Export). The
-//! other commands that need the desktop (their file dialogs, Send to USB,
-//! the folders of the user) show a notice.
+//! and the Backdrop panel; the commands that ask for a file through
+//! `dialog::open_then`) and go out by a download (Save, Export, the commands
+//! that save a file; a folder is one zip file, see `crate::dialog`). The
+//! other commands that need the desktop (Send to USB, the folders of the
+//! user: the library, fonts and assets) show a notice.
 
 use std::sync::Mutex;
 
@@ -45,6 +47,73 @@ enum Then {
     Backdrop,
     /// A picture as the backdrop, then the Picture to Design wizard on it.
     Wizard,
+    /// The command that asked for it goes on ([`upload_then`]).
+    Waiting,
+}
+
+/// A command that waits for an upload: it gets the path of the file
+/// (`dialog::open_then`). One at a time: a new one takes the place of the
+/// one before.
+type Waiting = Box<dyn FnOnce(&mut AppState, std::path::PathBuf)>;
+
+thread_local! {
+    static WAITING: std::cell::RefCell<Option<Waiting>> = const { std::cell::RefCell::new(None) };
+    /// The last file of a waiting command: its path and bytes
+    /// (`dialog::read`).
+    static FILE: std::cell::RefCell<Option<(std::path::PathBuf, Vec<u8>)>> = const { std::cell::RefCell::new(None) };
+    /// The files of the folder of `dialog::pick_folder` in this frame: one
+    /// zip file at the end of the frame.
+    static ZIP: std::cell::RefCell<Vec<(String, Vec<u8>)>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Asks the browser for a file of `filters` (names and extensions); `then`
+/// gets its path in a later frame (see `dialog::open_then`).
+pub fn upload_then(filters: Vec<(String, Vec<String>)>, then: Waiting) {
+    WAITING.with(|w| *w.borrow_mut() = Some(then));
+    wasm_bindgen_futures::spawn_local(async move {
+        let mut dialog = rfd::AsyncFileDialog::new();
+        for (name, extensions) in &filters {
+            dialog = dialog.add_filter(name, extensions);
+        }
+        let Some(file) = dialog.pick_file().await else {
+            return;
+        };
+        let bytes = file.read().await;
+        uploaded(file.file_name(), bytes, Then::Waiting);
+    });
+}
+
+/// The bytes of the uploaded file at `path` (see `dialog::read`).
+pub fn uploaded_file(path: &std::path::Path) -> Option<Vec<u8>> {
+    FILE.with(|f| f.borrow().as_ref().filter(|(p, _)| p == path).map(|(_, b)| b.clone()))
+}
+
+/// A file to save: a download, or a file of the zip file of a folder
+/// (`dialog::write`).
+pub fn write_download(path: &std::path::Path, bytes: &[u8]) -> Result<(), String> {
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .ok_or_else(|| format!("{}: no file name", path.display()))?;
+    if path.parent() == Some(std::path::Path::new(crate::dialog::ZIP_FOLDER)) {
+        ZIP.with(|z| z.borrow_mut().push((name, bytes.to_vec())));
+        if let Some(ctx) = CONTEXT.get() {
+            ctx.request_repaint();
+        }
+        return Ok(());
+    }
+    download(&name, bytes)
+}
+
+/// The zip file of a folder, as one download (see [`write_download`]).
+fn download_zip() {
+    let files = ZIP.with(|z| std::mem::take(&mut *z.borrow_mut()));
+    if !files.is_empty()
+        && let Err(e) = download(crate::dialog::ZIP_FOLDER, &crate::share::zip(&files))
+        && let Ok(mut n) = NOTICES.lock()
+    {
+        n.push(e);
+    }
 }
 
 /// No settings were in the storage of the page when the program started: a
@@ -54,6 +123,7 @@ static FRESH: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new
 /// Starts the program on the canvas `shokujodx` of the page.
 pub fn start() {
     FRESH.store(stored(SETTINGS_KEY).is_none(), std::sync::atomic::Ordering::Relaxed);
+    show_panics();
     listen_for_pen();
     let mut options = eframe::WebOptions::default();
     // `?gl=1`: WebGL2 only, as in a browser with no WebGPU (a measure).
@@ -99,6 +169,33 @@ pub fn start() {
             }
         }
     });
+}
+
+/// An error that stops the program shows on the page, with its text: the
+/// page stopped with no word before (the owner, 2026-11-25: "the site
+/// froze"). eframe puts its hook over this one and calls it.
+fn show_panics() {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        previous(info);
+        let Some(document) = web_sys::window().and_then(|w| w.document()) else {
+            return;
+        };
+        let Ok(note) = document.create_element("div") else {
+            return;
+        };
+        let _ = note.set_attribute(
+            "style",
+            "position:fixed;left:0;right:0;top:0;z-index:30;padding:12px 16px;             background:#b00020;color:#fff;font:15px system-ui,sans-serif;cursor:pointer",
+        );
+        let _ = note.set_attribute("onclick", "location.reload()");
+        note.set_text_content(Some(&format!(
+            "The program stopped because of an error. Tap here to reload the page.              Please send this text to the developer: {info}"
+        )));
+        if let Some(body) = document.body() {
+            let _ = body.append_child(&note);
+        }
+    }));
 }
 
 /// The key of the settings in the storage of the page.
@@ -304,11 +401,17 @@ struct Pen {
     palms: std::collections::BTreeSet<i32>,
     /// The last frame was in pen mode.
     active: bool,
+    /// A long press of the pen: the right-click menu (`crate::pen`).
+    press: crate::pen::LongPress,
 }
 
 /// After the pen goes up, touches are not input for this long (ms): the
 /// palm rests on the screen between two strokes of the pen.
 const PEN_HOLD_MS: f64 = 1000.0;
+/// A pen that is down with no event for this long (ms) is up: the system
+/// can take a stroke of the pen with no `pointerup` or `pointercancel`, and
+/// a pen that stays down for the program makes the fingers do nothing.
+const PEN_STALE_MS: f64 = 5000.0;
 
 static PEN: Mutex<Pen> = Mutex::new(Pen {
     events: Vec::new(),
@@ -317,11 +420,15 @@ static PEN: Mutex<Pen> = Mutex::new(Pen {
     touches: std::collections::BTreeSet::new(),
     palms: std::collections::BTreeSet::new(),
     active: false,
+    press: crate::pen::LongPress::new(),
 });
 
 impl Pen {
     fn in_use(&self, now: f64) -> bool {
-        self.down || now - self.last_ms < PEN_HOLD_MS || !self.palms.is_empty() || !self.events.is_empty()
+        (self.down && now - self.last_ms < PEN_STALE_MS)
+            || now - self.last_ms < PEN_HOLD_MS
+            || !self.palms.is_empty()
+            || !self.events.is_empty()
     }
 }
 
@@ -336,6 +443,14 @@ fn listen_for_pen() {
     for name in ["pointerdown", "pointermove", "pointerup", "pointercancel"] {
         let on = Closure::<dyn FnMut(web_sys::PointerEvent)>::new(move |e: web_sys::PointerEvent| {
             if e.pointer_type() != "pen" {
+                return;
+            }
+            // The pen on a field of the page (handwriting) is for the field.
+            let on_field = e
+                .target()
+                .and_then(|t| t.dyn_into::<web_sys::Element>().ok())
+                .is_some_and(|t| t.class_name() == NATIVE_TEXT_CLASS);
+            if on_field {
                 return;
             }
             let (x, y) = (e.client_x() as f32, e.client_y() as f32);
@@ -402,7 +517,12 @@ fn listen_for_pen() {
 pub fn pen_filter(ctx: &eframe::egui::Context, raw: &mut eframe::egui::RawInput) {
     use eframe::egui::{Event, PointerButton, Pos2, TouchDeviceId, TouchId, TouchPhase};
     let Ok(mut pen) = PEN.lock() else { return };
-    if !pen.in_use(js_sys::Date::now()) {
+    let now = js_sys::Date::now();
+    if pen.down && now - pen.last_ms >= PEN_STALE_MS {
+        pen.down = false;
+        pen.events.push(PenEvent::Cancel);
+    }
+    if !pen.in_use(now) {
         pen.active = false;
         return;
     }
@@ -447,27 +567,220 @@ pub fn pen_filter(ctx: &eframe::egui::Context, raw: &mut eframe::egui::RawInput)
                 let p = at(x, y);
                 raw.events.push(Event::PointerMoved(p));
                 raw.events.push(button(p, true));
+                pen.press.down(now, p);
                 last = Some(p);
             }
             PenEvent::Move(x, y) => {
                 let p = at(x, y);
                 raw.events.push(Event::PointerMoved(p));
+                pen.press.moved(p);
                 last = Some(p);
             }
             PenEvent::Up(x, y) => {
                 let p = at(x, y);
                 raw.events.push(Event::PointerMoved(p));
-                raw.events.push(button(p, false));
+                // After a long press the primary button is up already.
+                if !pen.press.up() {
+                    raw.events.push(button(p, false));
+                }
                 last = Some(p);
             }
             PenEvent::Cancel => {
-                if let Some(p) = last {
+                if let Some(p) = last
+                    && !pen.press.up()
+                {
                     raw.events.push(button(p, false));
                 }
                 raw.events.push(Event::PointerGone);
             }
         }
     }
+    // A pen held still: the right-click menu, as a long press of a finger.
+    if let Some(p) = pen.press.due(now) {
+        raw.events.extend(crate::pen::menu_events(p, modifiers));
+    }
+}
+
+/// A text field of the page over a text field of the program, on a touch
+/// screen (the owner, 2026-11-25). egui types into a hidden field of one
+/// pixel, and the handwriting of an iPad (Scribble) did not reach the text:
+/// the letters written with the pen were lost, and the program stopped
+/// answering. A real field of the page takes the handwriting, the keyboard,
+/// dictation and corrections of the system; the program copies its text
+/// each frame.
+struct NativeText {
+    /// The egui text field under it.
+    id: eframe::egui::Id,
+    element: web_sys::HtmlTextAreaElement,
+    /// The text that the program has (to know which side changed it).
+    known: String,
+    /// The last pass that drew the field (`Context::cumulative_pass_nr`).
+    pass: u64,
+    /// The field of the page lost the focus: the user tapped somewhere else.
+    blurred: std::rc::Rc<std::cell::Cell<bool>>,
+    _on_blur: wasm_bindgen::closure::Closure<dyn FnMut()>,
+}
+
+impl Drop for NativeText {
+    fn drop(&mut self) {
+        self.element.remove();
+    }
+}
+
+thread_local! {
+    static NATIVE_TEXT: std::cell::RefCell<Option<NativeText>> = const { std::cell::RefCell::new(None) };
+}
+
+/// On a touch screen: while the egui text field of `response` has the
+/// focus, a field of the page with the same `text` lies over it (see
+/// [`NativeText`]). Call it after the text field, each frame. A field of
+/// one line (`multiline` false) gets no new lines.
+pub fn native_text(ui: &eframe::egui::Ui, response: &eframe::egui::Response, text: &mut String, multiline: bool) {
+    if !touch_device() {
+        return;
+    }
+    let ctx = ui.ctx();
+    // The focus now: a `request_focus` after the field in this frame counts.
+    let focused = ctx.memory(|m| m.has_focus(response.id));
+    NATIVE_TEXT.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        let ours = slot.as_ref().is_some_and(|n| n.id == response.id);
+        if ours && (slot.as_ref().is_some_and(|n| n.blurred.get()) || !focused) {
+            // The user tapped somewhere else, or closed the keyboard.
+            *slot = None;
+            response.surrender_focus();
+            return;
+        }
+        if !focused {
+            return;
+        }
+        if !ours {
+            // Not while a pointer is down: the browser gives the canvas the
+            // focus when that pointer goes up (eframe), and the field would
+            // go at once (the tap that opened the window).
+            if ui.input(|i| i.pointer.any_down() || i.any_touches()) {
+                ctx.request_repaint();
+                return;
+            }
+            *slot = make_native_text(response.id, text, ui.visuals());
+        }
+        let Some(n) = slot.as_mut() else { return };
+        n.pass = ctx.cumulative_pass_nr();
+        place_native_text(&n.element, response.rect, ctx);
+        let mut value = n.element.value();
+        if !multiline && value.contains(['\n', '\r']) {
+            value = value.replace(['\n', '\r'], "");
+            n.element.set_value(&value);
+        }
+        if value != n.known {
+            text.clone_from(&value);
+            n.known = value;
+        } else if *text != n.known {
+            n.element.set_value(text);
+            n.known.clone_from(text);
+        }
+    });
+}
+
+/// A field of the page with `text`, with the colors of `visuals`, and the
+/// focus.
+fn make_native_text(id: eframe::egui::Id, text: &str, visuals: &eframe::egui::Visuals) -> Option<NativeText> {
+    let document = web_sys::window()?.document()?;
+    let element = document
+        .create_element("textarea")
+        .ok()?
+        .dyn_into::<web_sys::HtmlTextAreaElement>()
+        .ok()?;
+    let css = |c: eframe::egui::Color32| format!("rgb({},{},{})", c.r(), c.g(), c.b());
+    let style = element.style();
+    for (k, v) in [
+        ("position", "fixed".to_string()),
+        ("z-index", "20".to_string()),
+        ("box-sizing", "border-box".to_string()),
+        ("margin", "0".to_string()),
+        ("padding", "2px 4px".to_string()),
+        ("resize", "none".to_string()),
+        // 16 px or more: Safari does not zoom the page into the field.
+        ("font", "16px system-ui, sans-serif".to_string()),
+        ("background", css(visuals.extreme_bg_color)),
+        ("color", css(visuals.text_color())),
+        ("border", format!("1px solid {}", css(visuals.selection.stroke.color))),
+        ("border-radius", "2px".to_string()),
+        ("outline", "none".to_string()),
+    ] {
+        let _ = style.set_property(k, &v);
+    }
+    let _ = element.set_attribute("autocapitalize", "off");
+    element.set_class_name(NATIVE_TEXT_CLASS);
+    element.set_value(text);
+    let blurred = std::rc::Rc::new(std::cell::Cell::new(false));
+    let on_blur = {
+        let blurred = blurred.clone();
+        wasm_bindgen::closure::Closure::<dyn FnMut()>::new(move || {
+            blurred.set(true);
+            if let Some(ctx) = CONTEXT.get() {
+                ctx.request_repaint();
+            }
+        })
+    };
+    let _ = element.add_event_listener_with_callback("blur", on_blur.as_ref().unchecked_ref());
+    // Each change of the text: a frame, which copies it.
+    let on_input = wasm_bindgen::closure::Closure::<dyn FnMut()>::new(move || {
+        if let Some(ctx) = CONTEXT.get() {
+            ctx.request_repaint();
+        }
+    });
+    let _ = element.add_event_listener_with_callback("input", on_input.as_ref().unchecked_ref());
+    on_input.forget();
+    document.body()?.append_child(&element).ok()?;
+    let options = web_sys::FocusOptions::new();
+    options.set_prevent_scroll(true);
+    let _ = element.focus_with_options(&options);
+    let end = text.encode_utf16().count() as u32;
+    let _ = element.set_selection_range(end, end);
+    Some(NativeText {
+        id,
+        element,
+        known: text.to_string(),
+        pass: 0,
+        blurred,
+        _on_blur: on_blur,
+    })
+}
+
+/// The class of the fields of [`NativeText`]: the pen events on them are
+/// for the field, not for the program.
+const NATIVE_TEXT_CLASS: &str = "shokujodx-native-text";
+
+/// Puts the field of the page over `rect` (egui points) of the canvas.
+fn place_native_text(element: &web_sys::HtmlTextAreaElement, rect: eframe::egui::Rect, ctx: &eframe::egui::Context) {
+    let origin = web_sys::window()
+        .and_then(|w| w.document())
+        .and_then(|d| d.get_element_by_id("shokujodx"))
+        .map(|c| c.get_bounding_client_rect())
+        .map_or((0.0, 0.0), |r| (r.left() as f32, r.top() as f32));
+    let zoom = ctx.zoom_factor();
+    let style = element.style();
+    for (k, v) in [
+        ("left", origin.0 + rect.min.x * zoom),
+        ("top", origin.1 + rect.min.y * zoom),
+        ("width", rect.width() * zoom),
+        ("height", rect.height() * zoom),
+    ] {
+        let _ = style.set_property(k, &format!("{v}px"));
+    }
+}
+
+/// The field of the page goes when the program no longer draws its text
+/// field (its window closed).
+fn drop_stale_native_text(ctx: &eframe::egui::Context) {
+    let now = ctx.cumulative_pass_nr();
+    NATIVE_TEXT.with(|cell| {
+        let mut slot = cell.borrow_mut();
+        if slot.as_ref().is_some_and(|n| now > n.pass + 1) {
+            *slot = None;
+        }
+    });
 }
 
 /// The width of the page in CSS pixels.
@@ -637,6 +950,19 @@ fn probe(st: &AppState, ctx: &eframe::egui::Context) {
     }
     let (touching, middle) = ctx.input(|i| (i.any_touches(), i.multi_touch().map(|t| t.center_pos)));
     let rect = ctx.content_rect();
+    // The middle of each object on the screen (points), for a test to tap.
+    let d = st.doc.design();
+    let middles: Vec<[f32; 2]> = st.canvas_rect.map_or_else(Vec::new, |r| {
+        let map = crate::manipulate::ViewMap::new(r, st.view, d);
+        d.objects()
+            .iter()
+            .filter_map(|o| d.bbox_of(&[o.id]))
+            .map(|b| {
+                let p = map.to_screen(b.center());
+                [p.x, p.y]
+            })
+            .collect()
+    });
     let state = serde_json::json!({
         "tool": st.tool.label(),
         "message": st.message,
@@ -647,6 +973,11 @@ fn probe(st: &AppState, ctx: &eframe::egui::Context) {
         "simple": st.settings.simple_mode,
         "text_scale": st.settings.text_scale,
         "undo": st.doc.undo_len(),
+        "objects": st.doc.design().objects().len(),
+        "kinds": st.doc.design().objects().iter().map(|o| o.type_name()).collect::<Vec<_>>(),
+        "lettering": st.lettering_dialog.as_ref().map(|d| d.text.clone()),
+        "selected": st.selection.len(),
+        "middles": middles,
         "touching": touching,
         "middle": middle.map(|p| [p.x, p.y]),
         "canvas": st.canvas_rect.map(|r| [r.min.x, r.min.y, r.max.x, r.max.y]),
@@ -853,6 +1184,12 @@ fn large_design_word(st: &mut AppState) {
 /// Each frame: the measures, the uploaded files and the notices.
 pub fn poll(st: &mut AppState, ctx: &eframe::egui::Context) {
     CONTEXT.get_or_init(|| ctx.clone());
+    drop_stale_native_text(ctx);
+    // A pen held still: a frame at the time of its long press. (A request
+    // made before the pass, in `pen_filter`, is lost when the pass begins.)
+    if PEN.lock().is_ok_and(|p| p.press.waiting()) {
+        ctx.request_repaint_after(std::time::Duration::from_millis(100));
+    }
     large_design_word(st);
     update_window(ctx);
     if !STARTED.swap(true, std::sync::atomic::Ordering::Relaxed) {
@@ -871,6 +1208,13 @@ pub fn poll(st: &mut AppState, ctx: &eframe::egui::Context) {
                     st.open_wizard();
                 }
             }
+            Then::Waiting => {
+                let path = std::path::PathBuf::from(&name);
+                FILE.with(|f| *f.borrow_mut() = Some((path.clone(), bytes)));
+                if let Some(then) = WAITING.with(|w| w.borrow_mut().take()) {
+                    then(st, path);
+                }
+            }
         }
         let export = EXPORT_AFTER_OPEN.lock().ok().and_then(|mut e| e.take());
         if let Some(ext) = export {
@@ -884,6 +1228,7 @@ pub fn poll(st: &mut AppState, ctx: &eframe::egui::Context) {
             }
         }
     }
+    download_zip();
     if let Some(n) = NOTICES.lock().ok().and_then(|mut n| n.pop()) {
         st.message = n;
     }

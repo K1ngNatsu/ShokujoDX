@@ -503,6 +503,14 @@ impl Tool {
         matches!(self, Tool::Line | Tool::Manual | Tool::Freehand)
     }
 
+    /// The line tools stay on after each line on a touch screen too, for
+    /// lines one after the other with a pen; Done in the touch bar goes back
+    /// to Select (the owner, 2026-11-25). The other tools go back to Select
+    /// after each object there.
+    pub fn stays_on_touch(self) -> bool {
+        self.makes_running() || self == Tool::SmartDraw
+    }
+
     pub fn makes_satin(self) -> bool {
         matches!(
             self,
@@ -1053,7 +1061,10 @@ impl AppState {
         self.current_thread = self.doc.design().object(id).map(|o| o.thread);
         self.selection.set(id);
         self.draw = DrawState::default();
-        if self.touch_seen {
+        if self.touch_seen && self.tool.stays_on_touch() {
+            // Lines one after the other: Done in the touch bar ends them.
+            self.message = crate::i18n::fill("{} added. Draw the next one, or tap Done.", &[&(self.tool.label())]);
+        } else if self.touch_seen {
             // A touch screen has no Esc key: the tool goes back to Select
             // (P15 step 3). With a mouse the tool stays for the next shape.
             let label = self.tool.label();
@@ -2004,6 +2015,46 @@ mod tests {
         assert!(!Tool::ComplexFill.enter_goes_on(2, 1));
         assert!(!Tool::ComplexFill.enter_goes_on(0, 1));
         assert!(!Tool::Line.enter_goes_on(5, 0));
+    }
+
+    /// On a touch screen, the line tools stay on for the next line, and
+    /// Done goes back to Select; a column (another tool) goes back after one.
+    #[test]
+    fn line_tools_stay_on_a_touch_screen_until_done() {
+        let mut h = Harness::empty();
+        h.frame(crate::test_util::touch_screen());
+        h.st.set_tool(Tool::Freehand);
+        for y in [-10.0, 0.0, 10.0] {
+            h.drag(
+                PointerButton::Primary,
+                at(&h, -20.0, y),
+                at(&h, 20.0, y + 3.0),
+                Modifiers::NONE,
+            );
+        }
+        assert_eq!(kinds(&h), ["Running", "Running", "Running"], "three lines, one tool");
+        assert_eq!(h.st.tool, Tool::Freehand);
+        h.st.set_tool(Tool::Line);
+        for (x, y) in [(-20.0, 20.0), (20.0, 20.0)] {
+            h.click(PointerButton::Primary, at(&h, x, y));
+        }
+        let finish = h.widget("Finish").expect("Finish while the line has points");
+        h.click(PointerButton::Primary, finish.center());
+        assert_eq!(h.st.tool, Tool::Line, "the Line tool stays for the next line");
+        let done = h.widget("Done").expect("Done with no points");
+        h.click(PointerButton::Primary, done.center());
+        assert_eq!(h.st.tool, Tool::Select);
+        h.st.set_tool(Tool::Column);
+        for (x, y) in [(-20.0, -25.0), (20.0, -25.0)] {
+            h.click(PointerButton::Primary, at(&h, x, y));
+        }
+        h.key(Key::Enter);
+        for (x, y) in [(-20.0, -21.0), (20.0, -21.0)] {
+            h.click(PointerButton::Primary, at(&h, x, y));
+        }
+        h.key(Key::Enter);
+        assert_eq!(kinds(&h).len(), 5);
+        assert_eq!(h.st.tool, Tool::Select, "a column goes back to Select");
     }
 
     #[test]

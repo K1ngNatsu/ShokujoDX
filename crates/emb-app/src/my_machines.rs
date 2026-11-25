@@ -449,7 +449,7 @@ fn export_dialog(st: &mut AppState, id: &str) {
     else {
         return;
     };
-    st.message = match std::fs::write(&p, text) {
+    st.message = match crate::dialog::write(&p, text) {
         Ok(()) => fill("Machine written to {}.", &[&p.display()]),
         Err(e) => format!("{}: {e}", p.display()),
     };

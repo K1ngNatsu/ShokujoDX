@@ -142,15 +142,16 @@ impl AppState {
     }
 
     fn import_stock_dialog(&mut self) {
-        let Some(p) = crate::dialog::FileDialog::new()
+        let dialog = crate::dialog::FileDialog::new()
             .set_title(tr("Import thread stock"))
             .add_filter("CSV", &["csv"])
-            .set_directory(self.dialog_dir())
-            .pick_file()
-        else {
-            return;
-        };
-        match std::fs::read_to_string(&p)
+            .set_directory(self.dialog_dir());
+        crate::dialog::open_then(dialog, self, |st, p| st.import_stock_file(&p));
+    }
+
+    /// Adds the threads of the CSV file `p` to the stock.
+    fn import_stock_file(&mut self, p: &std::path::Path) {
+        match crate::dialog::read_to_string(p)
             .map_err(|e| e.to_string())
             .and_then(|t| ThreadStock::from_csv(&t))
         {
@@ -182,7 +183,7 @@ impl AppState {
         else {
             return;
         };
-        match std::fs::write(&p, text) {
+        match crate::dialog::write(&p, text) {
             Ok(()) => self.message = fill("Wrote {}", &[&p.display()]),
             Err(e) => {
                 self.notice = Some(crate::file::Notice {

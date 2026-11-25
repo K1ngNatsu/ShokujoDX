@@ -276,11 +276,16 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         ui.horizontal(|ui| {
             ui.label(tr("Initials"))
                 .on_hover_text(tr("One to three letters, for example \"JMK\"."));
-            ui.add(
+            let _field = ui.add(
                 egui::TextEdit::singleline(&mut w.initials)
                     .desired_width(80.0)
                     .char_limit(5),
             );
+            #[cfg(target_arch = "wasm32")]
+            {
+                crate::web::native_text(ui, &_field, &mut w.initials, false);
+                w.initials = w.initials.chars().take(5).collect();
+            }
         });
         ui.label(tr("Templates"));
         ui.horizontal_wrapped(|ui| {

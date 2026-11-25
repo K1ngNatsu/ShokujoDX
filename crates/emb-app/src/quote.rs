@@ -94,7 +94,7 @@ impl AppState {
             return;
         };
         let title = format!("{} quote", self.doc.design().name);
-        match std::fs::write(&p, emb_render::pdf::write(&[page], &title)) {
+        match crate::dialog::write(&p, emb_render::pdf::write(&[page], &title)) {
             Ok(()) => self.message = fill("Wrote the quote sheet to {}", &[&p.display()]),
             Err(e) => {
                 self.notice = Some(crate::file::Notice {

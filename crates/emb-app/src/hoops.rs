@@ -298,7 +298,7 @@ impl AppState {
             return;
         };
         let n = pages.len();
-        match std::fs::write(&p, emb_render::pdf::write(&pages, &title)) {
+        match crate::dialog::write(&p, emb_render::pdf::write(&pages, &title)) {
             Ok(()) => {
                 self.message = crate::i18n::fill(
                     "Hoop template written to {} ({} sheet{}). Print it at 100 %.",

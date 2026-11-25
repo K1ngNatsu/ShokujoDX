@@ -349,18 +349,18 @@ impl AppState {
         };
         let pdf = emb_render::pdf::write(&[emb_render::hooping_sheet::overview(&sheet, profile.paper)], name);
         let p = folder.join(format!("{name} hoopings.pdf"));
-        std::fs::write(&p, pdf).map_err(|e| format!("{}: {e}", p.display()))?;
+        crate::dialog::write(&p, pdf).map_err(|e| format!("{}: {e}", p.display()))?;
         written.push(p);
         Ok(written)
     }
 
     /// Asks for a folder, then writes the hoopings there.
     pub fn output_hoopings_dialog(&mut self) {
-        let Some(folder) = crate::dialog::FileDialog::new()
-            .set_title(tr("Output hoopings: choose a folder"))
-            .set_directory(self.dialog_dir())
-            .pick_folder()
-        else {
+        let Some(folder) = crate::dialog::folder_to_write(
+            crate::dialog::FileDialog::new()
+                .set_title(tr("Output hoopings: choose a folder"))
+                .set_directory(self.dialog_dir()),
+        ) else {
             return;
         };
         let name = self

@@ -1071,6 +1071,10 @@ pub fn windows(ctx: &egui::Context, st: &mut AppState) {
             r.request_focus();
             d.focus = false;
         }
+        // A touch screen in the browser: handwriting and the keyboard of the
+        // system in a field of the page.
+        #[cfg(target_arch = "wasm32")]
+        crate::web::native_text(ui, &r, &mut d.text, true);
         let ctrl_enter = r.has_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter) && i.modifiers.command);
         st.font_hover = None;
         font_picker(ui, st, &mut d.font, "dialog");
@@ -1706,6 +1710,8 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, l: &Letter
             .desired_rows(2)
             .desired_width(f32::INFINITY),
     );
+    #[cfg(target_arch = "wasm32")]
+    crate::web::native_text(ui, &text, &mut n.text, true);
     let typing = text.has_focus();
     if !has_font {
         ui.colored_label(

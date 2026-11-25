@@ -461,7 +461,7 @@ impl AppState {
             }
             _ => emb_formats::stones::svg(t).into_bytes(),
         };
-        std::fs::write(p, bytes).map_err(|e| format!("{}: {e}", p.display()))
+        crate::dialog::write(p, bytes).map_err(|e| format!("{}: {e}", p.display()))
     }
 }
 

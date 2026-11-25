@@ -497,7 +497,7 @@ impl AppState {
             "dxf" => emb_formats::cutter::dxf(&pieces),
             _ => emb_formats::cutter::svg(&pieces),
         };
-        std::fs::write(path, text).map_err(|e| format!("{}: {e}", path.display()))?;
+        crate::dialog::write(path, text).map_err(|e| format!("{}: {e}", path.display()))?;
         Ok(pieces.len())
     }
 

@@ -376,18 +376,19 @@ impl AppState {
     }
 
     pub fn product_picture_dialog(&mut self) {
-        let Some(p) = crate::dialog::FileDialog::new()
+        let dialog = crate::dialog::FileDialog::new()
             .set_title(tr("Picture of your product"))
             .add_filter(tr("Pictures (PNG, JPEG, BMP, TIFF, GIF)"), &crate::backdrop::FILE_TYPES)
-            .set_directory(self.dialog_dir())
-            .pick_file()
-        else {
-            return;
-        };
+            .set_directory(self.dialog_dir());
+        crate::dialog::open_then(dialog, self, |st, p| st.product_picture_file(&p));
+    }
+
+    /// The picture file `p` is the picture of the product.
+    fn product_picture_file(&mut self, p: &Path) {
         let name = p
             .file_name()
             .map_or_else(String::new, |n| n.to_string_lossy().into_owned());
-        let r = std::fs::read(&p)
+        let r = crate::dialog::read(p)
             .map_err(|e| format!("{}: {e}", p.display()))
             .and_then(|b| self.set_product_picture(b, &name, 500.0));
         match r {
@@ -419,7 +420,7 @@ impl AppState {
         let pic = self
             .decoration_picture()
             .ok_or(tr("Choose a product first (Design > Product)."))?;
-        std::fs::write(path, pic.png()).map_err(|e| format!("{}: {e}", path.display()))
+        crate::dialog::write(path, pic.png()).map_err(|e| format!("{}: {e}", path.display()))
     }
 
     pub fn save_decoration_dialog(&mut self) {
@@ -455,7 +456,7 @@ impl AppState {
         };
         let design = match crate::file::machine_ext(path) {
             Some(ext) => {
-                let s = emb_library::read_machine_file(path).map_err(|e| format!("{}: {e}", path.display()))?;
+                let s = crate::file::read_stitches(path).map_err(|e| format!("{}: {e}", path.display()))?;
                 if s.stitch_count() == 0 {
                     return Err(format!("{}: {}", path.display(), tr("The file has no stitches.")));
                 }
@@ -463,13 +464,16 @@ impl AppState {
                     .file_stem()
                     .map_or_else(String::new, |s| s.to_string_lossy().into_owned());
                 let mut d = emb_model::design_from_stitches(&s, &stem);
-                let needles = std::fs::read(path)
+                let needles = crate::dialog::read(path)
                     .map(|b| emb_formats::read_needles(&ext, &b))
                     .unwrap_or_default();
                 d.pin_block_needles(&needles);
                 d
             }
-            None => emb_model::project::load(path).map_err(|e| format!("{}: {e}", path.display()))?,
+            None => crate::dialog::read_to_string(path)
+                .map_err(|e| e.to_string())
+                .and_then(|t| emb_model::project::from_str(&t).map_err(|e| e.to_string()))
+                .map_err(|e| format!("{}: {e}", path.display()))?,
         };
         if design.view_extents().is_none() {
             return Err(format!("{}: {}", path.display(), tr("The design has no stitches.")));
@@ -495,20 +499,18 @@ impl AppState {
     pub fn add_product_design_dialog(&mut self) {
         let mut exts: Vec<&str> = vec![emb_model::project::FILE_EXTENSION];
         exts.extend(emb_formats::READ_EXTENSIONS);
-        let Some(p) = crate::dialog::FileDialog::new()
+        let dialog = crate::dialog::FileDialog::new()
             .set_title(tr("Design to show on the product"))
             .add_filter(tr("Designs (projects and machine files)"), &exts)
-            .set_directory(self.dialog_dir())
-            .pick_file()
-        else {
-            return;
-        };
-        if let Err(e) = self.add_product_design(&p) {
-            self.notice = Some(Notice {
-                title: "Cannot use the design".into(),
-                lines: vec![e],
-            });
-        }
+            .set_directory(self.dialog_dir());
+        crate::dialog::open_then(dialog, self, |st, p| {
+            if let Err(e) = st.add_product_design(&p) {
+                st.notice = Some(Notice {
+                    title: "Cannot use the design".into(),
+                    lines: vec![e],
+                });
+            }
+        });
     }
 
     #[cfg(test)]

@@ -134,7 +134,7 @@ pub fn save_template(dir: &Path, name: &str, p: &ProductPicture) -> Result<PathB
 
 /// Writes `p` to the template file `path`.
 pub fn write_template(path: &Path, p: &ProductPicture) -> Result<(), String> {
-    std::fs::write(path, product::template_to_string(p)).map_err(|e| format!("{}: {e}", path.display()))
+    crate::dialog::write(path, product::template_to_string(p)).map_err(|e| format!("{}: {e}", path.display()))
 }
 
 /// Reads the template file `path` and checks its photo.

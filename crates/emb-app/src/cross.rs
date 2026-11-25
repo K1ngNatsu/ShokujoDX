@@ -225,7 +225,7 @@ impl AppState {
             return;
         };
         let title = self.doc.design().name.clone();
-        match std::fs::write(&p, emb_render::pdf::write(&pages, &title)) {
+        match crate::dialog::write(&p, emb_render::pdf::write(&pages, &title)) {
             Ok(()) => {
                 self.message = crate::i18n::fill("Wrote the chart ({} pages) to {}", &[&(pages.len()), &(p.display())]);
             }
