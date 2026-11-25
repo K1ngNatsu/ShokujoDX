@@ -5,6 +5,7 @@ ideas into a new phase with milestones ordered so work builds
 efficiently on itself"). Milestone 1 is made (ADR 0167), and the travel
 faults that it found are fixed (ADR 0168). Milestone 2 is made (ADR
 0169). Milestone 3 is made in the software (ADR 0170); its sew-out is
+open. Milestone 4 is made in the software (ADR 0171); its sew-out is
 open.
 
 ## Goal
@@ -260,6 +261,33 @@ lean within 1°; no needle point out of the column, and no pairs that
 cross (`satin::pairs_cross`); bands with no overlap leave no gap wider
 than 0.1 mm, and two layers are only in the overlap; the golden
 snapshots do not change (lean 0, one band); the owner sews the swatches.
+
+**Made (2026-11-25, ADR 0171).** Lean is `SatinParams::lean_deg` (at
+most 45°): `satin::Column::leaned` gives the top stitches pairs about
+0.5 mm apart with the point on rail B moved along rail B by the width
+times the tangent of the lean, stopped at the ends of rail B (the
+stitches fan from the corners); the underlay does not lean. Object
+Properties has a Lean slider for satin, raised satin and zigzag columns,
+and lettering has the setting through its satin settings. Bands are
+`SatinParams::band` (`ColumnBand`: the index, the number of bands, the
+overlap): `SatinGeometry::band` makes the rails of a band, the first band
+sews the underlay of the whole column, and `SatinParams::banded` puts the
+pull compensation only out at the sides of the column. The window is
+Edit > Stitch Types > Bands (`column_bands.rs`: two to six threads, the
+overlap, Make bands, Remove bands; one undo step each). The Ink/Stitch
+writer writes each band as a column with the rails of its band, and
+warns for a lean. The swatches have the settings Lean and Band overlap,
+and a copy of a group is a group of its own. The corpus design
+`satin-lean-bands` (leans of 0°, 8° and 15°, three bands with an overlap
+of 0.3 mm) is a new golden snapshot and the start design of the
+sew-out.
+
+The exit test is met in the software (the tests
+`the_top_stitches_lean_by_the_angle`, `bands_cover_the_column`,
+`bands_are_a_group_of_columns_and_one_undo_step`,
+`the_bands_of_a_column_are_columns_with_the_rails_of_their_band`); the
+golden snapshots of the designs of before do not change. The sew-out of
+the swatches is open (the owner's list in `docs/design/open-work.md`).
 
 ## Milestone 5: machine files: check, fix and cross-check (M)
 

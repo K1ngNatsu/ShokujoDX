@@ -453,7 +453,7 @@ pub(super) const EDIT: &[Panel] = &[
             Custom(stitch_types, &[]),
             Small(&[Cmd::Motifs, Cmd::FlorentineGuide, Cmd::SplitLines]),
             Small(&[Cmd::Tartan, Cmd::Gradient, Cmd::GuideLines]),
-            Small(&[Cmd::RippleGuide]),
+            Small(&[Cmd::RippleGuide, Cmd::ColumnBands]),
         ],
     },
     Panel {

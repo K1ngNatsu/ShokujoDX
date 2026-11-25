@@ -55,6 +55,8 @@ fn start_values(setting: SwatchSetting, v: f64) -> (f64, f64) {
     let round = |x: f64| (x * 20.0).round() / 20.0;
     match setting {
         SwatchSetting::Angle => (v - 45.0, v + 45.0),
+        SwatchSetting::Lean => (v, v + 15.0),
+        SwatchSetting::BandOverlap => (0.0, 0.6),
         SwatchSetting::Underlay => (0.0, 4.0),
         SwatchSetting::PullCompensation => (0.0, round((v * 2.0).max(0.3))),
         _ => (round(v * 0.75), round(v * 1.25)),

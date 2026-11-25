@@ -12,7 +12,7 @@ use emb_model::{
     SatinGeometry, SatinParams, ThreadId,
 };
 
-pub const NAMES: [&str; 86] = [
+pub const NAMES: [&str; 87] = [
     "circle-fill",
     "satin-column",
     "s-curve",
@@ -81,6 +81,7 @@ pub const NAMES: [&str; 86] = [
     "content-families",
     "shaped-text",
     "content-clipart",
+    "satin-lean-bands",
     "view-satin-angles",
     "view-fill-border",
     "view-underlay",
@@ -145,6 +146,7 @@ pub fn build(name: &str) -> Option<Design> {
         "content-families" => content_families(),
         "shaped-text" => shaped_text(),
         "content-clipart" => content_clipart(),
+        "satin-lean-bands" => satin_lean_bands(),
         "patterns" => patterns(),
         "effects" => effects(),
         "blends" => blends(),
@@ -3552,6 +3554,61 @@ fn sett_threads(d: &mut Design, sett: &emb_model::Sett) -> Vec<ThreadId> {
             d.add_thread(name, rgb)
         })
         .collect()
+}
+
+/// P22 Milestone 4 (ADR 0171): three curved columns 5 mm wide with a
+/// lean of 0°, 8° and 15°, and a curved column 9 mm wide in three bands
+/// of thread (red, white, blue) with an overlap of 0.3 mm.
+fn satin_lean_bands() -> Design {
+    let mut d = Design::new("");
+    let navy = d.add_thread("Navy", Rgb(30, 40, 90));
+    for (i, lean_deg) in [0.0, 8.0, 15.0].into_iter().enumerate() {
+        let x = -70.0 + 22.0 * i as f64;
+        let line = Path::new()
+            .move_to(p(x, -40.0))
+            .cubic_to(p(x + 12.0, -20.0), p(x - 12.0, 20.0), p(x, 40.0));
+        d.add_object(
+            navy,
+            ObjectKind::Satin {
+                geometry: SatinGeometry::from_centerline(&line, 5.0),
+                params: SatinParams {
+                    lean_deg,
+                    ..SatinParams::default()
+                },
+            },
+        );
+    }
+    let threads = [
+        ("Red", Rgb(190, 30, 40)),
+        ("White", Rgb(240, 240, 235)),
+        ("Blue", Rgb(30, 70, 160)),
+    ]
+    .map(|(name, color)| d.add_thread(name, color));
+    let line = Path::new()
+        .move_to(p(10.0, 40.0))
+        .cubic_to(p(10.0, -10.0), p(60.0, -40.0), p(80.0, -10.0));
+    let geometry = SatinGeometry::from_centerline(&line, 9.0);
+    let g = d.new_group_id();
+    for (index, t) in threads.into_iter().enumerate() {
+        let id = d.add_object(
+            t,
+            ObjectKind::Satin {
+                geometry: geometry.clone(),
+                params: SatinParams {
+                    band: Some(emb_model::ColumnBand {
+                        index: index as u32,
+                        count: 3,
+                        overlap_mm: 0.3,
+                    }),
+                    ..SatinParams::default()
+                },
+            },
+        );
+        if let Some(o) = d.object_mut(id) {
+            o.group = Some(g);
+        }
+    }
+    d
 }
 
 /// P11 Milestone 4: a tartan of four colors (a mirrored sett) on a 90 mm

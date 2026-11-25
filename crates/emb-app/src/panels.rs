@@ -772,6 +772,18 @@ fn column_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &S
         ),
         _ => {}
     }
+    if matches!(
+        pattern,
+        ColumnPattern::Satin | ColumnPattern::Raised { .. } | ColumnPattern::Zigzag
+    ) {
+        lean_slider(ui, st, id, params.lean_deg);
+    }
+    if let Some(b) = params.band.filter(|b| b.count > 1) {
+        ui.weak(crate::i18n::fill("Band {} of {}", &[&(b.index + 1), &b.count]))
+            .on_hover_text(tr(
+                "This column sews one band of the width. Edit > Stitch Types > Bands changes the bands.",
+            ));
+    }
     if let ColumnPattern::ProgramSplit { scale } = pattern {
         let name = params.split_pattern.clone().unwrap_or_default().name;
         split_pattern_ui(ui, st, id, &name, scale, true);
@@ -873,7 +885,11 @@ fn column_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &S
         }
     }
     crate::effects_ui::column_effects(ui, st, id, params);
-    underlay_ui(ui, st, id, &params.underlay);
+    if params.band.is_some_and(|b| b.count > 1 && b.index > 0) {
+        ui.weak(tr("The first band sews the underlay of the whole column."));
+    } else {
+        underlay_ui(ui, st, id, &params.underlay);
+    }
 }
 
 /// A labeled list of the underlay settings. Returns `true` if the user
@@ -2053,6 +2069,41 @@ fn fill_slider(
                     }
                 },
             );
+            if !resp.dragged() {
+                st.doc.end_merge();
+            }
+        }
+        if resp.drag_stopped() {
+            st.doc.end_merge();
+        }
+    });
+}
+
+/// The lean of the top stitches of a column (P22 Milestone 4, ADR 0171).
+/// A band of a column of bands changes the lean of all the bands, so that
+/// their stitches meet. A drag is one undo step.
+fn lean_slider(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, value: f64) {
+    let max = emb_model::object::MAX_LEAN_DEG;
+    let mut v = value;
+    ui.horizontal(|ui| {
+        ui.label(tr("Lean")).on_hover_text(tr(
+            "The angle of the top stitches from square across the column. 0°: square. The underlay does not lean.",
+        ));
+        let resp = ui.add(
+            egui::Slider::new(&mut v, -max..=max)
+                .clamping(egui::SliderClamping::Edits)
+                .suffix("°")
+                .fixed_decimals(0),
+        );
+        if resp.changed() {
+            st.doc
+                .edit_merged(tr("Change lean"), MergeKey::new(format!("{}:lean", id.0)), |d| {
+                    for x in crate::column_bands::bands_of(d, id) {
+                        if let Some(c) = d.object_mut(x).and_then(|o| column_params(&mut o.kind)) {
+                            c.lean_deg = v;
+                        }
+                    }
+                });
             if !resp.dragged() {
                 st.doc.end_merge();
             }

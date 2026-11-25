@@ -397,6 +397,8 @@ pub struct AppState {
     pub families_window: crate::families::FamiliesWindow,
     pub decor: crate::decor::DecorWindows,
     pub color_fills: crate::color_fills::ColorFillsWindow,
+    /// The Bands window (P22 Milestone 4, ADR 0171).
+    pub column_bands: crate::column_bands::ColumnBandsWindow,
     pub quilting: crate::quilting::QuiltingWindow,
     pub cutwork: crate::cutwork::CutworkWindow,
     pub alphabets_window: crate::alphabets::AlphabetsWindow,
@@ -877,6 +879,7 @@ impl AppState {
             families_window: Default::default(),
             decor: Default::default(),
             color_fills: Default::default(),
+            column_bands: Default::default(),
             quilting: Default::default(),
             cutwork: Default::default(),
             alphabets_window: Default::default(),
@@ -1886,6 +1889,7 @@ impl EmbApp {
         crate::families::window(&ctx, st);
         crate::decor::windows(&ctx, st);
         crate::color_fills::window(&ctx, st);
+        crate::column_bands::window(&ctx, st);
         crate::quilting::window(&ctx, st);
         crate::cutwork::window(&ctx, st);
         crate::artwork::windows(&ctx, st);

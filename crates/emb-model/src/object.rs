@@ -294,6 +294,104 @@ pub struct SatinGeometry {
     pub rungs: Vec<(Point, Point)>,
 }
 
+impl SatinGeometry {
+    /// The rails of the band `band` of the column (P22 Milestone 4): the
+    /// points of each pair across the column at the fractions of the band.
+    /// The pairs are those of the rungs, and between two rungs points at
+    /// the same part of the length of each rail, about 0.5 mm apart. `None`
+    /// if a rail has no length.
+    pub fn band(&self, band: &ColumnBand) -> Option<SatinGeometry> {
+        let pairs = self.pairs(0.5)?;
+        let mut a = Vec::with_capacity(pairs.len());
+        let mut b = Vec::with_capacity(pairs.len());
+        for &(p, q) in &pairs {
+            let (lo, hi) = band.fractions(p.distance(q));
+            a.push(p.lerp(q, lo));
+            b.push(p.lerp(q, hi));
+        }
+        // A rung every few pairs keeps the stitch direction.
+        let rungs = (0..pairs.len()).step_by(4).skip(1).map(|i| (a[i], b[i])).collect();
+        let open = |pts: &[Point]| {
+            pts[1..]
+                .iter()
+                .fold(Path::new().move_to(pts[0]), |path, &p| path.line_to(p))
+        };
+        Some(SatinGeometry {
+            rail_a: open(&a),
+            rail_b: open(&b),
+            rungs,
+        })
+    }
+
+    /// Pairs of points across the column about `step` apart: at each rung,
+    /// and between two rungs at the same part of the length of each rail.
+    fn pairs(&self, step: f64) -> Option<Vec<(Point, Point)>> {
+        let line = |p: &Path| -> Option<Vec<Point>> {
+            let mut pts: Vec<Point> = p.flatten(0.05).into_iter().flat_map(|l| l.points).collect();
+            pts.dedup();
+            (pts.len() >= 2).then_some(pts)
+        };
+        let (ra, rb) = (line(&self.rail_a)?, line(&self.rail_b)?);
+        let lengths = |r: &[Point]| {
+            let mut l = vec![0.0];
+            for w in r.windows(2) {
+                l.push(l[l.len() - 1] + w[0].distance(w[1]));
+            }
+            l
+        };
+        let (la, lb) = (lengths(&ra), lengths(&rb));
+        let (ta, tb) = (la[la.len() - 1], lb[lb.len() - 1]);
+        if ta <= 0.0 || tb <= 0.0 {
+            return None;
+        }
+        let at = |r: &[Point], l: &[f64], s: f64| {
+            let i = l.partition_point(|&x| x <= s).clamp(1, r.len() - 1);
+            let seg = l[i] - l[i - 1];
+            let f = if seg > 0.0 {
+                ((s - l[i - 1]) / seg).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            r[i - 1].lerp(r[i], f)
+        };
+        let project = |r: &[Point], l: &[f64], p: Point| {
+            let mut best = (f64::INFINITY, 0.0);
+            for (i, w) in r.windows(2).enumerate() {
+                let q = p.nearest_on_segment(w[0], w[1]);
+                let d = q.distance(p);
+                if d < best.0 {
+                    best = (d, l[i] + w[0].distance(q));
+                }
+            }
+            best.1
+        };
+        let mut rungs: Vec<(f64, f64)> = self
+            .rungs
+            .iter()
+            .map(|&(p, q)| (project(&ra, &la, p), project(&rb, &lb, q)))
+            .collect();
+        rungs.sort_by(|x, y| x.0.total_cmp(&y.0));
+        let mut keys = vec![(0.0, 0.0)];
+        for r in rungs {
+            let last = keys[keys.len() - 1];
+            if r.0 > last.0 + 1e-6 && r.1 > last.1 + 1e-6 && r.0 < ta - 1e-6 && r.1 < tb - 1e-6 {
+                keys.push(r);
+            }
+        }
+        keys.push((ta, tb));
+        let mut out = vec![(ra[0], rb[0])];
+        for w in keys.windows(2) {
+            let (da, db) = (w[1].0 - w[0].0, w[1].1 - w[0].1);
+            let n = ((da + db) / 2.0 / step).ceil().max(1.0) as usize;
+            for q in 1..=n {
+                let f = q as f64 / n as f64;
+                out.push((at(&ra, &la, w[0].0 + f * da), at(&rb, &lb, w[0].1 + f * db)));
+            }
+        }
+        Some(out)
+    }
+}
+
 /// Tolerance to flatten a centerline for [`SatinGeometry::from_centerline`], in mm.
 const CENTERLINE_TOL_MM: f64 = 0.05;
 /// At sharp corners the rails go no farther out than this many half widths.
@@ -836,6 +934,56 @@ pub struct SatinParams {
     /// machine stops before it to put the foam on (ADR 0050).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub puff: bool,
+    /// Lean (P22 Milestone 4, ADR 0171): the angle of the top stitches from
+    /// square across the column, in degrees (0: square; positive: the end on
+    /// rail B is farther along the column). The underlay does not lean.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub lean_deg: f64,
+    /// A band of the width of the column, for more than one thread across
+    /// a column (P22 Milestone 4): the column sews only its band. `None`:
+    /// all of the width.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub band: Option<ColumnBand>,
+}
+
+/// The largest lean of satin stitches, degrees.
+pub const MAX_LEAN_DEG: f64 = 45.0;
+
+/// One band of the width of a satin column (P22 Milestone 4, ADR 0171): a
+/// group of columns with the same rails, each with its band and thread,
+/// gives more than one thread across the column (as the tartan and the
+/// gradient fills, ADR 0047).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct ColumnBand {
+    /// The band, from rail A: 0 to `count - 1`.
+    pub index: u32,
+    pub count: u32,
+    /// How far each band goes into the band next to it, mm.
+    #[serde(default)]
+    pub overlap_mm: f64,
+}
+
+impl ColumnBand {
+    /// The part of a stitch across the column that the band sews, for a
+    /// stitch of width `w`: from `lo` to `hi` (0 at rail A, 1 at rail B).
+    pub fn fractions(&self, w: f64) -> (f64, f64) {
+        let n = f64::from(self.count.max(1));
+        let k = f64::from(self.index.min(self.count.max(1) - 1));
+        let more = if w > 1e-9 {
+            self.overlap_mm.max(0.0) / 2.0 / w
+        } else {
+            0.0
+        };
+        let lo = if k > 0.0 { k / n - more } else { 0.0 };
+        let hi = if k + 1.0 < n { (k + 1.0) / n + more } else { 1.0 };
+        (lo.clamp(0.0, 1.0), hi.clamp(0.0, 1.0))
+    }
+
+    /// The band has rail A (the first band) and rail B (the last band) of
+    /// the column: pull compensation goes only out at these sides.
+    pub fn outer_sides(&self) -> (bool, bool) {
+        (self.index == 0, self.index + 1 >= self.count)
+    }
 }
 
 /// The satin spacing of puff columns, in mm: dense, so the foam does not show.
@@ -1033,11 +1181,31 @@ impl Default for SatinParams {
             pull_b_mm: None,
             omit_last: false,
             puff: false,
+            lean_deg: 0.0,
+            band: None,
         }
     }
 }
 
 impl SatinParams {
+    /// The settings of the column of the band `band` (P22 Milestone 4,
+    /// ADR 0171): pull compensation only out at the sides of the column
+    /// (the first band at rail A, the last band at rail B), and no pull in
+    /// percent (it is a part of the width of the whole column).
+    pub fn banded(&self, band: &ColumnBand) -> SatinParams {
+        let (out_a, out_b) = band.outer_sides();
+        SatinParams {
+            pull_compensation_mm: if out_a { self.pull_compensation_mm } else { 0.0 },
+            pull_b_mm: Some(if out_b {
+                self.pull_b_mm.unwrap_or(self.pull_compensation_mm)
+            } else {
+                0.0
+            }),
+            pull_percent: 0.0,
+            ..self.clone()
+        }
+    }
+
     /// Default settings for the column type `pattern`. The open types
     /// (zigzag, E stitch, square, coil, contour) have no underlay.
     pub fn with_pattern(pattern: ColumnPattern) -> Self {

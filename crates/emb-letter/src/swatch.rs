@@ -39,6 +39,10 @@ pub enum SwatchSetting {
     Angle,
     /// The underlay: none, light, auto, heavy, double.
     Underlay,
+    /// The lean of the top stitches of a column, degrees (ADR 0171).
+    Lean,
+    /// The overlap of the bands of a column of bands (ADR 0171).
+    BandOverlap,
 }
 
 /// The underlay of each copy for [`SwatchSetting::Underlay`].
@@ -51,13 +55,15 @@ pub const UNDERLAYS: [Underlay; 5] = [
 ];
 
 impl SwatchSetting {
-    pub const ALL: [SwatchSetting; 6] = [
+    pub const ALL: [SwatchSetting; 8] = [
         SwatchSetting::Spacing,
         SwatchSetting::StitchLength,
         SwatchSetting::PullCompensation,
         SwatchSetting::Width,
         SwatchSetting::Angle,
         SwatchSetting::Underlay,
+        SwatchSetting::Lean,
+        SwatchSetting::BandOverlap,
     ];
 
     /// The name (English; the program shows it with `tr`).
@@ -69,12 +75,17 @@ impl SwatchSetting {
             SwatchSetting::Width => "Width",
             SwatchSetting::Angle => "Angle",
             SwatchSetting::Underlay => "Underlay",
+            SwatchSetting::Lean => "Lean",
+            SwatchSetting::BandOverlap => "Band overlap",
         }
     }
 
     /// The values are lengths, in mm.
     pub fn is_length(self) -> bool {
-        !matches!(self, SwatchSetting::Angle | SwatchSetting::Underlay)
+        !matches!(
+            self,
+            SwatchSetting::Angle | SwatchSetting::Underlay | SwatchSetting::Lean
+        )
     }
 
     /// The range of the values that make sense, for the fields of the window.
@@ -86,6 +97,8 @@ impl SwatchSetting {
             SwatchSetting::Width => (0.5, 12.0),
             SwatchSetting::Angle => (-180.0, 180.0),
             SwatchSetting::Underlay => (0.0, (UNDERLAYS.len() - 1) as f64),
+            SwatchSetting::Lean => (-emb_model::object::MAX_LEAN_DEG, emb_model::object::MAX_LEAN_DEG),
+            SwatchSetting::BandOverlap => (0.0, 1.0),
         }
     }
 
@@ -102,6 +115,10 @@ impl SwatchSetting {
             (PullCompensation, ObjectKind::Satin { params, .. }) => Some(params.pull_compensation_mm),
             (Width, ObjectKind::Satin { geometry, .. }) => satin_width(geometry),
             (Underlay, ObjectKind::Satin { params, .. }) => underlay_index(&params.underlay),
+            (Lean, ObjectKind::Satin { params, .. }) => Some(params.lean_deg),
+            (BandOverlap, ObjectKind::Satin { params, .. }) => {
+                params.band.filter(|b| b.count > 1).map(|b| b.overlap_mm)
+            }
             (StitchLength, ObjectKind::Running { params, .. }) if params.border.is_none() => {
                 Some(params.stitch_length_mm)
             }
@@ -113,9 +130,11 @@ impl SwatchSetting {
             (Underlay, ObjectKind::Running { params, .. }) => {
                 params.border.as_ref().and_then(|b| underlay_index(&b.column.underlay))
             }
+            (Lean, ObjectKind::Running { params, .. }) => params.border.as_ref().map(|b| b.column.lean_deg),
             (Spacing, ObjectKind::Lettering(l)) => Some(l.satin.spacing_mm),
             (PullCompensation, ObjectKind::Lettering(l)) => Some(l.satin.pull_compensation_mm),
             (Underlay, ObjectKind::Lettering(l)) => underlay_index(&l.satin.underlay),
+            (Lean, ObjectKind::Lettering(l)) => Some(l.satin.lean_deg),
             _ => None,
         }
     }
@@ -139,10 +158,15 @@ impl SwatchSetting {
                 *geometry = widened(geometry, v / w);
             }
             (Underlay, ObjectKind::Satin { params, .. }) => params.underlay = underlay(),
+            (Lean, ObjectKind::Satin { params, .. }) => params.lean_deg = v,
+            (BandOverlap, ObjectKind::Satin { params, .. }) => match &mut params.band {
+                Some(b) if b.count > 1 => b.overlap_mm = v.max(0.0),
+                _ => return false,
+            },
             (StitchLength, ObjectKind::Running { params, .. }) if params.border.is_none() => {
                 params.stitch_length_mm = v;
             }
-            (Width | Spacing | PullCompensation | Underlay, ObjectKind::Running { params, .. }) => {
+            (Width | Spacing | PullCompensation | Underlay | Lean, ObjectKind::Running { params, .. }) => {
                 let Some(b) = params.border.as_mut() else {
                     return false;
                 };
@@ -150,10 +174,11 @@ impl SwatchSetting {
                     Width => b.width_mm = v,
                     Spacing => b.column.spacing_mm = v,
                     PullCompensation => b.column.pull_compensation_mm = v,
+                    Lean => b.column.lean_deg = v,
                     _ => b.column.underlay = underlay(),
                 }
             }
-            (Spacing | PullCompensation | Underlay, ObjectKind::Lettering(l)) => {
+            (Spacing | PullCompensation | Underlay | Lean, ObjectKind::Lettering(l)) => {
                 match self {
                     Spacing => {
                         l.satin.spacing_mm = v;
@@ -163,6 +188,7 @@ impl SwatchSetting {
                         l.satin.pull_compensation_mm = v;
                         l.fill.pull_compensation_mm = v;
                     }
+                    Lean => l.satin.lean_deg = v,
                     _ => {
                         l.satin.underlay = underlay();
                         l.fill.underlay = underlay();
@@ -294,7 +320,7 @@ pub struct Swatches {
 /// `length`, which gives the units of the program).
 pub fn label_text(setting: SwatchSetting, v: f64, length: &dyn Fn(f64) -> String) -> String {
     match setting {
-        SwatchSetting::Angle => format!("{v:.0}°"),
+        SwatchSetting::Angle | SwatchSetting::Lean => format!("{v:.0}°"),
         SwatchSetting::Underlay => {
             let u = &UNDERLAYS[(v.round().max(0.0) as usize).min(UNDERLAYS.len() - 1)];
             text::tr(match u {
@@ -403,6 +429,9 @@ pub fn swatches(
             cell.y - group.min.y,
         );
         let mut copy_box: Option<BBox> = None;
+        // A group of the copy (the bands of a column, the layers of a
+        // tartan) is a new group of its own.
+        let mut groups = std::collections::BTreeMap::new();
         for o in &objects {
             let mut kind = o.kind.clone();
             spec.setting.set(&mut kind, v);
@@ -415,6 +444,12 @@ pub fn swatches(
             if let Some(new) = out.object_mut(id) {
                 new.name = o.name.clone();
                 new.functions = o.functions;
+            }
+            if let Some(g) = o.group {
+                let group = *groups.entry(g).or_insert_with(|| out.new_group_id());
+                if let Some(new) = out.object_mut(id) {
+                    new.group = Some(group);
+                }
             }
         }
         copy_boxes.extend(copy_box);
@@ -523,6 +558,52 @@ mod tests {
         assert!(s.columns * s.rows >= 5);
     }
 
+    /// A column of two bands (ADR 0171) with the overlap from 0 to 0.6 mm:
+    /// each copy is a group of its own, with the overlap in both bands.
+    #[test]
+    fn a_column_of_bands_gets_the_overlap_in_each_copy() {
+        let (mut d, first) = satin();
+        let blue = d.add_thread("Blue", Rgb(30, 30, 200));
+        let mut kind = d.object(first).unwrap().kind.clone();
+        let band = |index| emb_model::ColumnBand {
+            index,
+            count: 2,
+            overlap_mm: 0.0,
+        };
+        if let ObjectKind::Satin { params, .. } = &mut kind {
+            params.band = Some(band(1));
+        }
+        let second = d.add_object(blue, kind);
+        for (id, index) in [(first, 0), (second, 1)] {
+            let o = d.object_mut(id).unwrap();
+            o.group = Some(7);
+            if let ObjectKind::Satin { params, .. } = &mut o.kind {
+                params.band = Some(band(index));
+            }
+        }
+        let spec = SwatchSpec {
+            setting: SwatchSetting::BandOverlap,
+            from: 0.0,
+            to: 0.6,
+            copies: 3,
+            field: Some((200.0, 260.0)),
+        };
+        let s = swatches(&d, &[first, second], &spec, None, &mm).unwrap();
+        let mut by_group: std::collections::BTreeMap<u32, Vec<f64>> = Default::default();
+        for o in s.design.objects() {
+            if let ObjectKind::Satin { params, .. } = &o.kind {
+                let g = o.group.expect("a copy of a group is in a group");
+                by_group.entry(g).or_default().push(params.band.unwrap().overlap_mm);
+            }
+        }
+        let overlaps: Vec<Vec<f64>> = by_group.into_values().collect();
+        assert_eq!(overlaps.len(), 3, "{overlaps:?}");
+        for (got, want) in overlaps.iter().zip([0.0, 0.3, 0.6]) {
+            assert_eq!(got.len(), 2);
+            assert!(got.iter().all(|v| (v - want).abs() < 1e-9), "{overlaps:?}");
+        }
+    }
+
     #[test]
     fn each_setting_changes_the_kinds_that_have_it() {
         let (mut d, satin) = satin();
@@ -550,6 +631,8 @@ mod tests {
         assert!(has(fill, Angle) && has(fill, Underlay) && !has(fill, Width));
         assert!(has(satin, Spacing) && has(satin, PullCompensation) && has(satin, Width));
         assert!(has(satin, Underlay) && !has(satin, Angle) && !has(satin, StitchLength));
+        // Lean is a setting of each column; the overlap only of a column of bands.
+        assert!(has(satin, Lean) && !has(satin, BandOverlap) && !has(fill, Lean));
         assert!(has(line, StitchLength) && !has(line, Spacing) && !has(line, Width));
         for s in SwatchSetting::ALL {
             for id in [satin, fill, line] {

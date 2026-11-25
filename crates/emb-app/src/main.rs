@@ -22,6 +22,7 @@ mod checks;
 mod cleanup;
 mod clipart;
 mod color_fills;
+mod column_bands;
 mod commands;
 mod corners;
 mod crash;

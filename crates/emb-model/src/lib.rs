@@ -104,8 +104,8 @@ pub use monogram::{
 pub use motif::{Motif, MotifRun};
 pub use needles::{NeedlePin, NeedlePlan, NeedleSetup};
 pub use object::{
-    Accordion, ColumnPattern, Corner, CrossStyle, DesignObject, DirectionLine, FillParams, FillPattern, Functions,
-    LineBorder, MeanderTile, ObjectId, ObjectKind, Ripple, RunPass, RunStyle, RunningParams, SatinGeometry,
+    Accordion, ColumnBand, ColumnPattern, Corner, CrossStyle, DesignObject, DirectionLine, FillParams, FillPattern,
+    Functions, LineBorder, MeanderTile, ObjectId, ObjectKind, Ripple, RunPass, RunStyle, RunningParams, SatinGeometry,
     SatinParams, TrimMode, Underlay, UnderlayLayer,
 };
 pub use product::{

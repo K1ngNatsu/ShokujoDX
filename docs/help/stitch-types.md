@@ -58,6 +58,13 @@ line. The outline types of a line are also:
 | Motif column | A motif repeated along the column, as high as the column is wide. |
 | Program split | Satin rows with the needle points in a pattern that bends with the column. |
 
+**Lean** (in Object Properties, for satin, raised satin and zigzag
+columns) is the angle of the top stitches from square across the column,
+from −45° to 45°. On a knit, stitches that lean a little do not sink
+between the rows of the knit; a larger angle is a look. The underlay does
+not lean. Near an end of the column the stitches fan from the corner, so
+no needle point goes out of the column.
+
 ## Fills
 
 | Fill type | What it sews |
@@ -134,6 +141,22 @@ colors.
 The fill angle sets the direction of the rows. Each row has one color, so
 the density stays the same. A gradient of one color alone fades to the
 fabric.
+
+## Bands
+
+1. Select a satin column, then **Edit > Stitch Types > Bands**.
+2. Choose a thread for each band, from the first side of the column.
+   **Add band** adds a band (at most six).
+3. **Overlap** sets how far each band goes into the band next to it. A
+   small overlap keeps the fabric from showing between the bands.
+4. Click **Make bands**.
+
+The program makes one satin column for each band, in one group, with the
+rails of the selected column. The bands have equal widths. The first band
+sews the underlay of the whole column, and pull compensation goes only
+out at the two sides of the column. The lean of a band changes the lean
+of all the bands of the column. **Remove bands** makes the column one
+thread again.
 
 ## Motifs
 

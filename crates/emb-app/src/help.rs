@@ -243,6 +243,7 @@ pub const WINDOW_HELP: &[(&str, &str)] = &[
     ("Buttonholes", "buttonholes"),
     ("Blends", "stitch-types"),
     ("ColorFills", "stitch-types"),
+    ("ColumnBands", "stitch-types"),
     ("Quilting", "quilting"),
     ("Cutwork", "cutwork"),
     ("Fabric", "fabrics-and-styles"),

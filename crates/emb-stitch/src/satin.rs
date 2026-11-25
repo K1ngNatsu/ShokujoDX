@@ -50,9 +50,12 @@ const AUTO_INSET_MM: f64 = 0.4;
 /// two rungs.
 const UNTANGLE_MAX_PAIRS: f64 = 20_000.0;
 const AUTO_ZIGZAG_SPACING_MM: f64 = 2.0;
+/// The distance of the pairs of a leaned column, along the rails, mm.
+const LEAN_STEP_MM: f64 = 0.5;
 const HEAVY_ZIGZAG_SPACING_MM: f64 = 1.2;
 
 /// A rail flattened to a polyline, with the length along it at each point.
+#[derive(Clone)]
 struct Rail {
     pts: Vec<Point>,
     at_len: Vec<f64>,
@@ -356,6 +359,43 @@ impl Column {
         rungs.push((la, lb));
         self.rungs = rungs;
         self.even = true;
+    }
+
+    /// The column with its top stitches at `lean_deg` from square (P22
+    /// Milestone 4, ADR 0171): pairs about [`LEAN_STEP_MM`] apart, each with
+    /// its point on rail B moved along rail B by the width there times the
+    /// tangent of the lean. Near an end the moved point stops at the end of
+    /// rail B: the stitches there fan from the corner, and no needle point
+    /// goes out of the column. The ends of the column stay.
+    pub fn leaned(&self, lean_deg: f64) -> Column {
+        let (s, c) = emb_geom::math::sin_cos_deg(
+            lean_deg.clamp(-emb_model::object::MAX_LEAN_DEG, emb_model::object::MAX_LEAN_DEG),
+        );
+        let tan = s / c;
+        let (la, lb) = (self.a.len(), self.b.len());
+        let mut rungs = vec![(0.0, 0.0)];
+        for w in self.rungs.windows(2) {
+            let (da, db) = (w[1].0 - w[0].0, w[1].1 - w[0].1);
+            let n = ((da + db) / 2.0 / LEAN_STEP_MM).ceil().max(1.0) as usize;
+            for q in 1..=n {
+                let f = q as f64 / n as f64;
+                let (sa, sb) = (w[0].0 + f * da, w[0].1 + f * db);
+                let width = self.a.at(sa).distance(self.b.at(sb));
+                let moved = (sb + width * tan).clamp(0.0, lb);
+                let last = rungs[rungs.len() - 1];
+                if sa > last.0 + 1e-6 && moved > last.1 + 1e-6 && sa < la - 1e-6 && moved < lb - 1e-6 {
+                    rungs.push((sa, moved));
+                }
+            }
+        }
+        rungs.push((la, lb));
+        Column {
+            a: self.a.clone(),
+            b: self.b.clone(),
+            rungs,
+            even: true,
+            across: false,
+        }
     }
 
     /// Mean distance between the rails.
@@ -697,7 +737,13 @@ pub(crate) fn satin_with(
         col.even = true;
         col.across = true;
     }
-    let layers = underlay_layers(&p.underlay, col.mean_width());
+    // A band of the width (P22 Milestone 4): its top stitches sew only the
+    // band, and the first band sews the underlay of the whole column.
+    let band = p.band.filter(|b| b.count > 1);
+    let layers = match band {
+        Some(b) if b.index > 0 => Vec::new(),
+        _ => underlay_layers(&p.underlay, col.mean_width()),
+    };
     let mut out: Vec<Point> = Vec::new();
     for layer in &layers {
         // Puff: no rows across the column, they press the foam flat.
@@ -740,7 +786,34 @@ pub(crate) fn satin_with(
         }
         _ => p,
     };
-    let top = crate::column::top(&col, p);
+    // The band and its pull compensation: only out at the sides of the
+    // column (the first band at rail A, the last at rail B).
+    let banded;
+    let (band_col, p) = match band {
+        Some(b) => {
+            let geometry = if reverse {
+                SatinGeometry {
+                    rail_a: reverse_path(&g.rail_a),
+                    rail_b: reverse_path(&g.rail_b),
+                    rungs: g.rungs.clone(),
+                }
+            } else {
+                g.clone()
+            };
+            banded = p.banded(&b);
+            (geometry.band(&b).and_then(|g| Column::new(&g)), &banded)
+        }
+        None => (None, p),
+    };
+    let top_col = band_col.as_ref().unwrap_or(&col);
+    let leaned;
+    let top_col = if p.lean_deg.abs() > 1e-9 {
+        leaned = top_col.leaned(p.lean_deg);
+        &leaned
+    } else {
+        top_col
+    };
+    let top = crate::column::top(top_col, p);
     // An underlay with its ends left out (on another part of a letter)
     // ends away from the start of the top stitches: a walk goes there.
     walk_to(&mut out, top.first());
@@ -911,6 +984,117 @@ mod tests {
             split_mm: emb_model::object::SATIN_SPLIT_MM,
             ..SatinParams::default()
         }
+    }
+
+    /// The exit test of the lean (P22 Milestone 4): the top stitches of a
+    /// straight column lean by the angle (their mean, away from the ends),
+    /// no needle point goes out of the column, and no two pairs across it
+    /// cross. The underlay does not lean.
+    #[test]
+    fn the_top_stitches_lean_by_the_angle() {
+        let g = straight(4.0, 30.0);
+        for lean in [-15.0_f64, 0.0, 8.0, 15.0] {
+            let p = SatinParams {
+                lean_deg: lean,
+                ..plain(0.4)
+            };
+            let pts = satin(&g, &p, Point::ZERO, None).unwrap();
+            assert!(
+                pts.iter()
+                    .all(|q| q.y > -1e-6 && q.y < 4.0 + 1e-6 && q.x > -1e-6 && q.x < 30.0 + 1e-6),
+                "a needle point out of the column at {lean}°"
+            );
+            // The stitches across the column, away from the ends: their
+            // mean slant (from rail A to rail B) is the lean.
+            let mut angles = Vec::new();
+            for w in pts.windows(2) {
+                let (a, b) = if w[0].y < w[1].y { (w[0], w[1]) } else { (w[1], w[0]) };
+                if (b.y - a.y) > 3.9 && a.x > 6.0 && a.x < 24.0 {
+                    angles.push(emb_geom::math::atan2(b.x - a.x, b.y - a.y).to_degrees());
+                }
+            }
+            let mean = angles.iter().sum::<f64>() / angles.len() as f64;
+            assert!((mean - lean).abs() <= 1.0, "{lean}°: mean {mean}°");
+            // Pairs: each stitch from rail A to rail B and the next one.
+            let pairs: Vec<(Point, Point)> = pts
+                .windows(2)
+                .filter(|w| w[0].y < 0.1 && w[1].y > 3.9)
+                .map(|w| (w[0], w[1]))
+                .collect();
+            assert!(
+                pairs.windows(2).all(|w| !pairs_cross(w[0], w[1])),
+                "pairs cross at {lean}°"
+            );
+        }
+        // The underlay stays square: a zigzag underlay is the same with a lean.
+        let under = |lean: f64| {
+            let p = SatinParams {
+                lean_deg: lean,
+                underlay: Underlay::Custom(vec![UnderlayLayer::Zigzag {
+                    inset_mm: 0.4,
+                    spacing_mm: 2.0,
+                }]),
+                ..plain(0.4)
+            };
+            let all = satin(&g, &p, Point::ZERO, None).unwrap();
+            let top = satin(
+                &g,
+                &SatinParams {
+                    underlay: Underlay::None,
+                    ..p
+                },
+                Point::ZERO,
+                None,
+            )
+            .unwrap();
+            all[..all.len() - top.len()].to_vec()
+        };
+        assert_eq!(under(0.0), under(12.0));
+    }
+
+    /// Bands of threads (P22 Milestone 4): three bands with no overlap
+    /// cover the column with no gap wider than 0.1 mm; with an overlap,
+    /// two layers only in the overlap; only the first band has underlay.
+    #[test]
+    fn bands_cover_the_column() {
+        let g = straight(6.0, 20.0);
+        let with = |index: u32, overlap: f64, underlay: Underlay| {
+            let p = SatinParams {
+                band: Some(emb_model::ColumnBand {
+                    index,
+                    count: 3,
+                    overlap_mm: overlap,
+                }),
+                pull_compensation_mm: 0.3,
+                underlay,
+                ..plain(0.4)
+            };
+            satin(&g, &p, Point::ZERO, None).unwrap()
+        };
+        let band = |index: u32, overlap: f64| with(index, overlap, Underlay::None);
+        let range = |pts: &[Point]| {
+            let inner: Vec<f64> = pts.iter().filter(|q| q.x > 2.0 && q.x < 18.0).map(|q| q.y).collect();
+            (
+                inner.iter().copied().fold(f64::INFINITY, f64::min),
+                inner.iter().copied().fold(f64::NEG_INFINITY, f64::max),
+            )
+        };
+        let r: Vec<(f64, f64)> = (0..3).map(|k| range(&band(k, 0.0))).collect();
+        // The outer sides keep the pull compensation; the inner sides meet.
+        assert!((r[0].0 + 0.3).abs() < 0.05 && (r[2].1 - 6.3).abs() < 0.05, "{r:?}");
+        assert!(
+            (r[0].1 - r[1].0).abs() <= 0.1 && (r[1].1 - r[2].0).abs() <= 0.1,
+            "{r:?}"
+        );
+        // The second and third bands have no underlay, the first band sews
+        // the underlay of the whole column.
+        assert_eq!(with(1, 0.0, Underlay::Auto), band(1, 0.0));
+        assert_eq!(with(2, 0.0, Underlay::Auto), band(2, 0.0));
+        assert!(with(0, 0.0, Underlay::Auto).iter().any(|q| q.y > 2.5 && q.y < 5.5));
+        // With an overlap of 0.6 mm, the bands go 0.3 mm into each other.
+        let o: Vec<(f64, f64)> = (0..3).map(|k| range(&band(k, 0.6))).collect();
+        assert!((o[0].1 - 2.3).abs() < 0.05 && (o[1].0 - 1.7).abs() < 0.05, "{o:?}");
+        assert!((o[1].1 - 4.3).abs() < 0.05 && (o[2].0 - 3.7).abs() < 0.05, "{o:?}");
     }
 
     /// A straight column 20 mm long and 4 mm wide, with the rungs of

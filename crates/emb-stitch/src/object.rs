@@ -1280,6 +1280,9 @@ pub fn underlay_layers(kind: &ObjectKind) -> Option<Vec<UnderlayLayer>> {
             let holes: Vec<Polyline> = holes.iter().flat_map(|h| h.flatten(FLATTEN_TOL_MM)).collect();
             Some(fill_underlay_layers(&Shape::new(&outers, &holes), &params.underlay))
         }
+        // A band after the first has no underlay (the first band sews the
+        // underlay of the whole column).
+        ObjectKind::Satin { params, .. } if params.band.is_some_and(|b| b.count > 1 && b.index > 0) => Some(Vec::new()),
         ObjectKind::Satin { geometry, params } => {
             let width = crate::satin::Column::new(geometry).map_or(0.0, |c| c.mean_width());
             Some(crate::satin::underlay_layers(&params.underlay, width))

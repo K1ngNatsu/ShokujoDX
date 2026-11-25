@@ -107,7 +107,7 @@ impl AppState {
             Cmd::Laydown => !d.objects().is_empty(),
             Cmd::Motifs | Cmd::Borders | Cmd::Buttonholes | Cmd::Blends => true,
             Cmd::SplitLines | Cmd::GuideLines => s.fills == 1 && s.lines > 0 && s.n == 1 + s.lines,
-            Cmd::Tartan | Cmd::Gradient => true,
+            Cmd::Tartan | Cmd::Gradient | Cmd::ColumnBands => true,
             Cmd::RippleGuide => s.n == 2 && s.lines == 2,
             Cmd::Redwork | Cmd::Branching => s.lines > 0,
             Cmd::LetteringOnLine => {
@@ -457,6 +457,7 @@ impl AppState {
             Cmd::GuideLines => {
                 crate::stitch_types::guide_lines(self);
             }
+            Cmd::ColumnBands => self.column_bands.open = true,
             Cmd::RippleGuide => {
                 crate::stitch_types::ripple_guide(self);
             }

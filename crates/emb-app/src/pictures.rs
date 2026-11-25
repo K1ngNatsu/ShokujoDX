@@ -558,6 +558,35 @@ fn scenes() -> Vec<Scene> {
         }
         st.focus_tab = Some(Tab::Properties);
     }));
+    // A band of a column of bands, with a lean (ADR 0171).
+    v.push(Scene::new("object properties band", View::Screen, |st, _| {
+        let threads: Vec<_> = st.doc.design().threads.iter().take(2).map(|t| t.id).collect();
+        let Some(&first) = threads.first() else { return };
+        let id = st.doc.edit("Column", |d| {
+            let line = emb_geom::Path::new()
+                .move_to(emb_geom::Point::new(-30.0, 60.0))
+                .line_to(emb_geom::Point::new(30.0, 60.0));
+            d.add_object(
+                first,
+                emb_model::ObjectKind::Satin {
+                    geometry: emb_model::SatinGeometry::from_centerline(&line, 8.0),
+                    params: emb_model::SatinParams {
+                        lean_deg: 10.0,
+                        ..Default::default()
+                    },
+                },
+            )
+        });
+        st.selection.set(id);
+        let last = *threads.last().unwrap_or(&first);
+        st.make_bands(&[first, last], 0.3);
+        if let Some(&second) = st.selection.ids().get(1)
+            && let Some(g) = st.doc.design().object(second).and_then(|o| o.group)
+        {
+            st.selection.enter(second, g);
+        }
+        st.focus_tab = Some(Tab::Properties);
+    }));
     // The windows that no command opens with the sample design.
     v.push(Scene::new("first start", View::Windows, |st, _| {
         st.ask_machine = Some(crate::first_start::MachineStep::new(st));

@@ -464,6 +464,8 @@ pub enum Cmd {
     GuideLines,
     /// Two lines: the second becomes the guide of a ripple of the first.
     RippleGuide,
+    /// The Bands window: more than one thread across a satin column.
+    ColumnBands,
     Motifs,
     Laydown,
     ClosestJoin,
@@ -1302,6 +1304,13 @@ impl Cmd {
                 tr(
                     "Select a fill and one or more lines: the fill rows follow the lines and change from one to the next (guided fill). \
                  The lines are used up.",
+                ),
+            ),
+            Cmd::ColumnBands => (
+                g(ph::BARCODE),
+                tr("Bands"),
+                tr(
+                    "Sew a satin column in bands of two or more threads across its width: a satin column for each band.",
                 ),
             ),
             Cmd::RippleGuide => (
