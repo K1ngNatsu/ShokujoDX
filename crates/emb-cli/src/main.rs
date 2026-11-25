@@ -184,7 +184,7 @@ Usage:
       part with two layers, and the narrowest and the widest column; and
       the trims of words. --face: the face of a font collection (.ttc; 0 is
       the first). --letters: one line for each character and size too.
-  emb-cli letter-faults [--proof <pictures.json>]
+  emb-cli letter-faults [--proof <pictures.json>] [--judged <judged.json>]
       The letter fault bench (P21): the letters A-Z, a-z and 0-9 of the
       four embroidery fonts with a source font in the program, as the
       embroidery font and as lettering in the source font, sewn at 25 mm
@@ -192,7 +192,9 @@ Usage:
       outside it, crossing stitches, fans, bulges, open area and open
       corners, columns that end on top of other columns, travel runs
       outside. --proof: the pictures of the letters as JSON, for
-      tools/letter-faults.py.
+      tools/letter-faults.py. --judged: compare the measures with the eye
+      (ADR 0173; crates/emb-cli/tests/data/judged-letters.json): the
+      letters where they do not agree, and the letters near a limit.
   emb-cli view-bench [--out <folder>] [--stress] [--sew]
       The bench of the 3D view (ADR 0122). Make the pictures of the
       reference set (twelve small corpus designs, each for one thing that a
@@ -360,6 +362,7 @@ fn run(args: &[String]) -> Result<(), String> {
     let (mut swatch_from, mut swatch_to, mut swatch_copies) = (None::<f64>, None::<f64>, 5usize);
     let mut swatch_objects: Vec<u64> = Vec::new();
     let mut fixes = emb_art::file_check::Fixes::ALL;
+    let mut judged: Option<PathBuf> = None;
     let mut rest = Vec::new();
     let mut it = args.iter();
     while let Some(a) = it.next() {
@@ -443,6 +446,7 @@ fn run(args: &[String]) -> Result<(), String> {
             }
             "--source" => audit_source = Some(PathBuf::from(it.next().ok_or("--source needs a font file")?)),
             "--proof" => audit_proof = Some(PathBuf::from(it.next().ok_or("--proof needs a file")?)),
+            "--judged" => judged = Some(PathBuf::from(it.next().ok_or("--judged needs a file")?)),
             "--sizes" => {
                 sheet_sizes = it
                     .next()
@@ -1032,6 +1036,15 @@ fn run(args: &[String]) -> Result<(), String> {
         ["letter-faults"] => {
             let fonts = emb_cli::letter_faults::run();
             print!("{}", emb_cli::letter_faults::report(&fonts));
+            if let Some(p) = &judged {
+                let text = std::fs::read_to_string(p).map_err(|e| format!("{}: {e}", p.display()))?;
+                let set = emb_cli::letter_faults::load_judged(&text)?;
+                print!(
+                    "
+{}",
+                    emb_cli::letter_faults::compare(&fonts, &set).text
+                );
+            }
             if let Some(p) = &audit_proof {
                 std::fs::write(p, emb_cli::letter_faults::pictures(&fonts))
                     .map_err(|e| format!("{}: {e}", p.display()))?;

@@ -6,7 +6,8 @@ efficiently on itself"). Milestone 1 is made (ADR 0167), and the travel
 faults that it found are fixed (ADR 0168). Milestone 2 is made (ADR
 0169). Milestone 3 is made in the software (ADR 0170); its sew-out is
 open. Milestone 4 is made in the software (ADR 0171); its sew-out is
-open. Milestone 5 is made (ADR 0172).
+open. Milestone 5 is made (ADR 0172). Milestone 6 is made (ADR 0173);
+the owner's look at 50 of the judged letters is open.
 
 ## Goal
 
@@ -365,6 +366,39 @@ test shows that the counts agree with what people see.
 **Exit test:** the measures agree with the eye on 90 % of the set or
 more; each letter where they do not agree is listed with the reason; a
 change of the snapshot of the fault bench has a note.
+
+**Made (2026-11-25, ADR 0173).** The judged set is
+`crates/emb-cli/tests/data/judged-letters.json`: the 496 letters of the
+bench (four fonts, both ways), judged from pictures with no marks of the
+measures (`tools/letter-faults.py --plain`). 16 have a fault that the
+eye sees: open area (Block Sans 6, Anton N, Y, a, Pacifico p) and open
+corners (Anton r, x, Varsity a), each in both ways. No letter shows a
+spike, a bulge or a pile of crossing stitches at 25 mm. The survey of
+127 fonts is not in the set: its source fonts are not in the
+repository.
+
+Notes of the changes where the measures and the eye did not agree:
+
+- Open area: any open cell made 435 clean letters faulty (the slivers
+  between the stitches of a curve). New measure `Faults::open_patch`:
+  the largest patch after an erosion of 0.1 mm. Limit 0.38 mm² (faulty
+  0.41 mm² or more, clean 0.35 mm² or less).
+- Open corners: a corner counted as open with any part open called 37
+  clean letters faulty. Limit of the eye: 0.5 mm² of open area at the
+  corners (faulty 0.54 mm² or more, clean 0.45 mm² or less).
+- Needle points out of the outline (over 0.4 mm: 4 clean letters),
+  bulges (26 clean letters) and crossing pairs (12 clean letters) are
+  smaller than the eye sees at 25 mm. Their limits of the eye (0.6 mm,
+  3 mm, 5 pairs) have no faulty letter in the set to test them.
+- One judgment changed: Pacifico u (a thin wedge at its joint, as the
+  fans of the clean N and M) is clean.
+
+`emb-cli letter-faults --judged <file>`: the measures agree with the eye
+on all 496 letters (100 %), with no letter where they do not agree; the
+limits come from this set, so the report lists the letters near a limit.
+The snapshot of the bench did not change. The owner looks at the 50
+letters of `out/p22-judged` (checklist and two sheets) and corrects the
+set (the owner's list in `docs/design/open-work.md`).
 
 ## Milestone 7: overlapped strokes (trial) (L)
 
