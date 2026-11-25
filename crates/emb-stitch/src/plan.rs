@@ -136,6 +136,19 @@ pub fn build_plan_until(
 ) -> Option<StitchPlan> {
     let to_out = design.output_transform();
     let to_design = to_out.inverse().unwrap_or(Transform::IDENTITY);
+    // The trim distance of the design wins over the one of the machine
+    // (P22 Milestone 2, ADR 0169).
+    let with_gap;
+    let opts = match design.trim_gap_mm {
+        Some(g) => {
+            with_gap = PlanOptions {
+                trim_mm: g,
+                ..opts.clone()
+            };
+            &with_gap
+        }
+        None => opts,
+    };
     let mut b = Builder::new(opts);
     // Auto start (ADR 0032): the needle goes to the start point first, so
     // the first object starts from there.
@@ -850,6 +863,22 @@ mod tests {
 
     fn plan(d: &Design) -> StitchPlan {
         build_plan(d, &PlanOptions::default(), &mut StitchCache::default())
+    }
+
+    /// The trim distance of the design wins over the one of the machine
+    /// (P22 Milestone 2): a 3 mm gap is a trim at the 2 mm of the machine,
+    /// and a travel stitch at 4 mm.
+    #[test]
+    fn the_trim_distance_of_the_design_wins() {
+        let mut d = Design::new("gap");
+        let t = d.add_thread("Red", Rgb(200, 0, 0));
+        add_line(&mut d, t, (0.0, 0.0), (20.0, 0.0), 2.5);
+        add_line(&mut d, t, (23.0, 0.0), (40.0, 0.0), 2.5);
+        let trims = |d: &Design| count(&plan(d), StitchKind::Trim);
+        assert_eq!(trims(&d), 2, "a trim at the gap and at the end");
+        d.trim_gap_mm = Some(4.0);
+        assert_eq!(trims(&d), 1, "only at the end");
+        assert_eq!(plan(&d).travel.len(), 1, "the stitch over the gap is travel");
     }
 
     #[test]

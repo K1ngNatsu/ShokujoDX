@@ -129,7 +129,8 @@ fn color(map: &CheckMap, i: usize, through: Option<f64>, high: Option<f64>) -> C
 /// Draws the checks that are on over the stitches, with a line that counts
 /// the places.
 pub fn draw(painter: &egui::Painter, ctx: &egui::Context, rect: Rect, st: &mut AppState) {
-    let travel = st.show_travel.then(|| draw_travel(painter, rect, st));
+    // Quicker to Sew shows the travel of its result (P22 Milestone 2).
+    let travel = (st.show_travel || st.quicker_dialog.is_some()).then(|| draw_travel(painter, rect, st));
     if !(st.show_through || st.show_high_thread) {
         if let Some(line) = travel {
             status(painter, ctx, rect, st, &[line]);

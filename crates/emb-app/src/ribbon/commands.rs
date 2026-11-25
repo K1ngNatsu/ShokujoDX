@@ -614,6 +614,8 @@ pub enum Cmd {
     RepeatLast,
     CloseGaps,
     CleanUp,
+    /// Quicker to Sew (P22 Milestone 2, ADR 0169).
+    QuickerToSew,
     ExportSvg,
     ExportInkstitch,
     Simplify,
@@ -1341,6 +1343,13 @@ impl Cmd {
                 tr("Close Gaps…"),
                 tr(
                     "Join the ends of the selected lines where they are near, so lines drawn one at a time become one line or a closed shape. See the result before you keep it.",
+                ),
+            ),
+            Cmd::QuickerToSew => (
+                g(ph::LIGHTNING),
+                tr("Quicker to Sew…"),
+                tr(
+                    "Make the design quicker to sew: merge threads that look almost the same, remove small details, fewer color changes, and sew across short gaps. A table shows the numbers before and after.",
                 ),
             ),
             Cmd::CleanUp => (

@@ -117,6 +117,12 @@ pub struct Design {
     /// garment, sizes, placement, due date. `None`: no order.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub order: Option<crate::order::OrderInfo>,
+    /// The trim distance of the design (P22 Milestone 2, ADR 0169): a gap
+    /// to the next part of the same color up to this length gets a travel
+    /// stitch, a longer gap a trim. `None`: the trim distance of the
+    /// machine.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trim_gap_mm: Option<f64>,
     /// For each lettering with a knockout, the revisions of the objects
     /// that cut it at the last `settle_knockouts` (ADR 0093). Not saved.
     #[serde(skip)]
@@ -371,6 +377,7 @@ impl Design {
             template_marks: None,
             needles: Vec::new(),
             order: None,
+            trim_gap_mm: None,
             knockout_seen: Default::default(),
         }
     }
@@ -604,6 +611,7 @@ impl Design {
             && self.product == o.product
             && self.repeat == o.repeat
             && self.template_marks == o.template_marks
+            && self.trim_gap_mm == o.trim_gap_mm
             && self.objects.len() == o.objects.len()
             && self.objects.iter().zip(&o.objects).all(|(a, b)| a.same_content(b))
     }

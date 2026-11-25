@@ -358,6 +358,9 @@ pub struct AppState {
     pub gap_settings: emb_geom::gaps::Gaps,
     /// The Clean Up window, and its last settings.
     pub cleanup_dialog: Option<crate::cleanup::CleanupDialog>,
+    /// The Quicker to Sew window (P22 Milestone 2) and its last settings.
+    pub quicker_dialog: Option<crate::quicker::QuickerDialog>,
+    pub quicker_settings: emb_model::quicker::QuickerToSew,
     /// The Recognize Objects window (P18 Milestone 4).
     pub recognize_dialog: Option<crate::recognize_objects::RecognizeDialog>,
     /// The Envelope window (ADR 0092).
@@ -847,6 +850,8 @@ impl AppState {
             gaps_dialog: None,
             gap_settings: emb_geom::gaps::Gaps::STANDARD,
             cleanup_dialog: None,
+            quicker_dialog: None,
+            quicker_settings: emb_model::quicker::QuickerToSew::STANDARD,
             recognize_dialog: None,
             envelope_dialog: None,
             cleanup_settings: emb_geom::cleanup::Cleanup::STANDARD,
@@ -1863,6 +1868,7 @@ impl EmbApp {
         crate::simplify::window(&ctx, st);
         crate::gaps::window(&ctx, st);
         crate::cleanup::window(&ctx, st);
+        crate::quicker::window(&ctx, st);
         crate::recognize_objects::window(&ctx, st);
         crate::drawing_aids::envelope_window(&ctx, st);
         crate::editing::paste_special_window(&ctx, st);

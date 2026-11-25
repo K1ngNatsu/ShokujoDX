@@ -50,6 +50,7 @@ pub mod object;
 pub mod order;
 pub mod product;
 pub mod project;
+pub mod quicker;
 pub mod quilt;
 pub mod quote;
 pub mod repeat;

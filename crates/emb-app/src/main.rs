@@ -84,6 +84,7 @@ mod product;
 mod product_photo;
 #[cfg(test)]
 mod product_probe;
+mod quicker;
 mod quilting;
 mod quote;
 mod recognize_objects;

@@ -231,6 +231,7 @@ pub const WINDOW_HELP: &[(&str, &str)] = &[
     ("Simplify", "editing"),
     ("Close Gaps", "editing"),
     ("Clean Up", "editing"),
+    ("Quicker to Sew", "arranging"),
     ("Envelope", "editing"),
     ("Corner Radius", "editing"),
     ("Hole Inside the Outline", "editing"),

@@ -44,6 +44,12 @@ pub fn out_of_range(design: &Design, before: Option<&Design>) -> Option<String> 
     if !in_range(design.hoop.center) {
         return Some(text::tr("the hoop center is out of range").into());
     }
+    if design
+        .trim_gap_mm
+        .is_some_and(|g| !(0.0..=crate::quicker::MAX_TRIM_GAP_MM).contains(&g))
+    {
+        return Some(text::tr("the trim distance of the design is out of range").into());
+    }
     let old = before.map(Design::objects).unwrap_or_default();
     for (i, o) in design.objects().iter().enumerate() {
         if old.get(i).is_some_and(|b| std::sync::Arc::ptr_eq(b, o)) {

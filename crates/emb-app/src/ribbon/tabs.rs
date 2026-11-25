@@ -532,6 +532,7 @@ pub(super) const ARRANGE: &[Panel] = &[
             Small(&[Cmd::ToEnd, Cmd::BackColor, Cmd::ForwardColor]),
             Small(&[Cmd::ClickOrder, Cmd::OptimizeColors, Cmd::GroupByColor]),
             Small(&[Cmd::OptimizeOrder, Cmd::CapOrder, Cmd::ClosestJoin]),
+            Small(&[Cmd::QuickerToSew]),
         ],
     },
 ];

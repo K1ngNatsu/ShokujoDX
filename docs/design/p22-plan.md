@@ -2,7 +2,9 @@
 
 Date: 2026-11-25 · Status: Accepted (owner, 2026-11-25: "build those
 ideas into a new phase with milestones ordered so work builds
-efficiently on itself"). Milestone 1 is made (ADR 0167).
+efficiently on itself"). Milestone 1 is made (ADR 0167), and the travel
+faults that it found are fixed (ADR 0168). Milestone 2 is made (ADR
+0169).
 
 ## Goal
 
@@ -171,6 +173,26 @@ stays open (`docs/design/open-work.md`).
 after the last change of a value; OK is one undo step; Cancel gives the
 design of before (the same project text); the numbers after OK are the
 numbers that the window showed.
+
+**Made (2026-11-25, ADR 0169).** `Design::trim_gap_mm` is the trim
+distance of a design (saved, 0 to 50 mm; `build_plan` uses it in place
+of the one of the machine). `emb_model::quicker` (`QuickerToSew`,
+`apply`) merges the threads whose colors differ by the value or less
+(the thread that sews more stays), removes small fills, satin columns
+and lines (not in groups or records), joins color blocks
+(`optimize_color_changes`) and sets the trim distance. The window
+Arrange > Sew Order > Quicker to Sew… applies it as Clean Up does (one
+merged edit; OK, Cancel, Standard), with the table of the numbers before
+and after (threads, color changes, trims, stitches, sew time, travel on
+stitches and on the fabric) and the travel that shows on the canvas.
+The slider of step 1 is in the window ("Sew across gaps up to"), not on
+its own: the live numbers are those of the table.
+
+The exit test is met: the tests `ok_is_one_undo_step_and_the_numbers_are_the_ones_shown`
+(the numbers after show in less than 1 s, and are the numbers after OK;
+one undo step goes back) and `cancel_goes_back_to_the_same_design` (the
+same project text); the plans of the corpus take at most about 60 ms
+each (release), so the numbers follow each change at once.
 
 ## Milestone 3: test swatches (M)
 

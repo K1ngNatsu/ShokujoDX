@@ -99,6 +99,19 @@ jeder Fadenschnitt kostet Zeit.
 - **Nächste Verbindung**: Jedes Objekt endet an dem Punkt, der dem
   nächsten am nächsten ist, und das nächste beginnt dort. Kurze Lücken
   bekommen dann Verbindungsstiche statt Fadenschnitten.
+- **Schneller sticken** macht vier Dinge in einem Fenster, jedes an oder
+  aus: **Ähnliche Garne zusammenführen** (Garne, deren Farben sich um den
+  Wert oder weniger unterscheiden, werden das Garn, das mehr stickt),
+  **Kleine Details entfernen** (Füllungen, Satinsäulen und Linien, die
+  kleiner als die Größe sind, nicht in Gruppen), **Lücken übersticken
+  bis** (eine Lücke zum nächsten Teil derselben Farbe bis zu dieser Länge
+  bekommt einen Verbindungsstich statt eines Fadenschnitts; das Design
+  behält den Wert, und ist er aus, entscheidet die Maschine) und
+  **Weniger Farbwechsel**. Eine Tabelle zeigt die Garne, Farbwechsel,
+  Fadenschnitte, Stiche, die Stickzeit und die sichtbaren
+  Verbindungsstiche vorher und nachher, und die Arbeitsfläche markiert die
+  sichtbaren Verbindungsstiche. **OK** behält das Ergebnis als einen
+  Schritt, den Sie rückgängig machen können; **Abbrechen** geht zurück.
 
 ## Kappen
 
