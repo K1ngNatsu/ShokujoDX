@@ -65,6 +65,7 @@ mod monogram;
 mod motifs;
 mod my_machines;
 mod needles;
+mod one_program;
 mod order;
 mod output;
 mod overview;
@@ -135,9 +136,11 @@ mod workspace;
 use eframe::egui;
 
 /// The text of `--help`.
-const USAGE: &str = "Use: shokujodx [--lang <code>] [--kiosk | <file>]
+const USAGE: &str = "Use: shokujodx [--lang <code>] [--kiosk | [--new-window] <file>]
 
-  <file>         open a design, a machine file, artwork or a picture
+  <file>         open a design, a machine file, artwork or a picture (in a
+                 tab of the program that runs, if one runs)
+  --new-window   start a second program, also if one runs
   --lang <code>  the language for this run: en, de, es or ja
   --kiosk        start in the lettering kiosk
   --thumbnail <file> <out.png> [<size>]
@@ -204,6 +207,15 @@ fn main() -> eframe::Result {
     // The speed of the canvas with the renderer of the arguments (ADR 0122).
     if let Some(out) = view_bench::wanted(&args) {
         return view_bench::run(startup::Start::from_args(&args).renderer, out);
+    }
+    // One program (P22 Milestone 8, ADR 0175): a file for a program that
+    // runs goes to it, and this process stops before it opens a window.
+    if settings.one_program
+        && let Some(file) = one_program::file_of_args(&args)
+        && let Some(root) = backup::backups_dir()
+        && one_program::hand_over(&root, &file, backup::unix_now())
+    {
+        return Ok(());
     }
     // The renderer, and the start again with the next renderer if this one
     // fails (v0.3 plan, Stage 1).

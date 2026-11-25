@@ -27,6 +27,19 @@ The program saves a backup of each design with changes every 2 minutes
 to the `crashes` folder of the settings; **Help > About** shows where it
 is.
 
+## Open tabs and one program
+
+When you quit, the program keeps the open designs with their changes
+that are not saved, and asks nothing. At the next start, the tabs open
+again, with the same tab in front and the same view (**Options > Open
+tabs**). After a crash, the **Recover Designs** window shows the backups
+as before.
+
+A file that you open while the program runs (a double-click, **Open
+with**, the command line) opens in a new tab of that program, and the
+program comes to the front (**Options > Files**). To start a second
+program, start it with `--new-window`.
+
 ## Export a machine file
 
 **Design > Export** (Ctrl+E, or File > Export machine file) writes the

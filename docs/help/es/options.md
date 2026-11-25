@@ -38,6 +38,12 @@ Los cambios se aplican enseguida y se conservan para el siguiente inicio.
 - **Copia de seguridad automática**: los diseños con cambios van a una
   carpeta de copias cada 1 a 60 minutos (2 al principio), o
   **desactivado**. Después de un fallo, el programa ofrece recuperarlos.
+- **Pestañas abiertas**: con **Volver a abrirlas en el siguiente inicio**
+  (activado al principio), salir conserva los diseños abiertos con sus
+  cambios, y el siguiente inicio los vuelve a abrir.
+- **Archivos**: con **Abrir en el programa que se ejecuta** (activado al
+  principio), un archivo que abre mientras el programa se ejecuta se abre
+  en una pestaña de él.
 - **Margen de seguridad del bastidor**: la distancia dentro del campo del
   bastidor. Las puntadas fuera de él reciben una advertencia.
 

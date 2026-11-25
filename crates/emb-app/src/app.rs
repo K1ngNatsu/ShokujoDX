@@ -638,6 +638,13 @@ impl EmbApp {
             state.lang_override = Some(args[1].to_string_lossy().into_owned());
             args.drain(..2);
         }
+        args.retain(|a| a != crate::one_program::NEW_WINDOW);
+        // The tabs of the last quit come back (ADR 0175), not in a kiosk.
+        if state.settings.restore_tabs && args.first().is_none_or(|a| a != "--kiosk") && state.restore_tabs() > 0 {
+            state.show_start = false;
+            state.focus_start = false;
+            state.focus_library = state.settings.library_open;
+        }
         let arg = args.into_iter().next();
         if arg.as_deref() == Some(std::ffi::OsStr::new("--kiosk")) {
             // A shop kiosk does not ask for the machine.
@@ -1828,7 +1835,13 @@ impl EmbApp {
             self.state.open_any(f.path());
         }
         self.state.backups_tick(std::time::Instant::now());
-        ctx.request_repaint_after(crate::backup::HEARTBEAT);
+        // A file from another process (one program, ADR 0175): it opens in
+        // a tab, and the window comes to the front.
+        if self.state.read_inbox(std::time::Instant::now()) {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
+            ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+        }
+        ctx.request_repaint_after(crate::one_program::POLL);
         crate::backup::recovery_window(&ctx, &mut self.state);
         crate::file::dialogs(&ctx, &mut self.state);
         crate::export::dialog(&ctx, &mut self.state);

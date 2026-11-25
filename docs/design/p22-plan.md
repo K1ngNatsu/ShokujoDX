@@ -10,7 +10,7 @@ open. Milestone 5 is made (ADR 0172). Milestone 6 is made (ADR 0173),
 and the owner agrees with the 50 judged letters that the owner looked at.
 Milestone 7 (the trial of overlapped strokes) is measured, and the owner
 chose the way of today (ADR 0174); the trial is on the branch
-`trial/overlapped-strokes`.
+`trial/overlapped-strokes`. Milestone 8 is made (ADR 0175).
 
 ## Goal
 
@@ -500,6 +500,25 @@ the first and stops in less than 2 s; a quit with three tabs (one with
 changes that are not saved) gives the three tabs, the changes and the
 same tab in front at the next start; after a crash, the recovery
 question as today.
+
+**Made (2026-11-25, ADR 0175).** The tabs: with `Settings::restore_tabs`
+(Options > Open tabs, on), a quit asks nothing and keeps the session
+folder with a backup of each tab that has changes or no project file and
+the list of the tabs (`backup::Closed`: file, backup, changes, view, the
+tab in front); the next start opens them again (`restore_tabs`, not in
+the kiosk) and deletes the folder. A closed session is not a crash
+(`find_recoverable` leaves it out). One program: with
+`Settings::one_program` (Options > Files, on), a start with a file finds
+a session with a new heartbeat (`backup::running_sessions`), writes the
+path in its `inbox` folder (`one_program::hand_over`) and stops before a
+window opens; the program that runs reads the inbox each second
+(`read_inbox`), opens the file in a tab and comes to the front.
+`--new-window` starts a second program.
+
+The exit test is met: `crates/emb-app/tests/one_program.rs` (two
+processes; the second stops in 0.5 s),
+`backup::tests::a_quit_keeps_the_tabs_and_the_next_start_opens_them`, and
+the recovery tests of before (a closed session is not offered).
 
 ## Milestone 9: agents through MCP (L)
 

@@ -8,6 +8,14 @@
 //! deletes the session folder. If the app stops by force (a crash, a power
 //! cut), the folder stays: at the next start, a session whose heartbeat is
 //! old is a crashed session, and the app offers its designs for recovery.
+//!
+//! The open tabs come back (P22 Milestone 8, ADR 0175): with
+//! `Settings::restore_tabs`, a normal quit does not ask about the changes
+//! that are not saved. It keeps the session folder with a backup of each
+//! tab that has changes (or no project file) and the list of the tabs
+//! ([`Closed`]: the file of each, the tab in front, the views). The next
+//! start opens the tabs again with no question and deletes the folder. A
+//! closed session is not a crashed session.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -42,6 +50,35 @@ pub struct BackupEntry {
 struct SessionFile {
     heartbeat: u64,
     docs: Vec<BackupEntry>,
+    /// A normal quit that keeps the tabs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    closed: Option<Closed>,
+}
+
+/// A tab of a normal quit (ADR 0175).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TabEntry {
+    pub name: String,
+    /// The file of the design, if it has one.
+    pub file: Option<PathBuf>,
+    /// The backup project of the tab (`<id>.embproj` in the session
+    /// folder): a design with changes that are not saved, or with no
+    /// project file. `None`: the tab opens its file again.
+    pub backup: Option<u64>,
+    /// The design had changes that are not saved.
+    pub changed: bool,
+    /// The view: the center (mm) and the zoom.
+    pub view: (f64, f64, f64),
+}
+
+/// The tabs of a normal quit (ADR 0175).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Closed {
+    /// When the program quit (seconds since 1970).
+    pub at: u64,
+    pub tabs: Vec<TabEntry>,
+    /// The tab in front (its number in `tabs`).
+    pub front: usize,
 }
 
 /// The backups of this session.
@@ -53,6 +90,8 @@ pub struct Backups {
     written: BTreeMap<u64, (u64, BackupEntry)>,
     last_write: Option<Instant>,
     last_heartbeat: Option<Instant>,
+    /// The last read of the inbox (`one_program`).
+    pub(crate) last_inbox: Option<Instant>,
 }
 
 /// A design from a crashed session that can be recovered.
@@ -83,6 +122,7 @@ impl Backups {
             written: BTreeMap::new(),
             last_write: None,
             last_heartbeat: None,
+            last_inbox: None,
         }
     }
 
@@ -101,6 +141,7 @@ impl Backups {
         let s = SessionFile {
             heartbeat: now,
             docs: self.written.values().map(|(_, e)| e.clone()).collect(),
+            closed: None,
         };
         let json = serde_json::to_string_pretty(&s).map_err(|e| e.to_string())?;
         let path = dir.join(SESSION_FILE);
@@ -127,7 +168,8 @@ pub fn find_recoverable(root: &Path, own: Option<&Path>, now: u64) -> Vec<Recove
         else {
             continue;
         };
-        if now.saturating_sub(s.heartbeat) <= STALE_S {
+        // A normal quit that kept its tabs is not a crash.
+        if s.closed.is_some() || now.saturating_sub(s.heartbeat) <= STALE_S {
             continue;
         }
         for e in s.docs {
@@ -143,6 +185,45 @@ pub fn find_recoverable(root: &Path, own: Option<&Path>, now: u64) -> Vec<Recove
     }
     out.sort_by_key(|r| std::cmp::Reverse(r.entry.written));
     out
+}
+
+/// The sessions in `root` (other than `own`) of a normal quit that kept
+/// its tabs, the oldest first.
+pub fn find_closed(root: &Path, own: Option<&Path>) -> Vec<(PathBuf, Closed)> {
+    let mut out: Vec<(PathBuf, Closed)> = std::fs::read_dir(root)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|d| d.is_dir() && Some(d.as_path()) != own)
+        .filter_map(|d| {
+            let s = std::fs::read_to_string(d.join(SESSION_FILE)).ok()?;
+            let s: SessionFile = serde_json::from_str(&s).ok()?;
+            Some((d, s.closed?))
+        })
+        .collect();
+    out.sort_by_key(|(_, c)| c.at);
+    out
+}
+
+/// The session folders in `root` of programs that run: a heartbeat newer
+/// than [`STALE_S`] at `now` and no normal quit, the newest heartbeat
+/// first (P22 Milestone 8: one program).
+pub fn running_sessions(root: &Path, now: u64) -> Vec<PathBuf> {
+    let mut out: Vec<(u64, PathBuf)> = std::fs::read_dir(root)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|d| d.is_dir())
+        .filter_map(|d| {
+            let s = std::fs::read_to_string(d.join(SESSION_FILE)).ok()?;
+            let s: SessionFile = serde_json::from_str(&s).ok()?;
+            (s.closed.is_none() && now.saturating_sub(s.heartbeat) <= STALE_S).then_some((s.heartbeat, d))
+        })
+        .collect();
+    out.sort_by_key(|(h, _)| std::cmp::Reverse(*h));
+    out.into_iter().map(|(_, d)| d).collect()
 }
 
 /// Deletes a crashed session folder when no design in it waits for recovery.
@@ -260,6 +341,127 @@ impl AppState {
         }
     }
 
+    /// A normal quit that keeps the tabs (ADR 0175): a backup of each tab
+    /// with changes that are not saved or with no project file, and the
+    /// list of the tabs in the session file. Blank tabs are left out.
+    pub fn backups_keep_tabs(&mut self) -> Result<(), String> {
+        let Some(dir) = self.backups.session_dir() else {
+            return Err(tr("no folder for the backups").into());
+        };
+        std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+        let mut tabs = Vec::new();
+        let mut front = 0;
+        for i in 0..self.tabs.len() {
+            let (id, doc, file, view) = match &self.tabs[i] {
+                Some(s) => (s.doc_id, &s.doc, s.file_path.clone(), &s.view),
+                None => (self.doc_id, &self.doc, self.file_path.clone(), &self.view),
+            };
+            let changed = doc.is_modified();
+            if doc.design().objects().is_empty() && !changed && file.is_none() {
+                continue;
+            }
+            let backup = if changed || file.is_none() {
+                let path = dir.join(format!("{id}.{}", project::FILE_EXTENSION));
+                project::save(doc.design(), &path).map_err(|e| e.to_string())?;
+                Some(id)
+            } else {
+                None
+            };
+            if i == self.active_tab {
+                front = tabs.len();
+            }
+            tabs.push(TabEntry {
+                name: doc.design().name.clone(),
+                file,
+                backup,
+                changed,
+                view: (view.center.x, view.center.y, view.zoom),
+            });
+        }
+        // The backups of designs that are not in the list go.
+        let kept: Vec<u64> = tabs.iter().filter_map(|t| t.backup).collect();
+        for id in self.backups.written.keys().copied().collect::<Vec<_>>() {
+            if !kept.contains(&id) {
+                self.backups_remove(id);
+            }
+        }
+        self.backups.written.clear();
+        if tabs.is_empty() {
+            self.backups_clean_exit();
+            return Ok(());
+        }
+        let now = unix_now();
+        let s = SessionFile {
+            heartbeat: now,
+            docs: Vec::new(),
+            closed: Some(Closed { at: now, tabs, front }),
+        };
+        let json = serde_json::to_string_pretty(&s).map_err(|e| e.to_string())?;
+        let path = dir.join(SESSION_FILE);
+        std::fs::write(&path, json).map_err(|e| format!("{}: {e}", path.display()))
+    }
+
+    /// Opens the tabs of the normal quits before again (ADR 0175), and
+    /// deletes their session folders. Returns the number of tabs.
+    pub fn restore_tabs(&mut self) -> usize {
+        let Some(root) = self.backups.root.clone() else {
+            return 0;
+        };
+        let own = self.backups.session_dir();
+        let mut front = None;
+        let mut count = 0;
+        let mut missing = Vec::new();
+        for (dir, closed) in find_closed(&root, own.as_deref()) {
+            for (k, t) in closed.tabs.iter().enumerate() {
+                let opened = match (t.backup, &t.file) {
+                    (Some(id), file) => match project::load(&dir.join(format!("{id}.{}", project::FILE_EXTENSION))) {
+                        Ok(d) => {
+                            self.start_design(d);
+                            self.file_path = file.clone();
+                            if t.changed {
+                                self.doc.mark_unsaved();
+                            }
+                            true
+                        }
+                        Err(_) => false,
+                    },
+                    (None, Some(file)) if file.is_file() => {
+                        self.open_path(file);
+                        self.file_path.as_deref() == Some(file.as_path())
+                    }
+                    _ => false,
+                };
+                if !opened {
+                    missing.push(t.name.clone());
+                    continue;
+                }
+                count += 1;
+                self.view = crate::canvas::CanvasView {
+                    center: emb_geom::Point::new(t.view.0, t.view.1),
+                    zoom: t.view.2,
+                };
+                self.fit_requested = false;
+                if k == closed.front {
+                    front = Some(self.active_tab);
+                }
+            }
+            std::fs::remove_dir_all(&dir).ok();
+        }
+        if let Some(i) = front {
+            self.switch_tab(i);
+        }
+        if count > 0 {
+            self.message = crate::i18n::fill("The tabs of the last time are open again: {}", &[&count]);
+        }
+        if !missing.is_empty() {
+            self.message = crate::i18n::fill(
+                "These designs of the last time could not open again: {}",
+                &[&missing.join(", ")],
+            );
+        }
+        count
+    }
+
     /// A normal exit: the session folder goes.
     pub fn backups_clean_exit(&mut self) {
         if let Some(dir) = self.backups.session_dir() {
@@ -368,6 +570,110 @@ mod tests {
         let d = std::env::temp_dir().join(format!("emb-backups-{name}-{}", std::process::id()));
         std::fs::remove_dir_all(&d).ok();
         d
+    }
+
+    /// A harness with one blank tab and backups in `r`.
+    fn blank_with_backups(r: &Path) -> Harness {
+        let mut h = Harness::empty();
+        while h.st.tab_count() > 1 {
+            h.st.switch_tab(0);
+            h.st.close_tab();
+        }
+        assert!(h.st.is_blank());
+        h.st.backups = Backups::new(Some(r.to_path_buf()));
+        h
+    }
+
+    /// A design with one run, named `name`.
+    fn small(name: &str) -> emb_model::Design {
+        let mut d = emb_model::Design::new(name);
+        let t = d.add_thread("Red", emb_model::Rgb(200, 0, 0));
+        d.add_object(
+            t,
+            emb_model::ObjectKind::Running {
+                path: emb_geom::Path::new()
+                    .move_to(emb_geom::Point::ZERO)
+                    .line_to(emb_geom::Point::new(20.0, 0.0)),
+                params: Default::default(),
+            },
+        );
+        d
+    }
+
+    /// The exit test of P22 Milestone 8 (ADR 0175): a quit with three tabs
+    /// (one with changes that are not saved) gives the three tabs, the
+    /// changes, the views and the same tab in front at the next start,
+    /// with no question; it is not a crash.
+    #[test]
+    fn a_quit_keeps_the_tabs_and_the_next_start_opens_them() {
+        let r = root("tabs");
+        std::fs::create_dir_all(&r).unwrap();
+        let first = r.join("first.embproj");
+        let third = r.join("third.embproj");
+        project::save(&small("First"), &first).unwrap();
+        project::save(&small("Third"), &third).unwrap();
+        let mut a = blank_with_backups(&r);
+        a.st.open_path(&first);
+        a.st.start_design(small("Second"));
+        a.st.doc.edit("Add", |d| {
+            let t = d.threads[0].id;
+            d.add_object(
+                t,
+                emb_model::ObjectKind::Running {
+                    path: emb_geom::Path::new()
+                        .move_to(emb_geom::Point::new(0.0, 5.0))
+                        .line_to(emb_geom::Point::new(20.0, 5.0)),
+                    params: Default::default(),
+                },
+            );
+        });
+        a.st.view = crate::canvas::CanvasView {
+            center: emb_geom::Point::new(5.0, 6.0),
+            zoom: 2.5,
+        };
+        a.st.open_path(&third);
+        assert_eq!(a.st.tab_count(), 3);
+        a.st.switch_tab(1);
+        a.st.request(crate::file::Pending::Quit);
+        assert!(a.st.close_now, "the quit asks nothing");
+        assert!(a.st.confirm.is_none());
+        // A normal quit is not a crash.
+        assert!(find_recoverable(&r, None, unix_now() + STALE_S + 10).is_empty());
+        assert_eq!(find_closed(&r, None).len(), 1);
+        // The next start.
+        let mut b = blank_with_backups(&r);
+        assert_eq!(b.st.restore_tabs(), 3);
+        assert_eq!(b.st.tab_count(), 3);
+        assert_eq!(b.st.active_tab, 1, "the same tab in front");
+        assert_eq!(b.st.doc.design().name, "Second");
+        assert_eq!(b.st.doc.design().objects().len(), 2, "the changes");
+        assert!(b.st.doc.is_modified());
+        assert!(b.st.file_path.is_none());
+        assert_eq!(b.st.view.zoom, 2.5);
+        assert_eq!(b.st.view.center, emb_geom::Point::new(5.0, 6.0));
+        b.st.switch_tab(0);
+        assert_eq!(b.st.file_path.as_deref(), Some(first.as_path()));
+        assert!(!b.st.doc.is_modified());
+        b.st.switch_tab(2);
+        assert_eq!(b.st.file_path.as_deref(), Some(third.as_path()));
+        // The session folder of the quit is gone.
+        assert!(find_closed(&r, None).is_empty());
+        std::fs::remove_dir_all(&r).ok();
+    }
+
+    /// With the option off, a quit asks about the changes as before.
+    #[test]
+    fn with_the_option_off_a_quit_asks() {
+        let r = root("asks");
+        let mut a = blank_with_backups(&r);
+        a.st.settings.restore_tabs = false;
+        a.st.start_design(small("Changed"));
+        a.st.doc.mark_unsaved();
+        a.st.request(crate::file::Pending::Quit);
+        assert!(!a.st.close_now);
+        assert_eq!(a.st.confirm, Some(crate::file::Pending::Quit));
+        assert!(find_closed(&r, None).is_empty());
+        std::fs::remove_dir_all(&r).ok();
     }
 
     #[test]

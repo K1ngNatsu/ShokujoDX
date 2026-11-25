@@ -39,6 +39,12 @@ Optionen. Änderungen gelten sofort und bleiben für den nächsten Start.
 - **Automatische Sicherung**: Designs mit Änderungen kommen alle 1 bis 60
   Minuten (am Anfang 2) in einen Sicherungsordner, oder **aus**. Nach einem
   Absturz bietet das Programm an, sie wiederherzustellen.
+- **Offene Tabs**: mit **Beim nächsten Start wieder öffnen** (am Anfang
+  an) behält Beenden die offenen Designs mit ihren Änderungen, und der
+  nächste Start öffnet sie wieder.
+- **Dateien**: mit **Im laufenden Programm öffnen** (am Anfang an) öffnet
+  sich eine Datei, die Sie öffnen, während das Programm läuft, in einem
+  Tab davon.
 - **Sicherheitsabstand im Rahmen**: der Abstand innerhalb des
   Rahmenfelds. Stiche außerhalb davon bekommen eine Warnung.
 

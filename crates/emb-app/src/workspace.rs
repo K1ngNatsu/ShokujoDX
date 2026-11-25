@@ -389,6 +389,12 @@ pub struct Settings {
     pub template: Option<String>,
     /// Minutes between automatic backups. 0: no backups.
     pub backup_minutes: u32,
+    /// A quit keeps the open tabs, with their changes that are not saved,
+    /// and the next start opens them again (P22 Milestone 8, ADR 0175).
+    pub restore_tabs: bool,
+    /// A file that is opened while the program runs opens in a tab of that
+    /// program (P22 Milestone 8, ADR 0175).
+    pub one_program: bool,
     /// Sew times that the user set, by machine id.
     pub sew_times: std::collections::BTreeMap<String, emb_model::SewTimes>,
     /// Screen calibration: real mm on screen per mm at 100 % zoom (1.0:
@@ -498,6 +504,8 @@ impl Default for Settings {
             output: Default::default(),
             template: None,
             backup_minutes: 2,
+            restore_tabs: true,
+            one_program: true,
             sew_times: Default::default(),
             screen_calibration: 1.0,
             dark_mode: true,
@@ -1466,6 +1474,18 @@ pub fn options_window(ctx: &egui::Context, st: &mut AppState) {
                             }),
                     )
                     .on_hover_text(tr("Designs with unsaved changes are saved to a backup folder. After a crash the app offers to recover them."));
+                    ui.end_row();
+                    ui.label(tr("Open tabs"));
+                    ui.checkbox(&mut s.restore_tabs, tr("Open them again at the next start"))
+                        .on_hover_text(tr(
+                            "Quit keeps the open designs with their changes that are not saved, and asks nothing. The next start opens them again.",
+                        ));
+                    ui.end_row();
+                    ui.label(tr("Files"));
+                    ui.checkbox(&mut s.one_program, tr("Open in the program that runs"))
+                        .on_hover_text(tr(
+                            "A file that you open while the program runs (a double-click, Open with) opens in a tab of that program. The command line option --new-window starts a second program.",
+                        ));
                     ui.end_row();
                     ui.label(tr("Hoop safety margin"));
                     let mut m = st.margin_mm;

@@ -37,6 +37,11 @@ sets all options back.
 
 - **Automatic backup**: designs with changes go to a backup folder every
   1 to 60 minutes (2 at the start), or **off**. After a crash, the program offers to recover them.
+- **Open tabs**: with **Open them again at the next start** (on at the
+  start), a quit keeps the open designs with their changes, and the next
+  start opens them again.
+- **Files**: with **Open in the program that runs** (on at the start), a
+  file that you open while the program runs opens in a tab of it.
 - **Hoop safety margin**: the distance inside the hoop field. Stitches
   outside it get a warning.
 
