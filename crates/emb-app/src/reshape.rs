@@ -73,6 +73,21 @@ fn target(st: &AppState) -> Option<DesignObject> {
     d.object(id).cloned()
 }
 
+/// `true` if Reshape can edit the nodes of the selection: one object with
+/// paths or single stones, not a sketch and not made from one. Edit Nodes
+/// in the object menu and in Object Properties use it.
+pub fn can_edit_nodes(st: &AppState) -> bool {
+    target(st).is_some_and(|o| {
+        !matches!(o.kind, ObjectKind::Sketch(_) | ObjectKind::CrossStitch(_))
+            && (stone_nodes(&o.kind).is_some() || o.kind.paths().next().is_some())
+    })
+}
+
+/// Edit Nodes: the Reshape tool on the selected object.
+pub fn edit_nodes(st: &mut AppState) {
+    st.set_tool(crate::draw::Tool::Reshape);
+}
+
 /// Returns `true` if the selected object follows its sketch.
 fn follows_sketch(st: &AppState) -> bool {
     st.selection
@@ -488,8 +503,9 @@ pub fn handle_input(ui: &egui::Ui, response: &egui::Response, st: &mut AppState,
         }
     }
 
-    // Right click: the Reshape menu for what is under the pointer.
-    if response.secondary_clicked() {
+    // Right click (a long press on a touch screen): the Reshape menu for
+    // what is under the pointer.
+    if response.secondary_clicked() || response.long_touched() {
         st.reshape_menu_hit = hover.map(MenuHit::from);
         if let (None, Some(pos)) = (hover, response.interact_pointer_pos())
             && let Some(id) = canvas::pick(st, map.view.to_mm(map.rect, pos))
@@ -695,6 +711,50 @@ mod tests {
 
     fn outer(h: &Harness, id: ObjectId) -> NodePath {
         NodePath::from_path(h.st.doc.design().object(id).unwrap().kind.paths().next().unwrap())
+    }
+
+    /// A line drawn by hand: its object menu and Object Properties have
+    /// Edit Nodes, which starts Reshape on it; a sketch has no such item.
+    #[test]
+    fn edit_nodes_is_in_the_object_menu_and_the_properties() {
+        let mut h = Harness::empty();
+        let id = h.st.doc.edit("Add", |d| {
+            let t = d.add_thread("Red", emb_model::Rgb(200, 0, 0));
+            d.add_object(
+                t,
+                ObjectKind::Running {
+                    path: Path::new()
+                        .move_to(Point::new(-20.0, 0.0))
+                        .line_to(Point::new(0.0, 10.0))
+                        .line_to(Point::new(20.0, 0.0)),
+                    params: Default::default(),
+                },
+            )
+        });
+        h.st.zoom_to = Some(BBox::new(Point::new(-30.0, -30.0), Point::new(30.0, 30.0)));
+        h.frame(vec![]);
+        assert!(!can_edit_nodes(&h.st), "no selection");
+        // A right click on the line selects it and opens its menu.
+        let at = h.screen(Point::new(-10.0, 5.0));
+        h.click(PointerButton::Secondary, at);
+        assert_eq!(h.st.selection.single(), Some(id));
+        assert!(can_edit_nodes(&h.st));
+        let item = h
+            .widget("Edit Nodes")
+            .expect("Edit Nodes in the object menu and the properties");
+        h.click(PointerButton::Primary, item.center());
+        assert_eq!(h.st.tool, Tool::Reshape);
+        assert_eq!(h.st.selection.single(), Some(id), "Reshape edits the line");
+        // A cross-stitch object has no nodes to edit.
+        let cross = h.st.doc.edit("Add", |d| {
+            let t = d.add_thread("Blue", emb_model::Rgb(0, 0, 200));
+            d.add_object(
+                t,
+                ObjectKind::CrossStitch(Box::new(emb_model::cross::CrossStitch::new(Point::ZERO, 2.0))),
+            )
+        });
+        h.st.selection.set(cross);
+        assert!(!can_edit_nodes(&h.st));
     }
 
     #[test]

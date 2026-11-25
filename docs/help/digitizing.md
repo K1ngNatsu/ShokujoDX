@@ -121,7 +121,9 @@ a cover satin. See [Tutorial: an appliqué](tutorial-applique).
 
 ## Change the shape: Reshape
 
-1. Select the object and click **Reshape** (Digitize > Select).
+1. Select the object and click **Reshape** (Digitize > Select). Or
+   right-click the object (on a touch screen: touch and hold it) and click
+   **Edit Nodes**, or click **Edit Nodes** in Object Properties.
 2. Drag a node to move it. Squares are corners; circles are curve nodes.
 3. Drag a handle to change a curve. **Alt** while you drag makes a
    corner. Double-click a node to change it between corner and curve.

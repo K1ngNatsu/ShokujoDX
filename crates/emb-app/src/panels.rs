@@ -196,7 +196,19 @@ fn object_properties(ui: &mut egui::Ui, st: &mut AppState) {
         return;
     };
 
-    ui.heading(tr(obj.type_name()));
+    ui.horizontal(|ui| {
+        ui.heading(tr(obj.type_name()));
+        // The nodes of the object: the Reshape tool (as in the object menu).
+        if st.tool != crate::draw::Tool::Reshape
+            && crate::reshape::can_edit_nodes(st)
+            && ui
+                .button(tr("Edit Nodes"))
+                .on_hover_text(crate::draw::Tool::Reshape.tooltip())
+                .clicked()
+        {
+            crate::reshape::edit_nodes(st);
+        }
+    });
     thread_picker(ui, st, &[id]);
     ui.separator();
     transform_section(ui, st, &[id]);
