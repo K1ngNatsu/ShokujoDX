@@ -62,6 +62,8 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
     .open(&mut open)
     .collapsible(false)
     .resizable(false)
+    // Room for the list (egui gives a fixed window 420 points).
+    .default_height(crate::dock::list_height(st.canvas_rect, 640.0))
     .show(ctx, |ui| {
         egui::ScrollArea::vertical().max_height(560.0).show(ui, |ui| {
             ui.label(tr(

@@ -23,6 +23,12 @@ thread_local! {
 #[cfg(test)]
 pub const PANEL_KEY: &str = "panel: ";
 
+/// The start of the name in `RECTS` of the arrow of a drop-down button,
+/// for each command under it that the button does not show (then its
+/// name): a test clicks the arrow, then the command in the menu.
+#[cfg(test)]
+pub const MORE_KEY: &str = "more: ";
+
 pub(super) fn note_rect(_label: &str, _rect: Rect) {
     #[cfg(test)]
     RECTS.with(|r| r.borrow_mut().push((_label.to_string(), _rect)));
@@ -239,6 +245,10 @@ pub(super) fn split_large(ui: &mut egui::Ui, st: &mut AppState, s: &SelInfo, key
         let (rect, resp) = ui.allocate_exact_size(vec2(12.0, LARGE.y), sense(enabled));
         let more = crate::i18n::fill("More: {}", &[&cmd.meta().1]);
         let resp = crate::a11y::named(resp, &more).on_hover_text(&more);
+        #[cfg(test)]
+        for c in cmds.iter().filter(|c| **c != cmd) {
+            note_rect(&format!("{MORE_KEY}{}", c.meta().1), rect);
+        }
         note_focus(ui, &resp);
         frame(ui, rect, &resp, false, enabled);
         let (fg, _) = colors(ui, enabled);

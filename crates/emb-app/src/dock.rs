@@ -85,6 +85,20 @@ pub fn dock_of(ctx: &egui::Context, id: Id) -> Dock {
 /// Sets where `window` (with the id `id`) goes in this frame: at its
 /// corner of `canvas` if it is docked, else where it is. Call it on each
 /// command window before `show`, in the same order in each frame.
+/// The height that a window with a long scroll list can take at a corner
+/// of the canvas: `want`, or less on a small screen (the canvas less the
+/// title bar and the margins). egui gives a window that is not resizable
+/// 420 points for its contents unless it sets `default_height`; with no
+/// canvas yet (the first frame), the window keeps that.
+pub fn list_height(canvas: Option<Rect>, want: f32) -> f32 {
+    canvas.map_or(want.min(EGUI_HEIGHT), |c| {
+        (c.height() - 2.0 * MARGIN - 40.0).clamp(EGUI_HEIGHT.min(want), want)
+    })
+}
+
+/// The height that egui gives a window by default.
+const EGUI_HEIGHT: f32 = 420.0;
+
 pub fn docked<'a>(window: egui::Window<'a>, ctx: &egui::Context, id: Id, canvas: Option<Rect>) -> egui::Window<'a> {
     let window = window.drag_area(egui::WindowDrag::Anywhere);
     let Some(canvas) = canvas else {
@@ -152,6 +166,17 @@ mod tests {
         min: Pos2::new(100.0, 100.0),
         max: Pos2::new(900.0, 700.0),
     };
+
+    /// A window with a long list is as high as it wants on a large screen,
+    /// and fits the canvas on a small one.
+    #[test]
+    fn a_list_window_fits_the_canvas() {
+        let canvas = |h: f32| Some(Rect::from_min_size(pos2(0.0, 100.0), vec2(800.0, h)));
+        assert_eq!(list_height(None, 640.0), 420.0);
+        assert_eq!(list_height(canvas(1000.0), 640.0), 640.0);
+        assert_eq!(list_height(canvas(500.0), 640.0), 444.0);
+        assert_eq!(list_height(canvas(300.0), 640.0), 420.0);
+    }
 
     #[test]
     fn a_window_near_a_corner_docks_there() {

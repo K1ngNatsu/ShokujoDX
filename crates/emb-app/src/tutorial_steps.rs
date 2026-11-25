@@ -102,7 +102,8 @@ struct Step {
     /// "25"]` (a number field or a text field on the row of the label).
     set: Option<[String; 2]>,
     /// Choose an item of the list after the English label: `["Baseline",
-    /// "Arc over"]` (the item in English too).
+    /// "Arc over"]` (the item in English too; or the start of the item
+    /// before a space, as `button`).
     choose: Option<[String; 2]>,
     /// Check the design and the program.
     expect: Option<Expect>,
@@ -115,7 +116,8 @@ struct Step {
     /// The English title of the ribbon panel in a picture of a panel.
     panel: Option<String>,
     /// The part of the design in a picture of the canvas (mm, two corners);
-    /// with none, the whole design and 5 mm round it.
+    /// with none, the whole design (with the product that shows) and 5 mm
+    /// round it.
     around: Option<[[f64; 2]; 2]>,
     /// The widgets in a picture of the area `widgets` (English names).
     widgets: Vec<String>,
@@ -157,6 +159,19 @@ struct Expect {
     hoopings: Option<usize>,
     /// The number of rows of the team names.
     names: Option<usize>,
+    /// The number of threads in the thread stock.
+    stock: Option<usize>,
+    /// The product under the design (its English name, `ProductKind::name`)
+    /// and the place of the design on it.
+    product: Option<[String; 2]>,
+    /// Sketch mode is open (or not).
+    sketch: Option<bool>,
+    /// The number of closed regions of the open sketch.
+    regions: Option<usize>,
+    /// The spacing of each satin column (mm, within 0.001 mm).
+    spacing: Option<f64>,
+    /// The id of the hoop of the design (`data/hoops.toml`).
+    hoop: Option<String>,
 }
 
 /// The step files: the id of the tutorial and the text of its steps.
@@ -419,6 +434,21 @@ impl Runner {
             .cloned()
     }
 
+    /// The item `name` of an open list: the item of that name, else the
+    /// item whose name starts with `name` and a space ("Same Density for
+    /// All Satins (sample)", where the end is in the language of now).
+    fn list_item(&self, name: &str) -> Option<Node> {
+        self.in_window(name).or_else(|| {
+            let windows = self.windows();
+            let field = self.field_parts();
+            let start = format!("{name} ");
+            self.nodes
+                .iter()
+                .find(|n| n.name.starts_with(&start) && !field(n) && windows.iter().any(|w| w.contains_rect(n.rect)))
+                .cloned()
+        })
+    }
+
     /// A test for a text field or a part of its text: the name of such a
     /// widget is the text in the field, not a name to click.
     fn field_parts(&self) -> impl Fn(&Node) -> bool + use<> {
@@ -494,7 +524,32 @@ impl Runner {
     /// The widget of one of `roles` after the label `label`, on its row
     /// (a label in a window first).
     fn after_label(&self, label: &str, roles: &[Role]) -> Result<Node, String> {
-        let l = self.button_node(label)?;
+        // A label of that name with such a field on its row (a window can
+        // have the name two times: "Quantity" of a field and of a column);
+        // in a window first.
+        let windows = self.windows();
+        let in_window = |n: &Node| windows.iter().any(|w| w.contains_rect(n.rect));
+        let field = self.field_parts();
+        let mut labels: Vec<Node> = self
+            .nodes
+            .iter()
+            .filter(|n| n.name == label && !field(n))
+            .cloned()
+            .collect();
+        labels.sort_by_key(|n| !in_window(n));
+        if labels.is_empty() {
+            labels.push(self.button_node(label)?);
+        }
+        labels
+            .iter()
+            .find_map(|l| self.field_after(l, roles))
+            .ok_or_else(|| format!("no field after \"{label}\""))
+    }
+
+    /// The widget with one of `roles` right of the label `l` on its row, or
+    /// left of it (a list made with `ComboBox::from_label` has its label
+    /// after it).
+    fn field_after(&self, l: &Node, roles: &[Role]) -> Option<Node> {
         let row: Vec<&Node> = self
             .nodes
             .iter()
@@ -505,16 +560,12 @@ impl Runner {
             .iter()
             .filter(|n| n.rect.left() >= l.rect.right() - 1.0)
             .min_by(|a, b| a.rect.left().total_cmp(&b.rect.left()));
-        // A list made with `ComboBox::from_label` has its label after it.
         let left = || {
             row.iter()
                 .filter(|n| n.rect.right() <= l.rect.left() + 1.0)
                 .max_by(|a, b| a.rect.right().total_cmp(&b.rect.right()))
         };
-        right
-            .or_else(left)
-            .map(|n| (*n).clone())
-            .ok_or_else(|| format!("no field after \"{label}\""))
+        right.or_else(left).map(|n| (*n).clone())
     }
 
     /// Sets the field after `label` to `value`: a click on it, all its
@@ -550,33 +601,53 @@ impl Runner {
     /// none, scrolls down with the wheel of the mouse (as a user does).
     fn choose(&mut self, label: &str, item: &str) -> Result<(), String> {
         let list = self.after_label(label, &[Role::ComboBox])?;
+        let before = self.windows();
+        let fields: Vec<Rect> = self
+            .nodes
+            .iter()
+            .filter(|n| TEXT_FIELDS.contains(&n.role))
+            .map(|n| n.rect)
+            .collect();
         self.click_at(list.rect.center(), Modifiers::NONE);
-        if self.in_window(item).is_none() {
-            if let Ok(search) = self.text_field(tr("Search")) {
+        // The open list: the area that was not there before the click (it
+        // opens under the list button, or over it near the bottom). An item
+        // shows when it is all in it (not under the window behind it).
+        let open = self.windows().into_iter().find(|w| !before.contains(w));
+        let shown = |r: &Runner| {
+            r.list_item(item)
+                .filter(|n| open.is_none_or(|o| o.expand(1.0).contains_rect(n.rect)))
+        };
+        if shown(self).is_none() {
+            // The search field of the list: a field that came with it (not
+            // a field of the window under it).
+            let search = self.text_field(tr("Search")).ok().filter(|f| !fields.contains(&f.rect));
+            if let Some(search) = search {
                 self.click_select_all(&search);
                 self.frame(vec![Event::Text(item.to_string())]);
                 self.settle();
             } else {
-                // The open list is under the list button.
-                let at = list.rect.center_bottom() + Vec2::new(0.0, 40.0);
-                for _ in 0..40 {
-                    if self.in_window(item).is_some() {
+                let at = open.map_or(list.rect.center_bottom() + Vec2::new(0.0, 40.0), |r| r.center());
+                for _ in 0..80 {
+                    if shown(self).is_some() {
                         break;
                     }
                     self.frame(vec![
                         Event::PointerMoved(at),
                         Event::MouseWheel {
                             unit: egui::MouseWheelUnit::Point,
-                            delta: Vec2::new(0.0, -40.0),
+                            delta: Vec2::new(0.0, -30.0),
                             phase: egui::TouchPhase::Move,
                             modifiers: Modifiers::NONE,
                         },
                     ]);
-                    self.frame(Vec::new());
+                    // Frames until the list stops (it scrolls smoothly).
+                    for _ in 0..4 {
+                        self.frame(Vec::new());
+                    }
                 }
             }
         }
-        let n = self.in_window(item).ok_or_else(|| {
+        let n = shown(self).ok_or_else(|| {
             format!(
                 "no item \"{item}\" in the list \"{label}\" (the windows have {:?})",
                 self.window_names()
@@ -646,13 +717,25 @@ impl Runner {
             if !s.check_only {
                 // A panel that does not fit is one button; a click on it
                 // shows the panel.
-                if Self::ribbon_rect(label, true).is_none() {
+                let more = format!("{}{label}", crate::ribbon::MORE_KEY);
+                if Self::ribbon_rect(label, true).is_none() && Self::ribbon_rect(&more, true).is_none() {
                     let folded = format!("{} {}", tr(panel), egui_phosphor::regular::CARET_DOWN);
                     let rect = Self::ribbon_rect(&folded, true).ok_or_else(|| format!("no button \"{label}\""))?;
                     self.click_at(rect.center(), Modifiers::NONE);
                 }
-                let rect = Self::ribbon_rect(label, true).ok_or_else(|| format!("no button \"{label}\""))?;
-                self.click_at(rect.center(), Modifiers::NONE);
+                match Self::ribbon_rect(label, true) {
+                    Some(rect) => self.click_at(rect.center(), Modifiers::NONE),
+                    // A command under the arrow of a drop-down button: the
+                    // arrow, then the command in its menu.
+                    None => {
+                        let arrow = Self::ribbon_rect(&more, true).ok_or_else(|| format!("no button \"{label}\""))?;
+                        self.click_at(arrow.center(), Modifiers::NONE);
+                        let item = self
+                            .in_window(label)
+                            .ok_or_else(|| format!("no \"{label}\" under the arrow"))?;
+                        self.click_at(item.rect.center(), Modifiers::NONE);
+                    }
+                }
             }
         }
         if let Some(name) = &s.thread {
@@ -782,6 +865,12 @@ impl Runner {
             }
         }
         let st = self.app.state();
+        if let Some(n) = e.regions {
+            let now = st.sketch_regions().len();
+            if now != n {
+                bad.push(format!("{now} regions, not {n}"));
+            }
+        }
         let d = st.doc.design();
         if let Some(id) = &e.fabric
             && d.fabric.as_deref() != Some(id.as_str())
@@ -811,6 +900,48 @@ impl Runner {
             let now = d.team_names.as_ref().map_or(0, |t| t.rows.len());
             if now != n {
                 bad.push(format!("{now} rows of names, not {n}"));
+            }
+        }
+        if let Some(id) = &e.hoop {
+            let now = match &d.hoop.selection {
+                emb_model::HoopSelection::Preset { id } => id.as_str(),
+                emb_model::HoopSelection::OpenField => "open field",
+            };
+            if now != id {
+                bad.push(format!("the hoop is {now}, not {id}"));
+            }
+        }
+        if let Some(want) = e.spacing {
+            let now: Vec<f64> = d
+                .objects()
+                .iter()
+                .filter_map(|o| match &o.kind {
+                    emb_model::ObjectKind::Satin { params, .. } => Some(params.spacing_mm),
+                    _ => None,
+                })
+                .collect();
+            if now.is_empty() || now.iter().any(|v| (v - want).abs() > 0.001) {
+                bad.push(format!("the satin spacings are {now:?}, not {want}"));
+            }
+        }
+        if let Some([kind, place]) = &e.product {
+            let now = d
+                .product
+                .as_ref()
+                .map(|v| (v.kind.name(), v.placement_of(d).map(|p| p.name)));
+            if now != Some((kind.as_str(), Some(place.as_str()))) {
+                bad.push(format!("the product is {now:?}, not {kind} at {place}"));
+            }
+        }
+        if let Some(open) = e.sketch
+            && st.sketch.is_some() != open
+        {
+            bad.push(format!("sketch mode is {}", if open { "not open" } else { "open" }));
+        }
+        if let Some(n) = e.stock {
+            let now = st.settings.thread_stock.threads.len();
+            if now != n {
+                bad.push(format!("{now} threads in stock, not {n}"));
             }
         }
         if let Some(n) = e.warnings {
@@ -861,7 +992,12 @@ impl Runner {
                 let [a, b] = match s.around {
                     Some(around) => around,
                     None => {
-                        let e = self.app.state().doc.design().extents().ok_or("the design is empty")?;
+                        let d = self.app.state().doc.design();
+                        let product = d.product.as_ref().filter(|v| v.visible).map(|v| v.bbox());
+                        let e = match (d.extents(), product) {
+                            (Some(e), Some(p)) => e.union(p),
+                            (e, p) => e.or(p).ok_or("the design is empty")?,
+                        };
                         let e = e.expand(5.0);
                         [[e.min.x, e.min.y], [e.max.x, e.max.y]]
                     }

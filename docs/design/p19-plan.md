@@ -362,6 +362,35 @@ next release.
   program off to a later phase (2026-11-24: "we're not bloated, I'd
   rather not deal with optimization yet"), so they stay in the program
   for now (`docs/design/open-work.md`).
+- **Milestone 5: made (2026-11-25, ADR 0162).** Path 6 has two new
+  tutorials: "A multi-needle order" (the needles of a 15-needle machine,
+  threads of a chart in the stock and Use Threads in Stock, the order
+  details, the heads and the run time, the threads to buy, the
+  worksheet) and "A quote with a product picture" (a polo shirt and the
+  left chest, a price list with a quantity price, the quote, the
+  approval sheet with its product page). Path 7 has two: "A badge in
+  sketch mode" (two circles and a hexagon, two diameters, fills and a
+  satin from the regions, a changed diameter that the stitches follow)
+  and "A script that does the work" (Check Before Output, Same Density
+  for All Satins, one undo step, a script of your own). 31 tutorials run
+  in CI in four languages; the pictures are 154 files, 16 MB. The steps
+  found faults of the program, now fixed: the "Add from a chart" part of
+  the Thread Stock window went out of sight when the stock had threads
+  (it is now first), and the windows Thread Stock, Quote and Order
+  Details showed only 420 points of their lists (egui gives a window
+  that is not resizable its default height); in German, Redo and Repeat
+  had the same name (Redo is now "Wiederherstellen"); one head and one
+  spool had plural texts; the worksheet cut the code of a thread
+  ("Madeira Polyneon 1" for 1967; now a long brand gets shorter and the
+  code stays whole), and a long label of a translation ran into its
+  value (the values now start after the longest label); a new machine
+  kept a hoop that does not go on it (the worksheet showed the Tajima
+  in the Crown hoop of the Topaz; the owner saw it): the hoop now
+  changes to the smallest hoop of the machine that holds the design
+  (`AppState::hoop_for_machine`). The pictures showed a fault that stays open:
+  the travel between the sections of a fill with a hole shows as a ridge
+  in the 3D look (`docs/design/open-work.md`). The steps do not save a
+  quote sheet, a PDF or a copy of a script (they write files).
 
 ### Answers to the open questions
 

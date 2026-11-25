@@ -40,6 +40,8 @@ pub const SAMPLES: &[(&str, &str)] = &[
     ("quilt-heart", "Quilt heart"),
     ("cap-front", "Cap front"),
     ("cutwork-circle", "Cutwork circle"),
+    ("club-crest", "Club crest"),
+    ("sketch-start", "Sketch badge"),
 ];
 
 /// The prefix of a link to a start design in a help topic.
@@ -148,6 +150,28 @@ pub const QUILT_WAVE: [Point; 5] = [
     Point { x: 10.0, y: 80.0 },
     Point { x: 20.0, y: 85.0 },
 ];
+
+/// The club crest of the production tutorials and of `tutorial-script`:
+/// a navy disc (its radius), a gold satin ring round it (the inner and the
+/// outer radius), a white star in it (two corners of its box) and a red
+/// chevron under the star (the two rails). The ring and the chevron have
+/// different satin spacings (mm), for the script that makes them the same.
+pub const CREST_DISC: f64 = 34.0;
+pub const CREST_RING: (f64, f64) = (33.0, 37.5);
+pub const CREST_STAR: [Point; 2] = [Point { x: -17.0, y: -22.0 }, Point { x: 17.0, y: 12.0 }];
+pub const CREST_CHEVRON: [[Point; 3]; 2] = [
+    [
+        Point { x: -16.0, y: 16.0 },
+        Point { x: 0.0, y: 23.0 },
+        Point { x: 16.0, y: 16.0 },
+    ],
+    [
+        Point { x: -16.0, y: 21.0 },
+        Point { x: 0.0, y: 28.0 },
+        Point { x: 16.0, y: 21.0 },
+    ],
+];
+pub const CREST_SPACINGS: (f64, f64) = (0.3, 0.55);
 
 /// The width of the satin column of Column C (the default of the settings).
 const COLUMN_C_MM: f64 = 3.0;
@@ -599,6 +623,59 @@ pub fn design(name: &str) -> Option<Design> {
             emb_letter::relayout(&mut l, &font);
             d.add_object(red, ObjectKind::Lettering(Box::new(l)));
         }
+        // The club crest: a navy disc with a hole for the white star, a red
+        // chevron and a gold satin ring last (it covers the edge of the
+        // disc). Four colors, for a multi-needle machine.
+        "club-crest" => {
+            let navy = d.add_thread("Navy", Rgb(25, 35, 90));
+            let white = d.add_thread("White", Rgb(245, 245, 245));
+            let red = d.add_thread("Red", Rgb(200, 30, 45));
+            let gold = d.add_thread("Gold", Rgb(230, 170, 40));
+            let [a, b] = CREST_STAR;
+            let star = crate::draw::star(emb_geom::BBox::new(a, b), 5);
+            d.add_object(
+                navy,
+                fill(Path::ellipse(Point::ZERO, CREST_DISC, CREST_DISC), vec![star.clone()]),
+            );
+            d.add_object(white, fill(star, Vec::new()));
+            let (ring, chevron) = CREST_SPACINGS;
+            let [rail_a, rail_b] = CREST_CHEVRON.map(|[a, b, c]| Path::new().move_to(a).line_to(b).line_to(c));
+            d.add_object(
+                red,
+                ObjectKind::Satin {
+                    geometry: SatinGeometry {
+                        rail_a,
+                        rail_b,
+                        rungs: vec![],
+                    },
+                    params: SatinParams {
+                        spacing_mm: chevron,
+                        ..SatinParams::default()
+                    },
+                },
+            );
+            let (inner, outer) = CREST_RING;
+            d.add_object(
+                gold,
+                ObjectKind::Satin {
+                    geometry: SatinGeometry {
+                        rail_a: Path::ellipse(Point::ZERO, outer, outer),
+                        rail_b: Path::ellipse(Point::ZERO, inner, inner),
+                        rungs: vec![],
+                    },
+                    params: SatinParams {
+                        spacing_mm: ring,
+                        ..SatinParams::default()
+                    },
+                },
+            );
+        }
+        // An empty design with the three threads of the sketch badge.
+        "sketch-start" => {
+            d.add_thread("Navy", Rgb(25, 35, 90));
+            d.add_thread("White", Rgb(245, 245, 245));
+            d.add_thread("Gold", Rgb(230, 170, 40));
+        }
         // A circle line: the edge of a hole to cut.
         "cutwork-circle" => {
             let navy = d.add_thread("Navy", Rgb(25, 35, 90));
@@ -698,6 +775,7 @@ mod tests {
         assert_eq!(d("hooping-banner").extents().unwrap().width().round(), 380.0);
         assert_eq!(d("team-shirt").objects().len(), 2);
         assert_eq!(d("vector-logo").objects().len(), 5);
+        assert_eq!(d("club-crest").sewn_color_blocks().len(), 4);
         assert_eq!(d("decor-shapes").objects().len(), 2);
         assert_eq!(d("placket").objects().len(), 1);
         assert_eq!(d("quilt-heart").objects().len(), 2);

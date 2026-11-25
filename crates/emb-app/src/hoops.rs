@@ -11,6 +11,15 @@ use emb_model::{Anchor, HoopCatalog, HoopPreset, HoopSelection, HoopShape, Merge
 
 use crate::app::AppState;
 use crate::file::Notice;
+
+/// The width and the height of the design in the frame of its hoop (with
+/// the design rotation and the hoop angle), or `None` for an empty design.
+fn size_in_hoop(d: &emb_model::Design) -> Option<(f64, f64)> {
+    let e = d.extents()?;
+    let out = d.output_transform();
+    let corners = [e.min, e.max, Point::new(e.min.x, e.max.y), Point::new(e.max.x, e.min.y)];
+    emb_geom::BBox::from_points(corners.map(|p| out.apply(p))).map(|b| (b.width(), b.height()))
+}
 use crate::i18n::tr;
 
 /// The step of the Turn hoop buttons, in degrees.
@@ -128,6 +137,42 @@ impl AppState {
     pub fn hoop_fits_machine(&self, hoop: &str) -> bool {
         let machine = self.doc.design().machine.as_deref().and_then(|m| self.machines.get(m));
         machine.is_none_or(|m| m.hoops.iter().any(|h| h == hoop)) || self.user_hoops.get(hoop).is_some()
+    }
+
+    /// The hoop that the design needs on the machine `machine`: `None` when
+    /// its hoop goes on that machine (in the list of the machine, or one of
+    /// the user's hoops) or it is in open field. Else the smallest hoop of
+    /// the machine that holds the design, or the largest if none holds it;
+    /// the first hoop for an empty design. A flat hoop stays a flat hoop and
+    /// a cap frame a cap frame, and a hoop of more than one position is not
+    /// taken.
+    pub fn hoop_for_machine(&self, machine: &str) -> Option<String> {
+        let m = self.machines.get(machine)?;
+        let d = self.doc.design();
+        let HoopSelection::Preset { id } = &d.hoop.selection else {
+            return None;
+        };
+        if m.hoops.iter().any(|h| h == id) || self.user_hoops.get(id).is_some() {
+            return None;
+        }
+        let cap = self.hoops.get(id).is_some_and(|h| h.cap);
+        let all: Vec<&HoopPreset> = m.hoops.iter().filter_map(|h| self.hoops.get(h)).collect();
+        let same: Vec<&HoopPreset> = all
+            .iter()
+            .copied()
+            .filter(|h| h.cap == cap && h.positions.is_empty())
+            .collect();
+        let list = if same.is_empty() { all } else { same };
+        let area = |h: &&HoopPreset| h.width_mm * h.height_mm;
+        let pick = match size_in_hoop(d) {
+            Some((w, h)) => list
+                .iter()
+                .filter(|p| p.fits(w, h, self.margin_mm))
+                .min_by(|a, b| area(a).total_cmp(&area(b)))
+                .or_else(|| list.iter().max_by(|a, b| area(a).total_cmp(&area(b)))),
+            None => list.first(),
+        };
+        pick.map(|h| h.id.clone())
     }
 
     /// Turns the hoop by `delta` degrees (clockwise on the screen).
@@ -912,6 +957,45 @@ mod tests {
         let (a, b) = (bbox(&before), bbox(&after));
         assert!(a.center().distance(b.center()) < 1.0, "{a:?} {b:?}");
         assert!((a.width() - b.width()).abs() < 1.0);
+    }
+
+    /// A hoop that does not go on a new machine changes to a hoop of the
+    /// machine that holds the design (a Husqvarna hoop on a Tajima machine
+    /// was on the worksheet of the multi-needle tutorial).
+    #[test]
+    fn a_new_machine_gets_a_hoop_that_goes_on_it() {
+        let mut h = Harness::empty();
+        h.st.start_on_machine("husqvarna_topaz20", None);
+        let tajima = h.st.machines.get("tajima").unwrap().clone();
+        assert_eq!(h.st.hoop_for_machine("tajima").as_ref(), tajima.hoops.first());
+        add_box(&mut h, 75.0, 75.0);
+        let id =
+            h.st.hoop_for_machine("tajima")
+                .expect("the hoop of the Topaz is not for the Tajima");
+        assert!(tajima.hoops.contains(&id));
+        let hoop = h.st.hoops.get(&id).unwrap();
+        assert!(!hoop.cap && hoop.positions.is_empty(), "{id}");
+        assert!(hoop.fits(75.0, 75.0, h.st.margin_mm), "{id}");
+        // A smaller hoop of the machine does not hold the design.
+        let area = hoop.width_mm * hoop.height_mm;
+        for other in tajima.hoops.iter().filter_map(|x| h.st.hoops.get(x)) {
+            if other.width_mm * other.height_mm < area && !other.cap && other.positions.is_empty() {
+                assert!(!other.fits(75.0, 75.0, h.st.margin_mm), "{}", other.id);
+            }
+        }
+        // A hoop of the machine and open field stay.
+        h.st.doc
+            .edit("Hoop", |d| d.hoop.selection = HoopSelection::Preset { id: id.clone() });
+        assert_eq!(h.st.hoop_for_machine("tajima"), None);
+        h.st.doc.edit("Hoop", |d| d.hoop.selection = HoopSelection::OpenField);
+        assert_eq!(h.st.hoop_for_machine("tajima"), None);
+        // A cap frame stays a cap frame.
+        h.st.start_on_machine("tajima", Some("cap_360x75"));
+        let cap = h.st.hoop_for_machine("happy");
+        assert!(
+            cap.is_none() || h.st.hoops.get(cap.as_deref().unwrap()).unwrap().cap,
+            "{cap:?}"
+        );
     }
 
     #[test]

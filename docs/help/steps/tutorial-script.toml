@@ -1,0 +1,54 @@
+# The steps of "Tutorial: a script that does the work" (tutorial-script.md).
+# The test each_tutorial_runs_in_each_language (crates/emb-app/src/
+# tutorial_steps.rs) does them in each language; write_tutorial_pictures
+# makes the pictures. A change of a step needs the same change in the topic
+# and its translations. The steps do not click Copy to My Scripts or Open
+# Scripts Folder: they write in the folder of the user. The messages of the
+# sample scripts are in English in each language (a script is a file of the
+# user).
+
+# Open the club crest: two satin columns with different spacings.
+[[step]]
+open = "club-crest"
+expect = { objects = 4, colors = 4 }
+
+# Check before output.
+[[step]]
+command = "Edit > Scripts > Scripts"
+expect = { window = "Scripts" }
+
+[[step]]
+choose = ["Script", "Check Before Output"]
+
+[[step]]
+set = ["Most colors", "3"]
+
+[[step]]
+button = "Run Script"
+expect = { shows = "4 colors: more than 3.", objects = 4 }
+
+# The same density for all satins, in one undo step.
+[[step]]
+choose = ["Script", "Same Density for All Satins"]
+
+[[step]]
+set = ["Spacing (mm)", "0.4"]
+
+[[step]]
+button = "Run Script"
+expect = { spacing = 0.4, shows = "2 satin columns now have a spacing of 0.4 mm." }
+
+[[step]]
+picture = "script-window"
+area = "windows"
+
+[[step]]
+command = "Undo"
+expect = { objects = 4 }
+
+[[step]]
+command = "Redo"
+expect = { spacing = 0.4 }
+
+[[step]]
+close = "Scripts"

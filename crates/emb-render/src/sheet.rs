@@ -680,10 +680,43 @@ fn size_line(p: &mut Page, d: &SheetData, area: BBox, scale: f64) -> f64 {
     area.max.y + 5.0
 }
 
-/// Label and value rows; long values wrap to the page margin. Returns the
-/// y below the last row.
+/// The brand and the code of a thread in `width` mm, at `size` points: the
+/// code stays whole (the operator needs it), and a long brand ends with
+/// "…".
+fn brand_and_code(brand: Option<&str>, code: Option<&str>, size: f64, width: f64) -> String {
+    let fits = |t: &str| crate::page::text_width_mm(t, size) <= width;
+    let full = match (brand, code) {
+        (Some(b), Some(k)) => format!("{b} {k}"),
+        (Some(b), None) => b.to_string(),
+        (None, Some(k)) => k.to_string(),
+        (None, None) => return String::new(),
+    };
+    if fits(&full) {
+        return full;
+    }
+    let chars: Vec<char> = brand.unwrap_or("").chars().collect();
+    for n in (1..chars.len()).rev() {
+        let short: String = chars[..n].iter().collect();
+        let t = match code {
+            Some(k) => format!("{}… {k}", short.trim_end()),
+            None => format!("{}…", short.trim_end()),
+        };
+        if fits(&t) {
+            return t;
+        }
+    }
+    code.map_or(full.clone(), str::to_string)
+}
+
+/// Label and value rows; long values wrap to the page margin. The values
+/// start after the longest label (a label can be long in a translation).
+/// Returns the y below the last row.
 fn rows(p: &mut Page, x: f64, mut y: f64, rows: &[(&str, String)]) -> f64 {
-    let vx = x + 27.0;
+    let longest = rows
+        .iter()
+        .map(|(k, _)| crate::page::text_width_mm(k, 9.0))
+        .fold(0.0, f64::max);
+    let vx = x + (longest + 2.5).max(27.0);
     let chars = ((p.width_mm - MARGIN - vx) / crate::page::text_width_mm("x", 9.5)).floor() as usize;
     for (k, v) in rows {
         p.gray_text(x, y, 9.0, k.to_string());
@@ -928,11 +961,11 @@ pub fn production(d: &SheetData, paper: Paper) -> Vec<Page> {
         MARGIN,
         MARGIN + 9.0 + shift,
         MARGIN + 22.0 + shift,
-        MARGIN + 92.0 + shift * 0.6,
+        MARGIN + 86.0 + shift * 0.6,
         MARGIN + 132.0 + shift * 0.4,
         MARGIN + 158.0 + shift * 0.2,
     ];
-    let (name_chars, brand_chars) = if with_needles { (28, 18) } else { (34, 20) };
+    let name_chars = if with_needles { 28 } else { 34 };
     let needle_x = MARGIN + 9.0;
     let table_head = |p: &mut Page, y: f64| {
         for (x, t) in col.iter().zip([
@@ -977,19 +1010,8 @@ pub fn production(d: &SheetData, paper: Paper) -> Vec<Page> {
         });
         let name: String = c.name.chars().take(name_chars).collect();
         p.text(col[2], y, 9.5, false, name);
-        let brand = match (&c.brand, &c.code) {
-            (Some(b), Some(k)) => format!("{b} {k}"),
-            (Some(b), None) => b.clone(),
-            (None, Some(k)) => k.clone(),
-            (None, None) => String::new(),
-        };
-        p.text(
-            col[3],
-            y,
-            9.5,
-            false,
-            brand.chars().take(brand_chars).collect::<String>(),
-        );
+        let brand = brand_and_code(c.brand.as_deref(), c.code.as_deref(), 9.5, col[4] - col[3] - 1.5);
+        p.text(col[3], y, 9.5, false, brand);
         p.text(col[4], y, 9.5, false, c.stitches.to_string());
         p.text(col[5], y, 9.5, false, emb_model::thread_use::length_text(c.thread_mm));
         y += 6.5;
@@ -1368,6 +1390,34 @@ mod tests {
             Paper::A4,
         );
         assert!(texts(&empty).iter().any(|x| x == "No prices are set."));
+    }
+
+    /// The code of a thread stays whole in its column (the operator needs
+    /// it); a long brand gets shorter. A long label of a translation moves
+    /// the values to the right (P19 Part 2, Milestone 5).
+    #[test]
+    fn the_code_of_a_thread_stays_whole_and_labels_fit() {
+        assert_eq!(
+            brand_and_code(Some("Madeira Polyneon"), Some("1967"), 9.5, 43.0),
+            "Madeira Polyneon 1967"
+        );
+        let t = brand_and_code(Some("Madeira Polyneon"), Some("1967"), 9.5, 30.0);
+        assert!(t.ends_with("… 1967"), "{t}");
+        assert!(crate::page::text_width_mm(&t, 9.5) <= 30.0, "{t}");
+        assert_eq!(brand_and_code(None, Some("1967"), 9.5, 5.0), "1967");
+        let mut p = Page::new(Paper::A4);
+        let label = "Tiempo de bordado de la máquina";
+        rows(&mut p, MARGIN, 50.0, &[(label, "unos 9:18".into())]);
+        let at = |t: &str| {
+            p.ops
+                .iter()
+                .find_map(|o| match o {
+                    Op::Text { at, text, .. } if text == t => Some(at.x),
+                    _ => None,
+                })
+                .unwrap()
+        };
+        assert!(at("unos 9:18") > MARGIN + crate::page::text_width_mm(label, 9.0));
     }
 
     #[test]

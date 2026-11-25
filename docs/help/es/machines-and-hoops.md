@@ -20,7 +20,10 @@ diseño. La máquina define:
 El primer inicio le pregunta por su máquina y su bastidor. Los diseños
 nuevos del inicio los usan; hasta que elija una, usan la máquina genérica
 con un bastidor de 130 × 180 mm. La máquina o el bastidor que elija en
-este panel se conservan también para el próximo inicio.
+este panel se conservan también para el próximo inicio. Si elige una
+máquina y el bastidor del diseño no es para ella, el bastidor cambia al
+bastidor más pequeño de la máquina en el que cabe el diseño (un marco de
+gorras a un marco de gorras); la línea de estado dice cuál.
 
 **Ajustes de la máquina** (Diseño > Máquina y bastidor) tiene:
 

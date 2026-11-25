@@ -142,6 +142,21 @@ where each warning is. The steps found two faults of the program: the
 Fabric list did not show its last fabrics, and puff letters had two
 layers of end stitches at their joints (ADR 0165).
 
+Milestone 5 (paths 6 and 7, four tutorials) added: `choose` scrolls in
+the list that opened (its area, also when it opens over the list button)
+and types only into a search field that came with the list, and an item
+can be the start of its name before a space ("Same Density for All
+Satins (sample)"); a field after a label is the field on the row of a
+label of that name (a window can have "Quantity" for a field and for a
+column); a command under the arrow of a drop-down button of the ribbon
+is clicked through its arrow (`ribbon::MORE_KEY`); a picture of the
+canvas has the product that shows; new checks are the threads in stock,
+the product and its place, the hoop, sketch mode, the regions of the
+sketch and the spacing of the satin columns. The start design
+`club-crest` is the design of three tutorials. The owner saw a fault in
+a picture that no check had: the worksheet showed the Tajima machine in
+a hoop of the Topaz; the multi-needle steps now check the hoop.
+
 ## Consequences
 
 - A change of the name or the place of a command, of the text of a

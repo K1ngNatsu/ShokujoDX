@@ -512,10 +512,17 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
                     if let Some(r) = run.filter(|r| r.quantity > 1) {
                         row(
                             tr("Run time"),
-                            fill(
-                                "about {} for {} pieces on {} heads",
-                                &[&emb_model::quote::duration_text(r.minutes), &r.quantity, &r.heads],
-                            ),
+                            if r.heads == 1 {
+                                fill(
+                                    "about {} for {} pieces on one head",
+                                    &[&emb_model::quote::duration_text(r.minutes), &r.quantity],
+                                )
+                            } else {
+                                fill(
+                                    "about {} for {} pieces on {} heads",
+                                    &[&emb_model::quote::duration_text(r.minutes), &r.quantity, &r.heads],
+                                )
+                            },
                         );
                     }
                 }

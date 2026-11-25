@@ -31,7 +31,7 @@ ShokujoDX makes the stitches and writes the file for your machine.
   digitizer: all the stitch types, lettering, Picture to design,
   multi-hoop layouts, production sheets and shop tools.
 - **Easy to learn.** A ribbon of commands by task, a simple mode with large
-  buttons, help on every button (push **F1**) and 27 step-by-step
+  buttons, help on every button (push **F1**) and 31 step-by-step
   tutorials, in English, German, Spanish and Japanese.
 - **Tested on real fabric.** The test designs of the first 14 roadmap
   phases sew correctly on a Husqvarna Viking Topaz 20.

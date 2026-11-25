@@ -541,11 +541,35 @@ pub(super) fn machine_hoop(ui: &mut egui::Ui, st: &mut AppState, _s: &SelInfo) {
             ui.end_row();
         });
     if let Some(m) = new_machine {
+        // A hoop that does not go on the new machine changes to a hoop of
+        // the machine, in the same undo step.
+        let hoop = st.hoop_for_machine(&m);
+        if let Some(h) = &hoop {
+            let name = |id: &str| st.hoops.get(id).map_or_else(|| id.to_string(), |p| p.name.clone());
+            let old = match &st.doc.design().hoop.selection {
+                HoopSelection::Preset { id } => name(id),
+                HoopSelection::OpenField => tr("Open field").to_string(),
+            };
+            let machine = st.machines.get(&m).map_or_else(|| m.clone(), |x| x.name.clone());
+            st.message = crate::i18n::fill(
+                "The hoop {} does not go on {}: the hoop is now {}.",
+                &[&old, &machine, &name(h)],
+            );
+            st.fit_requested = true;
+        }
         // The machine that the user picks is the machine of the next start.
         let mut s = st.settings.clone();
         s.machine = Some(m.clone());
+        if hoop.is_some() {
+            s.hoop = hoop.clone();
+        }
         st.set_settings(s);
-        st.doc.edit(tr("Change machine"), |d| d.machine = Some(m));
+        st.doc.edit(tr("Change machine"), |d| {
+            d.machine = Some(m);
+            if let Some(id) = hoop {
+                d.hoop.selection = HoopSelection::Preset { id };
+            }
+        });
     }
     if let Some(sel) = new_hoop {
         if let HoopSelection::Preset { id } = &sel {

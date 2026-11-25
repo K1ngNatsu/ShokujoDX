@@ -21,7 +21,10 @@ Beim ersten Start fragt das Programm nach Ihrer Maschine und Ihrem
 Rahmen. Neue Designs beim Start benutzen sie; bis Sie eine wählen,
 benutzen sie die allgemeine Maschine mit einem Rahmen von 130 × 180 mm.
 Eine Maschine oder einen Rahmen, die Sie in diesem Bereich wählen, behält
-das Programm auch für den nächsten Start.
+das Programm auch für den nächsten Start. Wenn Sie eine Maschine wählen
+und der Rahmen des Designs nicht auf sie passt, wechselt der Rahmen zum
+kleinsten Rahmen der Maschine, in den das Design passt (ein
+Kappenrahmen zu einem Kappenrahmen); die Statuszeile sagt, welchen.
 
 **Maschineneinstellungen** (Design > Maschine und Rahmen) hat:
 

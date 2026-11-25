@@ -245,6 +245,8 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
     .open(&mut open)
     .collapsible(false)
     .resizable(false)
+    // Room for the list (egui gives a fixed window 420 points).
+    .default_height(crate::dock::list_height(st.canvas_rect, 640.0))
     .show(ctx, |ui| {
         egui::ScrollArea::vertical().max_height(560.0).show(ui, |ui| {
             let currency = s.thread_prices.currency.clone();
@@ -437,10 +439,17 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
 
 /// The run time of an order.
 fn run_time_ui(ui: &mut egui::Ui, r: &RunTime) {
-    ui.label(fill(
-        "{} pieces on {} heads: {} cycles, about {}.",
-        &[&r.quantity, &r.heads, &r.cycles, &duration_text(r.minutes)],
-    ));
+    ui.label(if r.heads == 1 {
+        fill(
+            "{} pieces on one head: {} cycles, about {}.",
+            &[&r.quantity, &r.cycles, &duration_text(r.minutes)],
+        )
+    } else {
+        fill(
+            "{} pieces on {} heads: {} cycles, about {}.",
+            &[&r.quantity, &r.heads, &r.cycles, &duration_text(r.minutes)],
+        )
+    });
     ui.label(fill(
         "About {} pieces in an hour.",
         &[&format!("{:.1}", r.pieces_per_hour)],

@@ -37,7 +37,7 @@ oder PDF-Datei kommt in das Design, und ein Bild wird zum Hintergrundbild.
 - **Die Datei-Schaltfläche** (oben links) öffnet das Dateimenü: Neu,
   Öffnen, Speichern, Importieren, Exportieren, Optionen und Beenden.
   Daneben sind **Neu**, **Öffnen**, **Speichern**, **Rückgängig** und
-  **Wiederholen**.
+  **Wiederherstellen**.
 - **Das Menüband** hat die Befehle in Tabs. Siehe „Wo die Befehle sind“
   unten.
 - **Die Design-Tabs** unter dem Menüband zeigen jedes offene Design. Ein
@@ -138,7 +138,7 @@ Vorlagen](fabrics-and-styles).
   Projekt behält alle Objekte und Einstellungen, damit Sie sie später
   ändern können.
 - **Strg+Z** macht die letzte Änderung rückgängig. **Strg+Y** stellt sie
-  wieder her. Die Tooltips von Rückgängig und Wiederholen sagen, was sie
+  wieder her. Die Tooltips von Rückgängig und Wiederherstellen sagen, was sie
   ändern.
 - Das Programm speichert alle 2 Minuten eine Sicherung jedes geänderten
   Designs. Wenn das Programm abbricht, bietet es die Sicherungen beim
