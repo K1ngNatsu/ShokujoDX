@@ -253,6 +253,24 @@ impl Split {
     }
 }
 
+/// The trial of overlapped strokes (P22 Milestone 7, ADR 0174): with the
+/// environment variable `EMB_OVERLAP_TRIAL=1`, a stroke of a Latin letter
+/// that ends on a stroke that goes through goes on under it to its middle
+/// (`glyph::overlap_joints`), and the route sews it first. Off by default:
+/// the trial is measured against the way of today, and the owner chooses.
+pub fn overlap_trial() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("EMB_OVERLAP_TRIAL").is_ok_and(|v| v == "1" || v == "2"))
+}
+
+/// The second way of the trial (`EMB_OVERLAP_TRIAL=2`): also the ends at
+/// cuts from notches (a stroke that meets another at a corner, as the
+/// diagonal of an "N") go on under the other stroke.
+pub fn overlap_trial_cuts() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("EMB_OVERLAP_TRIAL").is_ok_and(|v| v == "2"))
+}
+
 /// Satin columns for a glyph, with checks of how well they fit it.
 #[derive(Debug, Clone, Default)]
 pub struct Strokes {
@@ -263,6 +281,9 @@ pub struct Strokes {
     pub max_width: f64,
     /// The middle width of the columns (over their rungs), in font units.
     pub typical_width: f64,
+    /// The joints of the split (the ends of strokes on strokes that go
+    /// through), for the trial of overlapped strokes ([`overlap_trial`]).
+    pub(crate) joints: Vec<crate::split::Joint>,
 }
 
 #[derive(Debug, Clone)]
@@ -1353,8 +1374,12 @@ pub(crate) fn strokes_split_soft(
             .iter()
             .map(|p| (piece(&p.rings, cap_height, p.axis), p.area))
             .collect();
+        let mut all = merged(parts);
+        if split == Split::Notches && overlap_trial() {
+            all.joints = s.pieces.iter().flat_map(|p| p.joints.iter().copied()).collect();
+        }
         return (
-            merged(parts),
+            all,
             Optional {
                 soft: s.soft,
                 elbows: s.elbows,

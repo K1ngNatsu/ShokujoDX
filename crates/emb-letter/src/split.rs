@@ -124,6 +124,22 @@ pub(crate) struct Piece {
     /// to the cut and away from the stroke, so its stitches lie as the
     /// last stitches of the stroke (P21 Milestone 11).
     pub axis: Option<Point>,
+    /// The ends of the piece at bridges: where its stroke ends on a stroke
+    /// that goes through (P22 Milestone 7).
+    pub joints: Vec<Joint>,
+}
+
+/// An end of a stroke on a stroke that goes through (a joint), for the
+/// trial of overlapped strokes (P22 Milestone 7, ADR 0174): the bridge,
+/// the direction into the stroke that goes through, and the distance from
+/// the bridge to the middle of that stroke (half its width there), in the
+/// units of the outline.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Joint {
+    pub a: Point,
+    pub b: Point,
+    pub into: Point,
+    pub depth: f64,
 }
 
 /// The split of a shape: its pieces and its bridges.
@@ -1132,10 +1148,14 @@ fn faces(
     }
     let mut pieces: Vec<Piece> = outers
         .iter()
-        .map(|(r, vs, bs, a)| Piece {
-            rings: vec![moved_ends(r, vs, bs, &at, cuts, rings)],
-            area: *a,
-            axis: None,
+        .map(|(r, vs, bs, a)| {
+            let (ring, joints) = moved_ends(r, vs, bs, &at, cuts, rings);
+            Piece {
+                rings: vec![ring],
+                area: *a,
+                axis: None,
+                joints,
+            }
         })
         .collect();
     for (r, vs, bs) in &holes {
@@ -1151,7 +1171,9 @@ fn faces(
             .min_by(|x, y| x.1.3.total_cmp(&y.1.3))
             .map(|(i, _)| i);
         if let Some(i) = owner {
-            pieces[i].rings.push(moved_ends(r, vs, bs, &at, cuts, rings));
+            let (ring, joints) = moved_ends(r, vs, bs, &at, cuts, rings);
+            pieces[i].rings.push(ring);
+            pieces[i].joints.extend(joints);
         }
     }
     Some(Ok(pieces))
@@ -1160,7 +1182,9 @@ fn faces(
 /// The ring of a face with each bridge that is an end of the piece (and
 /// each cut from a notch) moved out of it by [`BRIDGE_OVERLAP`] of its
 /// length (into the piece on the other side); an end that would go out of
-/// the shape in `rings` stays.
+/// the shape in `rings` stays. Also the joints of the piece: its ends at
+/// bridges (not at cuts), with the depth to the middle of the stroke on
+/// the other side.
 fn moved_ends(
     r: &[Point],
     vs: &[usize],
@@ -1168,10 +1192,11 @@ fn moved_ends(
     at: &[Point],
     cuts: &[bool],
     rings: &[Vec<Point>],
-) -> Vec<Point> {
+) -> (Vec<Point>, Vec<Joint>) {
     let n = vs.len();
     let cos_turn = emb_geom::math::cos(emb_geom::math::to_radians(END_TURN_DEG));
     let mut out = Vec::with_capacity(n + 4);
+    let mut joints = Vec::new();
     for k in 0..n {
         out.push(r[k]);
         if bs[k] == usize::MAX {
@@ -1186,7 +1211,26 @@ fn moved_ends(
         if !cuts[bs[k]] && (d0.dot(u) > cos_turn || u.dot(d1) > cos_turn) {
             continue;
         }
-        let shift = Point::new(u.y, -u.x) * (BRIDGE_OVERLAP * p.distance(q));
+        let normal = Point::new(u.y, -u.x);
+        if !cuts[bs[k]] || crate::stroke::overlap_trial_cuts() {
+            // The width of the stroke on the other side: from the middle of
+            // the bridge to where the shape ends, in small steps.
+            let (m, len) = (p.midpoint(q), p.distance(q));
+            let step = 0.02 * len;
+            let mut across = 0.0;
+            while across < 6.0 * len && winding(rings, m + normal * (across + step)) != 0 {
+                across += step;
+            }
+            if across > step {
+                joints.push(Joint {
+                    a: p,
+                    b: q,
+                    into: normal,
+                    depth: 0.5 * across,
+                });
+            }
+        }
+        let shift = normal * (BRIDGE_OVERLAP * p.distance(q));
         // An end that would go out of the shape stays. Where a cut meets
         // the outline at a slant, the moved end went out of the letter, and
         // the column of the piece with it (P21 Milestone 14: the top of the
@@ -1196,7 +1240,7 @@ fn moved_ends(
         out.push(moved(p));
         out.push(moved(q));
     }
-    out
+    (out, joints)
 }
 
 #[cfg(test)]

@@ -1039,11 +1039,8 @@ fn run(args: &[String]) -> Result<(), String> {
             if let Some(p) = &judged {
                 let text = std::fs::read_to_string(p).map_err(|e| format!("{}: {e}", p.display()))?;
                 let set = emb_cli::letter_faults::load_judged(&text)?;
-                print!(
-                    "
-{}",
-                    emb_cli::letter_faults::compare(&fonts, &set).text
-                );
+                print!("\n{}", emb_cli::letter_faults::compare(&fonts, &set).text);
+                print!("\n{}", emb_cli::letter_faults::eye_summary(&fonts));
             }
             if let Some(p) = &audit_proof {
                 std::fs::write(p, emb_cli::letter_faults::pictures(&fonts))

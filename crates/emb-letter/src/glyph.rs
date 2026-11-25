@@ -97,6 +97,7 @@ impl GlyphShapes {
             let (mut strokes, used) = crate::stroke::strokes_split_soft(rings, cap_height, split, with);
             add_missed_strokes(&fills, &mut strokes, cap_height);
             tune_ends(&fills, &mut strokes, cap_height);
+            overlap_joints(&fills, &mut strokes);
             untangle(&mut strokes, cap_height);
             (strokes, used)
         };
@@ -395,6 +396,89 @@ fn tune_ends(fills: &[(Vec<Point>, Vec<Vec<Point>>)], s: &mut Strokes, cap_heigh
         .collect();
     // The ends that went on into other columns stop at them again.
     crate::stroke::trim_column_ends(&mut s.satins, &rings, cell);
+}
+
+/// The trial of overlapped strokes (P22 Milestone 7, ADR 0174;
+/// `stroke::overlap_trial`): the end of each column at a joint (a stroke
+/// that ends on a stroke that goes through) goes on into that stroke, to
+/// its middle. The route then sews the column first, so the stroke that
+/// goes through covers the end (`route::joints`). An end goes on only as
+/// far as the outline lets it.
+pub(crate) fn overlap_joints(fills: &[(Vec<Point>, Vec<Vec<Point>>)], strokes: &mut crate::stroke::Strokes) {
+    use emb_geom::region::ring_contains;
+    let inside = |p: Point| {
+        fills
+            .iter()
+            .any(|(o, h)| ring_contains(o, p) && !h.iter().any(|h| ring_contains(h, p)))
+    };
+    let joints = std::mem::take(&mut strokes.joints);
+    for j in &joints {
+        let (mid, len) = (j.a.midpoint(j.b), j.a.distance(j.b));
+        let target = mid + j.into * j.depth;
+        for g in &mut strokes.satins {
+            let mut a: Vec<Point> = g.rail_a.points().collect();
+            let mut b: Vec<Point> = g.rail_b.points().collect();
+            if a.len() < 2 || b.len() < 2 {
+                continue;
+            }
+            for start in [true, false] {
+                let (end, inner) = if start {
+                    (a[0].midpoint(b[0]), a[1].midpoint(b[1]))
+                } else {
+                    let (na, nb) = (a.len(), b.len());
+                    (a[na - 1].midpoint(b[nb - 1]), a[na - 2].midpoint(b[nb - 2]))
+                };
+                // The end is at the bridge and the column goes into it.
+                let Some(out) = (end - inner).normalized() else {
+                    continue;
+                };
+                if end.distance(mid) > 0.6 * len || out.dot(j.into) < 0.5 {
+                    continue;
+                }
+                let mut by = (target - end).dot(j.into);
+                if by <= 0.0 {
+                    continue;
+                }
+                let (pa, pb) = if start {
+                    (a[0], b[0])
+                } else {
+                    (a[a.len() - 1], b[b.len() - 1])
+                };
+                // Shorter where the outline ends first.
+                for _ in 0..4 {
+                    if inside(pa + j.into * by) && inside(pb + j.into * by) {
+                        break;
+                    }
+                    by *= 0.5;
+                }
+                if !(inside(pa + j.into * by) && inside(pb + j.into * by)) {
+                    continue;
+                }
+                let shift = j.into * by;
+                if start {
+                    a.insert(0, pa + shift);
+                    b.insert(0, pb + shift);
+                } else {
+                    a.push(pa + shift);
+                    b.push(pb + shift);
+                }
+                g.rail_a = polyline(&a);
+                g.rail_b = polyline(&b);
+                break;
+            }
+        }
+    }
+}
+
+fn polyline(pts: &[Point]) -> emb_geom::Path {
+    let mut p = emb_geom::Path::new();
+    if let Some((&first, rest)) = pts.split_first() {
+        p = p.move_to(first);
+        for &q in rest {
+            p = p.line_to(q);
+        }
+    }
+    p
 }
 
 /// The outline of a satin column: rail A, then rail B back. It crosses
