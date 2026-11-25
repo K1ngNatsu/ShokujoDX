@@ -28,7 +28,7 @@ their columns: the font, the size and the color stay, the text changes.
    window opens, with the selected lettering as the column **Name**.
 3. Drag a box round **00** to select it.
 4. Click **Add the selected lettering as a column**. The second column is
-   **Number**.
+   **Player number**. Click a title to change it.
 
 **Fit to width** makes a long name smaller, so that it is not wider than
 the value (for example the width between the seams of a sleeve).

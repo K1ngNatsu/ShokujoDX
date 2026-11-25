@@ -23,10 +23,11 @@ se quedan, el texto cambia.
 1. Arrastre un recuadro alrededor de **NAME** para seleccionarlo.
 2. Haga clic en **Letras > Personalizar > Nombres de equipo**. Se abre la
    ventana **Nombres de equipo**, con las letras seleccionadas como la
-   columna **Name**.
+   columna **Nombre**.
 3. Arrastre un recuadro alrededor de **00** para seleccionarlo.
 4. Haga clic en **Añadir las letras seleccionadas como columna**. La
-   segunda columna es **Number**.
+   segunda columna es **Número del jugador**. Haga clic en un título para
+   cambiarlo.
 
 **Ajustar al ancho** hace más pequeño un nombre largo, para que no sea
 más ancho que el valor (por ejemplo el ancho entre las costuras de una

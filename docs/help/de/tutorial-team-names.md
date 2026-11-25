@@ -26,7 +26,8 @@ bleiben, der Text ändert sich.
    **Name**.
 3. Ziehen Sie einen Rahmen um **00**, um es auszuwählen.
 4. Klicken Sie auf **Die ausgewählte Schrift als Spalte hinzufügen**. Die
-   zweite Spalte ist **Number** (die Nummer).
+   zweite Spalte ist **Spielernummer**. Klicken Sie auf einen Titel, um ihn
+   zu ändern.
 
 **An Breite anpassen** macht einen langen Namen kleiner, damit er nicht
 breiter als der Wert ist (zum Beispiel die Breite zwischen den Nähten

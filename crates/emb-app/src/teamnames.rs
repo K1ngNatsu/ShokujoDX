@@ -73,7 +73,15 @@ impl AppState {
         if tn.columns.iter().any(|c| c.object == id) {
             return;
         }
-        let title = if tn.columns.is_empty() { "Name" } else { "Number" };
+        // The titles are in the language of the program: they are text of
+        // the user (the window edits them), so a saved design keeps them.
+        // "Number" is a count in other windows, so the key is "Player
+        // number".
+        let title = if tn.columns.is_empty() {
+            tr("Name")
+        } else {
+            tr("Player number")
+        };
         tn.columns.push(TeamColumn {
             object: id,
             title: title.into(),
@@ -237,7 +245,9 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
     .collapsible(false)
     .default_width(460.0)
     .show(ctx, |ui| {
-        ui.strong(tr("Columns"));
+        // Not "Columns": that is the word for satin columns in some
+        // languages.
+        ui.strong(tr("List columns"));
         if tn.columns.is_empty() {
             ui.weak(tr(
                 "Select a lettering object of the design (for example the name) and add it as a column.",
@@ -246,7 +256,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         let mut remove = None;
         for (i, c) in tn.columns.iter_mut().enumerate() {
             ui.horizontal(|ui| {
-                ui.add(egui::TextEdit::singleline(&mut c.title).desired_width(90.0));
+                ui.add(egui::TextEdit::singleline(&mut c.title).desired_width(130.0));
                 let mut fit = c.max_width_mm.is_some();
                 if ui
                     .checkbox(&mut fit, tr("Fit to width"))
@@ -487,6 +497,33 @@ mod tests {
         .unwrap_or(200.0);
         let width = d.extents().unwrap().width();
         assert!(width <= hoop - 2.0 * st.margin_mm + 1e-6, "{width} mm in {hoop} mm");
+    }
+
+    /// The titles of new columns are in the language of the program.
+    #[test]
+    fn the_column_titles_are_in_the_language_of_the_program() {
+        for (lang, titles) in [
+            ("en", ["Name", "Player number"]),
+            ("de", ["Name", "Spielernummer"]),
+            ("ja", ["名前", "背番号"]),
+        ] {
+            crate::i18n::set_language(lang);
+            let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+            for text in ["NAME", "00"] {
+                st.add_lettering(LetteringDialog::new(
+                    Point::new(0.0, 0.0),
+                    text,
+                    FontRef::embroidery("Block Sans", ""),
+                    12.0,
+                ));
+                let id = st.doc.design().objects().last().unwrap().id;
+                st.team_add_column(id);
+            }
+            crate::i18n::set_language("en");
+            let tn = st.doc.design().team_names.clone().unwrap();
+            let now: Vec<&str> = tn.columns.iter().map(|c| c.title.as_str()).collect();
+            assert_eq!(now, titles, "{lang}");
+        }
     }
 
     #[test]
