@@ -66,8 +66,12 @@ readers.
   (MIT license, not a part of the program, installed only to run the
   tool), and compares the needle points (to 0.15 mm, after a move of the
   whole design and a turn of the y axis, which it reports) and the color
-  changes with the stitch plan. A stop that a format writes as a color
-  change is a reason, not a difference.
+  changes and stops with the stitch plan. The same commands read as the
+  other kind are a reason, not a difference: a format with no stop
+  writes a stop as a color change; in PEC, a color change to the same
+  palette color is a stop; in JEF, a stop is a change to color 0 and the
+  next stop a change back to the color of the thread (as pyembroidery
+  writes it too), which pyembroidery reads as a color change.
 
 - **Faults of Recognize Objects that the check found** (the tutorial
   "a file from a customer"). The stitch object of the stitches that stay
@@ -91,8 +95,13 @@ readers.
   finds in the files of the program come from short stitches of the
   designs, which Design info shows too; cutwork and appliqué placement
   lines have no lock stitches by design (ADR 0051).
-- The cross-check needs pyembroidery: a download, with the owner's
-  permission. Its report is in `out/check-writers/report.txt`.
+- The cross-check ran with pyembroidery 1.5.1 (installed with the
+  owner's permission, 2026-11-25): the 87 designs of the corpus in the 10
+  formats, 870 files, all with the same needle points and the same
+  color changes and stops, 24 of them with one of the reasons above
+  (stops in DST, VP3, EXP, XXX and TAP; the stops of appliqué in JEF;
+  eight threads of one color in PES and PEC). The report is in
+  `out/check-writers/report.txt` (not in the repository).
 - Removing a short stitch in a lock pattern can remove the lock; the
   lock fix after it adds a new lock. The numbers of a fix can then be
   larger or smaller than the numbers of the check; the window shows the

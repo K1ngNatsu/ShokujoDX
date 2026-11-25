@@ -53,34 +53,47 @@ def plan_of(path):
 
 
 def read_with_pyembroidery(pyemb, path):
-    """The needle points (mm) and the number of color changes that
-    pyembroidery reads. A needle set after the first is a color change too
-    (the formats of multi-needle machines)."""
+    """The needle points (mm), the number of color changes and the number
+    of stops that pyembroidery reads. A needle set after the first is a
+    color change too (the formats of multi-needle machines)."""
     pattern = pyemb.read(path)
     if pattern is None:
         raise RuntimeError("pyembroidery cannot read the file")
-    points, changes, needles = [], 0, 0
+    points, changes, needles, stops = [], 0, 0, 0
     for x, y, cmd in pattern.stitches:
         c = cmd & pyemb.COMMAND_MASK
         if c == pyemb.STITCH:
             points.append((x / 10.0, y / 10.0))
         elif c == pyemb.COLOR_CHANGE:
             changes += 1
+        elif c == pyemb.STOP:
+            stops += 1
         elif c == getattr(pyemb, "NEEDLE_SET", -1):
             needles += 1
     if needles > 1 and changes == 0:
         changes = needles - 1
-    return points, changes
+    return points, changes, stops
 
 
 def compare(ours, theirs):
     """None if the needle points agree (after a move of the whole design
     and a turn of the y axis, which the report gives), else the reason."""
-    (p, c, stops), (q, d) = ours, theirs
+    (p, c, stops), (q, d, t) = ours, theirs
     notes = []
-    if d != c and d == c + stops:
-        # A format with no stop writes a stop as a color change.
-        notes.append("%d stops read as color changes" % stops)
+    if (d, t) != (c, stops) and d + t == c + stops:
+        # The same commands, read as the other kind.
+        if t == 0:
+            # A format with no stop writes a stop as a color change.
+            notes.append("%d stops read as color changes" % stops)
+        elif d == 0:
+            # PEC: threads of one palette color; a change to the same
+            # color is a stop.
+            notes.append("%d color changes to the same palette color read as stops" % c)
+        else:
+            # JEF: a stop is a change to color 0, the next stop a change
+            # back to the color of the thread (as pyembroidery writes it),
+            # which pyembroidery reads as a color change.
+            notes.append("%d stops and %d color changes read as %d and %d" % (stops, c, t, d))
         d = c
     if len(p) != len(q):
         return "needle points: %d in the plan, %d read" % (len(p), len(q))
@@ -159,7 +172,12 @@ def main():
                 totals[ext][1] += 1
             if why is not None:
                 lines.append("%s.%s: %s" % (name, ext, why))
-    report = ["Cross-check of the writers with pyembroidery %s" % getattr(pyemb, "__version__", ""),
+    try:
+        from importlib.metadata import version
+        pyemb_version = version("pyembroidery")
+    except Exception:
+        pyemb_version = "(version not known)"
+    report = ["Cross-check of the writers with pyembroidery %s" % pyemb_version,
               "%d designs, formats %s, tolerance %.2f mm" % (len(names), ",".join(formats), TOLERANCE_MM),
               ""]
     for ext in formats:

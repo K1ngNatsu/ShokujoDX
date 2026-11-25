@@ -6,8 +6,7 @@ efficiently on itself"). Milestone 1 is made (ADR 0167), and the travel
 faults that it found are fixed (ADR 0168). Milestone 2 is made (ADR
 0169). Milestone 3 is made in the software (ADR 0170); its sew-out is
 open. Milestone 4 is made in the software (ADR 0171); its sew-out is
-open. Milestone 5 is made (ADR 0172); its cross-check with pyembroidery
-waits for the owner's permission to download pyembroidery.
+open. Milestone 5 is made (ADR 0172).
 
 ## Goal
 
@@ -335,14 +334,16 @@ design are a file through `emb_model::records_of_stitch_objects`, and
 object; Edit > Machine Functions > Fix Stitches… (`fix_stitches.rs`) has
 a check box and the number of each fix and Apply Fixes (one undo step).
 `emb-cli check` and `emb-cli fix` do the same for a file.
-`tools/check-writers.py` is the cross-check; a stand-in reader (our own
-reader in the place of pyembroidery) ran it through.
+`tools/check-writers.py` is the cross-check.
 
-The exit test is met in the software (the tests of
-`emb_art::file_check`, `crates/emb-cli/tests/file_check.rs` and
-`fix_stitches::tests`). The run of `tools/check-writers.py` with
-pyembroidery is open: pyembroidery is a download (the owner's list in
-`docs/design/open-work.md`).
+The exit test is met: the tests of `emb_art::file_check`,
+`crates/emb-cli/tests/file_check.rs` and `fix_stitches::tests`; and
+`tools/check-writers.py` with pyembroidery 1.5.1 (2026-11-25): the 870
+files of the corpus (87 designs, 10 formats) read back with the same
+needle points and the same color changes and stops; the report gives
+the reason of the 24 files where the commands have the other kind (a
+stop as a color change in formats with no stop, the stops of JEF as
+pyembroidery writes them, color changes to one palette color in PEC).
 
 ## Milestone 6: letter measures against the eye (S)
 
