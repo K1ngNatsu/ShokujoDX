@@ -1051,11 +1051,15 @@ impl LetterSewer<'_> {
             }
         }
         // A run in a fixed letter is a travel run (the route makes it under
-        // the parts that sew later).
+        // the parts that sew later), in the direction of the route: the
+        // plan must not turn it round. As the first run of a lettering the
+        // plan turned it to the needle, and a straight travel stitch of up to
+        // 27 mm went back over the fabric to the next part (P22 Milestone 1).
         if fixed && matches!(part, ObjectKind::Running { .. }) {
             for run in &mut st.runs {
                 let all = 0..run.points.len().saturating_sub(1);
                 run.travel = Vec::from([all]);
+                run.fixed = true;
             }
         }
         if let Some(p) = st.runs.last().and_then(|r| r.points.last()) {
@@ -1324,8 +1328,14 @@ fn fill_runs(shape: &Shape, p: &FillParams, entry: Point, exit: Option<Point>) -
     let mut sewer = Sewer::new(&travel, TRAVEL_LEN_MM);
     sewer.edge_only = p.trapunto;
     // All travel of the fill, also of its underlay, goes along the top rows
-    // where it can: the top rows cover it best there.
-    sewer.rows = Some(emb_geom::Transform::rotate_deg(p.angle_deg).apply_vector(Point::new(1.0, 0.0)));
+    // where it can: the top rows cover it best there. Only straight rows
+    // have a direction: the rows of the other patterns (circular, guided,
+    // contour...) are curves, and the angle of the fill sent their travel
+    // straight across them (P22 Milestone 1).
+    let split = row_split(shape, p);
+    if split.is_some() {
+        sewer.rows = Some(emb_geom::Transform::rotate_deg(p.angle_deg).apply_vector(Point::new(1.0, 0.0)));
+    }
     let layers = fill_underlay_layers(shape, &p.underlay);
     for layer in &layers {
         match *layer {
@@ -1369,7 +1379,7 @@ fn fill_runs(shape: &Shape, p: &FillParams, entry: Point, exit: Option<Point>) -
             UnderlayLayer::CenterWalk | UnderlayLayer::Zigzag { .. } => {}
         }
     }
-    if let Some(split) = row_split(shape, p) {
+    if let Some(split) = split {
         let top = Tatami {
             spacing_mm: p.spacing_mm,
             angle_deg: p.angle_deg,
@@ -1380,6 +1390,14 @@ fn fill_runs(shape: &Shape, p: &FillParams, entry: Point, exit: Option<Point>) -
         };
         sew_tatami(shape, &top, entry, exit, &mut sewer);
     } else {
+        // Rings and guided rows: the travel between the parts goes round
+        // the rows that are sewn, else the needle path starts again (P22
+        // Milestone 1: their travel went straight across sewn rows). The
+        // other curved patterns keep their travel (a satin fill of a ring
+        // has no way round its sewn columns and got trims).
+        if matches!(p.pattern, FillPattern::Circular { .. } | FillPattern::Guided { .. }) {
+            sewer.track_sewn();
+        }
         crate::curves::sew(shape, p, entry, &mut sewer);
     }
     sewer.finish_with_travel()

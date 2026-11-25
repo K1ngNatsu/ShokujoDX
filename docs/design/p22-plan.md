@@ -133,11 +133,16 @@ cells that the travel goes through with a table of sums (a stitch far
 from all travel is left out with one look), and each turn of the needle
 path in one cell.
 
-What the measure found in the corpus (open work): travel straight across
-sewn rows in guided fills (55 and 42 mm) and a circular fill (37 mm),
-which ADR 0166 did not change; a fill in `shaping` whose travel crosses
-its own cut-out part (19 mm on the fabric); travel of 8 to 20 mm across
-the fabric in lettering of five corpus designs.
+What the measure found in the corpus: travel straight across sewn rows
+in guided fills (55 and 42 mm) and a circular fill (37 mm); a fill in
+`shaping` whose travel crosses its own cut-out part (19 mm on the
+fabric); travel of 8 to 20 mm across the fabric in lettering of six
+corpus designs. The owner asked for the fixes before Milestone 2 (ADR
+0168): a line through a corner of the outline is not inside, a travel run
+of a fixed letter keeps its direction, only tatami rows have a direction
+for the travel, and circular and guided fills go round their sewn rows
+(else the needle path starts again). One link of the route of a font
+stays open (`docs/design/open-work.md`).
 
 ## Milestone 2: live numbers and Quicker to Sew (M)
 

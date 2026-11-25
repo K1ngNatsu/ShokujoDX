@@ -69,8 +69,9 @@ which stitches are travel.
     across the fabric (for example at the "T" of a script font);
   - 4 mm on top of sewn stitches in a letter of `embroidery-fonts-9`.
 
-  These are open work (`docs/design/open-work.md`). Milestone 2 uses the
-  measure for the live numbers, and Milestones 5 and 9 show it.
+  ADR 0168 fixes them, but for a link of the route of a font
+  (`docs/design/open-work.md`). Milestone 2 uses the measure for the
+  live numbers, and Milestones 5 and 9 show it.
 - Satin stitches turn at each needle point, so travel on top of a satin
   column narrower than about 2.4 mm counts as the edge. The travel of a
   satin walk (ADR 0163) is not marked yet: it lies under the top stitches
