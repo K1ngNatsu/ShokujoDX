@@ -1,0 +1,67 @@
+# The steps of "Tutorial: team names" (tutorial-team-names.md). The test
+# each_tutorial_runs_in_each_language (crates/emb-app/src/
+# tutorial_steps.rs) does them in each language; write_tutorial_pictures
+# makes the pictures. A change of a step needs the same change in the topic
+# and its translations.
+
+# Open the start design: NAME and 00 on the back of a shirt.
+[[step]]
+open = "team-shirt"
+expect = { objects = 2, colors = 2 }
+
+# Make the columns.
+[[step]]
+drag = [[-45.0, -30.0], [45.0, -6.0]]
+expect = { selected = 1 }
+
+[[step]]
+command = "Lettering > Personalize > Team Names"
+expect = { window = "Team Names" }
+
+[[step]]
+drag = [[-45.0, -5.0], [45.0, 30.0]]
+expect = { selected = 1 }
+
+[[step]]
+button = "Add the selected lettering as a column"
+
+# Add the names.
+[[step]]
+button = "Paste a list"
+
+[[step]]
+field = "One name for each line. Columns: tab, comma or semicolon."
+
+[[step]]
+type = "Anna;7\nBen;10\nCarla;23\nDavid;4"
+
+[[step]]
+button = "Add these names"
+expect = { names = 4 }
+
+[[step]]
+picture = "team-names-window"
+area = "windows"
+
+# Look at one name.
+[[step]]
+button = "Show"
+expect = { objects = 2 }
+
+[[step]]
+key = "Escape"
+
+[[step]]
+picture = "team-names-anna"
+around = [[-45.0, -30.0], [45.0, 30.0]]
+
+# Write the files: all names in one design.
+[[step]]
+button = "All in one design"
+expect = { objects = 8, colors = 2, size = [140.3, 102.7], warnings = 0 }
+
+[[step]]
+key = "Escape"
+
+[[step]]
+picture = "team-names-all"

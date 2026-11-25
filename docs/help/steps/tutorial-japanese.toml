@@ -1,0 +1,63 @@
+# The steps of "Tutorial: Japanese text" (tutorial-japanese.md). The test
+# each_tutorial_runs_in_each_language (crates/emb-app/src/
+# tutorial_steps.rs) does them in each language; write_tutorial_pictures
+# makes the pictures. A change of a step needs the same change in the topic
+# and its translations.
+#
+# The font is a part of Noto Sans JP Bold (the test font of the lettering
+# bench), as a font of the computer: the steps do not depend on the fonts of
+# the computer that runs them.
+
+[[step]]
+font_file = "crates/emb-cli/tests/data/noto-sans-jp-bold-subset.ttf"
+
+[[step]]
+open = "lettering-start"
+expect = { objects = 0 }
+
+# Make the lettering.
+[[step]]
+command = "Lettering > Lettering > Lettering"
+
+[[step]]
+click = [-35.0, 10.0]
+expect = { window = "Lettering" }
+
+[[step]]
+type = "さくら"
+
+[[step]]
+choose = ["Font", "Noto Sans JP"]
+
+[[step]]
+set = ["Height", "15"]
+
+[[step]]
+picture = "japanese-window"
+area = "windows"
+
+[[step]]
+button = "OK"
+expect = { objects = 1, kinds = ["Lettering"], warnings = 0 }
+
+# Look at the stitches.
+[[step]]
+command = "View > Show > Thread Look"
+
+[[step]]
+button = "Thread Look"
+
+[[step]]
+key = "Escape"
+
+[[step]]
+picture = "japanese-stitches"
+
+# Text that is too small.
+[[step]]
+command = "Edit > Select > Select All"
+expect = { selected = 1 }
+
+[[step]]
+set = ["Height", "5"]
+expect = { warnings = 1 }

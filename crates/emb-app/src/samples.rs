@@ -31,6 +31,10 @@ pub const SAMPLES: &[(&str, &str)] = &[
     ("towel", "Towel"),
     ("applique-heart", "Heart"),
     ("hooping-banner", "Banner"),
+    ("team-shirt", "Team shirt"),
+    ("photo-apple", "Apple photo"),
+    ("vector-logo", "Cloud logo"),
+    ("customer-dst", "LEAF"),
 ];
 
 /// The prefix of a link to a start design in a help topic.
@@ -106,6 +110,21 @@ pub const HEART: &[Click] = &[
 
 /// Where the name of `tutorial-lettering` starts (a construction point).
 pub const NAME_START: Point = Point { x: -35.0, y: 10.0 };
+
+/// The name and the number on the back of the team shirt of
+/// `tutorial-team-names`: the text, the font, the height (mm) and the
+/// point of the baseline (the middle of the text).
+pub const TEAM_TEXTS: [(&str, &str, f64, Point); 2] = [
+    ("NAME", "Block Sans", 12.0, Point { x: 0.0, y: -12.0 }),
+    ("00", "Varsity", 25.0, Point { x: 0.0, y: 22.0 }),
+];
+
+/// The cloud logo of `tutorial-vector-logo`, as vector artwork after an
+/// import: three circles and a base for the cloud (center x, y and radius,
+/// and two corners), and the sun.
+pub const CLOUD_CIRCLES: [(f64, f64, f64); 3] = [(-18.0, 4.0, 12.0), (0.0, -4.0, 16.0), (17.0, 5.0, 11.0)];
+pub const CLOUD_BASE: [Point; 2] = [Point { x: -30.0, y: 4.0 }, Point { x: 28.0, y: 16.0 }];
+pub const SUN: (f64, f64, f64) = (26.0, -22.0, 12.0);
 
 /// The width of the satin column of Column C (the default of the settings).
 const COLUMN_C_MM: f64 = 3.0;
@@ -275,6 +294,105 @@ fn patch_picture() -> Option<Backdrop> {
     p.backdrop("patch.png")
 }
 
+/// A photo for Photo stitch: an apple lit from the top left, with its
+/// shadow, a stem and a leaf, on a light background. It has the light and
+/// the dark of a photo, not flat areas of a few colors.
+fn photo_picture() -> Option<Backdrop> {
+    let mut p = Drawing::new(Point::new(-40.0, -40.0), Point::new(40.0, 40.0), 8.0);
+    let (w, h) = p.img.dimensions();
+    // The light: from the top left and the front (a unit vector).
+    let light = {
+        let (x, y, z) = (-0.5_f64, -0.6, 0.62);
+        let n = (x * x + y * y + z * z).sqrt();
+        (x / n, y / n, z / n)
+    };
+    for row in 0..h {
+        for col in 0..w {
+            let q = Point::new(
+                p.origin.x + (f64::from(col) + 0.5) / p.ppm,
+                p.origin.y + (f64::from(row) + 0.5) / p.ppm,
+            );
+            let mut c = [236.0, 233.0, 226.0];
+            // The shadow on the table, soft at its edge.
+            let (sx, sy) = ((q.x - 7.0) / 30.0, (q.y - 25.0) / 8.0);
+            let shade = 1.0 - (sx * sx + sy * sy);
+            if shade > 0.0 {
+                for v in &mut c {
+                    *v *= 1.0 - 0.45 * shade.min(0.6);
+                }
+            }
+            // The apple: a ball, darker where it turns from the light.
+            let (u, v) = (q.x / 26.0, (q.y + 2.0) / 24.0);
+            let r2 = u * u + v * v;
+            if r2 < 1.0 {
+                let z = (1.0 - r2).sqrt();
+                let lambert = (u * light.0 + v * light.1 + z * light.2).max(0.0);
+                // A small highlight (the light seen in the skin).
+                let mut spec = (lambert * 1.02 - 0.02).max(0.0);
+                for _ in 0..5 {
+                    spec *= spec;
+                }
+                let base = [196.0, 32.0, 38.0];
+                for (k, v) in c.iter_mut().enumerate() {
+                    *v = base[k] * (0.22 + 0.78 * lambert) + 255.0 * 0.8 * spec;
+                }
+            }
+            let px = c.map(|v| v.round().clamp(0.0, 255.0) as u8);
+            p.img.put_pixel(col, row, image::Rgba([px[0], px[1], px[2], 255]));
+        }
+    }
+    let stem = Path::new().move_to(Point::new(0.5, -22.0)).cubic_to(
+        Point::new(0.5, -27.0),
+        Point::new(2.0, -31.0),
+        Point::new(4.5, -33.0),
+    );
+    p.stroke(&stem, 2.2, Rgb(90, 60, 30));
+    let leaf = Path::new()
+        .move_to(Point::new(3.0, -29.0))
+        .cubic_to(Point::new(8.0, -36.0), Point::new(16.0, -35.0), Point::new(20.0, -31.0))
+        .cubic_to(Point::new(14.0, -26.0), Point::new(8.0, -26.0), Point::new(3.0, -29.0))
+        .close();
+    p.fill(&[leaf], Rgb(70, 140, 50));
+    p.backdrop("apple.png")
+}
+
+/// The leaf logo made by hand (the result of `tutorial-logo-by-hand`): the
+/// leaf as a fill with `fill` and its hole, the stem as a satin column and
+/// the vein as a running stitch, in three threads.
+fn leaf_design(fill: FillParams) -> Design {
+    let mut d = Design::new("");
+    let green = d.add_thread("Green", GREEN);
+    let brown = d.add_thread("Brown", BROWN);
+    let dark = d.add_thread("Dark green", DARK_GREEN);
+    d.add_object(
+        green,
+        ObjectKind::Fill {
+            outer: path_of(LEAF, true),
+            holes: vec![path_of(LEAF_HOLE, true)],
+            params: fill,
+        },
+    );
+    d.add_object(
+        brown,
+        ObjectKind::Satin {
+            geometry: SatinGeometry {
+                rail_a: path_of(STEM_A, false),
+                rail_b: path_of(STEM_B, false),
+                rungs: vec![],
+            },
+            params: SatinParams::default(),
+        },
+    );
+    d.add_object(
+        dark,
+        ObjectKind::Running {
+            path: path_of(VEIN, false),
+            params: Default::default(),
+        },
+    );
+    d
+}
+
 fn fill(outer: Path, holes: Vec<Path>) -> ObjectKind {
     ObjectKind::Fill {
         outer,
@@ -317,40 +435,31 @@ pub fn design(name: &str) -> Option<Design> {
             d.add_thread("Dark green", DARK_GREEN);
             d.backdrop = leaf_picture();
         }
+        // The leaf logo, sewn and written as a DST file, then read again: a
+        // file from a customer (stitches only, no thread colors).
+        "customer-dst" => {
+            let mut leaf = leaf_design(FillParams::default());
+            leaf.name = "LEAF".into();
+            let plan = emb_stitch::build_plan(
+                &leaf,
+                &emb_stitch::PlanOptions::default(),
+                &mut emb_stitch::StitchCache::default(),
+            );
+            let bytes = emb_formats::write_machine("dst", &plan.stitches, "LEAF", "")?;
+            let read = emb_formats::read_machine("dst", &bytes).ok()?;
+            let mut file = emb_model::design_from_stitches(&read, title);
+            // On a white shirt: the first color of the file is black.
+            file.background = Some(Rgb(245, 245, 240));
+            std::mem::swap(&mut d, &mut file);
+        }
         // The leaf logo made, with a fill that is too dense.
         "sew-well" => {
-            let green = d.add_thread("Green", GREEN);
-            let brown = d.add_thread("Brown", BROWN);
-            let dark = d.add_thread("Dark green", DARK_GREEN);
-            d.add_object(
-                green,
-                ObjectKind::Fill {
-                    outer: path_of(LEAF, true),
-                    holes: vec![path_of(LEAF_HOLE, true)],
-                    params: FillParams {
-                        spacing_mm: 0.2,
-                        ..FillParams::default()
-                    },
-                },
-            );
-            d.add_object(
-                brown,
-                ObjectKind::Satin {
-                    geometry: SatinGeometry {
-                        rail_a: path_of(STEM_A, false),
-                        rail_b: path_of(STEM_B, false),
-                        rungs: vec![],
-                    },
-                    params: SatinParams::default(),
-                },
-            );
-            d.add_object(
-                dark,
-                ObjectKind::Running {
-                    path: path_of(VEIN, false),
-                    params: Default::default(),
-                },
-            );
+            let mut leaf = leaf_design(FillParams {
+                spacing_mm: 0.2,
+                ..FillParams::default()
+            });
+            leaf.name = d.name.clone();
+            d = leaf;
         }
         // The shapes to sew as columns, and a wave to convert.
         "columns" => {
@@ -398,6 +507,41 @@ pub fn design(name: &str) -> Option<Design> {
                 d.add_object(blue, fill(Path::ellipse(at, 30.0, 30.0), Vec::new()));
             }
         }
+        // A name and a number for the back of a team shirt.
+        "team-shirt" => {
+            let navy = d.add_thread("Navy", Rgb(25, 35, 90));
+            let red = d.add_thread("Red", Rgb(200, 30, 45));
+            for ((text, family, height, at), t) in TEAM_TEXTS.into_iter().zip([navy, red]) {
+                let font = emb_letter::bundled::embroidery(family)?;
+                let mut l = emb_model::Lettering::new(text, emb_letter::LetterSource::font_ref(&font), height, at);
+                l.justify = emb_model::Justify::Center;
+                emb_letter::relayout(&mut l, &font);
+                d.add_object(t, ObjectKind::Lettering(Box::new(l)));
+            }
+        }
+        // A photo for Photo stitch.
+        "photo-apple" => d.backdrop = photo_picture(),
+        // A logo as vector artwork (as Import as Vectors makes it): a cloud
+        // of four shapes that overlap, and a sun.
+        "vector-logo" => {
+            let (blue, yellow) = (Rgb(70, 140, 210), Rgb(245, 190, 30));
+            let sky = d.add_thread("Sky blue", blue);
+            let sun = d.add_thread("Yellow", yellow);
+            let vector = |path: Path, color: Rgb| ObjectKind::Vector {
+                path,
+                style: emb_model::VectorStyle {
+                    fill: Some(color),
+                    ..Default::default()
+                },
+            };
+            for (x, y, r) in CLOUD_CIRCLES {
+                d.add_object(sky, vector(Path::ellipse(Point::new(x, y), r, r), blue));
+            }
+            let [a, b] = CLOUD_BASE;
+            d.add_object(sky, vector(Path::rounded_rect(emb_geom::BBox::new(a, b), 4.0), blue));
+            let (x, y, r) = SUN;
+            d.add_object(sun, vector(Path::ellipse(Point::new(x, y), r, r), yellow));
+        }
         _ => return None,
     }
     Some(d)
@@ -444,13 +588,24 @@ mod tests {
             .collect();
         assert_eq!(kinds, ["fill", "satin border"]);
         assert_ne!(badge.objects()[0].thread, badge.objects()[1].thread);
-        for name in ["logo-backdrop", "columns", "patch-picture"] {
+        for name in ["logo-backdrop", "columns", "patch-picture", "photo-apple"] {
             let b = d(name).backdrop.unwrap_or_else(|| panic!("{name} has a picture"));
             assert!(b.pixels.0 > 500 && b.pixels.1 > 500, "{name}: {:?}", b.pixels);
         }
         assert_eq!(d("sew-well").objects().len(), 3);
         assert_eq!(d("sew-order").sewn_color_blocks().len(), 6);
         assert_eq!(d("hooping-banner").extents().unwrap().width().round(), 380.0);
+        assert_eq!(d("team-shirt").objects().len(), 2);
+        assert_eq!(d("vector-logo").objects().len(), 5);
+        let file = d("customer-dst");
+        assert!(
+            file.objects().len() >= 3
+                && file
+                    .objects()
+                    .iter()
+                    .all(|o| matches!(o.kind, ObjectKind::Stitches { .. })),
+            "a stitch object for each color"
+        );
         assert!(design("no such design").is_none());
     }
 

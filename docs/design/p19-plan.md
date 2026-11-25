@@ -319,6 +319,27 @@ next release.
   0163 and ADR 0164 fixed them, except one small place of "Block in a
   square" on towel fabric), and the lace ornament template shows ten
   "Thread builds up" warnings.
+- **Milestone 3: made (2026-11-24, ADR 0162).** Path 3 has four new
+  tutorials: "Choose a font and a size" (the Fonts window, the quality
+  score, the size range, satin or fill, fonts for small text), "Team
+  names" (columns, a pasted list, Show, All in one design), "An
+  embroidery font of your own" (the convert settings, a test sheet, a
+  letter correction) and "Japanese text" (a font with Japanese
+  characters, the height of the characters, text that is too small).
+  Path 4 has three: "A photo in stitches" (Photo stitch on a start photo
+  of an apple), "A vector logo" (Weld, To Fill, Add Border, Trace
+  Picture) and "A file from a customer" (a DST file, Recognize Objects,
+  a new size). 20 tutorials run in CI in four languages. The steps found
+  three faults of the program, now fixed: a click in the search field of
+  the font list closed the list; a docked window went under itself for
+  one frame when egui ran a frame two times (a font in the list that
+  showed its preview), so a click in that frame hit the canvas; and **All
+  in one design** of the team names put the outer names in the safety
+  margin of the hoop. The
+  steps of the own font do not convert a font or save a correction
+  (they write files in the folder of the user's fonts), and they make
+  the test sheet of an embroidery font of the program (the letters of a
+  TrueType font take too long in a test).
 
 ### Answers to the open questions
 

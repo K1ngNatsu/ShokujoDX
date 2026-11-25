@@ -162,10 +162,12 @@ impl AppState {
             .clone()
             .filter(|t| !t.rows.is_empty())
             .ok_or(tr("The list has no names."))?;
+        // The names go inside the safety margin of the hoop (Design Info
+        // warns of stitches outside it).
         let width = match &d.hoop.selection {
             HoopSelection::Preset { id } => self.hoops.get(id).map_or(200.0, |h| h.width_mm),
             HoopSelection::OpenField => 200.0,
-        };
+        } - 2.0 * self.margin_mm;
         let mut all = emb_letter::teamnames::layout_design(&d, &tn, &mut self.fonts_fn(), width, LAYOUT_GAP_MM)?;
         all.name = crate::i18n::fill("{} (all names)", &[&d.name]);
         self.start_design(all);
@@ -474,6 +476,17 @@ mod tests {
         assert_eq!(st.tab_count(), 2);
         assert_eq!(st.doc.design().objects().len(), 20);
         assert!(st.doc.design().team_names.is_none());
+        // The rows of names are not wider than the hoop in its safety
+        // margin (twenty names are higher than the hoop: the program says
+        // to check that they fit).
+        let d = st.doc.design();
+        let hoop = match &d.hoop.selection {
+            HoopSelection::Preset { id } => st.hoops.get(id).map(|h| h.width_mm),
+            HoopSelection::OpenField => None,
+        }
+        .unwrap_or(200.0);
+        let width = d.extents().unwrap().width();
+        assert!(width <= hoop - 2.0 * st.margin_mm + 1e-6, "{width} mm in {hoop} mm");
     }
 
     #[test]

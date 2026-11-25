@@ -1,0 +1,65 @@
+# The steps of "Tutorial: a photo in stitches" (tutorial-photo.md). The
+# test each_tutorial_runs_in_each_language (crates/emb-app/src/
+# tutorial_steps.rs) does them in each language; write_tutorial_pictures
+# makes the pictures. A change of a step needs the same change in the topic
+# and its translations.
+
+# Open the start design: the photo of an apple.
+[[step]]
+open = "photo-apple"
+expect = { objects = 0 }
+
+[[step]]
+picture = "photo-start"
+around = [[-40.0, -40.0], [40.0, 40.0]]
+
+# The wizard: a photo stitch.
+[[step]]
+command = "Artwork > Import > Picture to Design"
+expect = { window = "Picture to Design" }
+
+[[step]]
+button = "Photo stitch (a portrait, a photo)"
+
+[[step]]
+button = "Next ›"
+
+[[step]]
+button = "Remove the edge color"
+
+[[step]]
+button = "Next ›"
+
+[[step]]
+choose = ["Style", "Color rows"]
+
+[[step]]
+set = ["Thread colors", "3"]
+
+[[step]]
+picture = "photo-step"
+area = "windows"
+
+[[step]]
+button = "Next ›"
+
+[[step]]
+button = "Finish"
+expect = { colors = 3 }
+
+[[step]]
+key = "Escape"
+
+# Look at the stitches.
+[[step]]
+command = "View > Show > Thread Look"
+
+[[step]]
+button = "Thread Look"
+
+[[step]]
+key = "Escape"
+
+[[step]]
+picture = "photo-stitches"
+around = [[-40.0, -40.0], [40.0, 40.0]]

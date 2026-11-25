@@ -38,6 +38,9 @@ use crate::ribbon::{Cmd, RibbonTab, SelInfo, all_commands};
 /// The languages of the help.
 const LANGUAGES: [&str; 4] = ["en", "de", "es", "ja"];
 
+/// The roles of text fields: the name of such a widget is its text.
+const TEXT_FIELDS: [Role; 3] = [Role::TextInput, Role::MultilineTextInput, Role::SearchInput];
+
 /// A screen so wide that no panel of the ribbon folds (a folded panel
 /// stays open as a menu, and shows in the pictures of windows).
 const SCREEN: Vec2 = Vec2::new(3840.0, 1600.0);
@@ -78,8 +81,18 @@ struct Step {
     /// Push a key: `Enter`, `Escape`, `Delete`.
     key: Option<String>,
     /// Click the button with this English text (in a window or a menu
-    /// if more than one widget has the name).
+    /// if more than one widget has the name). With no widget of that name,
+    /// a widget in a window whose name starts with the text and a space
+    /// (a row of a list: "Graduate Regular  ·  TrueType").
     button: Option<String>,
+    /// Click the text field with this English hint text (a search field,
+    /// a field with no label), or the text field after this English label.
+    /// Then `type` types into it.
+    field: Option<String>,
+    /// Add this font file (a path from the folder of the repository) to the
+    /// fonts, as a font of the computer: the step files do not depend on
+    /// the fonts of the computer that runs them.
+    font_file: Option<String>,
     /// Close the window with this English title.
     close: Option<String>,
     /// Type this text (into the field that has the keyboard).
@@ -101,7 +114,8 @@ struct Step {
     area: Option<String>,
     /// The English title of the ribbon panel in a picture of a panel.
     panel: Option<String>,
-    /// The part of the design in a picture of the canvas (mm, two corners).
+    /// The part of the design in a picture of the canvas (mm, two corners);
+    /// with none, the whole design and 5 mm round it.
     around: Option<[[f64; 2]; 2]>,
     /// The widgets in a picture of the area `widgets` (English names).
     widgets: Vec<String>,
@@ -141,6 +155,8 @@ struct Expect {
     holes: Option<usize>,
     /// The number of hoopings (Hooping mode).
     hoopings: Option<usize>,
+    /// The number of rows of the team names.
+    names: Option<usize>,
 }
 
 /// The step files: the id of the tutorial and the text of its steps.
@@ -209,6 +225,8 @@ fn check_place(place: &[&str], file: &[String]) -> Result<(), String> {
 #[derive(Debug, Clone)]
 struct Node {
     name: String,
+    /// The hint text of a text field.
+    placeholder: String,
     rect: Rect,
     enabled: bool,
     role: Role,
@@ -225,6 +243,7 @@ fn nodes_of(out: &egui::FullOutput) -> Vec<Node> {
             let b = n.bounds()?;
             Some(Node {
                 name: n.label().or(n.value()).unwrap_or_default().to_string(),
+                placeholder: n.placeholder().unwrap_or_default().to_string(),
                 rect: Rect::from_min_max(Pos2::new(b.x0 as f32, b.y0 as f32), Pos2::new(b.x1 as f32, b.y1 as f32)),
                 enabled: !n.is_disabled(),
                 role: n.role(),
@@ -292,14 +311,16 @@ impl Runner {
             }
         }
         // The background work of the Picture to Design wizard (at most two
-        // minutes, as its tests).
+        // minutes, as its tests), and the search for the fonts of the
+        // computer (the font lists change when it ends).
         let start = std::time::Instant::now();
-        while self
+        while (self
             .app
             .state()
             .wizard
             .as_ref()
             .is_some_and(|w| w.working() || w.editing())
+            || self.app.state().fonts.scanning())
             && start.elapsed() < std::time::Duration::from_secs(120)
         {
             std::thread::sleep(std::time::Duration::from_millis(20));
@@ -391,15 +412,83 @@ impl Runner {
     /// The widget `name` in a window or a menu.
     fn in_window(&self, name: &str) -> Option<Node> {
         let windows = self.windows();
+        let field = self.field_parts();
         self.nodes
             .iter()
-            .find(|n| n.name == name && windows.iter().any(|w| w.contains_rect(n.rect)))
+            .find(|n| n.name == name && !field(n) && windows.iter().any(|w| w.contains_rect(n.rect)))
             .cloned()
     }
 
-    /// The widget `name`; of more than one, the one in a window or a menu.
+    /// A test for a text field or a part of its text: the name of such a
+    /// widget is the text in the field, not a name to click.
+    fn field_parts(&self) -> impl Fn(&Node) -> bool + use<> {
+        let fields: Vec<Rect> = self
+            .nodes
+            .iter()
+            .filter(|n| TEXT_FIELDS.contains(&n.role) || n.role == Role::SpinButton)
+            .map(|n| n.rect.expand(1.0))
+            .collect();
+        move |n: &Node| fields.iter().any(|f| f.contains_rect(n.rect))
+    }
+
+    /// The widget `name` that is not a text field (the name of a text
+    /// field is its text); of more than one, the one in a window or a
+    /// menu. With none, a widget in a window whose name starts with `name`
+    /// and a space (a row of a list): the row whose first part is `name`
+    /// ("Varsity  ·  embroidery", not "Varsity Fill  ·  embroidery"),
+    /// else the top row.
     fn button_node(&self, name: &str) -> Result<Node, String> {
-        self.in_window(name).map_or_else(|| self.node(name), Ok)
+        let windows = self.windows();
+        let in_window = |n: &Node| windows.iter().any(|w| w.contains_rect(n.rect));
+        let field = self.field_parts();
+        let named: Vec<&Node> = self.nodes.iter().filter(|n| n.name == name && !field(n)).collect();
+        let start = format!("{name} ");
+        named
+            .iter()
+            .find(|n| in_window(n))
+            .or(named.first())
+            .copied()
+            .or_else(|| {
+                let first_part = |n: &Node| n.name.split("  ·  ").next() == Some(name);
+                self.nodes
+                    .iter()
+                    .filter(|n| n.name.starts_with(&start) && in_window(n) && !field(n))
+                    .min_by(|a, b| {
+                        (!first_part(a))
+                            .cmp(&!first_part(b))
+                            .then(a.rect.top().total_cmp(&b.rect.top()))
+                    })
+            })
+            .cloned()
+            .ok_or_else(|| format!("no widget \"{name}\" (the windows have {:?})", self.window_names()))
+    }
+
+    /// The names of the widgets in the windows and menus (for a message).
+    fn window_names(&self) -> Vec<&str> {
+        let windows = self.windows();
+        self.nodes
+            .iter()
+            .filter(|n| !n.name.is_empty() && windows.iter().any(|w| w.contains_rect(n.rect)))
+            .map(|n| n.name.as_str())
+            .take(60)
+            .collect()
+    }
+
+    /// The text field with the hint text `hint` (in a window or a menu
+    /// first), else the text field after the label `hint`.
+    fn text_field(&self, hint: &str) -> Result<Node, String> {
+        let windows = self.windows();
+        let hinted: Vec<&Node> = self
+            .nodes
+            .iter()
+            .filter(|n| TEXT_FIELDS.contains(&n.role) && n.placeholder == hint)
+            .collect();
+        hinted
+            .iter()
+            .find(|n| windows.iter().any(|w| w.contains_rect(n.rect)))
+            .or(hinted.first())
+            .map(|n| (*n).clone())
+            .map_or_else(|| self.after_label(hint, &TEXT_FIELDS), Ok)
     }
 
     /// The widget of one of `roles` after the label `label`, on its row
@@ -435,6 +524,15 @@ impl Runner {
         if !f.enabled {
             return Err(format!("the field \"{label}\" is off"));
         }
+        self.click_select_all(&f);
+        self.frame(vec![Event::Text(value.to_string())]);
+        self.key(Key::Enter);
+        Ok(())
+    }
+
+    /// A click on the text field `f`, then Ctrl+A: what is typed next
+    /// replaces its text.
+    fn click_select_all(&mut self, f: &Node) {
         self.click_at(f.rect.center(), Modifiers::NONE);
         let all = |pressed| Event::Key {
             key: Key::A,
@@ -445,18 +543,26 @@ impl Runner {
         };
         self.frame(vec![Event::ModifiersChanged(Modifiers::COMMAND), all(true)]);
         self.frame(vec![all(false), Event::ModifiersChanged(Modifiers::NONE)]);
-        self.frame(vec![Event::Text(value.to_string())]);
-        self.key(Key::Enter);
-        Ok(())
     }
 
-    /// Chooses `item` in the list after `label`.
+    /// Chooses `item` in the list after `label`. A long list that does
+    /// not show the item, and has a search field, gets the item typed in it.
     fn choose(&mut self, label: &str, item: &str) -> Result<(), String> {
         let list = self.after_label(label, &[Role::ComboBox])?;
         self.click_at(list.rect.center(), Modifiers::NONE);
-        let n = self
-            .in_window(item)
-            .ok_or_else(|| format!("no item \"{item}\" in the list \"{label}\""))?;
+        if self.in_window(item).is_none()
+            && let Ok(search) = self.text_field(tr("Search"))
+        {
+            self.click_select_all(&search);
+            self.frame(vec![Event::Text(item.to_string())]);
+            self.settle();
+        }
+        let n = self.in_window(item).ok_or_else(|| {
+            format!(
+                "no item \"{item}\" in the list \"{label}\" (the windows have {:?})",
+                self.window_names()
+            )
+        })?;
         self.click_at(n.rect.center(), Modifiers::NONE);
         Ok(())
     }
@@ -483,6 +589,10 @@ impl Runner {
     /// Does one step.
     fn step(&mut self, s: &Step) -> Result<(), String> {
         let mods = holding(&s.holding)?;
+        if let Some(file) = &s.font_file {
+            let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join(file);
+            self.app.state().fonts.add_computer_font(&path)?;
+        }
         if let Some(name) = &s.open {
             if crate::samples::design(name).is_none() {
                 return Err(format!("no start design \"{name}\""));
@@ -548,6 +658,10 @@ impl Runner {
                 return Err(format!("the button \"{text}\" is off"));
             }
             self.click_at(n.rect.center(), Modifiers::NONE);
+        }
+        if let Some(hint) = &s.field {
+            let f = self.text_field(tr(hint))?;
+            self.click_select_all(&f);
         }
         if let Some(text) = &s.text {
             self.frame(vec![Event::Text(text.clone())]);
@@ -665,6 +779,12 @@ impl Runner {
                 bad.push(format!("{now} hoopings, not {n}"));
             }
         }
+        if let Some(n) = e.names {
+            let now = d.team_names.as_ref().map_or(0, |t| t.rows.len());
+            if now != n {
+                bad.push(format!("{now} rows of names, not {n}"));
+            }
+        }
         if let Some(n) = e.warnings {
             let info = st.design_info();
             let st = &*st;
@@ -689,7 +809,15 @@ impl Runner {
         {
             bad.push(format!("no window \"{title}\""));
         }
-        if bad.is_empty() { Ok(()) } else { Err(bad.join("; ")) }
+        if bad.is_empty() {
+            Ok(())
+        } else {
+            let message = &self.app.state().message;
+            if !message.is_empty() {
+                bad.push(format!("the status line says \"{message}\""));
+            }
+            Err(bad.join("; "))
+        }
     }
 
     fn picture(&mut self, name: &str, s: &Step) -> Result<(), String> {
@@ -699,7 +827,14 @@ impl Runner {
         let area = s.area.as_deref().unwrap_or("canvas");
         let (rect, text) = match area {
             "canvas" => {
-                let [a, b] = s.around.ok_or("a picture of the canvas needs \"around\"")?;
+                let [a, b] = match s.around {
+                    Some(around) => around,
+                    None => {
+                        let e = self.app.state().doc.design().extents().ok_or("the design is empty")?;
+                        let e = e.expand(5.0);
+                        [[e.min.x, e.min.y], [e.max.x, e.max.y]]
+                    }
+                };
                 let (a, b) = (self.screen(a)?, self.screen(b)?);
                 let canvas = self.app.state().canvas_rect.ok_or("the canvas does not show")?;
                 (Rect::from_two_pos(a, b).intersect(canvas), false)

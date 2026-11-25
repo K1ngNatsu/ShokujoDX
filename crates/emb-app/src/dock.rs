@@ -62,9 +62,11 @@ struct Docks {
     dock: Vec<(Id, Dock)>,
     /// The windows that a drag moved in the last frame.
     dragged: Vec<Id>,
-    /// The frame of `placed`.
-    frame: u64,
-    /// The windows docked in this frame: their corner and size.
+    /// The pass of `placed`: egui can run the windows two times in one
+    /// frame (a second pass after a change of size), and each pass places
+    /// the windows again.
+    pass: u64,
+    /// The windows docked in this pass: their corner and size.
     placed: Vec<(Align2, Vec2)>,
 }
 
@@ -89,9 +91,9 @@ pub fn docked<'a>(window: egui::Window<'a>, ctx: &egui::Context, id: Id, canvas:
         return window;
     };
     let mut s = ctx.data(|d| d.get_temp::<Docks>(docks_id())).unwrap_or_default();
-    let frame = ctx.cumulative_frame_nr();
-    if s.frame != frame {
-        s.frame = frame;
+    let pass = ctx.cumulative_pass_nr();
+    if s.pass != pass {
+        s.pass = pass;
         s.placed.clear();
     }
     // A drag of the title moves the window; at its end the window docks or
@@ -248,5 +250,40 @@ mod tests {
         assert!((free.left_top() - (CANVAS.left_top() + vec2(MARGIN + 250.0, MARGIN + 200.0))).length() < 1.0);
         r.frame(&ids);
         assert_eq!(r.rect("One"), free);
+    }
+
+    /// egui can run the windows two times in one frame (a second pass
+    /// after a change of size, for example while a font in the list of the
+    /// Lettering window shows its preview). A docked window stays at its
+    /// corner: it did go under itself for one frame, and a click there hit
+    /// the canvas.
+    #[test]
+    fn a_docked_window_stays_in_a_frame_of_two_passes() {
+        let ctx = egui::Context::default();
+        let rect_after = |discard: bool| {
+            let input = RawInput {
+                screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(1000.0, 800.0))),
+                ..Default::default()
+            };
+            let mut out = ctx.run_ui(input, |ui| {
+                let ctx = ui.ctx().clone();
+                if discard && ctx.current_pass_index() == 0 {
+                    ctx.request_discard("a test of two passes");
+                }
+                let id = Id::new("One");
+                let w = egui::Window::new("One").id(id).resizable(false);
+                docked(w, &ctx, id, Some(CANVAS)).show(&ctx, |ui| {
+                    ui.set_min_size(vec2(200.0, 100.0));
+                });
+            });
+            out.textures_delta.clear();
+            ctx.memory(|m| m.area_rect(Id::new("One"))).unwrap()
+        };
+        for _ in 0..3 {
+            rect_after(false);
+        }
+        let corner = CANVAS.left_top() + vec2(MARGIN, MARGIN);
+        assert_eq!(rect_after(false).left_top(), corner);
+        assert_eq!(rect_after(true).left_top(), corner, "a frame of two passes");
     }
 }

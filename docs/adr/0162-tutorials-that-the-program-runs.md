@@ -103,6 +103,36 @@ Milestone 2 (path 2 and the seven tutorials of before) added:
   where letters and borders overlap; the lace ornament template shows
   ten "Thread builds up" warnings.
 
+Milestone 3 (paths 3 and 4, seven tutorials) added:
+
+- **More step kinds:** `field` (a click on the text field with this hint
+  text, or after this label, and all its text selected: what `type`
+  types next replaces it), `font_file` (a font file of the repository as
+  a font of the computer: the Japanese tutorial uses the test font of
+  Noto Sans JP, so the steps do not depend on the fonts of the computer
+  that runs them) and the check `names` (the rows of the team names). A
+  `choose` in a long list with a search field types the item in the
+  field. A `button` with no widget of its name clicks a row of a list in
+  a window whose name starts with it ("Graduate Regular  ·  TrueType"),
+  and never a text field or the text in it (the name of a text field is
+  its text). A picture of the canvas with no `around` shows the whole
+  design. The runner waits for the search of the fonts of the computer.
+  A step that fails says which widgets the windows have, and what the
+  status line says.
+- **Start designs:** a team shirt (a name and a number), a photo of an
+  apple (light and dark, drawn in `samples.rs`), a cloud logo of vector
+  shapes, and a DST file of the leaf logo (the leaf sewn, written as DST
+  and read again, so it is what File > Open gives).
+- **Three faults of the program that the steps found:** the list of
+  fonts closed when you clicked its search field (an egui combo box
+  closes on any click; the list now closes on a click outside it or on a
+  font); a docked command window went under itself for one frame when
+  egui ran the windows two times in one frame (`dock::docked` now starts
+  its stack for each pass, not for each frame): a click in that frame hit
+  the canvas; and **All in one design** of the team names used the whole
+  width of the hoop, so Design Info warned of the outer names (the rows
+  are now not wider than the hoop in its safety margin).
+
 ## Consequences
 
 - A change of the name or the place of a command, of the text of a

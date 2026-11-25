@@ -1,0 +1,73 @@
+# The steps of "Tutorial: a vector logo" (tutorial-vector-logo.md). The
+# test each_tutorial_runs_in_each_language (crates/emb-app/src/
+# tutorial_steps.rs) does them in each language; write_tutorial_pictures
+# makes the pictures. A change of a step needs the same change in the topic
+# and its translations.
+
+# Open the start design: a cloud of four vector shapes and a sun.
+[[step]]
+open = "vector-logo"
+expect = { objects = 5, kinds = ["Vector", "Vector", "Vector", "Vector", "Vector"] }
+
+# Weld the cloud.
+[[step]]
+drag = [[-33.0, -23.0], [31.0, 19.0]]
+expect = { selected = 4 }
+
+[[step]]
+command = "Artwork > Shaping > Weld"
+expect = { objects = 2 }
+
+[[step]]
+picture = "vector-welded"
+around = [[-35.0, -38.0], [42.0, 20.0]]
+
+# Convert to stitches.
+[[step]]
+command = "Edit > Select > Select All"
+expect = { selected = 2 }
+
+[[step]]
+command = "Artwork > Convert > To Fill"
+expect = { kinds = ["Fill", "Fill"], colors = 2 }
+
+[[step]]
+key = "Escape"
+
+[[step]]
+drag = [[-33.0, -23.0], [31.0, 19.0]]
+expect = { selected = 1 }
+
+[[step]]
+command = "Artwork > Borders and Offsets > Add Border"
+expect = { window = "Offsets" }
+
+[[step]]
+button = "Add outlines"
+expect = { objects = 3 }
+
+[[step]]
+command = "View > Show > Thread Look"
+
+[[step]]
+button = "Thread Look"
+
+[[step]]
+key = "Escape"
+
+[[step]]
+picture = "vector-stitches"
+around = [[-35.0, -38.0], [42.0, 20.0]]
+
+# Trace a picture.
+[[step]]
+open = "logo-backdrop"
+expect = { objects = 0 }
+
+[[step]]
+command = "Artwork > Trace > Trace Picture"
+expect = { objects = 3, kinds = ["Vector", "Vector", "Vector"] }
+
+[[step]]
+picture = "vector-traced"
+around = [[-45.0, -40.0], [40.0, 45.0]]

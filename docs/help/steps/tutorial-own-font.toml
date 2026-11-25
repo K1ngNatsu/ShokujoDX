@@ -1,0 +1,86 @@
+# The steps of "Tutorial: an embroidery font of your own"
+# (tutorial-own-font.md). The test each_tutorial_runs_in_each_language
+# (crates/emb-app/src/tutorial_steps.rs) does them in each language;
+# write_tutorial_pictures makes the pictures. A change of a step needs the
+# same change in the topic and its translations.
+#
+# The steps do not click Convert or Save Correction: they write files in
+# the folder of the fonts of the user.
+
+[[step]]
+open = "lettering-start"
+expect = { objects = 0 }
+
+# Convert the font: the settings.
+[[step]]
+command = "Lettering > Lettering > Fonts"
+expect = { window = "Fonts" }
+
+[[step]]
+button = "TrueType"
+
+[[step]]
+field = "Search"
+
+[[step]]
+type = "Graduate"
+
+[[step]]
+button = "Graduate"
+
+[[step]]
+button = "Convert to embroidery font…"
+
+[[step]]
+picture = "own-font-convert"
+area = "windows"
+
+[[step]]
+button = "Cancel"
+
+# Make a test sheet: of an embroidery font of the program (the letters of
+# a TrueType font take too long in a test).
+[[step]]
+button = "Embroidery"
+
+[[step]]
+field = "Search"
+
+[[step]]
+type = "Varsity"
+
+[[step]]
+button = "Varsity"
+
+[[step]]
+button = "Test Sheet…"
+expect = { window = "Font Test Sheet" }
+
+[[step]]
+choose = ["Characters", "Capital letters"]
+
+[[step]]
+button = "Make Test Sheet"
+expect = { objects = 2 }
+
+[[step]]
+picture = "own-font-sheet"
+
+# Correct a letter, in a new design.
+[[step]]
+command = "New"
+expect = { objects = 0 }
+
+[[step]]
+command = "Lettering > Lettering > Alphabets"
+expect = { window = "Alphabets" }
+
+[[step]]
+set = ["Character", "A"]
+
+[[step]]
+button = "Place Letter"
+expect = { objects = 4 }
+
+[[step]]
+picture = "own-font-letter"

@@ -301,6 +301,12 @@ impl FontLibrary {
         });
     }
 
+    /// `true` while the fonts of the computer are found.
+    #[cfg(test)]
+    pub fn scanning(&self) -> bool {
+        self.scan.is_some()
+    }
+
     /// Takes the result of the scan when it is ready.
     pub fn poll(&mut self) {
         let Some(rx) = &self.scan else { return };
@@ -390,6 +396,27 @@ impl FontLibrary {
         }
         self.sort();
         Ok(r)
+    }
+
+    /// Adds the TrueType or OpenType font file `path` as a font of the
+    /// computer (the tutorial steps use a font that is not on each
+    /// computer).
+    #[cfg(test)]
+    pub fn add_computer_font(&mut self, path: &Path) -> Result<FontRef, String> {
+        let bytes = std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
+        let (family, style) =
+            emb_letter::face_names(&bytes, 0).ok_or_else(|| format!("{} is not a font", path.display()))?;
+        let font = FontRef::new(&family, &style);
+        self.entries.retain(|e| !e.font.same(&font));
+        self.entries.push(FontEntry {
+            font: font.clone(),
+            source: FontSource::File(path.to_path_buf(), 0),
+            tuned: false,
+            fill: false,
+            score: None,
+        });
+        self.sort();
+        Ok(font)
     }
 
     /// Reads the font again when it is used next (after a change of its
@@ -1190,10 +1217,13 @@ pub fn font_picker(ui: &mut egui::Ui, st: &mut AppState, font: &mut FontRef, sal
     ui.horizontal(|ui| {
         ui.label(tr("Font"));
         let families = st.fonts.families();
+        // A click in the list (in its search field, on its scroll bar)
+        // keeps it open; a click on a font closes it.
         egui::ComboBox::from_id_salt(("font_family", salt))
             .selected_text(&font.family)
             .width(180.0)
             .height(320.0)
+            .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
             .show_ui(ui, |ui| {
                 ui.add(
                     egui::TextEdit::singleline(&mut st.font_filter)
@@ -1252,6 +1282,7 @@ pub fn font_picker(ui: &mut egui::Ui, st: &mut AppState, font: &mut FontRef, sal
                 if let Some(f) = clicked {
                     *font = f;
                     changed = true;
+                    ui.close();
                 }
             });
         let styles = st.fonts.styles(&font.family, font.kind);

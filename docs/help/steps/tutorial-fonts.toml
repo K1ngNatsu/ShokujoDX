@@ -1,0 +1,107 @@
+# The steps of "Tutorial: choose a font and a size" (tutorial-fonts.md).
+# The test each_tutorial_runs_in_each_language (crates/emb-app/src/
+# tutorial_steps.rs) does them in each language; write_tutorial_pictures
+# makes the pictures. A change of a step needs the same change in the topic
+# and its translations.
+
+# Open the start design: a construction point where the name starts.
+[[step]]
+open = "lettering-start"
+expect = { objects = 0 }
+
+# Find a font.
+[[step]]
+command = "Lettering > Lettering > Fonts"
+expect = { window = "Fonts" }
+
+[[step]]
+button = "Quality"
+
+[[step]]
+field = "Search"
+
+[[step]]
+type = "Pacifico"
+
+[[step]]
+button = "Pacifico"
+
+[[step]]
+picture = "fonts-window"
+area = "windows"
+
+[[step]]
+close = "Fonts"
+
+# Make lettering in the size range.
+[[step]]
+command = "Lettering > Lettering > Lettering"
+
+[[step]]
+click = [-35.0, 10.0]
+expect = { window = "Lettering" }
+
+[[step]]
+type = "Sam"
+
+[[step]]
+choose = ["Font", "Pacifico"]
+
+[[step]]
+set = ["Height", "20"]
+
+[[step]]
+button = "OK"
+expect = { objects = 1, kinds = ["Lettering"], selected = 1, warnings = 0 }
+
+# Satin or fill.
+[[step]]
+choose = ["Stitch type", "Fill"]
+
+[[step]]
+command = "View > Show > Thread Look"
+
+[[step]]
+button = "Thread Look"
+
+[[step]]
+key = "Escape"
+
+[[step]]
+picture = "fonts-fill"
+around = [[-40.0, -15.0], [25.0, 20.0]]
+
+[[step]]
+command = "Edit > Select > Select All"
+expect = { selected = 1 }
+
+[[step]]
+choose = ["Stitch type", "Automatic"]
+
+# Text that is too small.
+[[step]]
+set = ["Height", "6"]
+expect = { warnings = 1 }
+
+[[step]]
+command = "Lettering > Lettering > Fonts"
+
+[[step]]
+button = "For small text"
+
+[[step]]
+field = "Search"
+
+[[step]]
+type = "Atkinson"
+
+[[step]]
+button = "Atkinson Hyperlegible"
+
+[[step]]
+button = "Use for the selected lettering"
+expect = { objects = 1, warnings = 0 }
+
+[[step]]
+picture = "fonts-small"
+area = "windows"
