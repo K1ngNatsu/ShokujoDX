@@ -119,6 +119,9 @@ pub struct Faults {
     /// default pull compensation, mm (P22 Milestone 6). Of several
     /// letters, the farthest.
     pub out_max_mm: f64,
+    /// The area of the outline that two parts or more cover, mm² (P22
+    /// Milestone 7).
+    pub two_layers: f64,
 }
 
 impl Faults {
@@ -144,6 +147,7 @@ impl Faults {
         self.trims += o.trims;
         self.open_patch = self.open_patch.max(o.open_patch);
         self.out_max_mm = self.out_max_mm.max(o.out_max_mm);
+        self.two_layers += o.two_layers;
     }
 
     /// The open area as a part of the area of the outline, in percent.
@@ -417,6 +421,7 @@ pub fn measure(name: &str, parts: &[ObjectKind], o: &Outline) -> Letter {
                 "open_other": f.open_other,
                 "open_patch": f.open_patch,
                 "out_max_mm": f.out_max_mm,
+                "two_layers": f.two_layers,
                 "corners_open": f.corners_open,
                 "on_top": f.on_top,
                 "under": f.under,
@@ -526,19 +531,28 @@ fn open_area(o: &Outline, covers: &[Cover], f: &mut Faults) -> (Vec<[f64; 2]>, V
     let cell = grid.cell;
     let glyph = emb_letter::tune::outline_mask(&grid, o);
     let mut cover = vec![false; grid.w * grid.h];
+    // The number of parts that cover each cell.
+    let mut layers = vec![0u8; grid.w * grid.h];
     for c in covers {
+        let mut part = vec![false; grid.w * grid.h];
         match c {
             Cover::Quads(quads, _) => {
                 for q in quads {
-                    emb_letter::grid::fill_into(&grid, &[q.to_vec()], &mut cover);
+                    emb_letter::grid::fill_into(&grid, &[q.to_vec()], &mut part);
                 }
             }
             Cover::Fill(fo) => {
                 for (k, m) in emb_letter::tune::outline_mask(&grid, fo).into_iter().enumerate() {
-                    cover[k] |= m;
+                    part[k] |= m;
                 }
             }
             Cover::None => {}
+        }
+        for (k, on) in part.into_iter().enumerate() {
+            if on {
+                cover[k] = true;
+                layers[k] = layers[k].saturating_add(1);
+            }
         }
     }
     for j in 0..grid.h {
@@ -549,6 +563,9 @@ fn open_area(o: &Outline, covers: &[Cover], f: &mut Faults) -> (Vec<[f64; 2]>, V
             }
             let p = grid.center(i, j);
             f.area += cell * cell;
+            if layers[k] >= 2 {
+                f.two_layers += cell * cell;
+            }
             let covered = cover[k];
             let mut at_corner = false;
             for (k, c) in corners.iter().enumerate() {
@@ -984,6 +1001,38 @@ pub fn compare(fonts: &[FontFaults], judged: &[(String, String)]) -> Comparison 
     }
     c.text = t;
     c
+}
+
+/// For each font and way: the letters with no fault that the eye sees
+/// ([`eye_faults`]), the open area, the area with two layers and the
+/// trims (P22 Milestone 7: the measure of the trial of overlapped
+/// strokes).
+pub fn eye_summary(fonts: &[FontFaults]) -> String {
+    let mut s = String::from(
+        "| Font | Way | Clean to the eye | Open area mm2 | Largest patch mm2 | Two layers mm2 | Trims |\n| --- | --- | --- | --- | --- | --- | --- |\n",
+    );
+    let (mut clean_all, mut n_all) = (0, 0);
+    for f in fonts {
+        let clean = f.letters.iter().filter(|l| eye_faults(&l.faults).is_empty()).count();
+        clean_all += clean;
+        n_all += f.letters.len();
+        s.push_str(&format!(
+            "| {} | {} | {} of {} | {:.1} | {:.2} | {:.1} | {} |\n",
+            f.family,
+            f.way,
+            clean,
+            f.letters.len(),
+            f.sum.open_corner + f.sum.open_other,
+            f.sum.open_patch,
+            f.sum.two_layers,
+            f.sum.trims
+        ));
+    }
+    s.push_str(&format!(
+        "\nClean to the eye: {clean_all} of {n_all} ({:.1} %).\n",
+        100.0 * clean_all as f64 / n_all.max(1) as f64
+    ));
+    s
 }
 
 /// The pictures of all letters as JSON, for `tools/letter-faults.py`.

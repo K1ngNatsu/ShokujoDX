@@ -423,6 +423,53 @@ joint so. zigzag measured more clean letters with it (81 % against
 **Exit test:** the numbers of both ways are in this plan; the owner's
 choice; with the choice, the snapshot of the fault bench and the fonts.
 
+**Measured (2026-11-25).** The trial is on the branch
+`trial/overlapped-strokes`: the split keeps the ends of the pieces at
+bridges (a stroke that ends on a stroke that goes through, `split::Joint`,
+with the distance to the middle of that stroke), and after the tuning of
+the ends `glyph::overlap_joints` takes each such end of a column on to the
+middle of the other stroke; the route sews a column that ends in another
+first (`route::joints`). `EMB_OVERLAP_TRIAL=1` turns it on for Latin
+letters; `EMB_OVERLAP_TRIAL=2` also takes the ends at cuts from notches
+(the diagonal of an "N" at a stem). The measure is the letter fault bench
+in TrueType lettering (the embroidery fonts are not made again for a
+trial) with the limits of the eye of Milestone 6
+(`emb-cli letter-faults --judged`, `letter_faults::eye_summary`):
+
+| Way | Clean to the eye | Open area mm2 | Two layers mm2 | Trims |
+| --- | --- | --- | --- | --- |
+| Today | 240 of 248 | 83.6 | 989 | 21 |
+| Trial (bridges) | 238 of 248 | 83.6 | 1,491 (+51 %) | 21 |
+| Trial (bridges and notches) | 238 of 248 | 82.9 | 1,625 (+64 %) | 21 |
+
+Of each font (today / bridges / bridges and notches): clean letters
+Block Sans 61 / 61 / 61, Anton 57 / 57 / 56, Pacifico 61 / 59 / 59,
+Varsity 61 / 61 / 62; two layers Block Sans 213 / 350 / 401, Anton
+279 / 327 / 355, Pacifico 254 / 289 / 297, Varsity 243 / 525 / 574 mm2.
+
+- The open area does not change: the end of a piece goes 10 % of its
+  bridge into the other stroke today (`BRIDGE_OVERLAP`), so the joints of
+  this kind are covered already. The open areas that the eye sees (Anton
+  N, Y, a, Pacifico p, Block Sans 6) are not at such joints, and the
+  trial does not close them. The second way closes the open corner of
+  Varsity a (0.55 to 0.09 mm2).
+- The trial makes bulges of 3.4 and 3.5 mm in Pacifico K and R and of
+  3.0 mm in Anton 1 (the second way): the column that goes on widens in
+  the joint. On the proof pictures they do not show.
+- The area with two layers grows by a half to two thirds: thicker,
+  stiffer joints on a sew-out.
+- Trims do not change. Where the route cuts the stroke that goes through
+  at the joint (the right stem of a Block Sans H), it sews both parts
+  before the bar, so the end of the bar lies on them, not under them (the
+  route does not count an end in a column cut there as on top).
+
+The proof pictures of twelve letters in the three ways are in
+`out/p22-overlap` (`sheet1.png`, `sheet2.png`). In the flat view the
+three ways look almost the same.
+
+The trial does not win: no more clean letters (two fewer), and half
+again or more thread at the joints. The owner chooses.
+
 ## Milestone 8: the open tabs come back, and one program (M)
 
 1. **The tabs come back.** At a normal quit, the session of the backups
