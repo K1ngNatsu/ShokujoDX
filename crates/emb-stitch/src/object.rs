@@ -1298,6 +1298,9 @@ fn fill_runs(shape: &Shape, p: &FillParams, entry: Point, exit: Option<Point>) -
     let travel = Travel::new(shape);
     let mut sewer = Sewer::new(&travel, TRAVEL_LEN_MM);
     sewer.edge_only = p.trapunto;
+    // All travel of the fill, also of its underlay, goes along the top rows
+    // where it can: the top rows cover it best there.
+    sewer.rows = Some(emb_geom::Transform::rotate_deg(p.angle_deg).apply_vector(Point::new(1.0, 0.0)));
     let layers = fill_underlay_layers(shape, &p.underlay);
     for layer in &layers {
         match *layer {

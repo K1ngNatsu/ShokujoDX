@@ -44,7 +44,7 @@ Schwarz ist.
    Stiche bleiben, wie sie sind.
 4. Klicken Sie auf **Übernehmen**. Die Objekte ersetzen die Stichobjekte,
    in einem Rückgängig-Schritt. Die Statuszeile sagt, was das Programm
-   erstellt hat: 5 Objekte, 4 mit einer Stichart und 1, das Stiche bleibt.
+   erstellt hat: 6 Objekte, 5 mit einer Stichart und 1, das Stiche bleibt.
 
 Wenn der Kunde auch die Grafik geschickt hat (SVG, PDF, AI, EPS, EMF oder
 WMF), klicken Sie vor **Übernehmen** auf **Umrisse…**: Die Objekte

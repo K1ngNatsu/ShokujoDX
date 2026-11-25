@@ -27,7 +27,7 @@ area = "windows"
 
 [[step]]
 button = "Accept"
-expect = { kinds = ["Stitches", "Running", "Fill", "Satin", "Running"], colors = 3 }
+expect = { kinds = ["Fill", "Stitches", "Running", "Fill", "Satin", "Running"], colors = 3 }
 
 # Change the size.
 [[step]]

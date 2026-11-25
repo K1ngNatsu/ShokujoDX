@@ -42,7 +42,7 @@ el primer color del archivo es el negro.
    están.
 4. Haga clic en **Aceptar**. Los objetos sustituyen a los objetos de
    puntadas, en un solo paso de deshacer. La línea de estado dice lo que
-   creó el programa: 5 objetos, 4 con un tipo de puntada y 1 que se queda
+   creó el programa: 6 objetos, 5 con un tipo de puntada y 1 que se queda
    como puntadas.
 
 Si el cliente también envió el arte (SVG, PDF, AI, EPS, EMF o WMF), haga

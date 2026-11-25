@@ -44,7 +44,7 @@ black.
 3. Look at the list. A part that the program does not recognize stays
    stitches. Clear a part to keep its stitches as they are.
 4. Click **Accept**. The objects replace the stitch objects, in one undo
-   step. The status line says what the program made: 5 objects, 4 with a
+   step. The status line says what the program made: 6 objects, 5 with a
    stitch type and 1 that stays stitches.
 
 If the customer also sent the artwork (SVG, PDF, AI, EPS, EMF or WMF),

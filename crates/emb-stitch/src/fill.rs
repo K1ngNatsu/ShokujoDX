@@ -11,7 +11,8 @@
 //!    the previous row, and that segment overlaps only it. Otherwise it starts
 //!    a new section. In a section, each row connects to the next at one side.
 //! 4. Sections are sewn back and forth. The next section is the one with the
-//!    corner nearest to the needle. Travel to it goes inside the shape (`travel`).
+//!    corner nearest to the needle. Travel to it goes inside the shape (`travel`),
+//!    along the rows where it can (ADR 0166).
 //! 5. Needle points in a row are on a grid along the row. The grid moves by
 //!    `1 / staggers` of the stitch length from one row to the next, so the
 //!    needle points make the diagonal tatami pattern and do not line up.
@@ -382,6 +383,13 @@ pub fn sew_tatami(shape: &Shape, t: &Tatami, entry: Point, exit: Option<Point>, 
         }
     }
     let mut buf: Vec<Point> = Vec::new();
+    // Travel between the sections goes along the rows where it can: these
+    // rows, or the rows that the sewer has (the top rows of a fill, for its
+    // underlay).
+    let rows_before = sewer.rows;
+    if sewer.rows.is_none() {
+        sewer.rows = Some(from_rows.apply_vector(Point::new(1.0, 0.0)));
+    }
     while !todo.is_empty() || last.is_some() {
         let (mut sec, last_first, mut right) = if todo.is_empty() {
             last.take().expect("checked above")
@@ -433,6 +441,7 @@ pub fn sew_tatami(shape: &Shape, t: &Tatami, entry: Point, exit: Option<Point>, 
             }
         }
     }
+    sewer.rows = rows_before;
 }
 
 #[cfg(test)]
@@ -528,6 +537,79 @@ mod tests {
         for w in runs[0].windows(2) {
             assert!(w[1].distance(c) >= 6.0 - 0.06, "{:?}", w[1]);
             assert!(w[0].midpoint(w[1]).distance(c) >= 6.0 - 0.06, "{w:?}");
+        }
+    }
+
+    /// The travel between the sections of a fill with holes goes along the
+    /// rows and the edge: no travel stitch inside the fill crosses a row
+    /// sewn before it (it would show on top), and few cross rows sewn
+    /// after it (a ridge under them). A disc with a hexagon hole at 45° (the
+    /// sketch badge) and a box with two round holes at 0°.
+    #[test]
+    fn travel_between_sections_goes_along_the_rows() {
+        let hexagon: Vec<Point> = (0..6)
+            .map(|i| {
+                let (s, c) = emb_geom::math::sin_cos_deg(60.0 * f64::from(i) + 30.0);
+                Point::new(15.0 * c, 15.0 * s)
+            })
+            .collect();
+        let cases = [
+            (
+                Path::ellipse(Point::ZERO, 39.0, 39.0),
+                vec![Path::polygon(&hexagon)],
+                45.0,
+            ),
+            (
+                Path::rounded_rect(
+                    emb_geom::BBox::new(Point::new(-35.0, -25.0), Point::new(35.0, 25.0)),
+                    6.0,
+                ),
+                vec![
+                    Path::ellipse(Point::new(-16.0, 0.0), 8.0, 8.0),
+                    Path::ellipse(Point::new(16.0, 0.0), 8.0, 8.0),
+                ],
+                0.0,
+            ),
+        ];
+        for (outer, holes, angle) in cases {
+            let outer = outer.flatten(0.05);
+            let holes: Vec<Polyline> = holes.iter().flat_map(|h| h.flatten(0.05)).collect();
+            let shape = Shape::new(&outer, &holes);
+            let edges: Vec<(Point, Point)> = outer
+                .iter()
+                .chain(&holes)
+                .flat_map(|p| (0..p.points.len()).map(|i| (p.points[i], p.points[(i + 1) % p.points.len()])))
+                .collect();
+            let runs = sew(&shape, &tatami(angle));
+            let segs: Vec<(Point, Point)> = runs.iter().flat_map(|r| r.windows(2).map(|w| (w[0], w[1]))).collect();
+            let (s, c) = emb_geom::math::sin_cos_deg(angle);
+            let dir = Point::new(c, s);
+            let sin = |a: Point, b: Point| ((b - a).cross(dir) / a.distance(b)).abs();
+            let rows: Vec<usize> = (0..segs.len())
+                .filter(|&i| segs[i].0.distance(segs[i].1) > 0.5 && sin(segs[i].0, segs[i].1) < 0.1)
+                .collect();
+            let (mut over, mut under) = (0, 0);
+            for (i, &(a, b)) in segs.iter().enumerate() {
+                let inside = edges
+                    .iter()
+                    .all(|(p, q)| a.midpoint(b).distance_to_segment(*p, *q) > 1.0);
+                if a.distance(b) < 1.0 || sin(a, b) < 0.35 || !inside {
+                    continue;
+                }
+                for &j in &rows {
+                    let crossing = Point::crossing(a, b, segs[j].0, segs[j].1)
+                        .is_some_and(|(u, v)| u > 1e-6 && u < 1.0 - 1e-6 && v > 1e-6 && v < 1.0 - 1e-6);
+                    if crossing {
+                        if j < i {
+                            over += 1;
+                        } else {
+                            under += 1;
+                        }
+                    }
+                }
+            }
+            assert_eq!(over, 0, "travel on top of sewn rows at {angle}°");
+            assert!(under <= 10, "travel under {under} rows at {angle}°");
         }
     }
 

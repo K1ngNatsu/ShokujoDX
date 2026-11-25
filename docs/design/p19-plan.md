@@ -387,9 +387,10 @@ next release.
   kept a hoop that does not go on it (the worksheet showed the Tajima
   in the Crown hoop of the Topaz; the owner saw it): the hoop now
   changes to the smallest hoop of the machine that holds the design
-  (`AppState::hoop_for_machine`). The pictures showed a fault that stays open:
-  the travel between the sections of a fill with a hole shows as a ridge
-  in the 3D look (`docs/design/open-work.md`). The steps do not save a
+  (`AppState::hoop_for_machine`). The pictures showed one more fault:
+  the travel between the sections of a fill with a hole crossed the
+  rows (on top of sewn rows, or as a ridge under the next rows); it now
+  goes along the rows (ADR 0166). The steps do not save a
   quote sheet, a PDF or a copy of a script (they write files).
 
 ### Answers to the open questions
