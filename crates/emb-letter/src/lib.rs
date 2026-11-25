@@ -35,6 +35,7 @@ pub mod source;
 mod split;
 pub mod stroke;
 pub mod style;
+pub mod swatch;
 pub mod teamnames;
 pub mod tune;
 

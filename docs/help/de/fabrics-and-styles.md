@@ -34,6 +34,28 @@ Wenn Sie den Stoff ändern:
   3D-Garnansicht dann dünne Stiche, die in den Flor sinken. Ein Deckvlies
   oder eine Unterlagefüllung unter den Stichen hält sie oben.
 
+## Testmuster
+
+Jeder Stoff nimmt die Stiche auf seine eigene Weise auf. Um die beste
+Einstellung für einen Stoff zu finden, sticken Sie Testmuster. Wählen Sie
+ein Objekt aus (eine Füllung, eine Satinsäule, eine Linie oder einen
+Schriftzug) und klicken Sie auf **Design > Ausgabe > Testmuster**.
+
+- **Einstellung**: die Einstellung, die sich von Kopie zu Kopie ändert:
+  Abstand, Stichlänge, Zugausgleich, Breite, Winkel oder Unterlage. Die
+  Liste zeigt nur die Einstellungen, die die ausgewählten Objekte haben.
+- **Ab**, **Bis** und **Kopien**: die Werte der ersten und der letzten
+  Kopie und die Zahl der Kopien. Die Stufen dazwischen sind gleich. Für
+  die Unterlage gibt es eine Kopie für jede Art (keine, leicht, auto,
+  stark, doppelt).
+
+Das Fenster zeigt die Werte und die Größe des Rasters. **Muster
+erstellen** legt die Kopien in ein neues Design, jede mit ihrem Wert
+darunter, im Rahmen Ihres Designs: Ihr Design ändert sich nicht. Ist das
+Raster größer als der Rahmen, kommen die Muster auf mehrere Einspannungen
+(das Register Einspannen). Sticken Sie sie auf Ihren Stoff und verwenden
+Sie die Einstellung, die am besten aussieht.
+
 ## Aktuelle Eigenschaften
 
 Die **aktuellen Eigenschaften** sind die Sticheinstellungen, die neue

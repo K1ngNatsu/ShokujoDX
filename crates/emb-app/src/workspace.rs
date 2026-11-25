@@ -60,6 +60,12 @@ impl Units {
         format!("{:.*} {}", self.decimals(), self.of_mm(mm), self.suffix())
     }
 
+    /// A length with one decimal more than [`Units::fmt`] and no zeros at
+    /// the end, for example "0.35 mm" (the labels of test swatches).
+    pub fn fmt_fine(self, mm: f64) -> String {
+        format!("{} {}", self.fmt_plain(mm), self.suffix())
+    }
+
     /// A length as a number in the units, for a text field: no unit and no
     /// zeros at the end, for example "20" or "12.25".
     pub fn fmt_plain(self, mm: f64) -> String {

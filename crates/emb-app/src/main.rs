@@ -111,6 +111,7 @@ mod stock;
 mod styles;
 mod tabs;
 mod teamnames;
+mod test_swatches;
 #[cfg(test)]
 mod test_util;
 mod threads;

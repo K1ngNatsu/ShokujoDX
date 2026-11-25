@@ -122,6 +122,7 @@ impl AppState {
             Cmd::Align(_) | Cmd::SameSize(..) | Cmd::Group | Cmd::ClosestJoin | Cmd::ClickOrder | Cmd::Join => s.n > 1,
             Cmd::OptimizeOrder | Cmd::CapOrder => d.objects().len() > 1,
             Cmd::QuickerToSew => !d.objects().is_empty(),
+            Cmd::TestSwatches => s.fills + s.columns + s.lines + s.letterings > 0,
             Cmd::Puff => self.selection.ids().iter().any(|id| {
                 matches!(
                     d.object(*id).map(|o| &o.kind),
@@ -654,6 +655,7 @@ impl AppState {
             }
             Cmd::CleanUp => self.open_cleanup(),
             Cmd::QuickerToSew => self.open_quicker(),
+            Cmd::TestSwatches => self.open_test_swatches(),
             Cmd::CornerRadius => self.open_corner_dialog(),
             Cmd::HoleFromOutline => self.open_hole_dialog(),
             Cmd::PreviousView => self.previous_view(),

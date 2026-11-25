@@ -616,6 +616,8 @@ pub enum Cmd {
     CleanUp,
     /// Quicker to Sew (P22 Milestone 2, ADR 0169).
     QuickerToSew,
+    /// Test Swatches (P22 Milestone 3, ADR 0170).
+    TestSwatches,
     ExportSvg,
     ExportInkstitch,
     Simplify,
@@ -1343,6 +1345,13 @@ impl Cmd {
                 tr("Close Gaps…"),
                 tr(
                     "Join the ends of the selected lines where they are near, so lines drawn one at a time become one line or a closed shape. See the result before you keep it.",
+                ),
+            ),
+            Cmd::TestSwatches => (
+                g(ph::FLASK),
+                tr("Test Swatches…"),
+                tr(
+                    "Make copies of the selected objects in a grid, with one setting (spacing, stitch length, pull compensation, width, angle or underlay) in steps and its value under each copy, as a new design. Sew it on your fabric and keep the setting that looks best.",
                 ),
             ),
             Cmd::QuickerToSew => (

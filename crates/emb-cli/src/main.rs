@@ -136,6 +136,14 @@ Usage:
       wider than --row (180 mm), with the size at each group. With a
       TrueType or OpenType font, the letters that lettering makes from it
       (the stitch type Automatic).
+  emb-cli swatch <design.embproj> <out.embproj> --setting <name> --from <v> --to <v>
+                 [--copies <n>] [--objects <id>,<id>,...]
+      Write test swatches (ADR 0170): a copy of the objects (all, or the
+      ids of --objects) for each value from --from to --to in equal steps
+      (--copies, 5 by default), in a grid that fits the hoop of the design,
+      each with its value under it. The setting is spacing, stitch-length,
+      pull-compensation, width, angle (degrees) or underlay (none, light,
+      auto, heavy, double; --from and --to are not needed). Lengths in mm.
   emb-cli font-audit <font.embfont> [--source <font.ttf>] [--chars ...]
                      [--sizes <mm>,...] [--corrections <file>] [--proof <out.json>]
                      [--text <text>] [--weight <n>]
@@ -335,6 +343,9 @@ fn run(args: &[String]) -> Result<(), String> {
     let mut order_given = false;
     let mut sheet: Option<PathBuf> = None;
     let mut script_inputs = std::collections::BTreeMap::new();
+    let mut swatch_setting: Option<emb_letter::swatch::SwatchSetting> = None;
+    let (mut swatch_from, mut swatch_to, mut swatch_copies) = (None::<f64>, None::<f64>, 5usize);
+    let mut swatch_objects: Vec<u64> = Vec::new();
     let mut rest = Vec::new();
     let mut it = args.iter();
     while let Some(a) = it.next() {
@@ -495,6 +506,47 @@ fn run(args: &[String]) -> Result<(), String> {
                 )
             }
             "--sheet" => sheet = Some(PathBuf::from(it.next().ok_or("--sheet needs a PDF file")?)),
+            "--setting" => {
+                use emb_letter::swatch::SwatchSetting;
+                let name = it.next().ok_or("--setting needs a setting")?.to_lowercase();
+                swatch_setting = Some(
+                    SwatchSetting::ALL
+                        .into_iter()
+                        .find(|s| s.name().to_lowercase().replace(' ', "-") == name)
+                        .ok_or_else(|| format!("unknown setting {name:?}"))?,
+                );
+            }
+            "--from" | "--to" => {
+                let v = it
+                    .next()
+                    .and_then(|v| v.parse::<f64>().ok())
+                    .filter(|v| v.is_finite())
+                    .ok_or_else(|| format!("{a} needs a number"))?;
+                if a == "--from" {
+                    swatch_from = Some(v);
+                } else {
+                    swatch_to = Some(v);
+                }
+            }
+            "--copies" => {
+                swatch_copies = it
+                    .next()
+                    .and_then(|v| v.parse::<usize>().ok())
+                    .filter(|v| (1..=emb_letter::swatch::MAX_COPIES).contains(v))
+                    .ok_or("--copies needs a number from 1 to 24")?;
+            }
+            "--objects" => {
+                swatch_objects = it
+                    .next()
+                    .ok_or("--objects needs a list of ids")?
+                    .split(',')
+                    .map(|s| {
+                        s.trim()
+                            .parse::<u64>()
+                            .map_err(|_| format!("{s:?} is not an object id"))
+                    })
+                    .collect::<Result<_, _>>()?;
+            }
             "--set" => {
                 let (k, v) = emb_cli::script_input(it.next().ok_or("--set needs name=value")?)?;
                 script_inputs.insert(k, v);
@@ -876,6 +928,53 @@ fn run(args: &[String]) -> Result<(), String> {
                 sizes.len(),
                 b.width(),
                 b.height()
+            );
+            Ok(())
+        }
+        ["swatch", input, output] => {
+            use emb_letter::swatch::{SwatchSetting, SwatchSpec, swatches};
+            let design = emb_model::project::load(Path::new(input)).map_err(|e| format!("{input}: {e}"))?;
+            let setting = swatch_setting.ok_or("swatch needs --setting")?;
+            let (from, to) = match (setting, swatch_from, swatch_to) {
+                (SwatchSetting::Underlay, _, _) => (0.0, 0.0),
+                (_, Some(f), Some(t)) => (f, t),
+                _ => return Err("swatch needs --from and --to".into()),
+            };
+            let ids: Vec<emb_model::ObjectId> = if swatch_objects.is_empty() {
+                design.objects().iter().map(|o| o.id).collect()
+            } else {
+                swatch_objects.iter().map(|&i| emb_model::ObjectId(i)).collect()
+            };
+            let field = match &design.hoop.selection {
+                emb_model::HoopSelection::Preset { id } => emb_model::HoopCatalog::builtin()
+                    .get(id)
+                    .map(|h| (h.width_mm, h.height_mm)),
+                emb_model::HoopSelection::OpenField => None,
+            };
+            let spec = SwatchSpec {
+                setting,
+                from,
+                to,
+                copies: swatch_copies,
+                field,
+            };
+            let label = emb_letter::bundled::embroidery("Atkinson Hyperlegible");
+            let made = swatches(
+                &design,
+                &ids,
+                &spec,
+                label.as_ref().map(|l| l as &dyn emb_letter::source::LetterSource),
+                &|v| format!("{v:.2} mm"),
+            )?;
+            emb_model::project::save(&made.design, Path::new(output)).map_err(|e| format!("{output}: {e}"))?;
+            println!(
+                "wrote {output}: {} copies in {} x {}, {:.0} x {:.0} mm{}",
+                made.values.len(),
+                made.columns,
+                made.rows,
+                made.size.0,
+                made.size.1,
+                if made.fits { "" } else { " (larger than the hoop)" }
             );
             Ok(())
         }

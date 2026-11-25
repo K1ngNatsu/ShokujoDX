@@ -361,6 +361,8 @@ pub struct AppState {
     /// The Quicker to Sew window (P22 Milestone 2) and its last settings.
     pub quicker_dialog: Option<crate::quicker::QuickerDialog>,
     pub quicker_settings: emb_model::quicker::QuickerToSew,
+    /// The Test Swatches window (P22 Milestone 3).
+    pub swatch_window: crate::test_swatches::SwatchWindow,
     /// The Recognize Objects window (P18 Milestone 4).
     pub recognize_dialog: Option<crate::recognize_objects::RecognizeDialog>,
     /// The Envelope window (ADR 0092).
@@ -852,6 +854,7 @@ impl AppState {
             cleanup_dialog: None,
             quicker_dialog: None,
             quicker_settings: emb_model::quicker::QuickerToSew::STANDARD,
+            swatch_window: Default::default(),
             recognize_dialog: None,
             envelope_dialog: None,
             cleanup_settings: emb_geom::cleanup::Cleanup::STANDARD,
@@ -1869,6 +1872,7 @@ impl EmbApp {
         crate::gaps::window(&ctx, st);
         crate::cleanup::window(&ctx, st);
         crate::quicker::window(&ctx, st);
+        crate::test_swatches::window(&ctx, st);
         crate::recognize_objects::window(&ctx, st);
         crate::drawing_aids::envelope_window(&ctx, st);
         crate::editing::paste_special_window(&ctx, st);

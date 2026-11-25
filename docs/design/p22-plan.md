@@ -4,7 +4,8 @@ Date: 2026-11-25 · Status: Accepted (owner, 2026-11-25: "build those
 ideas into a new phase with milestones ordered so work builds
 efficiently on itself"). Milestone 1 is made (ADR 0167), and the travel
 faults that it found are fixed (ADR 0168). Milestone 2 is made (ADR
-0169).
+0169). Milestone 3 is made in the software (ADR 0170); its sew-out is
+open.
 
 ## Goal
 
@@ -215,6 +216,27 @@ The user finds the settings for a fabric by sewing them out.
 labels; no label touches a copy; the labels use the units of the
 program; each setting works for each object kind that has it; the owner
 sews a sheet of swatches on the Topaz 20.
+
+**Made (2026-11-25, ADR 0170).** The engine is `emb_letter::swatch`
+(not `emb_model::swatch`: the labels are lettering, and `emb-letter`
+lays them out): `SwatchSetting` (spacing, stitch length, pull
+compensation, width, angle, underlay) with `value_in` and `set` for
+fills, satin columns, lines (and lines with a border) and lettering,
+`widened` for the width of a satin column, and `swatches`, which makes a
+new design with the copies in a grid that fits the field of the hoop and
+the labels in Atkinson Hyperlegible. The window is Design > Output >
+Test Swatches… (`test_swatches.rs`): the settings of the selection,
+From, To, Copies, the labels and the size of the grid; Make Swatches
+opens a new design tab (more hoopings when the grid is larger than the
+hoop). `emb-cli swatch` makes the same from a project file. The labels
+use the units of the program with one decimal more (`Units::fmt_fine`).
+
+The exit test is met in the software (the tests
+`five_copies_of_a_satin_with_their_spacings_and_labels`,
+`each_setting_changes_the_kinds_that_have_it`,
+`the_swatches_are_a_new_design_and_the_design_does_not_change`); the
+sew-out of a sheet of swatches is open (the owner's list in
+`docs/design/open-work.md`).
 
 ## Milestone 4: satin lean and bands of threads (M)
 
