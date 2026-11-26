@@ -41,7 +41,8 @@ En un Mac la herramienta está dentro del programa:
 El servidor guarda un diseño. Sus herramientas:
 
 - empezar un diseño nuevo o abrir uno (un proyecto, un archivo de
-  máquina o un archivo SVG), y guardarlo;
+  máquina o un archivo SVG), cambiar su máquina, su bastidor y su tela, y
+  guardarlo;
 - listar los objetos, añadir formas con texto de trazado SVG (líneas,
   rellenos, columnas de satén y formas vectoriales) y añadir letras en
   las fuentes de bordado del programa;

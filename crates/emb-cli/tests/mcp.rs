@@ -144,7 +144,7 @@ fn an_agent_makes_a_badge_through_the_mcp_server() {
     let list = c.request("tools/list", json!({}));
     let tools = list["result"]["tools"].as_array().unwrap().clone();
     let names: BTreeSet<String> = tools.iter().map(|t| t["name"].as_str().unwrap().to_string()).collect();
-    assert_eq!(names.len(), 25);
+    assert_eq!(names.len(), 26);
     for t in &tools {
         assert_eq!(t["inputSchema"]["type"], "object", "{t}");
         assert_eq!(t["inputSchema"]["additionalProperties"], false, "{t}");
@@ -164,7 +164,15 @@ fn an_agent_makes_a_badge_through_the_mcp_server() {
 
     // The names to use.
     let fonts = c.ok("list_catalog", json!({"what": "fonts"}));
-    assert!(fonts["fonts"].as_array().unwrap().contains(&json!("Block Sans")));
+    let block = fonts["fonts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|f| f["name"] == "Block Sans")
+        .expect("Block Sans")
+        .clone();
+    assert_eq!(block["kind"], "satin columns", "{block}");
+    assert!(block["sizes_mm"][0].as_f64().unwrap() > 0.0, "{block}");
     let hoops = c.ok("list_catalog", json!({"what": "hoops"}));
     let hoop = hoops["hoops"]
         .as_array()
@@ -173,7 +181,10 @@ fn an_agent_makes_a_badge_through_the_mcp_server() {
         .find(|h| h["width"].as_f64().unwrap() >= 100.0 && h["height"].as_f64().unwrap() >= 100.0)
         .unwrap()["id"]
         .clone();
-    c.ok("list_catalog", json!({"what": "machines"}));
+    let machines = c.ok("list_catalog", json!({"what": "machines"}));
+    assert!(machines["machines"][0]["formats"].is_array(), "{machines}");
+    let fabrics = c.ok("list_catalog", json!({"what": "fabrics"}));
+    let fabric = fabrics["fabrics"][0]["id"].clone();
 
     // The badge: one undo step for each change.
     c.ok(
@@ -182,12 +193,12 @@ fn an_agent_makes_a_badge_through_the_mcp_server() {
     );
     assert_eq!(c.undo_steps(), 0);
     let circle = |r: f64| format!("M {} 0 A {r} {r} 0 1 0 {r} 0 A {r} {r} 0 1 0 {} 0 Z", -r, -r);
-    let fill = c.ok(
+    let added = c.ok(
         "add_shape",
         json!({"svg_path": circle(30.0), "stitch": "fill", "color": "#d8e4f0"}),
-    )["added"]
-        .as_u64()
-        .unwrap();
+    );
+    assert_eq!(added["object"]["fits_hoop"], true, "{added}");
+    let fill = added["added"].as_u64().unwrap();
     let text = c.ok(
         "add_lettering",
         json!({"text": "STAR", "height_mm": 12, "x": 0, "y": 0, "color": "#c01818"}),
@@ -236,24 +247,57 @@ fn an_agent_makes_a_badge_through_the_mcp_server() {
     );
     let settings = &c.ok("list_objects", json!({"ids": [fill]}))["objects"][0]["settings"];
     assert_eq!(settings["spacing_mm"], 0.45);
+    // Lettering that is laid out again keeps the middle of its box.
+    let middle = |c: &mut Client, id: u64| {
+        let b = c.ok("list_objects", json!({"ids": [id]}))["objects"][0]["box_mm"].clone();
+        let v = |k: &str| b[k].as_f64().unwrap();
+        (v("x") + v("width") / 2.0, v("y") + v("height") / 2.0)
+    };
+    let was = middle(&mut c, text);
     c.ok(
         "set_settings",
-        json!({"ids": [text], "settings": {"text": "STARS", "height_mm": 10}}),
+        json!({"ids": [text], "settings": {"text": "STARS", "height_mm": 10, "font": "Block Sans"}}),
     );
-    c.ok("move_objects", json!({"ids": [text], "dy": -2}));
+    let now = middle(&mut c, text);
+    assert!(
+        (was.0 - now.0).abs() < 0.01 && (was.1 - now.1).abs() < 0.01,
+        "{was:?} {now:?}"
+    );
+    // Move to a place: the middle of the box goes there.
+    c.ok("move_objects", json!({"ids": [text], "x": 0, "y": -2}));
+    let now = middle(&mut c, text);
+    assert!(now.0.abs() < 0.01 && (now.1 + 2.0).abs() < 0.01, "{now:?}");
     c.ok("rotate_objects", json!({"ids": [text], "degrees": 5}));
     c.ok("scale_objects", json!({"ids": [text], "factor": 1.1}));
     c.ok(
         "set_thread",
         json!({"ids": [border], "color": "#204080", "name": "Navy"}),
     );
-    assert_eq!(c.undo_steps(), 9);
+    let set = c.ok("set_design", json!({"fabric": fabric}));
+    assert_eq!(set["fabric"], fabric);
+    assert!(set["objects_changed_for_the_fabric"].as_u64().unwrap() >= 2, "{set}");
+    assert_eq!(c.undo_steps(), 10);
     // A change out of the range of a project is refused, with the reason.
     let e = c.refused("move_objects", json!({"ids": [fill], "dx": 2_000_000}));
     assert!(e.contains("refused"), "{e}");
-    assert_eq!(c.undo_steps(), 9);
-    assert_eq!(c.ok("undo", json!({}))["undone"], "Change thread");
-    assert_eq!(c.ok("redo", json!({}))["redone"], "Change thread");
+    assert_eq!(c.undo_steps(), 10);
+    assert_eq!(c.ok("undo", json!({}))["undone"], "Design settings");
+    assert_eq!(c.ok("redo", json!({}))["redone"], "Design settings");
+
+    // Stitches outside the field of the hoop: a warning.
+    assert_eq!(c.ok("design_info", json!({}))["fits_hoop"], true);
+    c.ok("move_objects", json!({"ids": [fill], "dx": 200}));
+    let check = c.ok("check_design", json!({}));
+    assert!(
+        check["warnings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|w| w["object"] == fill && w["text"].as_str().unwrap().contains("outside the field of the hoop")),
+        "{check}"
+    );
+    assert_eq!(c.ok("design_info", json!({}))["fits_hoop"], false);
+    c.ok("undo", json!({}));
 
     // The checks, the picture, the machine file.
     let check = c.ok("check_design", json!({}));
@@ -280,6 +324,8 @@ fn an_agent_makes_a_badge_through_the_mcp_server() {
     let back = emb_formats::read_machine("pes", &std::fs::read(&pes).unwrap()).expect("the PES file reads back");
     assert!(back.stitch_count() > 1000);
     assert_eq!(back.color_count(), 3);
+    // The project of the export is the file of the design now.
+    assert_eq!(c.ok("design_info", json!({}))["saved"], true);
 
     // Save, swatches, Quicker to Sew, a script.
     let project = dir.join("badge.embproj");
@@ -294,14 +340,23 @@ fn an_agent_makes_a_badge_through_the_mcp_server() {
     let steps = c.undo_steps();
     let q = c.ok("quicker_to_sew", json!({"dry_run": true}));
     assert!(q["before"]["stitches"].is_u64() && q["after"]["stitches"].is_u64());
+    assert_eq!(q["changed"], false);
+    assert!(q["would_change"].is_boolean(), "{q}");
+    assert!(
+        q["merged_threads"].is_array() && q["trim_distance_mm"].is_object(),
+        "{q}"
+    );
     assert_eq!(c.undo_steps(), steps, "a dry run changes nothing");
     let script = c.ok("run_script", json!({"source": "set_design_name(\"Badge 2\");"}));
     assert_eq!(script["changed"], true);
     assert_eq!(c.undo_steps(), steps + 1);
 
     // A machine file: check it, fix it.
-    let checked = c.ok("check_machine_file", json!({"path": s(&pes)}));
+    let checked = c.ok("check_machine_file", json!({"path": s(&pes), "hoop": hoop}));
     assert!(checked["faults"].is_object());
+    assert!(checked["stitches"].as_u64().unwrap() > 1000, "{checked}");
+    assert_eq!(checked["fits_hoop"], true, "{checked}");
+    assert_eq!(checked["threads"].as_array().unwrap().len(), 3, "{checked}");
     let fixed = dir.join("fixed.dst");
     c.ok("fix_machine_file", json!({"path": s(&pes), "out": s(&fixed)}));
     assert!(fixed.is_file());

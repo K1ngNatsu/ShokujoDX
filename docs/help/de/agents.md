@@ -43,7 +43,8 @@ JSON-Datei:
 Der Server hält ein Design. Seine Werkzeuge:
 
 - ein neues Design beginnen oder eines öffnen (ein Projekt, eine
-  Maschinendatei oder eine SVG-Datei) und es speichern;
+  Maschinendatei oder eine SVG-Datei), seine Maschine, seinen Rahmen und
+  seinen Stoff ändern und es speichern;
 - die Objekte auflisten, Formen aus SVG-Pfadtext hinzufügen (Linien,
   Füllungen, Satinsäulen und Vektorformen) und Schriftzüge in den
   Stickschriften des Programms hinzufügen;

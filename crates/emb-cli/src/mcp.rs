@@ -38,7 +38,8 @@ const STATELESS: &str = "2026-07-28";
 
 /// What the agent reads first.
 const INSTRUCTIONS: &str = "ShokujoDX makes machine embroidery designs. This server keeps one \
-design: start with new_design or open_design, add objects with add_shape (SVG path text) and \
+design: start with new_design or open_design (set_design changes its machine, hoop and \
+fabric), add objects with add_shape (SVG path text) and \
 add_lettering, change them with set_settings, move_objects, scale_objects, rotate_objects and \
 delete_objects, look at it with picture and check_design, and keep it with save_design or \
 export. show opens it in the program. Each change is one undo step (undo, redo). Coordinates \
@@ -220,6 +221,7 @@ impl Session {
             "saved": !self.doc.is_modified(),
             "machine": d.machine,
             "hoop": hoop,
+            "fabric": d.fabric,
             "size_mm": size,
             "objects": d.objects().len(),
             "threads": d.threads.iter().map(|t| json!({"id": t.id.0, "name": t.name, "color": hex(t.color)})).collect::<Vec<_>>(),
@@ -449,7 +451,7 @@ fn objects_of(s: &Session, a: &Args) -> Result<Vec<ObjectId>, String> {
     Ok(ids)
 }
 
-static TOOLS: [Tool; 25] = [
+static TOOLS: [Tool; 26] = [
     Tool {
         name: "new_design",
         title: "New design",
@@ -464,6 +466,12 @@ static TOOLS: [Tool; 25] = [
             ),
             p("hoop", Kind::Text, false, "The id of the hoop (list_catalog hoops)."),
             p(
+                "fabric",
+                Kind::Text,
+                false,
+                "The id of the fabric (list_catalog fabrics): the settings of new objects suit it.",
+            ),
+            p(
                 "discard_changes",
                 Kind::Flag,
                 false,
@@ -473,6 +481,30 @@ static TOOLS: [Tool; 25] = [
         reads: false,
         destroys: true,
         run: new_design,
+    },
+    Tool {
+        name: "set_design",
+        title: "Design settings",
+        about: "Changes the name, machine, hoop or fabric of the design, as one undo step. A new fabric changes the settings of the satin, fill and lettering objects for it, and of new objects.",
+        params: &[
+            p("name", Kind::Text, false, "The name of the design."),
+            p(
+                "machine",
+                Kind::Text,
+                false,
+                "The id of the machine (list_catalog machines).",
+            ),
+            p("hoop", Kind::Text, false, "The id of the hoop (list_catalog hoops)."),
+            p(
+                "fabric",
+                Kind::Text,
+                false,
+                "The id of the fabric (list_catalog fabrics), or \"none\".",
+            ),
+        ],
+        reads: false,
+        destroys: false,
+        run: set_design,
     },
     Tool {
         name: "open_design",
@@ -508,7 +540,7 @@ static TOOLS: [Tool; 25] = [
     Tool {
         name: "design_info",
         title: "Design information",
-        about: "The design: its name, file, machine, hoop, size, threads, stitches, color changes, trims, the travel that shows, and the undo steps.",
+        about: "The design: its name, file, machine, hoop (its field is round the middle, 0, 0), fabric, size and box, if it fits the hoop, threads, stitches, color changes, trims, the travel that shows, and the undo steps.",
         params: &[],
         reads: true,
         destroys: false,
@@ -517,7 +549,7 @@ static TOOLS: [Tool; 25] = [
     Tool {
         name: "list_objects",
         title: "List objects",
-        about: "The objects in sew order: id, kind, thread, box (mm) and settings.",
+        about: "The objects in sew order: id, kind, thread, box (mm: x and y of the top left corner, width, height), if the shape fits the hoop, and settings.",
         params: &[p("ids", Kind::Ids, false, "Only these objects.")],
         reads: true,
         destroys: false,
@@ -526,7 +558,7 @@ static TOOLS: [Tool; 25] = [
     Tool {
         name: "add_shape",
         title: "Add a shape",
-        about: "Adds an object from SVG path text (M, L, H, V, C, S, Q, T, A, Z; mm): a run along the path, a fill of its closed parts (the first part the outline, the others holes), a satin column with the path as its middle line, or a vector shape with no stitches.",
+        about: "Adds an object from SVG path text (M, L, H, V, C, S, Q, T, A, Z; mm): a run along the path, a fill of its closed parts (the first part the outline, the others holes), a satin column with the path as its middle line, or a vector shape with no stitches. Coordinates are mm from the middle of the hoop, x to the right and y down.",
         params: &[
             p(
                 "svg_path",
@@ -539,7 +571,7 @@ static TOOLS: [Tool; 25] = [
                 "width_mm",
                 Kind::Number,
                 false,
-                "The width of a satin column (4 if not given).",
+                "The full width of a satin column, mm: half of it on each side of the path (4 if not given).",
             ),
             p(
                 "color",
@@ -596,7 +628,7 @@ static TOOLS: [Tool; 25] = [
     Tool {
         name: "set_settings",
         title: "Change settings",
-        about: "Changes the settings of objects: the names that list_objects shows for each object, for example {\"spacing_mm\": 0.4, \"angle_deg\": 45} for a fill. Lettering also takes text, height_mm and its other settings.",
+        about: "Changes the settings of objects: the names that list_objects shows for each object, for example {\"spacing_mm\": 0.4, \"angle_deg\": 45} for a fill. Lettering also takes text, height_mm, font (the name of a font) and its other settings, and keeps the middle of its box. A wrong value gives an error that names the values that are allowed.",
         params: &[
             p("ids", Kind::Ids, true, "The objects."),
             p("settings", Kind::Object, true, "The settings to change, by name."),
@@ -621,11 +653,13 @@ static TOOLS: [Tool; 25] = [
     Tool {
         name: "move_objects",
         title: "Move",
-        about: "Moves objects.",
+        about: "Moves objects by dx and dy, or puts the middle of their box at x and y (0, 0 is the middle of the hoop).",
         params: &[
             p("ids", Kind::Ids, true, "The objects."),
             p("dx", Kind::Number, false, "To the right, mm."),
             p("dy", Kind::Number, false, "Down, mm."),
+            p("x", Kind::Number, false, "The new middle of the box, mm (not with dx)."),
+            p("y", Kind::Number, false, "The new middle of the box, mm (not with dy)."),
         ],
         reads: false,
         destroys: false,
@@ -705,7 +739,7 @@ static TOOLS: [Tool; 25] = [
     Tool {
         name: "check_design",
         title: "Check",
-        about: "The warnings of the design: the warnings of the stitch plan (density, sizes), travel that shows, loose parts of lace, the faults of stitch objects.",
+        about: "The warnings of the design: stitches outside the field of the hoop, the warnings of the stitch plan (density, sizes), travel that shows, loose parts of lace, the faults of stitch objects.",
         params: &[],
         reads: true,
         destroys: false,
@@ -721,7 +755,13 @@ static TOOLS: [Tool; 25] = [
                 "px_per_mm",
                 Kind::Number,
                 false,
-                "Pixels for each mm (4 if not given; at most 2,000 pixels on a side).",
+                "Pixels for each mm (4 if not given; 0.5 to 20, and at most 2,000 pixels on a side).",
+            ),
+            p(
+                "background",
+                Kind::Text,
+                false,
+                "A plain color behind the design, #rrggbb, or \"none\" (clear). If not given: the fabric of the design (its weave in its color, else white).",
             ),
             p(
                 "flat",
@@ -737,7 +777,7 @@ static TOOLS: [Tool; 25] = [
     Tool {
         name: "export",
         title: "Export",
-        about: "Writes the output files of the design to a folder: machine files and, if asked, the worksheet, the approval sheet and the picture. Also the project file.",
+        about: "Writes the output files of the design to a folder: machine files and, if asked, the worksheet, the approval sheet and the picture. Also the project file, which becomes the file of the design. PES and PEC files keep each thread as the nearest of the 64 colors of the Brother palette.",
         params: &[
             p("folder", Kind::Text, true, "The folder."),
             p(
@@ -764,13 +804,13 @@ static TOOLS: [Tool; 25] = [
                 "setting",
                 Kind::Text,
                 true,
-                "spacing, stitch length, pull compensation, width, angle, underlay, lean or band overlap.",
+                "spacing (the density: mm from one stitch to the next), stitch length, pull compensation, width, angle, underlay, lean or band overlap.",
             ),
             p(
                 "from",
                 Kind::Number,
                 false,
-                "The value of the first copy (not for underlay).",
+                "The value of the first copy: mm, or degrees for angle and lean (not for underlay).",
             ),
             p(
                 "to",
@@ -793,7 +833,7 @@ static TOOLS: [Tool; 25] = [
     Tool {
         name: "quicker_to_sew",
         title: "Quicker to Sew",
-        about: "Makes the design quicker to sew: merges similar threads, removes small details, joins color blocks, and sets the trim distance. Gives the numbers before and after; dry_run gives only the numbers.",
+        about: "Makes the design quicker to sew: merges similar threads, removes small details, joins color blocks, and sets the trim distance. Gives the numbers before and after and what changes (changed; with dry_run nothing changes, and would_change says if it would).",
         params: &[
             p(
                 "merge_threads",
@@ -817,7 +857,7 @@ static TOOLS: [Tool; 25] = [
                 "gap_mm",
                 Kind::Number,
                 false,
-                "Sew across gaps up to this, mm (3 if not given).",
+                "Sew across gaps up to this, mm (3 if not given). Lettering has its own setting for the gaps between letters (trim_over_mm).",
             ),
             p("dry_run", Kind::Flag, false, "Only give the numbers; change nothing."),
         ],
@@ -828,7 +868,7 @@ static TOOLS: [Tool; 25] = [
     Tool {
         name: "check_machine_file",
         title: "Check a machine file",
-        about: "Checks the stitches of a machine file (or of the stitch objects of a project): short and long stitches, color changes to the same thread, long jumps with no trim, short pieces, no lock stitches, travel that shows.",
+        about: "Checks the stitches of a machine file (or of the stitch objects of a project): short and long stitches, color changes to the same thread, long jumps with no trim, short pieces, no lock stitches, travel that shows. Also its size, stitches, colors, trims and threads (the colors that the file keeps).",
         params: &[
             p("path", Kind::Text, true, "The file."),
             p(
@@ -836,6 +876,12 @@ static TOOLS: [Tool; 25] = [
                 Kind::Text,
                 false,
                 "The id of the machine for the stitch lengths.",
+            ),
+            p(
+                "hoop",
+                Kind::Text,
+                false,
+                "The id of a hoop: the result says if the stitches fit its field.",
             ),
         ],
         reads: true,
@@ -883,7 +929,7 @@ static TOOLS: [Tool; 25] = [
     Tool {
         name: "list_catalog",
         title: "List names",
-        about: "The names to use in other tools: fonts, machines, hoops, fabrics or swatch settings.",
+        about: "The names to use in other tools: fonts (kind, size range in mm, quality score), machines (brand, formats, hoops), hoops, fabrics or swatch settings.",
         params: &[p(
             "what",
             Kind::Text,
@@ -913,9 +959,59 @@ fn new_design(s: &mut Session, a: &Args) -> Result<Out, String> {
         }
         d.hoop.selection = HoopSelection::Preset { id: h.to_string() };
     }
+    if let Some(f) = a.text("fabric")? {
+        let fabrics = emb_model::FabricCatalog::builtin();
+        if fabrics.get(f).is_none() {
+            return Err(format!("no fabric {f:?} (list_catalog fabrics)"));
+        }
+        d.set_fabric(&fabrics, Some(f), false);
+    }
     s.doc = Document::new(d);
     s.path = None;
     out(s.summary())
+}
+
+fn set_design(s: &mut Session, a: &Args) -> Result<Out, String> {
+    let name = a.text("name")?.map(str::to_string);
+    let machine = a.text("machine")?.map(str::to_string);
+    let hoop = a.text("hoop")?.map(str::to_string);
+    let fabrics = emb_model::FabricCatalog::builtin();
+    let fabric = match a.text("fabric")? {
+        None => None,
+        Some(f) if f.eq_ignore_ascii_case("none") => Some(None),
+        Some(f) if fabrics.get(f).is_some() => Some(Some(f.to_string())),
+        Some(f) => return Err(format!("no fabric {f:?} (list_catalog fabrics)")),
+    };
+    if name.is_none() && machine.is_none() && hoop.is_none() && fabric.is_none() {
+        return Err("give one or more of name, machine, hoop, fabric".into());
+    }
+    if let Some(m) = &machine
+        && MachineCatalog::builtin().get(m).is_none()
+    {
+        return Err(format!("no machine {m:?} (list_catalog machines)"));
+    }
+    if let Some(h) = &hoop
+        && HoopCatalog::builtin().get(h).is_none()
+    {
+        return Err(format!("no hoop {h:?} (list_catalog hoops)"));
+    }
+    let changed = s.change("Design settings", |d| {
+        if let Some(n) = name {
+            d.name = n;
+        }
+        if let Some(m) = machine {
+            d.machine = Some(m);
+        }
+        if let Some(h) = hoop {
+            d.hoop.selection = HoopSelection::Preset { id: h };
+        }
+        fabric.map(|f| d.set_fabric(&fabrics, f.as_deref(), true).len())
+    })?;
+    let mut v = s.summary();
+    if let Some(n) = changed {
+        v["objects_changed_for_the_fabric"] = json!(n);
+    }
+    out(v)
 }
 
 fn open_design(s: &mut Session, a: &Args) -> Result<Out, String> {
@@ -960,7 +1056,14 @@ fn save_design(s: &mut Session, a: &Args) -> Result<Out, String> {
 }
 
 fn design_info(s: &mut Session, _: &Args) -> Result<Out, String> {
-    out(s.summary())
+    let mut v = s.summary();
+    let d = s.design();
+    v["box_mm"] = json!(boxes(d, &d.objects().iter().map(|o| o.id).collect::<Vec<_>>()).map(box_value));
+    if let Some(h) = hoop_of(d) {
+        let p = plan(d, &plan_options(d, None).unwrap_or_default());
+        v["fits_hoop"] = json!(outside_hoop(d, &h, &p).is_empty());
+    }
+    out(v)
 }
 
 fn list_objects(s: &mut Session, a: &Args) -> Result<Out, String> {
@@ -971,13 +1074,14 @@ fn list_objects(s: &mut Session, a: &Args) -> Result<Out, String> {
         .iter()
         .filter(|o| only.is_empty() || only.contains(&o.id))
         .map(|o| {
-            let b = d.bbox_of(&[o.id]);
+            let b = boxes(d, &[o.id]);
             let thread = d.thread(o.thread);
             let mut v = json!({
                 "id": o.id.0,
+                "fits_hoop": shape_fits_hoop(d, o.id),
                 "kind": o.type_name(),
                 "thread": {"id": o.thread.0, "color": thread.map(|t| hex(t.color))},
-                "box_mm": b.map(|b| json!({"x": round(b.min.x), "y": round(b.min.y), "width": round(b.width()), "height": round(b.height())})),
+                "box_mm": b.map(box_value),
                 "settings": shown_settings(&o.kind),
             });
             if let Some(n) = &o.name {
@@ -1059,6 +1163,8 @@ fn add_lettering(s: &mut Session, a: &Args) -> Result<Out, String> {
         kind.transform(&Transform::translate(at.x - c.x, at.y - c.y));
     }
     let id = s.change("Add lettering", |d| {
+        let mut kind = kind;
+        d.fabric_change(&emb_model::FabricCatalog::builtin()).object(&mut kind);
         let t = thread_of(d, color);
         d.add_object(t, kind)
     })?;
@@ -1082,8 +1188,17 @@ fn set_settings(s: &mut Session, a: &Args) -> Result<Out, String> {
     }
     s.change("Change settings", |d| {
         for (id, kind) in new {
+            // Lettering that is laid out again keeps the middle of its box.
+            let keep = matches!(kind, ObjectKind::Lettering(_))
+                .then(|| boxes(d, &[id]).map(|b| b.center()))
+                .flatten();
             if let Some(o) = d.object_mut(id) {
                 o.kind = kind;
+            }
+            if let (Some(was), Some(now)) = (keep, boxes(d, &[id]).map(|b| b.center()))
+                && was.distance(now) > 1e-9
+            {
+                d.transform_objects(&[id], &Transform::translate(was.x - now.x, was.y - now.y));
             }
         }
     })?;
@@ -1117,7 +1232,15 @@ fn set_thread(s: &mut Session, a: &Args) -> Result<Out, String> {
 
 fn move_objects(s: &mut Session, a: &Args) -> Result<Out, String> {
     let ids = objects_of(s, a)?;
-    let t = Transform::translate(a.number("dx")?.unwrap_or(0.0), a.number("dy")?.unwrap_or(0.0));
+    let (x, y, dx, dy) = (a.number("x")?, a.number("y")?, a.number("dx")?, a.number("dy")?);
+    if (x.is_some() && dx.is_some()) || (y.is_some() && dy.is_some()) {
+        return Err("give dx or x, and dy or y, not both".into());
+    }
+    let c = boxes(s.design(), &ids).map(|b| b.center()).unwrap_or(Point::ZERO);
+    let t = Transform::translate(
+        x.map_or(dx.unwrap_or(0.0), |x| x - c.x),
+        y.map_or(dy.unwrap_or(0.0), |y| y - c.y),
+    );
     transform(s, "Move", &ids, t)
 }
 
@@ -1204,11 +1327,21 @@ fn check_design(s: &mut Session, _: &Args) -> Result<Out, String> {
     let d = s.design();
     let opts = plan_options(d, None).unwrap_or_default();
     let p = plan(d, &opts);
-    let mut warnings: Vec<Value> = p
-        .warnings
-        .iter()
-        .map(|w| json!({"object": w.object.map(|o| o.0), "text": w.message}))
-        .collect();
+    let mut warnings: Vec<Value> = Vec::new();
+    if let Some(h) = hoop_of(d) {
+        for (object, at) in outside_hoop(d, &h, &p) {
+            warnings.push(json!({
+                "object": object.0,
+                "text": format!("Stitches outside the field of the hoop {} ({} × {} mm)", h.name, h.width_mm, h.height_mm),
+                "at_mm": [round(at.x), round(at.y)],
+            }));
+        }
+    }
+    warnings.extend(
+        p.warnings
+            .iter()
+            .map(|w| json!({"object": w.object.map(|o| o.0), "text": w.message})),
+    );
     // Travel that shows (P22 Milestone 1, ADR 0167): the limits of Design
     // info.
     if !emb_stitch::lace::is_lace(d, &emb_model::FabricCatalog::builtin()) {
@@ -1256,10 +1389,26 @@ fn picture(s: &mut Session, a: &Args) -> Result<Out, String> {
     }
     let p = plan(d, &plan_options(d, None).unwrap_or_default());
     let preset = emb_model::FabricCatalog::builtin().of(d);
-    let ground = Some(emb_render::fabric::Ground::of(&preset, d));
-    let look = crate::picture_look(d, a.flag("flat")?.unwrap_or(false));
+    let flat = a.flag("flat")?.unwrap_or(false);
+    let plain = a.text("background")?.is_some();
+    // A color that the agent gives is plain (no weave of the fabric); with
+    // no color the fabric of the design shows (its weave in its color, else
+    // white).
+    let look = if plain && !flat {
+        emb_render::raster::Look::three_d(None)
+    } else {
+        crate::picture_look(d, flat)
+    };
+    let (background, ground) = match a.text("background")? {
+        Some(t) if t.eq_ignore_ascii_case("none") => (None, None),
+        Some(t) => (Some(parse_color(t)?), None),
+        None => (
+            Some(d.background.unwrap_or(Rgb(255, 255, 255))),
+            Some(emb_render::fabric::Ground::of(&preset, d)),
+        ),
+    };
     let spans = p.spans.iter().map(|s| (s.object, s.records.clone()));
-    let pic = emb_render::picture::design_picture(d, &p.stitches, spans, ground, px, 2.0, d.background, &look);
+    let pic = emb_render::picture::design_picture(d, &p.stitches, spans, ground, px, 2.0, background, &look);
     let png = pic.png();
     let mut value = json!({"width": pic.width, "height": pic.height, "px_per_mm": round(px)});
     if let Some(path) = a.text("path")? {
@@ -1316,6 +1465,8 @@ fn export(s: &mut Session, a: &Args) -> Result<Out, String> {
     if !files.contains(&proj.display().to_string()) {
         files.insert(0, proj.display().to_string());
     }
+    s.doc.mark_saved();
+    s.path = Some(proj);
     out(json!({"files": files}))
 }
 
@@ -1330,13 +1481,19 @@ fn test_swatches(s: &mut Session, a: &Args) -> Result<Out, String> {
     let made = crate::swatch_design(s.design(), &ids, setting, a.number("from")?, a.number("to")?, copies)?;
     let path = PathBuf::from(a.need_text("path")?);
     project::save(&made.design, &path).map_err(|e| format!("{}: {e}", path.display()))?;
-    out(json!({
+    let mut v = json!({
         "file": path.display().to_string(),
         "values": made.values.iter().map(|v| round(*v)).collect::<Vec<_>>(),
         "grid": [made.columns, made.rows],
         "size_mm": [round(made.size.0), round(made.size.1)],
         "fits_the_hoop": made.fits,
-    }))
+    });
+    if !made.fits {
+        v["warning"] = json!(
+            "The swatches do not fit the field of the hoop: use fewer copies, a smaller object, or a larger hoop."
+        );
+    }
+    out(v)
 }
 
 fn quicker_to_sew(s: &mut Session, a: &Args) -> Result<Out, String> {
@@ -1373,15 +1530,24 @@ fn quicker_to_sew(s: &mut Session, a: &Args) -> Result<Out, String> {
     }
     let sews_of = |t| sews.get(&t).copied().unwrap_or(0);
     let mut after_design = d.clone();
-    apply(&mut after_design, &q, &sews_of);
+    let report = apply(&mut after_design, &q, &sews_of);
     let after = numbers(&after_design);
+    let changes = !after_design.same_content(&d);
     let dry = a.flag("dry_run")?.unwrap_or(false);
-    if !dry {
+    if !dry && changes {
         s.change("Quicker to Sew", |d| {
             apply(d, &q, &sews_of);
         })?;
     }
-    out(json!({"before": before, "after": after, "changed": !dry}))
+    out(json!({
+        "before": before,
+        "after": after,
+        "merged_threads": report.merged.iter().map(|(gone, stays)| json!({"gone": gone.0, "now": stays.0})).collect::<Vec<_>>(),
+        "removed_objects": report.removed.iter().map(|o| o.0).collect::<Vec<_>>(),
+        "trim_distance_mm": {"before": d.trim_gap_mm, "after": after_design.trim_gap_mm},
+        "changed": !dry && changes,
+        "would_change": dry && changes,
+    }))
 }
 
 fn check_machine_file(_: &mut Session, a: &Args) -> Result<Out, String> {
@@ -1393,7 +1559,29 @@ fn check_machine_file(_: &mut Session, a: &Args) -> Result<Out, String> {
         .iter()
         .map(|f| (f.key().to_string(), json!(c.count(*f))))
         .collect();
-    out(json!({"faults": counts, "report": crate::check_report(&c)}))
+    let needle = st
+        .records
+        .iter()
+        .filter(|r| r.kind == emb_model::StitchKind::Stitch)
+        .map(|r| r.pos);
+    let mut v = json!({
+        "faults": counts,
+        "report": crate::check_report(&c),
+        "box_mm": BBox::from_points(needle.clone()).map(box_value),
+        "stitches": st.stitch_count(),
+        "colors": st.color_count(),
+        "trims": st.trim_count(),
+        "threads": st.threads.iter().map(|t| json!({"color": hex(t.color), "name": t.name})).collect::<Vec<_>>(),
+    });
+    if let Some(id) = a.text("hoop")? {
+        let h = HoopCatalog::builtin()
+            .get(id)
+            .cloned()
+            .ok_or_else(|| format!("no hoop {id:?} (list_catalog hoops)"))?;
+        // A machine file has its middle at the middle of the hoop.
+        v["fits_hoop"] = json!(needle.clone().all(|p| h.contains(p, 0.0)));
+    }
+    out(v)
 }
 
 fn fix_machine_file(_: &mut Session, a: &Args) -> Result<Out, String> {
@@ -1468,14 +1656,20 @@ fn program() -> Result<PathBuf, String> {
 fn list_catalog(_: &mut Session, a: &Args) -> Result<Out, String> {
     let what = a.need_text("what")?.to_lowercase();
     let list: Vec<Value> = match what.as_str() {
-        "fonts" => emb_letter::bundled::EMBROIDERY
-            .iter()
-            .map(|(name, _)| json!(name))
-            .collect(),
+        "fonts" => font_list().clone(),
         "machines" => MachineCatalog::builtin()
             .machines
             .iter()
-            .map(|m| json!({"id": m.id, "name": m.name}))
+            .map(|m| {
+                json!({
+                    "id": m.id,
+                    "name": m.name,
+                    "brand": m.brand,
+                    "formats": m.formats,
+                    "default_format": m.default_format,
+                    "hoops": m.hoops,
+                })
+            })
             .collect(),
         "hoops" => HoopCatalog::builtin()
             .hoops
@@ -1485,7 +1679,7 @@ fn list_catalog(_: &mut Session, a: &Args) -> Result<Out, String> {
         "fabrics" => emb_model::FabricCatalog::builtin()
             .fabrics
             .iter()
-            .map(|f| json!({"id": f.id, "name": f.name}))
+            .map(|f| json!({"id": f.id, "name": f.name, "description": f.description, "topping": f.topping}))
             .collect(),
         "settings" => emb_letter::swatch::SwatchSetting::ALL
             .iter()
@@ -1504,19 +1698,96 @@ fn list_catalog(_: &mut Session, a: &Args) -> Result<Out, String> {
 
 // --- Helpers -------------------------------------------------------------
 
+/// The bundled embroidery fonts: name, kind, size range and score (read
+/// one time).
+fn font_list() -> &'static Vec<Value> {
+    static LIST: std::sync::OnceLock<Vec<Value>> = std::sync::OnceLock::new();
+    LIST.get_or_init(|| {
+        emb_letter::bundled::EMBROIDERY
+            .iter()
+            .map(|(name, _)| {
+                let font = emb_letter::bundled::embroidery(name);
+                let fill = emb_letter::bundled::is_fill(name);
+                json!({
+                    "name": name,
+                    "kind": if fill { "fill letters" } else { "satin columns" },
+                    "sizes_mm": font.map(|f| [round(f.min_height_mm), round(f.max_height_mm)]),
+                    "score": emb_letter::bundled::quality(name).map(|q| q.score),
+                })
+            })
+            .collect()
+    })
+}
+
+/// The hoop of the design (none for an open field).
+fn hoop_of(d: &Design) -> Option<emb_model::HoopPreset> {
+    match &d.hoop.selection {
+        HoopSelection::Preset { id } => HoopCatalog::builtin().get(id).cloned(),
+        HoopSelection::OpenField => None,
+    }
+}
+
+/// The objects with stitches outside the field of the hoop `h`, and the
+/// first such stitch of each (design coordinates).
+fn outside_hoop(d: &Design, h: &emb_model::HoopPreset, p: &emb_stitch::StitchPlan) -> Vec<(ObjectId, Point)> {
+    let back = d.from_hoop_transform();
+    p.spans
+        .iter()
+        .filter_map(|span| {
+            p.stitches.records[span.records.clone()]
+                .iter()
+                .filter(|r| r.kind == emb_model::StitchKind::Stitch)
+                .find(|r| !h.contains(r.pos, 0.0))
+                .map(|r| (span.object, back.apply(r.pos)))
+        })
+        .collect()
+}
+
+/// The shape of the object is in the field of the hoop (`None`: no hoop).
+/// The stitches can go out a little more (pull compensation):
+/// check_design checks them.
+fn shape_fits_hoop(d: &Design, id: ObjectId) -> Option<bool> {
+    let h = hoop_of(d)?;
+    let o = d.object(id)?;
+    let t = d.output_transform();
+    if matches!(o.kind, ObjectKind::CrossStitch(_) | ObjectKind::Bling(_)) {
+        let b = o.kind.control_bbox()?;
+        let corners = [b.min, b.max, Point::new(b.min.x, b.max.y), Point::new(b.max.x, b.min.y)];
+        return Some(corners.iter().all(|p| h.contains(t.apply(*p), 0.0)));
+    }
+    Some(
+        o.kind
+            .paths()
+            .flat_map(|p| p.flatten(0.05))
+            .all(|l| l.points.iter().all(|p| h.contains(t.apply(*p), 0.0))),
+    )
+}
+
+/// The box of the shapes of `ids` (the curves, not their control points).
+fn boxes(d: &Design, ids: &[ObjectId]) -> Option<BBox> {
+    ids.iter()
+        .filter_map(|id| d.object(*id))
+        .filter_map(|o| kind_box(&o.kind))
+        .reduce(BBox::union)
+}
+
+fn box_value(b: BBox) -> Value {
+    json!({"x": round(b.min.x), "y": round(b.min.y), "width": round(b.width()), "height": round(b.height())})
+}
+
 /// Moves, scales or rotates `ids` by `t` as one undo step.
 fn transform(s: &mut Session, label: &str, ids: &[ObjectId], t: Transform) -> Result<Out, String> {
     s.change(label, |d| d.transform_objects(ids, &t))?;
-    let b = s.design().bbox_of(ids);
+    let b = boxes(s.design(), ids);
     out(json!({
         "objects": ids.iter().map(|i| i.0).collect::<Vec<_>>(),
-        "box_mm": b.map(|b| json!({"x": round(b.min.x), "y": round(b.min.y), "width": round(b.width()), "height": round(b.height())})),
+        "box_mm": b.map(box_value),
     }))
 }
 
 /// `t` about the middle of the box of `ids`.
 fn about_middle(d: &Design, ids: &[ObjectId], t: Transform) -> Result<Transform, String> {
-    let c = d.bbox_of(ids).ok_or("the objects have no size")?.center();
+    let c = boxes(d, ids).ok_or("the objects have no size")?.center();
     Ok(Transform::translate(-c.x, -c.y)
         .then(t)
         .then(Transform::translate(c.x, c.y)))
@@ -1548,12 +1819,13 @@ fn numbers(d: &Design) -> Value {
 /// One object for a reply.
 fn object_value(d: &Design, id: ObjectId) -> Value {
     let Some(o) = d.object(id) else { return Value::Null };
-    let b = d.bbox_of(&[id]);
+    let b = boxes(d, &[id]);
     json!({
         "id": id.0,
         "kind": o.type_name(),
         "thread": o.thread.0,
-        "box_mm": b.map(|b| json!({"x": round(b.min.x), "y": round(b.min.y), "width": round(b.width()), "height": round(b.height())})),
+        "box_mm": b.map(box_value),
+        "fits_hoop": shape_fits_hoop(d, id),
         "settings": shown_settings(&o.kind),
     })
 }
@@ -1635,6 +1907,14 @@ fn with_settings(kind: &ObjectKind, patch: &Map<String, Value>) -> Result<Object
         return Err(format!("a {} has no settings that the tools change", kind.type_name()));
     };
     let lettering = matches!(kind, ObjectKind::Lettering(_));
+    // The font of lettering by its name, as add_lettering takes it.
+    let mut patch = patch.clone();
+    if lettering && let Some(Value::String(name)) = patch.get("font").cloned() {
+        let font = emb_letter::bundled::embroidery(&name)
+            .ok_or_else(|| format!("no bundled embroidery font {name:?} (list_catalog fonts)"))?;
+        let font = serde_json::to_value(emb_letter::LetterSource::font_ref(&font)).map_err(|e| e.to_string())?;
+        patch.insert("font".into(), font);
+    }
     let unknown: Vec<&str> = patch
         .keys()
         .map(String::as_str)
@@ -1654,7 +1934,7 @@ fn with_settings(kind: &ObjectKind, patch: &Map<String, Value>) -> Result<Object
         ));
     }
     for (k, v) in patch {
-        all.insert(k.clone(), v.clone());
+        all.insert(k, v);
     }
     let mut new = kind.clone();
     put_settings(&mut new, Value::Object(all)).map_err(|e| format!("these settings do not fit: {e}"))?;
@@ -1743,8 +2023,16 @@ fn subpaths(p: &Outline) -> Vec<Outline> {
     out
 }
 
+/// The box of the shapes of `k`: the curves, not their control points.
 fn kind_box(k: &ObjectKind) -> Option<BBox> {
-    k.paths().filter_map(Outline::control_bbox).reduce(BBox::union)
+    if matches!(k, ObjectKind::CrossStitch(_) | ObjectKind::Bling(_)) {
+        return k.control_bbox();
+    }
+    k.paths()
+        .flat_map(|p| p.flatten(0.01))
+        .filter_map(|l| BBox::from_points(l.points))
+        .reduce(BBox::union)
+        .or_else(|| k.control_bbox())
 }
 
 fn parse_color(s: &str) -> Result<Rgb, String> {

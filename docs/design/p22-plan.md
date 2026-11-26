@@ -564,8 +564,9 @@ sentence.
 **Made (2026-11-25, ADR 0176).** `emb-cli mcp` (`emb_cli::mcp`): the
 handshake `initialize` (MCP 2025-11-25 and the versions before it),
 `server/discover` (2026-07-28), `ping`, `tools/list` and `tools/call` on
-standard input and output. 25 tools on one design (each change one
-`Document::edit`; a refused change gives its reason): new, open and save;
+standard input and output. 26 tools on one design (each change one
+`Document::edit`; a refused change gives its reason): new, open and save,
+and the name, machine, hoop and fabric;
 design info and the list of objects; shapes from SVG path text (run, fill,
 satin column, vector) and lettering in the bundled embroidery fonts; the
 settings (by the names of the saved settings; a name that is not a setting
@@ -587,6 +588,31 @@ a PES file that reads back, a refused argument, one undo step for each
 change, a refused change with its reason) and
 `file_watch::tests::a_file_that_another_program_saves_gets_the_question`.
 The owner's agent and its design from one sentence are open.
+
+**Agent test with subagents (2026-11-25).** Three agents, each with only
+the tool list, used the server through a bridge: a round badge (60 mm,
+STAR in red, a blue satin border), the name Emma in a script font with a
+heart for a Brother 4x4 hoop (PES, checked), and a 4-inch square patch
+with a 5 mm satin edge, TEAM 7, a swatch of three densities, Quicker to
+Sew and a DST file. All three designs were right. The changes from their
+friction: boxes of the curves (not of the control points); lettering keeps
+the middle of its box when it is laid out again; `move_objects` to x, y;
+the warning for stitches outside the hoop in `check_design` and
+`fits_hoop` in `design_info`; `set_design` and a fabric for `new_design`;
+the picture on a background; `quicker_to_sew` says what changes (no undo
+step when nothing does); `export` makes its project the file of the
+design; `check_machine_file` gives the numbers of the file and the fit of
+a hoop; the fonts with their kind, sizes and score, and the machines with
+their brand, formats and hoops; clearer descriptions (the coordinates,
+the width of a satin column, the units of swatches, the trim setting of
+lettering, the PES palette). A fourth agent made a towel design with the
+changes (the name in a 5x7 hoop on terry, made smaller in its place, a PES
+file); from its friction: the font of lettering by its name in
+`set_settings`, if the shape of each object fits the hoop, a plain
+background with no weave, `would_change` for a dry run of Quicker to Sew,
+and the threads of a machine file in `check_machine_file`. Open: the labels of test swatches at 5 mm sew heavy, and the
+travel measure does not count a short travel stitch between two letters on
+a fill (under the limit of a warning).
 
 ## Exit test of the phase
 

@@ -41,7 +41,7 @@ servers in a JSON file:
 The server keeps one design. Its tools:
 
 - start a new design or open one (a project, a machine file or an SVG
-  file), and save it;
+  file), change its machine, hoop and fabric, and save it;
 - list the objects, add shapes from SVG path text (runs, fills, satin
   columns and vector shapes) and add lettering in the embroidery fonts of
   the program;

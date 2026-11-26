@@ -37,14 +37,26 @@ use the program, with no AI in the program.
   (`Document::take_refused`). `new_design` and `open_design` do not take
   the place of changes that are not saved unless `discard_changes` is
   true.
-- **25 tools:** `new_design`, `open_design`, `save_design`,
-  `design_info`, `list_objects`, `add_shape`, `add_lettering`,
+- **26 tools:** `new_design`, `set_design` (name, machine, hoop and
+  fabric), `open_design`, `save_design`, `design_info`, `list_objects`, `add_shape`, `add_lettering`,
   `set_settings`, `set_thread`, `move_objects`, `scale_objects`,
   `rotate_objects`, `delete_objects`, `undo`, `redo`, `run_script`,
   `check_design`, `picture`, `export`, `test_swatches`, `quicker_to_sew`
   (with `dry_run`), `check_machine_file`, `fix_machine_file`, `show` and
   `list_catalog`. Measures are mm from the middle of the hoop, x to the
-  right and y down; angles are degrees.
+  right and y down; angles are degrees. The server instructions and the
+  descriptions of the tools that take coordinates say so (a client can
+  leave the instructions out).
+- **Boxes** are the boxes of the curves, not of their control points.
+  Lettering that is laid out again (a new text or size) keeps the middle
+  of its box; `move_objects` also puts the middle of a box at x, y. Each
+  object in a result says if its shape fits the hoop.
+- **Checks for the hoop.** `check_design` warns about the stitches of each
+  object outside the field of the hoop (as Design info in the program),
+  `design_info` says if the design fits the hoop, and
+  `check_machine_file` gives the size, stitches, colors, trims and
+  threads of a file (the colors that the file keeps), and if it fits a
+  hoop.
 - **Checked arguments.** The schema of each tool has
   `additionalProperties: false`. A tool refuses an argument that it does
   not take and names the ones that it takes, an argument that it needs
@@ -57,11 +69,18 @@ use the program, with no AI in the program.
   numbers). A fill takes the first closed part as its outline and the
   others as holes; a satin column takes the path as its middle line.
 - **Settings.** `set_settings` changes the settings of objects by the
-  names that `list_objects` shows (the saved form of the settings). A
+  names that `list_objects` shows (the saved form of the settings; the
+  font of lettering also by its name, as `add_lettering` takes it). A
   name that is not a setting is refused (a setting at its default value
   is not written, so the server tries values to find it). Lettering is
   laid out again with its bundled embroidery font; the server has only
   the bundled embroidery fonts.
+- **Results that say what changed.** `quicker_to_sew` gives the merged
+  threads, the removed objects and the trim distance before and after,
+  and makes no undo step when nothing changes. `export` makes the project
+  that it writes the file of the design. A picture shows the fabric of
+  the design (its weave in its color, else white), a plain color, or
+  nothing (`none`).
 - **Show.** `show` saves the design (to its file, else to the folder
   `ShokujoDX agent` of the temporary files) and starts the program next
   to `emb-cli` with the file (`SHOKUJODX_PROGRAM` names another program,
@@ -87,8 +106,19 @@ use the program, with no AI in the program.
   makes a badge (a round fill, lettering, a satin border), checks it, and
   writes a picture and a PES file that reads back; an argument that a
   tool does not take is refused; each change is one undo step; a change
-  out of range is refused with its reason. The owner's test with an agent
-  (a design from one sentence) is open.
+  out of range is refused with its reason (about 3 s, most of it to read
+  the 68 fonts for `list_catalog`). The owner's test with an agent (a
+  design from one sentence) is open.
+- An agent test with subagents (2026-11-25): three agents, each with only
+  the tool list, made a round badge, a name with a heart for a Brother
+  machine, and a square patch with a swatch and a DST file, through a
+  bridge to the server. All three designs were right. Their friction made
+  the changes above (boxes, the middle of lettering, the hoop checks,
+  `set_design`, the background, the results of Quicker to Sew and
+  export). A fourth agent checked the changes. Two findings are open
+  (`docs/design/open-work.md`): the labels of test swatches at 5 mm sew
+  heavy, and the travel measure does not count a short travel stitch
+  between two letters on a fill (under the limit of a warning).
 - The agent works with the rights of the user: the tools read and write
   the files that the agent names. The server has no network code.
 - The server has one design at a time, and only the bundled embroidery
