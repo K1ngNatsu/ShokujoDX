@@ -77,6 +77,10 @@ pub struct FontLibrary {
     /// thread (P20 Milestone 4, ADR 0144), so typing stays quick; the
     /// tests make them when the letters are laid out.
     pub background_routes: bool,
+    /// The routes of the fonts of the computer on the disk (ADR 0179),
+    /// opened when the first such font is read (`None` in the tests: they do
+    /// not write in the folders of the user).
+    route_store: Option<Option<emb_letter::RouteStore>>,
     /// The number of routes of each font that the design has (see
     /// [`AppState::poll_routes`]).
     routes_seen: HashMap<FontRef, u64>,
@@ -269,6 +273,7 @@ impl Default for FontLibrary {
                 .filter(|_| !cfg!(test))
                 .map(|d| d.join(CORRECTIONS_DIR)),
             background_routes: !cfg!(test),
+            route_store: if cfg!(test) { Some(None) } else { None },
             routes_seen: HashMap::new(),
             routes_reported: None,
         };
@@ -278,6 +283,24 @@ impl Default for FontLibrary {
         lib.sort();
         lib
     }
+}
+
+/// The route store of the fonts of the computer (ADR 0179): the folder
+/// `routes` in the folder of the program. Its build is the version of the
+/// program and the size and the time of its program file, so each build
+/// (a new release, or a new build of a developer) starts a new store.
+fn open_route_store() -> Option<emb_letter::RouteStore> {
+    let dir = crate::workspace::settings_path()?.parent()?.join("routes");
+    let exe = std::env::current_exe().ok().and_then(|p| std::fs::metadata(p).ok());
+    let (len, time) = exe.map_or((0, 0), |m| {
+        let time = m
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map_or(0, |d| d.as_nanos());
+        (m.len(), time)
+    });
+    emb_letter::RouteStore::open(dir, &format!("{} {len} {time}", env!("CARGO_PKG_VERSION")))
 }
 
 /// The folder of the letter corrections, in the folder of the user's fonts.
@@ -444,6 +467,9 @@ impl FontLibrary {
             && self.background_routes
         {
             f.set_route_mode(emb_letter::RouteMode::Background);
+            if let Some(store) = self.route_store.get_or_insert_with(open_route_store) {
+                f.set_route_store(store);
+            }
         }
         self.loaded.insert(e.font, font.clone());
         Some(font)

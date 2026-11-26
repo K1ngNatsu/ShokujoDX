@@ -426,7 +426,10 @@ documents.
   (25 s with the rule of before). After the audit, the owner chose a
   faster route (ADR 0161): the same routes, Georgia 7.6 s, Times New
   Roman 4.6 s, Webdings 19.8 s (50.9 s), and the converter 3 to 4 times
-  faster. More speed is proposed work (`docs/design/open-work.md`).
+  faster. The second part (ADR 0179, 2026-11-26): one search for the
+  links of an edge, and the routes of a font of the computer on the disk:
+  the same routes, Georgia 2.4 s, Times New Roman 1.7 s, Webdings 11.8 s,
+  and a second session reads the routes at once.
 - **Symbol fonts are slow in the route thread.** The first ten pictures
   of Webdings have 12 to 29 columns each, and the route of one took
   0.1 s to 8 s (122 s for the 76 characters of the probe, with 16 fonts

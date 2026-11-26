@@ -56,7 +56,6 @@ and tests on other machines and systems.
 | Feature | State | Where |
 | --- | --- | --- |
 | Letter shapes: the split of the outline into strokes (ADR 0152) for the scripts that it does not take yet (punctuation, Hangul, Arabic, Devanagari, Greek, Cyrillic) | Not made: each script needs a measure with the split first. The other work of the phase is made (fourteen milestones) | P21, `docs/design/p21-plan.md` |
-| More speed for the route, after ADR 0161 (the route of the 62 letters and digits of Georgia takes 7.6 s, 32.8 s before; Webdings 19.8 s): a search toward the goal (A*) and reused buffers for the searches that find a way (two ways of the same length can change places, so a run could move: check the golden snapshots), work kept between the cuts of a letter, and the routes of a font of the computer kept on the disk (the second use is at once) | Proposed. Made in ADR 0161, the first part: Measured: 93 % of the time is in the searches for a travel run under the parts that are not sewn (Georgia "H": 120,000 questions, 31,000 searches of a grid of 11,000 cells, 72 % of them with no way; each cell check looks at all parts again). ADR 0161 made one map of the passable cells for each set of parts that are not sewn, with its connected groups (no search where the start and the goal are in different groups), routes the cuts of a letter on threads, and gives the converter a queue of letters: the same routes and fonts. The probe `probe_p21_font_times` (`EMB_FONT`) gives the times and a hash of each route | "Audit of P21" in the roadmap |
 | Help and tutorials: pictures in the help, Show Me, guided lessons, the sew-out doctor, samples and Try It, ways to start, the help on the web and as a manual, moving pictures, better answers | Proposed (2026-11-18): nine milestones | P19, `docs/design/p19-plan.md` |
 | More tutorials (P19 Part 2): seven paths, about 31 tutorials with start designs, pictures and step files (ADR 0162), and lessons in the program (ADR 0177) | Accepted (2026-11-24); done (2026-11-25): 31 tutorials, each also a lesson. Open: the test of the lessons with new users (P19 Part 1, Milestone 3), lessons of users and shops, and a few topics that can say their steps better (the list in the plan) | P19 Part 2, `docs/design/p19-plan.md` |
 | Checks, swatches and agents (P22): travel that shows, live numbers and Quicker to Sew, test swatches, satin lean and bands of threads, machine files (check, fix, a cross-check with pyembroidery), letter measures against the eye, overlapped strokes (a trial), the open tabs come back and one program, agents through MCP | Accepted (owner, 2026-11-25); Milestones 1 to 6 made (ADR 0167 to 0173); Milestone 7 measured and not adopted (ADR 0174); Milestone 8 made (ADR 0175); audited ("Audit of P22" in the roadmap); Milestone 9 made in the software (ADR 0176), the owner's test with an agent open. The findings of the agent test are fixed (the labels of test swatches: Soft Round; the travel between two letters on a fill: ADR 0178) | `docs/design/p22-plan.md` |
@@ -71,6 +70,7 @@ and tests on other machines and systems.
 | Chenille and Schiffli | Waits for a tester with such a machine and a public description of the format | P9 Milestone 7 |
 | Embroidery fonts for Arabic and Devanagari (converted, routed, with a score) | Shelved (owner, 2026-11-19) | Lane 7 of the review of P17 |
 | Clipart sets with more detail, by theme, as asset packages | Shelved (owner, 2026-11-19) | Lane 8 of the review of P17 |
+| The embroidery fonts made again with the stitch engine of ADR 0163 | Open: the fonts in the repository are from P21 Milestone 14 (2026-11-24). ADR 0163 (less thread at the joints of letters) changed the stitches that the converter measures when it chooses a split, so the fonts made now differ in some letters of 56 fonts of the program and of the packages. Trims of the 58 fonts of the program: 5,934 to 5,929 (four fonts 1 to 4 fewer, Black Ops One 3 more, Soft Round 1 more). The owner decides; then make the fonts again, look at the proof pictures and accept the snapshots | `tools/make-embroidery-fonts.py`, ADR 0163, ADR 0179 |
 | A bundled Ink/Stitch font | Needs a font with a license that permits it (the owner chose a test only) | P18 Milestone 6 |
 
 ### Letter shapes (after P21 Milestone 14)
@@ -121,10 +121,6 @@ and tests on other machines and systems.
   Options window is wider in German and in Spanish than in English.
 - Recognize Objects is slow for a stitch file that sews one fill many
   times at one place (500 layers: 28 s).
-- The routes of the letters of a font of the computer are kept while the
-  program runs, not on the disk: the first use of a kanji in a new session
-  makes its route again (0.004 s to 0.56 s for each character, in a
-  thread).
 
 ### Ideas from zigzag (2026-11-25)
 
