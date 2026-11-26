@@ -10,9 +10,18 @@
 //!   of the two rail parts. It is the distance between two needle points on
 //!   the same side, so the thread crosses the column every half spacing.
 //! - Pull compensation makes each stitch longer at both ends.
-//! - Short stitches: where needle points on one side are nearer than
-//!   [`SHORT_DIST_MM`] (the inside of a tight curve), every second stitch on
-//!   that side ends [`SHORT_INSET`] of the width before the rail.
+//! - Short stitches: where the stitches on one side are nearer than
+//!   [`SHORT_DIST_MM`] (the inside of a tight curve, or a side that the
+//!   stitches meet at a small angle), every second stitch on that side
+//!   ends [`SHORT_INSET`] of the width before the rail. The distance is
+//!   from a needle point to the line of the pair two before it (ADR 0180).
+//! - Stitches that run almost along the column (the end of a column bent
+//!   by an envelope, where a side turns toward the stitches) come close
+//!   together across the stitches, also when they are `step` apart along
+//!   the middle. There a pair is left out while the pair after it is not
+//!   farther than one step across the stitches from the pair before it
+//!   ([`thin_across`], ADR 0180). Where the pairs are more than half a
+//!   step apart across the stitches, they do not change.
 //! - Auto split: a stitch longer than `split_mm` (default 7 mm) gets needle points
 //!   along it. Their positions change from stitch to stitch, so they do not
 //!   make a line.
@@ -25,7 +34,8 @@ use emb_model::{SatinGeometry, SatinParams, Underlay, UnderlayLayer};
 use crate::object::FLATTEN_TOL_MM;
 use crate::running;
 
-/// Needle points on one side nearer than this make short stitches.
+/// Stitches on one side nearer than this make short stitches: the distance
+/// from a needle point to the line of the pair two before it.
 pub const SHORT_DIST_MM: f64 = 0.25;
 /// A short stitch ends this fraction of the column width before the rail.
 pub const SHORT_INSET: f64 = 0.15;
@@ -560,7 +570,8 @@ fn underlay_layer(col: &Column, layer: &UnderlayLayer) -> Vec<Point> {
             pts
         }
         UnderlayLayer::Zigzag { inset_mm, spacing_mm } => {
-            let pairs = inset_pairs(&col.even_pairs(spacing_mm.max(0.2) / 2.0), inset_mm);
+            let step = spacing_mm.max(0.2) / 2.0;
+            let pairs = inset_pairs(&thin_across(col.even_pairs(step), step), inset_mm);
             let mut pts: Vec<Point> = pairs
                 .iter()
                 .enumerate()
@@ -581,6 +592,42 @@ fn underlay_layer(col: &Column, layer: &UnderlayLayer) -> Vec<Point> {
     }
 }
 
+/// The pairs of a column, made `step` apart, without those that the
+/// stitches do not need (ADR 0180): where the stitches run almost along
+/// the column, pairs that are one step apart along the middle are much
+/// closer across the stitches, and the thread builds up. A pair is left
+/// out when the pair after it is not farther across the stitches from the
+/// last pair that stays than the step of the pairs there (the distance of
+/// the middles of the pair and the pair after it, not more than `step`:
+/// the spacing effects make pairs closer, and the pairs of a column fill
+/// are `step` apart across the stitches already). So the pairs that stay
+/// are not farther apart across the stitches than one step. The distance
+/// of two pairs across the stitches is the larger of the distances from
+/// the middle of each to the line of the other. Where the pairs are more
+/// than half a step apart across the stitches (all columns with stitches
+/// across them), no pair is left out. The first and the last pair stay.
+pub(crate) fn thin_across(pairs: Vec<(Point, Point)>, step: f64) -> Vec<(Point, Point)> {
+    if pairs.len() < 3 {
+        return pairs;
+    }
+    let mid = |p: &(Point, Point)| p.0.midpoint(p.1);
+    let to_line = |p: &(Point, Point), m: Point| match (p.1 - p.0).normalized() {
+        Some(u) => u.cross(m - p.0).abs(),
+        None => p.0.distance(m),
+    };
+    let across = |p: &(Point, Point), q: &(Point, Point)| to_line(p, mid(q)).max(to_line(q, mid(p)));
+    let mut out = Vec::with_capacity(pairs.len());
+    out.push(pairs[0]);
+    for w in pairs[1..].windows(2) {
+        let (pr, next) = (&w[0], &w[1]);
+        if across(&out[out.len() - 1], next) >= mid(pr).distance(mid(next)).min(step) {
+            out.push(*pr);
+        }
+    }
+    out.push(pairs[pairs.len() - 1]);
+    out
+}
+
 /// Satin top stitching: zigzag through `pairs` (one needle point a pair, sides
 /// in turn) from the first pair to the last.
 pub(crate) fn satin_top(pairs: &[(Point, Point)], p: &SatinParams) -> Vec<Point> {
@@ -588,6 +635,19 @@ pub(crate) fn satin_top(pairs: &[(Point, Point)], p: &SatinParams) -> Vec<Point>
     let n = pairs.len();
     // Needle point on the side of stitch j, before compensation.
     let side = |j: usize| if j.is_multiple_of(2) { pairs[j].0 } else { pairs[j].1 };
+    // The stitches on the side of stitch j are crowded: its needle point
+    // is nearer than SHORT_DIST_MM to the line of the pair two before it
+    // (on the inside of a tight curve the needle points come close; where
+    // the stitches meet the side at a small angle, the lines of the
+    // stitches come close; ADR 0180).
+    let crowded = |j: usize| {
+        let (q, r) = pairs[j - 2];
+        let d = match (r - q).normalized() {
+            Some(u) => u.cross(side(j) - q).abs(),
+            None => side(j).distance(side(j - 2)),
+        };
+        d < SHORT_DIST_MM
+    };
     let mut out: Vec<Point> = Vec::with_capacity(n * 2);
     for (j, &(a, b)) in pairs.iter().enumerate() {
         let (this, other) = if j.is_multiple_of(2) { (a, b) } else { (b, a) };
@@ -601,8 +661,8 @@ pub(crate) fn satin_top(pairs: &[(Point, Point)], p: &SatinParams) -> Vec<Point>
             if p.jagged_mm > 0.0 {
                 pt -= u * (p.jagged_mm.min(w * 0.45) * crate::effects::hash01(JAGGED_SEED, j as u64));
             }
-            // Short stitch: every second stitch on a side with crowded needle points.
-            if p.short_stitches && j >= 2 && (j / 2) % 2 == 1 && side(j).distance(side(j - 2)) < SHORT_DIST_MM {
+            // Short stitch: every second stitch on a side with crowded stitches.
+            if p.short_stitches && j >= 2 && (j / 2) % 2 == 1 && crowded(j) {
                 pt = this - u * (SHORT_INSET * w);
             }
         }
@@ -1281,6 +1341,76 @@ mod tests {
         );
         // No needle point inside the inner rail (within the flatten tolerance).
         assert!(short.iter().all(|q| q.length() > 2.0 - 2.0 * FLATTEN_TOL_MM));
+    }
+
+    /// A column whose rails are side by side but whose ends are slanted
+    /// far: rail B starts `shift` mm after rail A, so the pairs make an
+    /// angle of atan(width / shift) with the column.
+    fn slanted(shift: f64) -> SatinGeometry {
+        let line = |a: Point, b: Point| Path::new().move_to(a).line_to(b);
+        SatinGeometry {
+            rail_a: line(Point::new(0.0, 0.0), Point::new(20.0, 0.0)),
+            rail_b: line(Point::new(shift, 2.0), Point::new(20.0 + shift, 2.0)),
+            rungs: Vec::new(),
+        }
+    }
+
+    /// The distance of two pairs across the stitches (as `thin_across`).
+    fn across(p: (Point, Point), q: (Point, Point)) -> f64 {
+        let u = (p.1 - p.0).normalized().unwrap();
+        u.cross(q.0.midpoint(q.1) - p.0).abs()
+    }
+
+    /// Stitches that run almost along the column (ADR 0180): pairs one
+    /// step apart along the middle are a seventh of a step apart across
+    /// the stitches. The pairs that stay are not more than one step apart
+    /// across the stitches, and not less than half a step; a column with
+    /// stitches across it keeps all its pairs.
+    #[test]
+    fn stitches_along_the_column_do_not_crowd() {
+        let step = 0.2;
+        let col = Column::new(&slanted(14.0)).unwrap();
+        let all = col.pairs(step);
+        let kept = thin_across(all.clone(), step);
+        assert!(kept.len() * 5 < all.len(), "{} of {}", kept.len(), all.len());
+        assert_eq!((kept[0], kept[kept.len() - 1]), (all[0], all[all.len() - 1]));
+        for w in kept[..kept.len() - 1].windows(2) {
+            let d = across(w[0], w[1]);
+            assert!(d > 0.5 * step && d < step + 1e-9, "{d}");
+        }
+        // The top stitches: fewer needle points than a straight column,
+        // also with the points that split the long stitches.
+        let straight = satin(&slanted(0.0), &plain(0.4), Point::ZERO, None).unwrap();
+        let along = satin(&slanted(14.0), &plain(0.4), Point::ZERO, None).unwrap();
+        assert!(along.len() < straight.len() / 2, "{} {}", along.len(), straight.len());
+        // Pairs 30 degrees or more from the column, and a straight column:
+        // no pair goes.
+        for shift in [0.0, 1.0, 3.4] {
+            let all = Column::new(&slanted(shift)).unwrap().pairs(step);
+            assert_eq!(thin_across(all.clone(), step), all, "{shift}");
+        }
+    }
+
+    /// Short stitches where the stitches meet a side at a small angle (ADR
+    /// 0180): the needle points on each side are 0.4 mm apart (not
+    /// crowded), but the lines of the stitches are 0.22 mm apart there.
+    #[test]
+    fn short_stitches_where_the_stitches_meet_a_side_at_a_small_angle() {
+        let shortened = |shift: f64| {
+            let g = slanted(shift);
+            let mut p = plain(0.4);
+            let long = satin(&g, &p, Point::ZERO, None).unwrap();
+            p.short_stitches = true;
+            let short = satin(&g, &p, Point::ZERO, None).unwrap();
+            assert_eq!(long.len(), short.len());
+            long.iter().zip(&short).filter(|(a, b)| a.distance(**b) > 0.1).count()
+        };
+        // 34 degrees: the pairs stay, and every second stitch on each side
+        // is short.
+        let n = Column::new(&slanted(3.0)).unwrap().pairs(0.2).len();
+        assert!(shortened(3.0) > n / 3, "{} of {n}", shortened(3.0));
+        // Stitches straight across: none.
+        assert_eq!(shortened(0.0), 0);
     }
 
     #[test]

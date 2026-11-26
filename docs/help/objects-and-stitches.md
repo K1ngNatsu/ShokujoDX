@@ -60,7 +60,8 @@ word next to it that tells what the value means, for example "dense" or
 - **Split stitches over**: satin stitches longer than this get extra
   needle points, so they do not snag.
 - **Short stitches at curves**: shorter stitches on the inside of tight
-  curves, so the curve does not get too dense.
+  curves, and on a side that the stitches meet at a small angle, so the
+  thread does not get too dense there.
 - **Omit last stitch**: the column ends one stitch early, on the other
   side. Use it where a column joins the next column.
 - **Liquid**: the stitch angle changes evenly along the column, also

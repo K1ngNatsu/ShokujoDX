@@ -63,7 +63,8 @@ para ver qué hace.
 - **Dividir puntadas de más de**: las puntadas de satén más largas reciben
   puntos de aguja extra, para que no se enganchen.
 - **Puntadas cortas en curvas**: puntadas más cortas en el interior de las
-  curvas cerradas, para que la curva no quede demasiado densa.
+  curvas cerradas y en un lado al que las puntadas llegan con un ángulo
+  pequeño, para que el hilo no quede demasiado denso allí.
 - **Omitir la última puntada**: la columna termina una puntada antes, en
   el otro lado. Úselo donde una columna se une con la siguiente.
 - **Líquido**: el ángulo de puntada cambia de forma uniforme a lo largo de

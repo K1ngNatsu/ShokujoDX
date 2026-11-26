@@ -35,7 +35,7 @@ use emb_geom::Point;
 use emb_geom::math::{cos, sin};
 use emb_model::{ColumnPattern, SatinParams};
 
-use crate::satin::{Column, inset_pairs, satin_top};
+use crate::satin::{Column, inset_pairs, satin_top, thin_across};
 
 /// Smallest spacing that the generator accepts, in mm.
 const MIN_SPACING_MM: f64 = 0.1;
@@ -77,10 +77,12 @@ pub fn top(col: &Column, p: &SatinParams) -> Vec<Point> {
             satin_top(&half(&rows), &rows)
         }
         ColumnPattern::Raised { layers } => raised(col, p, layers),
-        ColumnPattern::EStitch => e_stitch(&widen(&col.pairs(spacing), p)),
-        ColumnPattern::Square => square(&widen(&col.pairs(spacing), p), p.split_mm),
+        ColumnPattern::EStitch => e_stitch(&widen(&thin_across(col.pairs(spacing), spacing), p)),
+        ColumnPattern::Square => square(&widen(&thin_across(col.pairs(spacing), spacing), p), p.split_mm),
         ColumnPattern::Coil => coil(&widen(&col.pairs(FINE_STEP_MM), p), spacing),
-        ColumnPattern::String { chord_mm } => string(&widen(&col.pairs(spacing), p), chord_mm / spacing),
+        ColumnPattern::String { chord_mm } => {
+            string(&widen(&thin_across(col.pairs(spacing), spacing), p), chord_mm / spacing)
+        }
         ColumnPattern::Motif { aspect } => {
             let default = emb_model::Motif::default();
             let m = p.motif.as_ref().unwrap_or(&default);

@@ -61,8 +61,15 @@ pub fn auto_spacing_factor(w: f64) -> f64 {
 }
 
 /// Point pairs across the column about `step` apart, with the spacing
-/// effects of `p`. With no effects, the pairs of [`Column::pairs`].
+/// effects of `p`. With no effects, the pairs of [`Column::pairs`]. Pairs
+/// that come too close across the stitches are left out
+/// ([`crate::satin::thin_across`]).
 pub fn spaced_pairs(col: &Column, p: &SatinParams, step: f64) -> Vec<(Point, Point)> {
+    crate::satin::thin_across(spaced(col, p, step), step)
+}
+
+/// [`spaced_pairs`] before the pairs that are too close go.
+fn spaced(col: &Column, p: &SatinParams, step: f64) -> Vec<(Point, Point)> {
     if p.spacing_at == 0.5 && !p.auto_spacing && p.accordion.is_none() {
         return col.pairs(step);
     }

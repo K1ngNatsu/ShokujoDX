@@ -607,13 +607,11 @@ mod tests {
 
     /// The monogram templates sew with no warning: no thread that builds
     /// up at the joints of the letters, and no short lock stitch (ADR
-    /// 0163); the oval and the diamond styles too (ADR 0164). A known
-    /// place that is still over the limit (`docs/design/open-work.md`): on
-    /// towel fabric (denser, heavy underlay) "Block in a square" has one
-    /// small place (4 mm²).
+    /// 0163); the oval and the diamond styles too (ADR 0164); on towel
+    /// fabric (denser, heavy underlay) too, since the stitches that meet a
+    /// side at a small angle are short (ADR 0180).
     #[test]
     fn the_monogram_templates_sew_with_no_warning() {
-        const KNOWN: [(&str, &str, &str); 1] = [("JMK", "towel", "Block in a square")];
         let mut bad = Vec::new();
         for t in MonogramTemplate::builtin(&default_font()) {
             for (initials, fabric) in [
@@ -625,8 +623,7 @@ mod tests {
                 ("SRW", "towel"),
             ] {
                 let w = monogram_warnings(initials, &t.spec, fabric);
-                let known = KNOWN.contains(&(initials, fabric, t.name.as_str()));
-                if !w.is_empty() && !known {
+                if !w.is_empty() {
                     bad.push(format!("{initials} on {fabric}, {}: {w:?}", t.name));
                 }
             }
