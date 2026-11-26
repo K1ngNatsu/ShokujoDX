@@ -89,6 +89,21 @@ fn the_windows_installer_agrees() {
     let iss = read("packaging/windows/installer.iss");
     assert!(iss.contains("#define AppExe \"ShokujoDX.exe\""));
     assert!(read("tools/package-windows.ps1").contains("'ShokujoDX.exe'"));
+    // The command-line tool with the MCP server is in each package (ADR 0176).
+    for script in [
+        "tools/package-windows.ps1",
+        "tools/package-macos.sh",
+        "tools/package-linux.sh",
+    ] {
+        assert!(
+            read(script).contains("-p emb-cli") || read(script).contains("'-p', 'emb-cli'"),
+            "{script}"
+        );
+        assert!(
+            read(script).contains("release/emb-cli") || read(script).contains("release\\emb-cli.exe"),
+            "{script}"
+        );
+    }
     assert!(iss.contains(&format!("Classes\\.{}\"", emb_model::project::FILE_EXTENSION)));
     let mut machine = 0;
     for line in iss

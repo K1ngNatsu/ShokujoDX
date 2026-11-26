@@ -98,6 +98,9 @@ ShokujoDX makes the stitches and writes the file for your machine.
   (PDF), a 3D thread picture, and Send to USB.
 - Quotes and run times, order details with a barcode, thread stock and
   scripts.
+- **Your own AI agent can use the program:** `emb-cli mcp` gives it tools
+  (MCP) to make, check, export and show designs. The program has no AI in
+  it and no network code (help topic "Agents").
 
 **Specialty**
 - Free-standing lace, quilting, puff (3D foam), cross stitch, rhinestones,
@@ -264,6 +267,7 @@ batch work. Build it with `cargo build --release -p emb-cli`.
 | `quote <in>` | The price and the run time of an order |
 | `swatch <in> <out> --setting <name>` | Test swatches: copies of objects with a setting in steps, each with its value |
 | `check <file>`, `fix <file> <out>` | Check the stitches of a machine file, and fix what can be fixed |
+| `mcp` | The MCP server for your own AI agent (help topic "Agents") |
 | `script <script.rhai> <in>...` | Run a script on designs |
 
 `emb-cli --help` lists all commands and options.

@@ -239,6 +239,8 @@ pub struct AppState {
     pub kiosk: Option<crate::kiosk::Kiosk>,
     /// The backdrop picture that another program edits.
     pub outside_edit: Option<crate::share::OutsideEdit>,
+    /// The files of the tabs that another program saves (ADR 0176).
+    pub file_watch: crate::file_watch::FileWatch,
     /// The My assets window.
     pub assets_window: crate::assets::AssetsWindow,
     /// The views of View > New view (`None`: closed).
@@ -798,6 +800,7 @@ impl AppState {
             start: Default::default(),
             kiosk: None,
             outside_edit: None,
+            file_watch: Default::default(),
             assets_window: Default::default(),
             views: Vec::new(),
             other_design: None,
@@ -1918,6 +1921,8 @@ impl EmbApp {
         crate::font_sheet::window(&ctx, st);
         crate::guides::window(&ctx, st);
         crate::send::window(&ctx, st);
+        st.poll_file_changes(std::time::Instant::now());
+        crate::file_watch::window(&ctx, st);
         crate::clipart::window(&ctx, st);
         // Jobs and the library scan go on while their tabs are hidden.
         if st.poll_jobs() | st.poll_library() | st.poll_outside_edit() | st.poll_routes() {

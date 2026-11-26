@@ -27,8 +27,8 @@ else
 fi
 
 # Apple silicon needs macOS 11; Intel Macs from macOS 10.15.
-MACOSX_DEPLOYMENT_TARGET=11.0 cargo build --release -p emb-app -p emb-thumbnail --target aarch64-apple-darwin
-MACOSX_DEPLOYMENT_TARGET=10.15 cargo build --release -p emb-app -p emb-thumbnail --target x86_64-apple-darwin
+MACOSX_DEPLOYMENT_TARGET=11.0 cargo build --release -p emb-app -p emb-thumbnail -p emb-cli --target aarch64-apple-darwin
+MACOSX_DEPLOYMENT_TARGET=10.15 cargo build --release -p emb-app -p emb-thumbnail -p emb-cli --target x86_64-apple-darwin
 
 stage="dist/$name-macos"
 app="$stage/ShokujoDX.app"
@@ -37,6 +37,10 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources/licenses"
 
 lipo -create -output "$app/Contents/MacOS/ShokujoDX" \
     target/aarch64-apple-darwin/release/emb-app target/x86_64-apple-darwin/release/emb-app
+# The command-line tool, with the MCP server for the agent of the user
+# (`emb-cli mcp`, ADR 0176): next to the program, so its tool `show` finds it.
+lipo -create -output "$app/Contents/MacOS/emb-cli" \
+    target/aarch64-apple-darwin/release/emb-cli target/x86_64-apple-darwin/release/emb-cli
 sed "s/@VERSION@/$version/g" packaging/macos/Info.plist > "$app/Contents/Info.plist"
 printf 'APPL????' > "$app/Contents/PkgInfo"
 

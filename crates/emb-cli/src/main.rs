@@ -145,6 +145,12 @@ Usage:
       pull-compensation, width, angle (degrees), underlay (none, light,
       auto, heavy, double; --from and --to are not needed), lean (degrees)
       or band-overlap (ADR 0171). Lengths in mm.
+  emb-cli mcp
+      An MCP server for the AI agent of the user (ADR 0176): the agent (an
+      MCP client) starts it and talks to it on standard input and output
+      (JSON-RPC, one message on each line). Its tools make and change one
+      design, check it, draw it, export it and show it in ShokujoDX. No
+      network code. The help topic Agents has the setup.
   emb-cli check <file> [--machine <id>]
       Check the stitches of a machine file, or of the stitch objects of a
       design (ADR 0172): stitches shorter or longer than the machine sews,
@@ -529,14 +535,9 @@ fn run(args: &[String]) -> Result<(), String> {
             }
             "--sheet" => sheet = Some(PathBuf::from(it.next().ok_or("--sheet needs a PDF file")?)),
             "--setting" => {
-                use emb_letter::swatch::SwatchSetting;
                 let name = it.next().ok_or("--setting needs a setting")?.to_lowercase();
-                swatch_setting = Some(
-                    SwatchSetting::ALL
-                        .into_iter()
-                        .find(|s| s.name().to_lowercase().replace(' ', "-") == name)
-                        .ok_or_else(|| format!("unknown setting {name:?}"))?,
-                );
+                swatch_setting =
+                    Some(emb_cli::swatch_setting_named(&name).ok_or_else(|| format!("unknown setting {name:?}"))?);
             }
             "--from" | "--to" => {
                 let v = it
@@ -958,40 +959,14 @@ fn run(args: &[String]) -> Result<(), String> {
             Ok(())
         }
         ["swatch", input, output] => {
-            use emb_letter::swatch::{SwatchSetting, SwatchSpec, swatches};
             let design = emb_model::project::load(Path::new(input)).map_err(|e| format!("{input}: {e}"))?;
             let setting = swatch_setting.ok_or("swatch needs --setting")?;
-            let (from, to) = match (setting, swatch_from, swatch_to) {
-                (SwatchSetting::Underlay, _, _) => (0.0, 0.0),
-                (_, Some(f), Some(t)) => (f, t),
-                _ => return Err("swatch needs --from and --to".into()),
-            };
-            let ids: Vec<emb_model::ObjectId> = if swatch_objects.is_empty() {
-                design.objects().iter().map(|o| o.id).collect()
-            } else {
-                swatch_objects.iter().map(|&i| emb_model::ObjectId(i)).collect()
-            };
-            let field = match &design.hoop.selection {
-                emb_model::HoopSelection::Preset { id } => emb_model::HoopCatalog::builtin()
-                    .get(id)
-                    .map(|h| (h.width_mm, h.height_mm)),
-                emb_model::HoopSelection::OpenField => None,
-            };
-            let spec = SwatchSpec {
-                setting,
-                from,
-                to,
-                copies: swatch_copies,
-                field,
-            };
-            let label = emb_letter::bundled::embroidery(emb_letter::sheet::LABEL_FONT);
-            let made = swatches(
-                &design,
-                &ids,
-                &spec,
-                label.as_ref().map(|l| l as &dyn emb_letter::source::LetterSource),
-                &|v| format!("{v:.2} mm"),
-            )?;
+            if setting != emb_letter::swatch::SwatchSetting::Underlay && (swatch_from.is_none() || swatch_to.is_none())
+            {
+                return Err("swatch needs --from and --to".into());
+            }
+            let ids: Vec<emb_model::ObjectId> = swatch_objects.iter().map(|&i| emb_model::ObjectId(i)).collect();
+            let made = emb_cli::swatch_design(&design, &ids, setting, swatch_from, swatch_to, swatch_copies)?;
             emb_model::project::save(&made.design, Path::new(output)).map_err(|e| format!("{output}: {e}"))?;
             println!(
                 "wrote {output}: {} copies in {} x {}, {:.0} x {:.0} mm{}",
@@ -1004,6 +979,7 @@ fn run(args: &[String]) -> Result<(), String> {
             );
             Ok(())
         }
+        ["mcp"] => emb_cli::mcp::serve(std::io::stdin().lock(), std::io::stdout().lock()).map_err(|e| e.to_string()),
         ["check", input] => {
             let input = read_input(Path::new(input))?;
             let s = emb_cli::file_stitches(&input)?;

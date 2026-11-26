@@ -603,6 +603,13 @@ fn scenes() -> Vec<Scene> {
     v.push(Scene::new("update question", View::Windows, |st, _| {
         st.updates.ask = true
     }));
+    // An agent saved the file of the tab (ADR 0176).
+    v.push(Scene::new("file changed", View::Windows, |st, _| {
+        let path = std::env::temp_dir().join("Badge.embproj");
+        st.file_path = Some(path.clone());
+        st.file_watch.changed = Some(path);
+        st.doc.mark_unsaved();
+    }));
     for (name, status) in [
         (
             "update found",

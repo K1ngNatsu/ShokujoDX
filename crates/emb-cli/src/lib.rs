@@ -8,6 +8,7 @@ pub mod corpus;
 pub mod fontaudit;
 pub mod letter_faults;
 pub mod lettering_bench;
+pub mod mcp;
 pub mod view;
 
 use std::path::Path;
@@ -28,7 +29,7 @@ fn extension(path: &Path) -> String {
         .unwrap_or_default()
 }
 
-fn stem(path: &Path) -> String {
+pub(crate) fn stem(path: &Path) -> String {
     path.file_stem()
         .map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_else(|| "design".into())
@@ -165,6 +166,63 @@ pub fn file_check_options(input: &Input, machine: Option<&str>) -> Result<emb_st
         Input::Design(d) => Ok(plan_options(d, machine)?.for_design(d)),
         Input::Stitches(_) => plan_options(&Design::new(""), machine),
     }
+}
+
+/// The setting of test swatches with the name `name` (`stitch length`,
+/// `stitch-length` or `stitch_length`; any case).
+pub fn swatch_setting_named(name: &str) -> Option<emb_letter::swatch::SwatchSetting> {
+    let key = |s: &str| s.to_lowercase().replace([' ', '_'], "-");
+    emb_letter::swatch::SwatchSetting::ALL
+        .into_iter()
+        .find(|s| key(s.name()) == key(name))
+}
+
+/// Test swatches (ADR 0170) of the objects `ids` of `design` (all if
+/// empty): `copies` copies with the values from `from` to `to` (not needed
+/// for underlay), in the field of the hoop of the design, with labels in
+/// the bundled label font. `emb-cli swatch` and the MCP server use it.
+pub fn swatch_design(
+    design: &Design,
+    ids: &[emb_model::ObjectId],
+    setting: emb_letter::swatch::SwatchSetting,
+    from: Option<f64>,
+    to: Option<f64>,
+    copies: usize,
+) -> Result<emb_letter::swatch::Swatches, String> {
+    use emb_letter::swatch::{SwatchSetting, SwatchSpec};
+    let (from, to) = match (setting, from, to) {
+        (SwatchSetting::Underlay, _, _) => (0.0, 0.0),
+        (_, Some(f), Some(t)) => (f, t),
+        _ => return Err("swatches need the values from and to".into()),
+    };
+    let all: Vec<emb_model::ObjectId>;
+    let ids = if ids.is_empty() {
+        all = design.objects().iter().map(|o| o.id).collect();
+        &all[..]
+    } else {
+        ids
+    };
+    let field = match &design.hoop.selection {
+        emb_model::HoopSelection::Preset { id } => emb_model::HoopCatalog::builtin()
+            .get(id)
+            .map(|h| (h.width_mm, h.height_mm)),
+        emb_model::HoopSelection::OpenField => None,
+    };
+    let spec = SwatchSpec {
+        setting,
+        from,
+        to,
+        copies,
+        field,
+    };
+    let label = emb_letter::bundled::embroidery(emb_letter::sheet::LABEL_FONT);
+    emb_letter::swatch::swatches(
+        design,
+        ids,
+        &spec,
+        label.as_ref().map(|l| l as &dyn emb_letter::source::LetterSource),
+        &|v| format!("{v:.2} mm"),
+    )
 }
 
 /// The fixes of a list such as `join,short,long,jumps,locks`.

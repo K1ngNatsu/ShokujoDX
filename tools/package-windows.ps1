@@ -28,7 +28,7 @@ if (git status --porcelain --untracked-files=no) {
 if (-not $SkipTests) {
     Run cargo @('test', '--workspace')
 }
-Run cargo @('build', '--release', '-p', 'emb-app', '-p', 'emb-thumbnail')
+Run cargo @('build', '--release', '-p', 'emb-app', '-p', 'emb-thumbnail', '-p', 'emb-cli')
 
 $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"' | Select-Object -First 1).Matches[0].Groups[1].Value
 $build = (git rev-parse --short=7 HEAD).Trim()
@@ -45,9 +45,12 @@ Copy-Item target\release\emb-app.exe $exe
 Copy-Item target\release\emb_app.pdb $out
 # The thumbnail handler of Explorer (ADR 0046; the installer registers it).
 Copy-Item target\release\emb_thumbnail.dll $out
+# The command-line tool, with the MCP server for the agent of the user
+# (`emb-cli mcp`, ADR 0176): next to the program, so its tool `show` finds it.
+Copy-Item target\release\emb-cli.exe $out
 # The program must not need the Visual C++ runtime: a new PC does not
 # always have it (v0.3 plan, Stage 1; .cargo/config.toml).
-foreach ($f in @($exe, (Join-Path $out 'emb_thumbnail.dll'))) {
+foreach ($f in @($exe, (Join-Path $out 'emb_thumbnail.dll'), (Join-Path $out 'emb-cli.exe'))) {
     $text = [System.Text.Encoding]::ASCII.GetString([System.IO.File]::ReadAllBytes($f))
     if ($text -match '(?i)vcruntime\d+\.dll|msvcp\d+\.dll|api-ms-win-crt-') {
         throw "$f needs the Visual C++ runtime: build it with the static CRT (.cargo/config.toml)."

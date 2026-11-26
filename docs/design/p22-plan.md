@@ -11,7 +11,8 @@ and the owner agrees with the 50 judged letters that the owner looked at.
 Milestone 7 (the trial of overlapped strokes) is measured, and the owner
 chose the way of today (ADR 0174); the trial is on the branch
 `trial/overlapped-strokes`. Milestone 8 is made (ADR 0175). The audit
-of Milestones 1 to 8 is "Audit of P22" in the roadmap.
+of Milestones 1 to 8 is "Audit of P22" in the roadmap. Milestone 9 is made
+in the software (ADR 0176); the owner's test with an agent is open.
 
 ## Goal
 
@@ -559,6 +560,33 @@ lettering, a satin border), checks it, and writes a picture and a PES
 file that reads back; an argument that a tool does not take is refused;
 each change is one undo step; the owner's agent makes a design from one
 sentence.
+
+**Made (2026-11-25, ADR 0176).** `emb-cli mcp` (`emb_cli::mcp`): the
+handshake `initialize` (MCP 2025-11-25 and the versions before it),
+`server/discover` (2026-07-28), `ping`, `tools/list` and `tools/call` on
+standard input and output. 25 tools on one design (each change one
+`Document::edit`; a refused change gives its reason): new, open and save;
+design info and the list of objects; shapes from SVG path text (run, fill,
+satin column, vector) and lettering in the bundled embroidery fonts; the
+settings (by the names of the saved settings; a name that is not a setting
+is refused) and the thread; move, scale, rotate, delete; undo and redo; a
+script; the checks; a picture (PNG with the 3D look); export (machine
+files and sheets); test swatches; Quicker to Sew (with `dry_run`); check
+and fix a machine file; `show` (the program next to `emb-cli`, through the
+inbox of Milestone 8); the names of fonts, machines, hoops, fabrics and
+swatch settings. An argument that a tool does not take is refused with
+the names that it takes; the tools that only read have `readOnlyHint`. The
+program asks about a file of a tab that another program saved
+(`file_watch.rs`: Open Again, Keep This Version). `emb-cli` is in each
+package next to the program. The help topic Agents (four languages) and
+the README.
+
+The exit test is met in the software: `crates/emb-cli/tests/mcp.rs` (a
+session through pipes with each tool: the badge, its check, a picture and
+a PES file that reads back, a refused argument, one undo step for each
+change, a refused change with its reason) and
+`file_watch::tests::a_file_that_another_program_saves_gets_the_question`.
+The owner's agent and its design from one sentence are open.
 
 ## Exit test of the phase
 

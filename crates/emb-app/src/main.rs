@@ -38,6 +38,7 @@ mod effects_ui;
 mod export;
 mod families;
 mod file;
+mod file_watch;
 mod first_start;
 mod fix_stitches;
 mod font_sheet;
