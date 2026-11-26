@@ -11,8 +11,9 @@
 //! - else the stitch sewn last before it at the point is the top of the
 //!   embroidery there. If the travel crosses it (at [`CROSS_DEG`] or more),
 //!   the travel shows on top of sewn stitches, but at the edge of an area:
-//!   where the needle path of the stitches under it turns (the ends of the
-//!   rows, the sides of a satin column) nearer than [`EDGE_MM`]. Travel
+//!   where the needle path of the stitches of the object under it turns
+//!   (the ends of the rows, the sides of a satin column) nearer than
+//!   [`EDGE_MM`]. Travel
 //!   along the edge goes 0.3 mm inside it, and the rows go out over the
 //!   edge by their pull compensation: the travel lies in the turns. If the
 //!   travel goes along the top stitch (nearer than [`GROOVE_MM`]), it lies
@@ -166,6 +167,7 @@ struct Seg {
 /// The travel of `plan` that shows.
 pub fn shown_travel(plan: &StitchPlan) -> ShownTravel {
     let recs = &plan.stitches.records;
+    let objects = record_objects(plan);
     let mut travel_ranges = plan.travel.iter().peekable();
     let turn_cos = emb_geom::math::sin_cos_deg(TURN_DEG).1;
     // The stitches that are not travel, with the turns of the needle path.
@@ -246,7 +248,7 @@ pub fn shown_travel(plan: &StitchPlan) -> ShownTravel {
     // Most stitches are far from all travel: the blocks of the marked cells
     // leave them out with one look.
     let mut grid: Vec<Vec<u32>> = vec![Vec::new(); wanted.count];
-    let mut turns: Vec<Vec<Point>> = vec![Vec::new(); turn_cells.count];
+    let mut turns: Vec<Vec<(Point, usize)>> = vec![Vec::new(); turn_cells.count];
     let reach = GROOVE_MM + on;
     for (k, s) in stitches.iter().enumerate() {
         wanted.each_marked_in(s.a, s.b, GROOVE_MM, |c, slot| {
@@ -256,12 +258,11 @@ pub fn shown_travel(plan: &StitchPlan) -> ShownTravel {
         });
         for (turn, q) in [(s.turn_a, s.a), (s.turn_b, s.b)] {
             if turn && let Some(slot) = turn_cells.slot(turn_cells.cell(q)) {
-                turns[slot].push(q);
+                turns[slot].push((q, s.record));
             }
         }
     }
     let cell = |p: Point| wanted.cell(p);
-    let objects = record_objects(plan);
     let cross_sin = emb_geom::math::sin_cos_deg(CROSS_DEG).0;
     let mut pieces: Vec<ShownPiece> = Vec::new();
     for run in &runs {
@@ -284,6 +285,7 @@ pub fn shown_travel(plan: &StitchPlan) -> ShownTravel {
                     cell: wanted.slot(cell(p)).map_or(&[], |k| grid[k].as_slice()),
                     turn_cells: &turn_cells,
                     turns: &turns,
+                    objects: &objects,
                 };
                 let Some(shows) = shows_at(p, dir, t.record, &near, cross_sin) else {
                     continue;
@@ -480,20 +482,31 @@ struct Near<'a> {
     stitches: &'a [Seg],
     /// The stitches of the cell of the point (indices in `stitches`).
     cell: &'a [u32],
-    /// The turns of the needle path near the travel, by cell.
+    /// The turns of the needle path near the travel, by cell, with the
+    /// record of their stitch.
     turn_cells: &'a CellMap,
-    turns: &'a [Vec<Point>],
+    turns: &'a [Vec<(Point, usize)>],
+    /// The objects of the plan by their records (see [`record_objects`]).
+    objects: &'a [(usize, usize, ObjectId)],
 }
 
 impl Near<'_> {
-    /// A turn of the needle path is nearer than [`EDGE_MM`] to `p`.
-    fn turn_near(&self, p: Point) -> bool {
+    /// A turn of the needle path of the object of the stitch of record
+    /// `top` is nearer than [`EDGE_MM`] to `p`. The turns of other objects
+    /// do not count: travel from one letter to the next over a fill sewn
+    /// before them showed on the fill, and the turns at the sides of the
+    /// letters hid it (an agent test of P22 Milestone 9: a white stitch
+    /// 2 mm across green, measured as 0 mm).
+    fn turn_near(&self, p: Point, top: usize) -> bool {
+        let object = object_at(self.objects, top);
         let (x, y) = self.turn_cells.cell(p);
         (-TURN_REACH..=TURN_REACH).any(|dx| {
             (-TURN_REACH..=TURN_REACH).any(|dy| {
-                self.turn_cells
-                    .slot((x + dx, y + dy))
-                    .is_some_and(|k| self.turns[k].iter().any(|q| q.distance(p) < EDGE_MM))
+                self.turn_cells.slot((x + dx, y + dy)).is_some_and(|k| {
+                    self.turns[k]
+                        .iter()
+                        .any(|&(q, r)| q.distance(p) < EDGE_MM && object_at(self.objects, r) == object)
+                })
             })
         })
     }
@@ -528,7 +541,7 @@ fn shows_at(p: Point, dir: Point, record: usize, near: &Near, cross_sin: f64) ->
     match top {
         None => Some(Shows::OnFabric),
         Some((_, false)) => None,
-        Some((_, true)) if near.turn_near(p) => None,
+        Some((top, true)) if near.turn_near(p, top) => None,
         Some((_, true)) => Some(Shows::OnStitches),
     }
 }
@@ -613,6 +626,41 @@ mod tests {
         // 9.6 mm up across the rows shows, but its last 0.5 mm.
         assert!((s.on_stitches_mm() - 9.1).abs() < 0.25, "{}", s.on_stitches_mm());
         assert_eq!(s.on_fabric_mm(), 0.0);
+    }
+
+    #[test]
+    fn the_turns_of_another_object_do_not_hide_travel() {
+        // A fill (object 1: rows from y 0 to 9.6), then a letter on it
+        // (object 2: a narrow column from x 2 to 3, its sides are turns),
+        // and travel of the letter across the rows at 45 degrees to the
+        // next letter. The turns of the column are near the start of the
+        // travel, but the rows under it are of the fill.
+        let r = rows(0.0, 25);
+        let column: Vec<(f64, f64)> = (0..10)
+            .flat_map(|k| {
+                let y = 2.0 + 0.4 * f64::from(k);
+                [(2.0, y), (3.0, y + 0.2)]
+            })
+            .collect();
+        let travel: &[(f64, f64)] = &[(6.0, 8.8)];
+        let mut p = plan(&[(&r, false), (&column, false), (travel, true)]);
+        let fill_end = 1 + r.len();
+        let end = p.stitches.records.len() - 1;
+        let span = |object: u64, records: std::ops::Range<usize>| crate::plan::ObjectSpan {
+            object: ObjectId(object),
+            start: Point::ZERO,
+            end: Point::ZERO,
+            records,
+        };
+        p.spans = vec![span(1, 1..fill_end), span(2, fill_end..end)];
+        let s = shown_travel(&p);
+        // 4.24 mm from (3, 5.8) to (6, 8.8), but the 0.5 mm at each end.
+        assert!((s.on_stitches_mm() - 3.24).abs() < 0.25, "{:?}", s.pieces);
+        // With the fill and the letter one object, the turns of the column
+        // count (the edge of the area under the travel), as before.
+        p.spans = vec![span(1, 1..end)];
+        let one = shown_travel(&p);
+        assert!(one.on_stitches_mm() < s.on_stitches_mm() - 0.3, "{:?}", one.pieces);
     }
 
     #[test]

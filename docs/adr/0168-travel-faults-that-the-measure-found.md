@@ -68,3 +68,8 @@ that lies on top of sewn stitches or on the fabric:
   that goes back over the column sewn before it (4.2 mm shows). The
   route of the font decides this link (`joined`), so the fix is in the
   route and the fonts, not in the travel.
+
+Note of 2026-11-26 (ADR 0178): the link of Fat Face Serif is fixed in the
+stitch engine, not in the route: where a fixed letter joins two parts with
+no trim, the travel goes along the end edge and the start edge of the two
+parts.

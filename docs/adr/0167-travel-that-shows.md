@@ -94,3 +94,7 @@ sewn stitches and the longest pieces of each object in one pass.
   (release) keeps it under 15 %. A stitch far from all travel is left
   out with one look at a table of sums of the cells that the travel goes
   through.
+
+Note of 2026-11-26 (ADR 0178): a turn hides travel at the edge of an area
+only if it is a turn of the object of the stitch on top at that point. The
+turns at the sides of letters hid travel between the letters on a fill.
