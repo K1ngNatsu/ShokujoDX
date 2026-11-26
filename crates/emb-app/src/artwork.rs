@@ -70,7 +70,7 @@ pub(crate) fn number(ui: &mut egui::Ui, label: &str, help: &str, v: &mut f64, ra
     ui.horizontal(|ui| {
         ui.label(label).on_hover_text(help);
         ui.add(
-            egui::DragValue::new(v)
+            crate::workspace::drag(v)
                 .range(range)
                 .clamp_existing_to_range(false)
                 .speed(0.1)
@@ -83,7 +83,7 @@ pub(crate) fn number(ui: &mut egui::Ui, label: &str, help: &str, v: &mut f64, ra
 pub(crate) fn count(ui: &mut egui::Ui, label: &str, v: &mut u32, range: std::ops::RangeInclusive<u32>) {
     ui.horizontal(|ui| {
         ui.label(label);
-        ui.add(egui::DragValue::new(v).range(range).clamp_existing_to_range(false));
+        ui.add(crate::workspace::drag(v).range(range).clamp_existing_to_range(false));
     });
 }
 

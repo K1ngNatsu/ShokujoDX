@@ -103,7 +103,9 @@ tab to show it again.
   **Ctrl+Minus** and **Ctrl+0** change it too.
 - **High contrast**: black or white panels with strong lines.
 - **Language**: English, Deutsch, Español or 日本語. The help topics are
-  in the same language (a topic with no translation is in English).
+  in the same language (a topic with no translation is in English). In
+  all number fields you can type a decimal point or a decimal comma
+  (`0.4` or `0,4`).
 
 See [Options](options) for all the settings.
 

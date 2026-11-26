@@ -106,7 +106,9 @@ más espacio; haga clic en una pestaña para mostrarla de nuevo.
   **Ctrl+Más**, **Ctrl+Menos** y **Ctrl+0** también lo cambian.
 - **Alto contraste**: paneles negros o blancos con líneas marcadas.
 - **Idioma**: English, Deutsch, Español o 日本語. Los temas de ayuda están
-  en el mismo idioma (un tema sin traducción está en inglés).
+  en el mismo idioma (un tema sin traducción está en inglés). En todos
+  los campos numéricos puede escribir un punto o una coma decimal
+  (`0.4` o `0,4`).
 
 Vea [Opciones](options) para todos los ajustes.
 

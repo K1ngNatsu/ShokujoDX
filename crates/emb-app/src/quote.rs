@@ -109,7 +109,7 @@ impl AppState {
 /// A money field of a price list.
 fn money(ui: &mut egui::Ui, v: &mut f64, currency: &str) -> egui::Response {
     ui.add(
-        egui::DragValue::new(v)
+        crate::workspace::drag(v)
             .range(0.0..=MAX_PRICE)
             .clamp_existing_to_range(false)
             .speed(0.05)
@@ -121,7 +121,7 @@ fn money(ui: &mut egui::Ui, v: &mut f64, currency: &str) -> egui::Response {
 /// A percent field of a price list.
 fn percent(ui: &mut egui::Ui, v: &mut f64) -> egui::Response {
     ui.add(
-        egui::DragValue::new(v)
+        crate::workspace::drag(v)
             .range(0.0..=100.0)
             .clamp_existing_to_range(false)
             .speed(0.5)
@@ -149,7 +149,7 @@ fn price_list_ui(ui: &mut egui::Ui, l: &mut PriceList, currency: &str) {
             ui.end_row();
             ui.label(tr("Colors in the price"))
                 .on_hover_text(tr("The stitch price includes this many threads."));
-            ui.add(egui::DragValue::new(&mut l.free_colors).range(0..=99));
+            ui.add(crate::workspace::drag(&mut l.free_colors).range(0..=99));
             ui.end_row();
             ui.label(tr("Each added color"))
                 .on_hover_text(tr("For each piece, for each thread over the colors in the price."));
@@ -182,7 +182,7 @@ fn price_list_ui(ui: &mut egui::Ui, l: &mut PriceList, currency: &str) {
         ui.horizontal(|ui| {
             ui.label(tr("From"));
             ui.add(
-                egui::DragValue::new(&mut b.from)
+                crate::workspace::drag(&mut b.from)
                     .range(1..=MAX_QUANTITY)
                     .clamp_existing_to_range(false)
                     .suffix(tr(" pieces")),
@@ -307,7 +307,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                     if o.sizes.is_empty() {
                         let mut n = o.total_quantity();
                         let r = ui.add(
-                            egui::DragValue::new(&mut n)
+                            crate::workspace::drag(&mut n)
                                 .range(1..=MAX_QUANTITY)
                                 .clamp_existing_to_range(false)
                                 .suffix(tr(" pieces")),

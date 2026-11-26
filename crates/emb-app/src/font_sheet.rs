@@ -300,7 +300,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                 ui.checkbox(on, name);
                 ui.add_enabled(
                     *on,
-                    egui::DragValue::new(size)
+                    crate::workspace::drag(size)
                         .range(2.0..=300.0)
                         .clamp_existing_to_range(false)
                         .speed(0.1)
@@ -335,7 +335,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         ui.horizontal(|ui| {
             ui.label(tr("Row width"));
             ui.add(
-                egui::DragValue::new(&mut w.width_mm)
+                crate::workspace::drag(&mut w.width_mm)
                     .range(20.0..=1000.0)
                     .clamp_existing_to_range(false)
                     .speed(1.0)

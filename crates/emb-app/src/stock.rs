@@ -435,15 +435,15 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                         }
                         swatch(ui, t.color);
                         ui.label(text);
-                        ui.add(egui::DragValue::new(&mut t.spools).range(0..=MAX_SPOOLS));
+                        ui.add(crate::workspace::drag(&mut t.spools).range(0..=MAX_SPOOLS));
                         let mut m = t.spool_m.unwrap_or(0.0);
                         if ui
-                            .add(egui::DragValue::new(&mut m).range(0.0..=MAX_SPOOL_M).speed(10.0).suffix(" m"))
+                            .add(crate::workspace::drag(&mut m).range(0.0..=MAX_SPOOL_M).speed(10.0).suffix(" m"))
                             .changed()
                         {
                             t.spool_m = (m > 0.0).then_some(m);
                         }
-                        ui.add(egui::DragValue::new(&mut t.min_spools).range(0..=MAX_SPOOLS));
+                        ui.add(crate::workspace::drag(&mut t.min_spools).range(0..=MAX_SPOOLS));
                         if crate::a11y::named(ui.small_button(egui_phosphor::regular::X), tr("Remove the thread from the stock")).clicked() {
                             remove = Some(i);
                         }

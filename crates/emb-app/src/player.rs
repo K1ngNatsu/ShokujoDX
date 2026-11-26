@@ -157,7 +157,7 @@ pub fn bar(ui: &mut egui::Ui, st: &mut AppState) {
         ui.spacing_mut().slider_width = width;
         if ui
             .add(
-                egui::Slider::new(&mut pos, 0..=last)
+                crate::workspace::slider(&mut pos, 0..=last)
                     .clamping(egui::SliderClamping::Edits)
                     .show_value(false),
             )

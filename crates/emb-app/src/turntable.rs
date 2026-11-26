@@ -445,7 +445,7 @@ fn contents(ui: &mut egui::Ui, st: &mut AppState) {
         let mut deg = t.step as f64 * STEP_DEG;
         if ui
             .add(
-                egui::Slider::new(&mut deg, 0.0..=360.0 - STEP_DEG)
+                crate::workspace::slider(&mut deg, 0.0..=360.0 - STEP_DEG)
                     .step_by(STEP_DEG)
                     .suffix("°"),
             )

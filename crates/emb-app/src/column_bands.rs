@@ -269,7 +269,7 @@ fn bands_ui(
             "How far each band goes into the band next to it. A small overlap keeps the fabric from showing between the bands.",
         ));
         ui.add(
-            egui::Slider::new(&mut w.overlap_mm, 0.0..=1.0)
+            crate::workspace::slider(&mut w.overlap_mm, 0.0..=1.0)
                 .clamping(egui::SliderClamping::Edits)
                 .suffix(" mm")
                 .fixed_decimals(2),

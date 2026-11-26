@@ -267,7 +267,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                 }
                 if let Some(m) = &mut c.max_width_mm {
                     ui.add(
-                        egui::DragValue::new(m)
+                        crate::workspace::drag(m)
                             .range(5.0..=400.0)
                             .clamp_existing_to_range(false)
                             .speed(0.5)
@@ -316,7 +316,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                         ui.add(egui::TextEdit::singleline(v).desired_width(120.0));
                     }
                     ui.add(
-                        egui::DragValue::new(&mut r.quantity)
+                        crate::workspace::drag(&mut r.quantity)
                             .range(1..=999)
                             .clamp_existing_to_range(false),
                     );

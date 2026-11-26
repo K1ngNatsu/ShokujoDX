@@ -109,7 +109,9 @@ klicken Sie auf einen Tab, um es wieder zu zeigen.
   **Strg+Plus**, **Strg+Minus** und **Strg+0** ändern sie auch.
 - **Hoher Kontrast**: schwarze oder weiße Bereiche mit kräftigen Linien.
 - **Sprache**: English, Deutsch, Español oder 日本語. Die Hilfethemen sind
-  in derselben Sprache (ein Thema ohne Übersetzung ist auf Englisch).
+  in derselben Sprache (ein Thema ohne Übersetzung ist auf Englisch). In
+  alle Zahlenfelder können Sie einen Dezimalpunkt oder ein Dezimalkomma
+  eingeben (`0.4` oder `0,4`).
 
 Siehe [Optionen](options) für alle Einstellungen.
 

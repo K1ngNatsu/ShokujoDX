@@ -290,7 +290,7 @@ pub fn options_ui(ui: &mut egui::Ui, s: &mut crate::workspace::Settings) {
         let mut pct = s.show_through_limit * 100.0;
         if ui
             .add(
-                egui::DragValue::new(&mut pct)
+                crate::workspace::drag(&mut pct)
                     .range(5.0..=90.0)
                     .speed(1.0)
                     .clamp_existing_to_range(false)
@@ -306,7 +306,7 @@ pub fn options_ui(ui: &mut egui::Ui, s: &mut crate::workspace::Settings) {
         ui.end_row();
         ui.label(tr("Thread height limit"));
         ui.add(
-            egui::DragValue::new(&mut s.thread_height_limit_mm)
+            crate::workspace::drag(&mut s.thread_height_limit_mm)
                 .range(0.3..=5.0)
                 .speed(0.05)
                 .clamp_existing_to_range(false)

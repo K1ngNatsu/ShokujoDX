@@ -189,7 +189,7 @@ pub fn edit_panel(ui: &mut egui::Ui, st: &mut AppState) {
     let mut sides = st.sketch.as_ref().map_or(6, |e| e.polygon_sides);
     ui.horizontal(|ui| {
         ui.label(tr("Polygon sides"));
-        if ui.add(egui::DragValue::new(&mut sides).range(3..=40)).changed()
+        if ui.add(crate::workspace::drag(&mut sides).range(3..=40)).changed()
             && let Some(e) = &mut st.sketch
         {
             e.polygon_sides = sides;
@@ -277,7 +277,11 @@ fn edit_values(ui: &mut egui::Ui, st: &mut AppState) {
                     crate::workspace::length_value(ui, &mut v.chamfer2_mm, units, 0.01, max);
                 }),
                 2 => row(ui, tr("Angle"), &mut |ui| {
-                    ui.add(egui::DragValue::new(&mut v.chamfer_deg).range(1.0..=179.0).suffix("°"));
+                    ui.add(
+                        crate::workspace::drag(&mut v.chamfer_deg)
+                            .range(1.0..=179.0)
+                            .suffix("°"),
+                    );
                 }),
                 _ => {}
             }
@@ -297,10 +301,10 @@ fn edit_values(ui: &mut egui::Ui, st: &mut AppState) {
         }
         SketchTool::RectPattern => {
             row(ui, tr("Number of columns"), &mut |ui| {
-                ui.add(egui::DragValue::new(&mut v.cols).range(1..=100));
+                ui.add(crate::workspace::drag(&mut v.cols).range(1..=100));
             });
             row(ui, tr("Number of rows"), &mut |ui| {
-                ui.add(egui::DragValue::new(&mut v.rows).range(1..=100));
+                ui.add(crate::workspace::drag(&mut v.rows).range(1..=100));
             });
             row(ui, tr("Column spacing"), &mut |ui| {
                 crate::workspace::length_value(ui, &mut v.dx_mm, units, -max, max);
@@ -312,10 +316,10 @@ fn edit_values(ui: &mut egui::Ui, st: &mut AppState) {
         }
         SketchTool::CircularPattern => {
             row(ui, tr("Copies"), &mut |ui| {
-                ui.add(egui::DragValue::new(&mut v.count).range(2..=400));
+                ui.add(crate::workspace::drag(&mut v.count).range(2..=400));
             });
             row(ui, tr("Angle"), &mut |ui| {
-                ui.add(egui::DragValue::new(&mut v.angle_deg).range(1.0..=360.0).suffix("°"));
+                ui.add(crate::workspace::drag(&mut v.angle_deg).range(1.0..=360.0).suffix("°"));
             });
         }
         SketchTool::Move | SketchTool::Copy => {
@@ -333,7 +337,7 @@ fn edit_values(ui: &mut egui::Ui, st: &mut AppState) {
         SketchTool::Rotate => {
             row(ui, tr("Angle"), &mut |ui| {
                 ui.add(
-                    egui::DragValue::new(&mut v.rotate_deg)
+                    crate::workspace::drag(&mut v.rotate_deg)
                         .range(-360.0..=360.0)
                         .suffix("°"),
                 );
@@ -345,7 +349,7 @@ fn edit_values(ui: &mut egui::Ui, st: &mut AppState) {
         }
         SketchTool::Scale => {
             row(ui, tr("Factor"), &mut |ui| {
-                ui.add(egui::DragValue::new(&mut v.scale).range(0.01..=100.0).speed(0.01));
+                ui.add(crate::workspace::drag(&mut v.scale).range(0.01..=100.0).speed(0.01));
             });
             ui.checkbox(&mut v.copy_parts, tr("Copy"));
             ui.weak(tr("Click the base point of the scale."));

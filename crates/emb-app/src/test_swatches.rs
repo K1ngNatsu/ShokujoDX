@@ -209,7 +209,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                     for (name, v) in [(tr("From"), &mut w.from), (tr("To"), &mut w.to)] {
                         ui.label(name);
                         ui.add(
-                            egui::DragValue::new(v)
+                            crate::workspace::drag(v)
                                 .range(lo..=hi)
                                 .speed(if w.setting.is_length() { 0.01 } else { 1.0 })
                                 .fixed_decimals(if w.setting.is_length() { 2 } else { 0 })
@@ -219,7 +219,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                         ui.end_row();
                     }
                     ui.label(tr("Copies"));
-                    ui.add(egui::DragValue::new(&mut w.copies).range(2..=swatch::MAX_COPIES));
+                    ui.add(crate::workspace::drag(&mut w.copies).range(2..=swatch::MAX_COPIES));
                     ui.end_row();
                 }
             });

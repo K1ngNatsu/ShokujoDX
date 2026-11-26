@@ -410,7 +410,7 @@ pub fn screen(ui: &mut egui::Ui, st: &mut AppState) {
                 ui.horizontal(|ui| {
                     ui.label(big(tr("Size"), 17.0));
                     ui.add(
-                        egui::Slider::new(&mut c.height_mm, 6.0..=80.0)
+                        crate::workspace::slider(&mut c.height_mm, 6.0..=80.0)
                             .clamping(egui::SliderClamping::Edits)
                             .suffix(" mm")
                             .fixed_decimals(0),

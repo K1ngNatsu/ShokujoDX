@@ -317,7 +317,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
             ui.label(tr("Height"))
                 .on_hover_text(tr("The height of the largest initial."));
             ui.add(
-                egui::DragValue::new(&mut w.spec.height_mm)
+                crate::workspace::drag(&mut w.spec.height_mm)
                     .range(5.0..=200.0)
                     .clamp_existing_to_range(false)
                     .speed(0.2)
@@ -347,7 +347,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                 if w.spec.border.stitch == BorderStitch::Satin {
                     ui.label(tr("Width"));
                     ui.add(
-                        egui::DragValue::new(&mut w.spec.border.width_mm)
+                        crate::workspace::drag(&mut w.spec.border.width_mm)
                             .range(0.8..=10.0)
                             .clamp_existing_to_range(false)
                             .speed(0.05)
@@ -357,7 +357,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                 ui.label(tr("Space"))
                     .on_hover_text(tr("The space between the initials and the border."));
                 ui.add(
-                    egui::DragValue::new(&mut w.spec.border.margin_mm)
+                    crate::workspace::drag(&mut w.spec.border.margin_mm)
                         .range(0.0..=30.0)
                         .clamp_existing_to_range(false)
                         .speed(0.1)
@@ -386,7 +386,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
             ui.horizontal(|ui| {
                 ui.label(tr("Size"));
                 ui.add(
-                    egui::DragValue::new(&mut w.spec.ornaments.size_mm)
+                    crate::workspace::drag(&mut w.spec.ornaments.size_mm)
                         .range(1.0..=60.0)
                         .clamp_existing_to_range(false)
                         .speed(0.1)

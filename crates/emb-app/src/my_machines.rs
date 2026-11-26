@@ -362,7 +362,7 @@ fn machine_form(ui: &mut egui::Ui, st: &mut AppState) {
         let mut needles = u32::from(m.needles.unwrap_or(1));
         if ui
             .add(
-                egui::DragValue::new(&mut needles)
+                crate::workspace::drag(&mut needles)
                     .range(1..=15)
                     .clamp_existing_to_range(false),
             )
@@ -373,7 +373,7 @@ fn machine_form(ui: &mut egui::Ui, st: &mut AppState) {
         ui.end_row();
         ui.label(tr("Speed"));
         ui.add(
-            egui::DragValue::new(&mut m.stitches_per_minute)
+            crate::workspace::drag(&mut m.stitches_per_minute)
                 .range(100..=2000)
                 .clamp_existing_to_range(false)
                 .suffix(tr(" stitches/min")),
@@ -381,7 +381,7 @@ fn machine_form(ui: &mut egui::Ui, st: &mut AppState) {
         ui.end_row();
         ui.label(tr("Longest stitch"));
         ui.add(
-            egui::DragValue::new(&mut m.max_stitch_length_mm)
+            crate::workspace::drag(&mut m.max_stitch_length_mm)
                 .range(1.0..=12.7)
                 .speed(0.1)
                 .clamp_existing_to_range(false)

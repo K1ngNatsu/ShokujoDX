@@ -122,14 +122,14 @@ fn contents(ui: &mut egui::Ui, st: &mut AppState) {
     egui::Grid::new("repeats").num_columns(3).show(ui, |ui| {
         ui.label(tr("Columns"));
         ui.add(
-            egui::DragValue::new(&mut n.columns)
+            crate::workspace::drag(&mut n.columns)
                 .range(1..=20)
                 .clamp_existing_to_range(false),
         );
         ui.end_row();
         ui.label(tr("Rows"));
         ui.add(
-            egui::DragValue::new(&mut n.rows)
+            crate::workspace::drag(&mut n.rows)
                 .range(1..=20)
                 .clamp_existing_to_range(false),
         );

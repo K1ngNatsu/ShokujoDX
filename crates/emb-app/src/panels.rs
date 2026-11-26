@@ -43,7 +43,7 @@ fn param_slider(
     ui.horizontal(|ui| {
         ui.label(label).on_hover_text(help);
         let resp = ui.add(
-            egui::Slider::new(&mut v, range)
+            crate::workspace::slider(&mut v, range)
                 .clamping(egui::SliderClamping::Edits)
                 .suffix(" mm")
                 .fixed_decimals(2)
@@ -415,7 +415,7 @@ fn ripple_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, r: &emb_mo
     ui.horizontal(|ui| {
         ui.label(tr("Lines"))
             .on_hover_text(tr("The number of lines, the line itself included."));
-        let resp = ui.add(egui::Slider::new(&mut lines, 1..=100).clamping(egui::SliderClamping::Edits));
+        let resp = ui.add(crate::workspace::slider(&mut lines, 1..=100).clamping(egui::SliderClamping::Edits));
         if resp.changed() {
             edit_ripple(st, id, "lines", "Change ripple lines", &|r| r.lines = lines);
             if !resp.dragged() {
@@ -431,7 +431,7 @@ fn ripple_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, r: &emb_mo
             "0 %: the lines go to the point. 100 %: all lines have the size of the line.",
         ));
         let resp = ui.add(
-            egui::Slider::new(&mut end, 0.0..=200.0)
+            crate::workspace::slider(&mut end, 0.0..=200.0)
                 .clamping(egui::SliderClamping::Edits)
                 .suffix(" %")
                 .fixed_decimals(0),
@@ -462,7 +462,7 @@ fn ripple_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, r: &emb_mo
                 "Where the lines get smaller to, measured from the middle of the line (right, down).",
             ));
             for v in [&mut x, &mut y] {
-                let resp = ui.add(egui::DragValue::new(v).speed(0.2).suffix(" mm").fixed_decimals(1));
+                let resp = ui.add(crate::workspace::drag(v).speed(0.2).suffix(" mm").fixed_decimals(1));
                 changed |= resp.changed();
                 stop |= resp.drag_stopped() || resp.lost_focus();
             }
@@ -616,7 +616,7 @@ fn count_slider(
     let mut v = value;
     ui.horizontal(|ui| {
         ui.label(label);
-        let resp = ui.add(egui::Slider::new(&mut v, range).clamping(egui::SliderClamping::Edits));
+        let resp = ui.add(crate::workspace::slider(&mut v, range).clamping(egui::SliderClamping::Edits));
         if resp.changed() {
             st.doc.edit_merged(
                 crate::i18n::fill("Change {}", &[&crate::i18n::in_sentence(label)]),
@@ -1052,7 +1052,7 @@ fn transform_section(ui: &mut egui::Ui, st: &mut AppState, ids: &[ObjectId]) {
             let mut field = |ui: &mut egui::Ui, label: &str, v: &mut f64, min: f64, which: &'static str| {
                 ui.label(label);
                 let r = ui.add(
-                    egui::DragValue::new(v)
+                    crate::workspace::drag(v)
                         .speed(0.1)
                         .range(min..=10_000.0)
                         // A straight line has no height: show 0, do not change it.
@@ -1142,7 +1142,7 @@ fn transform_section(ui: &mut egui::Ui, st: &mut AppState, ids: &[ObjectId]) {
         for (v, arrow) in [(&mut h1, "↔"), (&mut v1, "↕")] {
             ui.label(arrow);
             let r = ui.add(
-                egui::DragValue::new(v)
+                crate::workspace::drag(v)
                     .speed(0.5)
                     .range(-60.0..=60.0)
                     .suffix("°")
@@ -1341,7 +1341,7 @@ fn fill_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &Fil
             ui.label(tr("Angle to the direction line"))
                 .on_hover_text(tr("90°: the stitches go square across the direction line."));
             let resp = ui.add(
-                egui::Slider::new(&mut angle, 1.0..=179.0)
+                crate::workspace::slider(&mut angle, 1.0..=179.0)
                     .clamping(egui::SliderClamping::Edits)
                     .suffix("°")
                     .fixed_decimals(0),
@@ -1383,7 +1383,7 @@ fn fill_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &Fil
         ui.horizontal(|ui| {
             ui.label(tr("Angle")).on_hover_text(tr(words::ANGLE_HELP));
             let resp = ui.add(
-                egui::Slider::new(&mut angle, 0.0..=179.0)
+                crate::workspace::slider(&mut angle, 0.0..=179.0)
                     .clamping(egui::SliderClamping::Edits)
                     .suffix("°")
                     .fixed_decimals(0),
@@ -1834,7 +1834,7 @@ fn split_pattern_ui(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, current:
     ui.horizontal(|ui| {
         ui.label(tr("Pattern size"));
         let resp = ui.add(
-            egui::Slider::new(&mut v, 0.5..=4.0)
+            crate::workspace::slider(&mut v, 0.5..=4.0)
                 .clamping(egui::SliderClamping::Edits)
                 .suffix(" ×")
                 .fixed_decimals(2),
@@ -1889,7 +1889,7 @@ fn stamps_ui(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &FillPa
             ui.horizontal(|ui| {
                 ui.label(label);
                 let resp = ui.add(
-                    egui::Slider::new(&mut v, range)
+                    crate::workspace::slider(&mut v, range)
                         .clamping(egui::SliderClamping::Edits)
                         .suffix(suffix)
                         .fixed_decimals(1),
@@ -2014,7 +2014,7 @@ fn radial_center_ui(
     ui.horizontal(|ui| {
         ui.label(tr("Center")).on_hover_text(tr(words::CENTER_HELP));
         for v in [&mut x, &mut y] {
-            let r = ui.add(egui::DragValue::new(v).speed(0.2).suffix(" mm").fixed_decimals(1));
+            let r = ui.add(crate::workspace::drag(v).speed(0.2).suffix(" mm").fixed_decimals(1));
             changed |= r.changed();
             stop |= r.drag_stopped() || r.lost_focus();
         }
@@ -2062,7 +2062,7 @@ fn fill_slider(
     let whole = suffix.is_empty();
     ui.horizontal(|ui| {
         ui.label(label);
-        let mut slider = egui::Slider::new(&mut v, range)
+        let mut slider = crate::workspace::slider(&mut v, range)
             .clamping(egui::SliderClamping::Edits)
             .suffix(suffix);
         slider = if whole {
@@ -2102,7 +2102,7 @@ fn lean_slider(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, value: f64) {
             "The angle of the top stitches from square across the column. 0°: square. The underlay does not lean.",
         ));
         let resp = ui.add(
-            egui::Slider::new(&mut v, -max..=max)
+            crate::workspace::slider(&mut v, -max..=max)
                 .clamping(egui::SliderClamping::Edits)
                 .suffix("°")
                 .fixed_decimals(0),
@@ -2140,7 +2140,7 @@ fn fill_free_slider(
     ui.horizontal(|ui| {
         ui.label(label);
         let resp = ui.add(
-            egui::Slider::new(&mut v, range)
+            crate::workspace::slider(&mut v, range)
                 .clamping(egui::SliderClamping::Edits)
                 .suffix(" × width")
                 .fixed_decimals(1),

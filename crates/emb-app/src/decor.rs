@@ -245,14 +245,14 @@ fn blends_window(ctx: &egui::Context, st: &mut AppState) {
                 .horizontal(|ui| {
                     ui.label(tr("Density from"));
                     let ra = ui.add(
-                        egui::Slider::new(&mut a, 5.0..=100.0)
+                        crate::workspace::slider(&mut a, 5.0..=100.0)
                             .clamping(egui::SliderClamping::Edits)
                             .suffix(" %")
                             .fixed_decimals(0),
                     );
                     ui.label(tr("to"));
                     let rb = ui.add(
-                        egui::Slider::new(&mut b, 5.0..=100.0)
+                        crate::workspace::slider(&mut b, 5.0..=100.0)
                             .clamping(egui::SliderClamping::Edits)
                             .suffix(" %")
                             .fixed_decimals(0),
@@ -449,7 +449,7 @@ fn borders_window(ctx: &egui::Context, st: &mut AppState) {
             ));
             let mut pct = w.frame_scale * 100.0;
             ui.add(
-                egui::Slider::new(&mut pct, 50.0..=200.0)
+                crate::workspace::slider(&mut pct, 50.0..=200.0)
                     .clamping(egui::SliderClamping::Always)
                     .fixed_decimals(0)
                     .suffix(" %"),
@@ -459,7 +459,7 @@ fn borders_window(ctx: &egui::Context, st: &mut AppState) {
         ui.horizontal(|ui| {
             ui.label(tr("Space round the objects"));
             ui.add(
-                egui::Slider::new(&mut w.frame_margin_mm, 0.0..=20.0)
+                crate::workspace::slider(&mut w.frame_margin_mm, 0.0..=20.0)
                     .clamping(egui::SliderClamping::Edits)
                     .suffix(" mm"),
             );

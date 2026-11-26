@@ -124,7 +124,7 @@ pub fn light_ui(ui: &mut egui::Ui, l: &mut Lighting) {
     egui::Grid::new("light").num_columns(2).show(ui, |ui| {
         ui.label(tr("Light from"));
         ui.add(
-            egui::Slider::new(&mut l.azimuth_deg, 0.0..=360.0)
+            crate::workspace::slider(&mut l.azimuth_deg, 0.0..=360.0)
                 .clamping(egui::SliderClamping::Edits)
                 .suffix("°")
                 .fixed_decimals(0),
@@ -135,7 +135,7 @@ pub fn light_ui(ui: &mut egui::Ui, l: &mut Lighting) {
         ui.end_row();
         ui.label(tr("Light height"));
         ui.add(
-            egui::Slider::new(&mut l.elevation_deg, 10.0..=90.0)
+            crate::workspace::slider(&mut l.elevation_deg, 10.0..=90.0)
                 .clamping(egui::SliderClamping::Edits)
                 .suffix("°")
                 .fixed_decimals(0),
@@ -146,7 +146,7 @@ pub fn light_ui(ui: &mut egui::Ui, l: &mut Lighting) {
         ui.end_row();
         ui.label(tr("Strength"));
         ui.add(
-            egui::Slider::new(&mut l.strength, 0.0..=1.0)
+            crate::workspace::slider(&mut l.strength, 0.0..=1.0)
                 .clamping(egui::SliderClamping::Edits)
                 .fixed_decimals(2),
         );

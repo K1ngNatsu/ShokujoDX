@@ -135,7 +135,7 @@ pub(super) fn shaping_options(ui: &mut egui::Ui, st: &mut AppState, _s: &SelInfo
                  Also for Remove overlaps and the knife.",
             ));
             ui.add(
-                egui::DragValue::new(&mut st.shaping.overlap_mm)
+                crate::workspace::drag(&mut st.shaping.overlap_mm)
                     .range(0.0..=5.0)
                     .clamp_existing_to_range(false)
                     .speed(0.05)
@@ -150,7 +150,7 @@ pub(super) fn rotate_skew(ui: &mut egui::Ui, st: &mut AppState, s: &SelInfo) {
     let (mut sx, mut sy, mut rot) = st.arrange_values;
     ui.horizontal(|ui| {
         ui.add(
-            egui::DragValue::new(&mut rot)
+            crate::workspace::drag(&mut rot)
                 .range(-360.0..=360.0)
                 .clamp_existing_to_range(false)
                 .suffix("°"),
@@ -170,13 +170,13 @@ pub(super) fn rotate_skew(ui: &mut egui::Ui, st: &mut AppState, s: &SelInfo) {
     });
     ui.horizontal(|ui| {
         ui.add(
-            egui::DragValue::new(&mut sx)
+            crate::workspace::drag(&mut sx)
                 .range(-80.0..=80.0)
                 .clamp_existing_to_range(false)
                 .suffix("° X"),
         );
         ui.add(
-            egui::DragValue::new(&mut sy)
+            crate::workspace::drag(&mut sy)
                 .range(-80.0..=80.0)
                 .clamp_existing_to_range(false)
                 .suffix("° Y"),

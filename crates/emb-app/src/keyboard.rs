@@ -218,7 +218,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         ui.horizontal(|ui| {
             ui.label(tr("Height"));
             ui.add(
-                egui::DragValue::new(&mut w.height_mm)
+                crate::workspace::drag(&mut w.height_mm)
                     .range(5.0..=200.0)
                     .clamp_existing_to_range(false)
                     .speed(0.2)
@@ -226,7 +226,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
             );
             ui.label(tr("Spacing"));
             ui.add(
-                egui::DragValue::new(&mut w.spacing_mm)
+                crate::workspace::drag(&mut w.spacing_mm)
                     .range(-10.0..=30.0)
                     .clamp_existing_to_range(false)
                     .speed(0.05)

@@ -99,7 +99,7 @@ pub fn sew_time_window(ctx: &egui::Context, st: &mut AppState) {
             .show(ui, |ui| {
                 ui.label(tr("Speed"));
                 ui.add(
-                    egui::DragValue::new(&mut t.stitches_per_minute)
+                    crate::workspace::drag(&mut t.stitches_per_minute)
                         .range(50..=2000)
                         .clamp_existing_to_range(false)
                         .suffix(" stitches/min"),
@@ -120,7 +120,7 @@ pub fn sew_time_window(ctx: &egui::Context, st: &mut AppState) {
                 ] {
                     ui.label(label).on_hover_text(help);
                     ui.add(
-                        egui::DragValue::new(v)
+                        crate::workspace::drag(v)
                             .range(0.0..=600.0)
                             .clamp_existing_to_range(false)
                             .speed(0.5)
@@ -132,7 +132,7 @@ pub fn sew_time_window(ctx: &egui::Context, st: &mut AppState) {
                 ui.label(tr("Heads"))
                     .on_hover_text(tr("The pieces that the machine sews at a time."));
                 ui.add(
-                    egui::DragValue::new(&mut t.heads)
+                    crate::workspace::drag(&mut t.heads)
                         .range(1..=emb_model::machine::MAX_HEADS)
                         .clamp_existing_to_range(false),
                 );
@@ -151,7 +151,7 @@ pub fn sew_time_window(ctx: &egui::Context, st: &mut AppState) {
                 ] {
                     ui.label(label).on_hover_text(help);
                     ui.add(
-                        egui::DragValue::new(v)
+                        crate::workspace::drag(v)
                             .range(0.0..=3600.0)
                             .clamp_existing_to_range(false)
                             .speed(0.5)
@@ -192,7 +192,7 @@ pub fn sew_time_window(ctx: &egui::Context, st: &mut AppState) {
                 ui.label(tr("Jumps for a trim"));
                 if ui
                     .add(
-                        egui::DragValue::new(&mut jumps)
+                        crate::workspace::drag(&mut jumps)
                             .range(emb_model::machine::TRIM_JUMPS_RANGE)
                             .clamp_existing_to_range(false),
                     )
@@ -204,7 +204,7 @@ pub fn sew_time_window(ctx: &egui::Context, st: &mut AppState) {
                 ui.label(tr("Length of each jump"));
                 if ui
                     .add(
-                        egui::DragValue::new(&mut jump_mm)
+                        crate::workspace::drag(&mut jump_mm)
                             .range(emb_model::machine::TRIM_JUMP_MM_RANGE)
                             .clamp_existing_to_range(false)
                             .speed(0.1)
@@ -262,7 +262,7 @@ pub fn calibration_ui(ui: &mut egui::Ui, s: &mut Settings) {
     ui.horizontal(|ui| {
         ui.label(tr("Scale"));
         ui.add(
-            egui::DragValue::new(&mut s.screen_calibration)
+            crate::workspace::drag(&mut s.screen_calibration)
                 .range(0.5..=2.0)
                 .clamp_existing_to_range(false)
                 .speed(0.002)
@@ -272,7 +272,7 @@ pub fn calibration_ui(ui: &mut egui::Ui, s: &mut Settings) {
         let mut measured: f64 = ui.data_mut(|d| *d.get_temp_mut_or(id, 100.0));
         ui.label(tr("Measured"));
         ui.add(
-            egui::DragValue::new(&mut measured)
+            crate::workspace::drag(&mut measured)
                 .range(20.0..=400.0)
                 .clamp_existing_to_range(false)
                 .suffix(" mm"),

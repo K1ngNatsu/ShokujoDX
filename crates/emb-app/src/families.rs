@@ -359,7 +359,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                     ui.checkbox(&mut on, "");
                     *v = f64::from(u8::from(on));
                 } else {
-                    let slider = egui::Slider::new(v, p.min..=p.max).clamping(egui::SliderClamping::Always);
+                    let slider = crate::workspace::slider(v, p.min..=p.max).clamping(egui::SliderClamping::Always);
                     ui.add(if p.whole {
                         slider.integer()
                     } else {

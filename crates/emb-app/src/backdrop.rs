@@ -258,7 +258,7 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
             });
             let mut opacity = b.opacity * 100.0;
             let r = ui.add(
-                egui::Slider::new(&mut opacity, 10.0..=100.0)
+                crate::workspace::slider(&mut opacity, 10.0..=100.0)
                     .clamping(egui::SliderClamping::Edits)
                     .text("Strength")
                     .suffix(" %"),
@@ -273,7 +273,7 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
             let r = ui.horizontal(|ui| {
                 ui.label(tr("Width"));
                 ui.add(
-                    egui::DragValue::new(&mut width)
+                    crate::workspace::drag(&mut width)
                         .range(MIN_WIDTH_MM..=2000.0)
                         .clamp_existing_to_range(false)
                         .speed(0.5)
@@ -295,9 +295,9 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
             let (mut x, mut y) = (c.x, c.y);
             let r = ui.horizontal(|ui| {
                 ui.label(tr("Center X"));
-                let a = ui.add(egui::DragValue::new(&mut x).speed(0.5).suffix(" mm"));
+                let a = ui.add(crate::workspace::drag(&mut x).speed(0.5).suffix(" mm"));
                 ui.label(tr("Y"));
-                let b = ui.add(egui::DragValue::new(&mut y).speed(0.5).suffix(" mm"));
+                let b = ui.add(crate::workspace::drag(&mut y).speed(0.5).suffix(" mm"));
                 a | b
             });
             if r.inner.changed() {

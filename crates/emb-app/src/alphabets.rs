@@ -615,14 +615,14 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         ui.horizontal(|ui| {
             ui.label(tr("Letter height"));
             ui.add(
-                egui::DragValue::new(&mut w.height_mm)
+                crate::workspace::drag(&mut w.height_mm)
                     .range(5.0..=200.0)
                     .clamp_existing_to_range(false)
                     .speed(0.2)
                     .suffix(" mm"),
             );
             ui.label(tr("Baseline at"));
-            ui.add(egui::DragValue::new(&mut w.baseline_y).speed(0.2).suffix(" mm"));
+            ui.add(crate::workspace::drag(&mut w.baseline_y).speed(0.2).suffix(" mm"));
             if ui.button(tr("Add guides")).clicked() {
                 act = Act::Guides;
             }

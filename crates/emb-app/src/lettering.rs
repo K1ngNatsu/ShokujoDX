@@ -1115,7 +1115,7 @@ pub fn windows(ctx: &egui::Context, st: &mut AppState) {
                 "The height of the capital letters, or of the Japanese, Chinese or Korean characters of the text.",
             ));
             ui.add(
-                egui::DragValue::new(&mut d.height_mm)
+                crate::workspace::drag(&mut d.height_mm)
                     .range(2.0..=300.0)
                     .clamp_existing_to_range(false)
                     .speed(0.2)
@@ -1450,7 +1450,7 @@ fn baseline_ui(ui: &mut egui::Ui, n: &mut Lettering, drag: &mut bool) -> bool {
             ui.label(tr("Radius"))
                 .on_hover_text(tr("The radius of the baseline circle."));
             let r = ui.add(
-                egui::DragValue::new(radius_mm)
+                crate::workspace::drag(radius_mm)
                     .range(emb_model::baseline::MIN_RADIUS_MM..=2000.0)
                     .clamp_existing_to_range(false)
                     .speed(0.2)
@@ -1478,7 +1478,7 @@ fn letter_ui(ui: &mut egui::Ui, n: &mut Lettering, letter: usize, drag: &mut boo
     let mut value = |ui: &mut egui::Ui, label: &str, help: &str, v: &mut f64, speed: f64, suffix: &str| {
         ui.horizontal(|ui| {
             ui.label(label).on_hover_text(help);
-            let r = ui.add(egui::DragValue::new(v).speed(speed).suffix(suffix).max_decimals(2));
+            let r = ui.add(crate::workspace::drag(v).speed(speed).suffix(suffix).max_decimals(2));
             *drag |= r.dragged();
         });
     };
@@ -1640,7 +1640,7 @@ fn envelope_ui(ui: &mut egui::Ui, n: &mut Lettering, drag: &mut bool) -> bool {
                 .on_hover_text(tr("How far the edges of the text move, as a part of the text height."));
             let mut pct = n.envelope.amount * 100.0;
             let r = ui.add(
-                egui::Slider::new(&mut pct, 0.0..=emb_model::envelope::MAX_AMOUNT * 100.0)
+                crate::workspace::slider(&mut pct, 0.0..=emb_model::envelope::MAX_AMOUNT * 100.0)
                     .clamping(egui::SliderClamping::Edits)
                     .suffix(" %")
                     .fixed_decimals(0),
@@ -1698,7 +1698,7 @@ fn order_ui(ui: &mut egui::Ui, n: &mut Lettering, drag: &mut bool) {
         ui.label(tr("Trim gaps longer than"))
             .on_hover_text(tr("A shorter gap between two parts gets a travel stitch."));
         let r = ui.add(
-            egui::DragValue::new(&mut n.trim_over_mm)
+            crate::workspace::drag(&mut n.trim_over_mm)
                 .range(0.0..=20.0)
                 .clamp_existing_to_range(false)
                 .speed(0.05)
@@ -1771,7 +1771,7 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, l: &Letter
         ui.horizontal(|ui| {
             ui.label(label).on_hover_text(help);
             let r = ui.add(
-                egui::Slider::new(v, range)
+                crate::workspace::slider(v, range)
                     .clamping(egui::SliderClamping::Edits)
                     .suffix(suffix)
                     .fixed_decimals(2),
@@ -1885,7 +1885,7 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, l: &Letter
             ui.horizontal(|ui| {
                 ui.label(label).on_hover_text(word.1);
                 let r = ui.add(
-                    egui::Slider::new(v, range)
+                    crate::workspace::slider(v, range)
                         .clamping(egui::SliderClamping::Edits)
                         .suffix(" mm")
                         .fixed_decimals(2),
@@ -1916,7 +1916,7 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, l: &Letter
         ui.horizontal(|ui| {
             ui.label(tr("Density")).on_hover_text(tr(words::DENSITY_HELP));
             let r = ui.add(
-                egui::Slider::new(&mut n.fill.spacing_mm, 0.2..=1.0)
+                crate::workspace::slider(&mut n.fill.spacing_mm, 0.2..=1.0)
                     .clamping(egui::SliderClamping::Edits)
                     .suffix(" mm")
                     .fixed_decimals(2),
@@ -1927,7 +1927,7 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, l: &Letter
         ui.horizontal(|ui| {
             ui.label(tr("Angle"));
             let r = ui.add(
-                egui::Slider::new(&mut n.fill.angle_deg, 0.0..=179.0)
+                crate::workspace::slider(&mut n.fill.angle_deg, 0.0..=179.0)
                     .clamping(egui::SliderClamping::Edits)
                     .suffix("°")
                     .fixed_decimals(0),
@@ -2020,7 +2020,7 @@ fn knockout_ui(ui: &mut egui::Ui, n: &mut Lettering, overlap_mm: f64, drag: &mut
             "How far the letters stay under the objects in front, so that no fabric shows at the edge.",
         ));
         let r = ui.add(
-            egui::Slider::new(&mut k.overlap_mm, 0.0..=2.0)
+            crate::workspace::slider(&mut k.overlap_mm, 0.0..=2.0)
                 .clamping(egui::SliderClamping::Edits)
                 .suffix(" mm")
                 .fixed_decimals(2),
@@ -2115,7 +2115,7 @@ fn style_ui(ui: &mut egui::Ui, st: &AppState, n: &mut Lettering, drag: &mut bool
             ui.label(tr("Underline gap"))
                 .on_hover_text(tr("From the baseline to the bar."));
             let r = ui.add(
-                egui::Slider::new(&mut u.gap_mm, 0.0..=10.0)
+                crate::workspace::slider(&mut u.gap_mm, 0.0..=10.0)
                     .clamping(egui::SliderClamping::Edits)
                     .suffix(" mm")
                     .fixed_decimals(1),
@@ -2125,7 +2125,7 @@ fn style_ui(ui: &mut egui::Ui, st: &AppState, n: &mut Lettering, drag: &mut bool
         ui.horizontal(|ui| {
             ui.label(tr("Underline width"));
             let r = ui.add(
-                egui::Slider::new(&mut u.thickness_mm, 0.5..=10.0)
+                crate::workspace::slider(&mut u.thickness_mm, 0.5..=10.0)
                     .clamping(egui::SliderClamping::Edits)
                     .suffix(" mm")
                     .fixed_decimals(1),

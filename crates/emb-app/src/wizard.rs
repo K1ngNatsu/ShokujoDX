@@ -1852,7 +1852,7 @@ fn show_window(ctx: &egui::Context, st: &mut AppState) {
 
 /// A slider for a design value, as the other windows have them.
 fn slider<'a>(v: &'a mut f64, range: std::ops::RangeInclusive<f64>, text: &str) -> egui::Slider<'a> {
-    egui::Slider::new(v, range)
+    crate::workspace::slider(v, range)
         .clamping(egui::SliderClamping::Edits)
         .text(text)
 }
@@ -1865,7 +1865,7 @@ fn width_row(ui: &mut egui::Ui, w: &mut Wizard) {
         ui.label(tr("Design width"));
         if ui
             .add(
-                egui::DragValue::new(&mut width)
+                crate::workspace::drag(&mut width)
                     .range(5.0..=1000.0)
                     .clamp_existing_to_range(false)
                     .speed(0.5)
@@ -2020,7 +2020,7 @@ fn controls(ui: &mut egui::Ui, st: &mut AppState, w: &mut Wizard, current: &Curr
             ui.horizontal(|ui| {
                 ui.label(tr("Shrink the edge by"));
                 ui.add(
-                    egui::DragValue::new(&mut w.shrink_px)
+                    crate::workspace::drag(&mut w.shrink_px)
                         .range(0..=10)
                         .clamp_existing_to_range(false)
                         .suffix(" px"),
@@ -2032,7 +2032,7 @@ fn controls(ui: &mut egui::Ui, st: &mut AppState, w: &mut Wizard, current: &Curr
             ui.horizontal(|ui| {
                 ui.label(tr("Remove bits under"));
                 ui.add(
-                    egui::DragValue::new(&mut w.bits_mm2)
+                    crate::workspace::drag(&mut w.bits_mm2)
                         .range(0.0..=500.0)
                         .clamp_existing_to_range(false)
                         .speed(0.2)
@@ -2070,7 +2070,7 @@ fn controls(ui: &mut egui::Ui, st: &mut AppState, w: &mut Wizard, current: &Curr
             ui.horizontal(|ui| {
                 ui.label(tr("Colors"));
                 ui.add(
-                    egui::DragValue::new(&mut w.colors)
+                    crate::workspace::drag(&mut w.colors)
                         .range(2..=16)
                         .clamp_existing_to_range(false),
                 );
@@ -2078,7 +2078,7 @@ fn controls(ui: &mut egui::Ui, st: &mut AppState, w: &mut Wizard, current: &Curr
             ui.horizontal(|ui| {
                 ui.label(tr("Remove specks under"));
                 ui.add(
-                    egui::DragValue::new(&mut w.speck_mm2)
+                    crate::workspace::drag(&mut w.speck_mm2)
                         .range(0.0..=100.0)
                         .clamp_existing_to_range(false)
                         .speed(0.1)
@@ -2089,7 +2089,7 @@ fn controls(ui: &mut egui::Ui, st: &mut AppState, w: &mut Wizard, current: &Curr
             ui.horizontal(|ui| {
                 ui.label(tr("Smooth noise"));
                 ui.add(
-                    egui::DragValue::new(&mut w.denoise)
+                    crate::workspace::drag(&mut w.denoise)
                         .range(0..=3)
                         .clamp_existing_to_range(false),
                 )
@@ -2100,7 +2100,7 @@ fn controls(ui: &mut egui::Ui, st: &mut AppState, w: &mut Wizard, current: &Curr
             ui.horizontal(|ui| {
                 ui.label(tr("Even out"));
                 ui.add(
-                    egui::DragValue::new(&mut w.smooth)
+                    crate::workspace::drag(&mut w.smooth)
                         .range(0..=3)
                         .clamp_existing_to_range(false),
                 )
@@ -2260,7 +2260,7 @@ fn controls(ui: &mut egui::Ui, st: &mut AppState, w: &mut Wizard, current: &Curr
                     ui.horizontal(|ui| {
                         ui.label(tr("Thread colors"));
                         ui.add(
-                            egui::DragValue::new(&mut p.colors)
+                            crate::workspace::drag(&mut p.colors)
                                 .range(2..=8)
                                 .clamp_existing_to_range(false),
                         );
@@ -2279,7 +2279,7 @@ fn controls(ui: &mut egui::Ui, st: &mut AppState, w: &mut Wizard, current: &Curr
             ui.horizontal(|ui| {
                 ui.label(tr("Smooth noise"));
                 ui.add(
-                    egui::DragValue::new(&mut w.denoise)
+                    crate::workspace::drag(&mut w.denoise)
                         .range(0..=3)
                         .clamp_existing_to_range(false),
                 );
@@ -2308,7 +2308,7 @@ fn controls(ui: &mut egui::Ui, st: &mut AppState, w: &mut Wizard, current: &Curr
                 ui.label(tr("Cell size"));
                 let changed = ui
                     .add(
-                        egui::DragValue::new(&mut mm)
+                        crate::workspace::drag(&mut mm)
                             .range(emb_model::cross::MIN_CELL_MM..=emb_model::cross::MAX_CELL_MM)
                             .speed(0.05)
                             .max_decimals(2)
@@ -2323,7 +2323,7 @@ fn controls(ui: &mut egui::Ui, st: &mut AppState, w: &mut Wizard, current: &Curr
             ui.horizontal(|ui| {
                 ui.label(tr("Thread colors"));
                 ui.add(
-                    egui::DragValue::new(&mut w.cross.colors)
+                    crate::workspace::drag(&mut w.cross.colors)
                         .range(2..=32)
                         .clamp_existing_to_range(false),
                 );
@@ -2335,7 +2335,7 @@ fn controls(ui: &mut egui::Ui, st: &mut AppState, w: &mut Wizard, current: &Curr
             ui.horizontal(|ui| {
                 ui.label(tr("Smooth noise"));
                 ui.add(
-                    egui::DragValue::new(&mut w.denoise)
+                    crate::workspace::drag(&mut w.denoise)
                         .range(0..=3)
                         .clamp_existing_to_range(false),
                 );

@@ -434,7 +434,7 @@ pub fn bar(ui: &mut egui::Ui, cross: &mut CrossUi, cell_mm: &mut f64, tool: Tool
         None => {
             ui.label(tr("Cell size"));
             ui.add(
-                egui::DragValue::new(cell_mm)
+                crate::workspace::drag(cell_mm)
                     .range(MIN_CELL_MM..=MAX_CELL_MM)
                     .speed(0.05)
                     .max_decimals(2)
@@ -507,7 +507,7 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, x: &CrossS
         ui.label(tr("Cell size"));
         changed |= ui
             .add(
-                egui::DragValue::new(&mut mm)
+                crate::workspace::drag(&mut mm)
                     .range(MIN_CELL_MM..=MAX_CELL_MM)
                     .speed(0.05)
                     .max_decimals(2)

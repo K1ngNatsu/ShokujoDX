@@ -386,7 +386,7 @@ fn controls(ui: &mut egui::Ui, st: &mut AppState, in_window: bool) {
         ui.label(tr("Tilt"));
         moved |= ui
             .add(
-                egui::Slider::new(&mut cam.tilt_deg, 0.0..=MAX_TILT_DEG)
+                crate::workspace::slider(&mut cam.tilt_deg, 0.0..=MAX_TILT_DEG)
                     .suffix("°")
                     .fixed_decimals(0),
             )
@@ -395,7 +395,7 @@ fn controls(ui: &mut egui::Ui, st: &mut AppState, in_window: bool) {
         ui.label(tr("Turn"));
         moved |= ui
             .add(
-                egui::Slider::new(&mut cam.turn_deg, -180.0..=180.0)
+                crate::workspace::slider(&mut cam.turn_deg, -180.0..=180.0)
                     .suffix("°")
                     .fixed_decimals(0),
             )
@@ -406,7 +406,7 @@ fn controls(ui: &mut egui::Ui, st: &mut AppState, in_window: bool) {
         ui.label(tr("Heights"));
         moved |= ui
             .add(
-                egui::Slider::new(&mut cam.lift, 1.0..=MAX_LIFT)
+                crate::workspace::slider(&mut cam.lift, 1.0..=MAX_LIFT)
                     .prefix("×")
                     .fixed_decimals(1),
             )

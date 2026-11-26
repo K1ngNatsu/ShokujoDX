@@ -688,7 +688,7 @@ fn options_window(ctx: &egui::Context, st: &mut AppState) {
             }
             let mut a = angle;
             let r = ui.add(
-                egui::DragValue::new(&mut a)
+                crate::workspace::drag(&mut a)
                     .range(-180.0..=180.0)
                     .clamp_existing_to_range(false)
                     .speed(0.5)

@@ -250,7 +250,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                         let v = w.inputs.entry(i.name.clone()).or_insert_with(|| i.default.clone());
                         match v {
                             InputValue::Number(n) => {
-                                ui.add(egui::DragValue::new(n).speed(0.1));
+                                ui.add(crate::workspace::drag(n).speed(0.1));
                             }
                             InputValue::Bool(b) => {
                                 ui.checkbox(b, "");

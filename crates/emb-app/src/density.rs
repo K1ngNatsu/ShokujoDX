@@ -71,7 +71,7 @@ pub fn options_ui(ui: &mut egui::Ui, s: &mut crate::workspace::Settings) {
     egui::Grid::new("density_options").num_columns(2).show(ui, |ui| {
         ui.label(tr("Density limit"));
         ui.add(
-            egui::DragValue::new(&mut s.density_limit)
+            crate::workspace::drag(&mut s.density_limit)
                 .range(2.0..=12.0)
                 .speed(0.1)
                 .clamp_existing_to_range(false)
@@ -82,10 +82,14 @@ pub fn options_ui(ui: &mut egui::Ui, s: &mut crate::workspace::Settings) {
         let p = &mut s.thread_prices;
         ui.label(tr("Top thread spool"));
         ui.horizontal(|ui| {
-            ui.add(egui::DragValue::new(&mut p.spool_m).range(10.0..=50_000.0).suffix(" m"));
+            ui.add(
+                crate::workspace::drag(&mut p.spool_m)
+                    .range(10.0..=50_000.0)
+                    .suffix(" m"),
+            );
             ui.label(tr("price"));
             ui.add(
-                egui::DragValue::new(&mut p.spool_price)
+                crate::workspace::drag(&mut p.spool_price)
                     .range(0.0..=1000.0)
                     .speed(0.05)
                     .max_decimals(2),
@@ -94,10 +98,14 @@ pub fn options_ui(ui: &mut egui::Ui, s: &mut crate::workspace::Settings) {
         ui.end_row();
         ui.label(tr("Bobbin"));
         ui.horizontal(|ui| {
-            ui.add(egui::DragValue::new(&mut p.bobbin_m).range(1.0..=10_000.0).suffix(" m"));
+            ui.add(
+                crate::workspace::drag(&mut p.bobbin_m)
+                    .range(1.0..=10_000.0)
+                    .suffix(" m"),
+            );
             ui.label(tr("price"));
             ui.add(
-                egui::DragValue::new(&mut p.bobbin_price)
+                crate::workspace::drag(&mut p.bobbin_price)
                     .range(0.0..=1000.0)
                     .speed(0.01)
                     .max_decimals(2),

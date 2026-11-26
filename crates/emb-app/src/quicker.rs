@@ -145,7 +145,7 @@ fn optional(
     let mut v = value.unwrap_or(standard);
     ui.add_enabled(
         on,
-        egui::Slider::new(&mut v, range)
+        crate::workspace::slider(&mut v, range)
             .clamping(egui::SliderClamping::Edits)
             .fixed_decimals(1)
             .suffix(suffix),

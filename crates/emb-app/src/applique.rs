@@ -194,7 +194,7 @@ pub fn properties(
                     l.on_hover_text(help);
                 }
                 let r = ui.add(
-                    egui::Slider::new(v, range)
+                    crate::workspace::slider(v, range)
                         .clamping(egui::SliderClamping::Edits)
                         .suffix(" mm")
                         .fixed_decimals(2),
@@ -303,7 +303,7 @@ pub fn properties(
                 let mut layer = pc.layer + 1;
                 if ui
                     .add(
-                        egui::DragValue::new(&mut layer)
+                        crate::workspace::drag(&mut layer)
                             .range(1..=emb_model::applique::MAX_LAYERS)
                             .clamp_existing_to_range(false)
                             .prefix("layer "),

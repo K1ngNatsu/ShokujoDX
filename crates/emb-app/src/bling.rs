@@ -331,7 +331,7 @@ pub fn stone_ui(ui: &mut egui::Ui, salt: &str, stone: &mut Stone, mine: &mut Vec
 fn gap_ui(ui: &mut egui::Ui, gap: &mut f64) -> bool {
     ui.label(tr("Gap"));
     ui.add(
-        egui::DragValue::new(gap)
+        crate::workspace::drag(gap)
             .range(0.0..=10.0)
             .speed(0.05)
             .max_decimals(2)
@@ -356,7 +356,7 @@ fn fill_ui(ui: &mut egui::Ui, fill: &mut BlingFill) -> bool {
     if let BlingFill::Rows { angle_deg } = fill {
         changed |= ui
             .add(
-                egui::DragValue::new(angle_deg)
+                crate::workspace::drag(angle_deg)
                     .range(0.0..=179.0)
                     .clamp_existing_to_range(false)
                     .suffix("°"),
@@ -373,7 +373,7 @@ fn fill_ui(ui: &mut egui::Ui, fill: &mut BlingFill) -> bool {
 pub fn clearance_ui(ui: &mut egui::Ui, mm: &mut f64) -> bool {
     ui.label(tr("Template holes +"));
     ui.add(
-        egui::DragValue::new(mm)
+        crate::workspace::drag(mm)
             .range(0.0..=3.0)
             .speed(0.01)
             .max_decimals(2)

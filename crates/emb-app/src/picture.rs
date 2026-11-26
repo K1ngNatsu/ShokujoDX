@@ -353,7 +353,7 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
                 (tr("Sharpen"), &mut a.sharpen, 0.0..=2.0),
             ] {
                 ui.add(
-                    egui::Slider::new(v, range)
+                    crate::workspace::slider(v, range)
                         .clamping(egui::SliderClamping::Edits)
                         .text(label)
                         .fixed_decimals(2),
@@ -379,7 +379,7 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
             ui.horizontal(|ui| {
                 ui.label(tr("Colors"));
                 ui.add(
-                    egui::DragValue::new(&mut r.colors)
+                    crate::workspace::drag(&mut r.colors)
                         .range(2..=32)
                         .clamp_existing_to_range(false),
                 );
@@ -389,7 +389,7 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
                     "Areas of one color with fewer pixels than this take the color round them. 0: keep all.",
                 ));
                 ui.add(
-                    egui::DragValue::new(&mut r.min_speck_px)
+                    crate::workspace::drag(&mut r.min_speck_px)
                         .range(0..=10_000)
                         .clamp_existing_to_range(false)
                         .suffix(" px"),
@@ -444,7 +444,7 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
             ));
             let t = &mut st.picture.trace;
             ui.add(
-                egui::Slider::new(&mut t.tolerance_px, 0.2..=3.0)
+                crate::workspace::slider(&mut t.tolerance_px, 0.2..=3.0)
                     .clamping(egui::SliderClamping::Edits)
                     .text(tr("Smoothing (px)")),
             )
@@ -452,7 +452,7 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
                 "How far the curves can go from the pixel edges. More: fewer, smoother curves.",
             ));
             ui.add(
-                egui::Slider::new(&mut t.corner_deg, 20.0..=150.0)
+                crate::workspace::slider(&mut t.corner_deg, 20.0..=150.0)
                     .clamping(egui::SliderClamping::Edits)
                     .text(tr("Corners (°)")),
             )
@@ -460,7 +460,7 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
             ui.horizontal(|ui| {
                 ui.label(tr("Leave out areas under"));
                 ui.add(
-                    egui::DragValue::new(&mut t.min_area_px)
+                    crate::workspace::drag(&mut t.min_area_px)
                         .range(1..=10_000)
                         .clamp_existing_to_range(false)
                         .suffix(" px"),

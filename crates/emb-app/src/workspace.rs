@@ -80,7 +80,7 @@ pub fn length_value(ui: &mut egui::Ui, mm: &mut f64, units: Units, min_mm: f64, 
     let d = units.decimals();
     let sfx = units.suffix();
     ui.add(
-        egui::DragValue::new(mm)
+        drag(mm)
             .range(min_mm..=max_mm)
             .clamp_existing_to_range(false)
             .speed(units.to_mm(if units == Units::Mm { 0.1 } else { 0.005 }))
@@ -314,6 +314,51 @@ pub fn parse_number(text: &str) -> Option<f64> {
         Typed::Number(n) => Some(n),
         Typed::Length(_) => None,
     }
+}
+
+/// A number that the user types in a number field: with a decimal comma or
+/// a decimal point (`0,4` or `0.4`: German and Spanish users type a comma),
+/// `+ - * /` and a degree sign, as [`parse_number`]. In a field of whole
+/// numbers (`whole`), a comma, a point or a space between groups of three
+/// digits groups the thousands (`1,000`, `1.000` or `1 000`).
+pub fn parse_field(text: &str, whole: bool) -> Option<f64> {
+    let t: String = text.trim().chars().map(|c| if c == '−' { '-' } else { c }).collect();
+    if whole && let Some(n) = thousands(&t) {
+        return Some(n);
+    }
+    parse_number(&t)
+}
+
+/// A whole number with its thousands in groups of three digits, with one
+/// kind of separator: `1,000`, `-12.500`, `1 000 000`.
+fn thousands(t: &str) -> Option<f64> {
+    let (sign, digits) = match t.strip_prefix('-') {
+        Some(rest) => (-1.0, rest),
+        None => (1.0, t),
+    };
+    let sep = digits.chars().find(|c| !c.is_ascii_digit())?;
+    if ![',', '.', ' ', '\''].contains(&sep) {
+        return None;
+    }
+    let groups: Vec<&str> = digits.split(sep).collect();
+    let ok = groups.len() > 1
+        && (1..=3).contains(&groups[0].len())
+        && groups.iter().all(|g| g.chars().all(|c| c.is_ascii_digit()))
+        && groups[1..].iter().all(|g| g.len() == 3);
+    ok.then(|| sign * groups.concat().parse::<f64>().unwrap_or(0.0))
+}
+
+/// A number field (an egui drag value) that takes a typed number with
+/// [`parse_field`]. All number fields of the program go through it or
+/// [`slider`] (a test checks it); a field with its own parser (a length
+/// with its unit) sets it after this one.
+pub fn drag<Num: egui::emath::Numeric>(value: &mut Num) -> egui::DragValue<'_> {
+    egui::DragValue::new(value).custom_parser(|s| parse_field(s, Num::INTEGRAL))
+}
+
+/// A slider that takes a typed number with [`parse_field`] (see [`drag`]).
+pub fn slider<Num: egui::emath::Numeric>(value: &mut Num, range: std::ops::RangeInclusive<Num>) -> egui::Slider<'_> {
+    egui::Slider::new(value, range).custom_parser(|s| parse_field(s, Num::INTEGRAL))
 }
 
 /// Shape settings of new objects (the property bar edits them). The stitch
@@ -1414,7 +1459,7 @@ pub fn options_window(ctx: &egui::Context, st: &mut AppState) {
                     length_value(ui, &mut s.grid_mm, s.units, 0.5, 100.0);
                     ui.end_row();
                     ui.label(tr("Major line every"));
-                    ui.add(egui::DragValue::new(&mut s.grid_major).range(1..=20).clamp_existing_to_range(false).suffix(format!(" {}", tr("lines"))));
+                    ui.add(drag(&mut s.grid_major).range(1..=20).clamp_existing_to_range(false).suffix(format!(" {}", tr("lines"))));
                     ui.end_row();
                     ui.label(tr("Rulers and guides"));
                     ui.horizontal(|ui| {
@@ -1457,7 +1502,7 @@ pub fn options_window(ctx: &egui::Context, st: &mut AppState) {
                     });
                     ui.end_row();
                     ui.label(tr("Snap distance"));
-                    ui.add(egui::DragValue::new(&mut s.snap_px).range(2.0..=30.0).clamp_existing_to_range(false).suffix(" px"));
+                    ui.add(drag(&mut s.snap_px).range(2.0..=30.0).clamp_existing_to_range(false).suffix(" px"));
                     ui.end_row();
                     ui.label(tr("Arrow key nudge"));
                     length_value(ui, &mut s.nudge_mm, s.units, 0.1, 50.0);
@@ -1467,7 +1512,7 @@ pub fn options_window(ctx: &egui::Context, st: &mut AppState) {
                     ui.end_row();
                     ui.label(tr("Automatic backup"));
                     ui.add(
-                        egui::DragValue::new(&mut s.backup_minutes)
+                        drag(&mut s.backup_minutes)
                             .range(0..=60).clamp_existing_to_range(false)
                             .custom_formatter(|v, _| {
                                 if v < 0.5 {
@@ -1598,7 +1643,7 @@ pub fn property_bar(ui: &mut egui::Ui, st: &mut AppState) {
                     "90°: the stitches go square across the line. Other angles slant them.",
                 ));
                 ui.add(
-                    egui::DragValue::new(&mut d.direction_angle_deg)
+                    drag(&mut d.direction_angle_deg)
                         .range(1.0..=179.0)
                         .clamp_existing_to_range(false)
                         .suffix("°"),
@@ -1664,7 +1709,7 @@ pub fn property_bar(ui: &mut egui::Ui, st: &mut AppState) {
                 );
                 ui.label(tr("Angle")).on_hover_text(tr(words::ANGLE_HELP));
                 ui.add(
-                    egui::DragValue::new(&mut p.fill.angle_deg)
+                    drag(&mut p.fill.angle_deg)
                         .range(0.0..=179.0)
                         .clamp_existing_to_range(false)
                         .suffix("°"),
@@ -1676,7 +1721,7 @@ pub fn property_bar(ui: &mut egui::Ui, st: &mut AppState) {
                 if t == Tool::Star {
                     ui.label(tr("Points"));
                     ui.add(
-                        egui::DragValue::new(&mut d.star_points)
+                        drag(&mut d.star_points)
                             .range(3..=24)
                             .clamp_existing_to_range(false),
                     );
@@ -1775,6 +1820,112 @@ mod tests {
         assert!(near(parse_number("45°"), 45.0));
         assert!(near(parse_number("90/2"), 45.0));
         assert_eq!(parse_number("2 in"), None);
+    }
+
+    #[test]
+    fn number_fields_take_a_decimal_comma() {
+        let near = |a: Option<f64>, b: f64| a.is_some_and(|a| (a - b).abs() < 1e-9);
+        for (text, v) in [
+            ("0,4", 0.4),
+            ("0.4", 0.4),
+            (" 12,5 ", 12.5),
+            ("-0,25", -0.25),
+            ("−3", -3.0),
+            ("1,5 + 2", 3.5),
+            ("45,5°", 45.5),
+            ("7", 7.0),
+        ] {
+            assert!(near(parse_field(text, false), v), "{text}");
+        }
+        // A field of whole numbers: the thousands in groups.
+        for (text, v) in [
+            ("1,000", 1000.0),
+            ("1.000", 1000.0),
+            ("12 500", 12500.0),
+            ("-2,000,000", -2e6),
+            ("850", 850.0),
+            ("3,5", 3.5),
+        ] {
+            assert!(near(parse_field(text, true), v), "{text}");
+        }
+        for bad in ["", "abc", "1,2,3x", "2 in"] {
+            assert_eq!(parse_field(bad, false), None, "{bad}");
+        }
+    }
+
+    /// A number typed with a decimal comma into a field of the program gets
+    /// its value (a click starts the edit, Enter ends it).
+    #[test]
+    fn a_typed_decimal_comma_sets_the_field() {
+        let ctx = crate::test_util::ready_context();
+        let mut v = 0.0f64;
+        // One frame; gives the place of the field.
+        let frame = |events: Vec<egui::Event>, v: &mut f64| {
+            let raw = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(400.0, 300.0))),
+                events,
+                ..Default::default()
+            };
+            let mut rect = egui::Rect::NOTHING;
+            let mut out = ctx.run_ui(raw, |ui| {
+                rect = ui.add(drag(v).range(0.0..=10.0)).rect;
+            });
+            out.textures_delta.clear();
+            rect
+        };
+        let at = frame(Vec::new(), &mut v).center();
+        let button = |pressed| egui::Event::PointerButton {
+            pos: at,
+            button: PointerButton::Primary,
+            pressed,
+            modifiers: Modifiers::NONE,
+        };
+        frame(vec![egui::Event::PointerMoved(at), button(true)], &mut v);
+        frame(vec![button(false)], &mut v);
+        frame(vec![egui::Event::Text("2,5".into())], &mut v);
+        frame(
+            vec![egui::Event::Key {
+                key: egui::Key::Enter,
+                physical_key: None,
+                pressed: true,
+                repeat: false,
+                modifiers: Modifiers::NONE,
+            }],
+            &mut v,
+        );
+        frame(Vec::new(), &mut v);
+        assert!((v - 2.5).abs() < 1e-9, "{v}");
+    }
+
+    /// All number fields and sliders of the program take a decimal comma:
+    /// they go through `drag` and `slider` (the decimal comma of 2026-11-24
+    /// was in the fields of Object Properties only).
+    #[test]
+    fn all_number_fields_go_through_the_parser() {
+        fn files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+            for e in std::fs::read_dir(dir).unwrap().flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    files(&p, out);
+                } else if p.extension().is_some_and(|x| x == "rs") {
+                    out.push(p);
+                }
+            }
+        }
+        let mut all = Vec::new();
+        files(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src"), &mut all);
+        let mut found = Vec::new();
+        for f in &all {
+            let text = std::fs::read_to_string(f).unwrap();
+            let allowed = usize::from(f.ends_with("workspace.rs"));
+            for pat in [concat!("DragValue", "::new("), concat!("Slider", "::new(")] {
+                let n = text.matches(pat).count();
+                if n > allowed {
+                    found.push(format!("{}: {n} × {pat}", f.display()));
+                }
+            }
+        }
+        assert!(found.is_empty(), "use workspace::drag or workspace::slider: {found:?}");
     }
 
     /// The folder of an earlier name moves to the new name once, with its

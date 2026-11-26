@@ -175,7 +175,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                     "Loops, spikes and zig-zags smaller than this go. Larger: smoother lines, fewer details.",
                 ));
                 ui.add(
-                    egui::Slider::new(&mut s.detail_mm, 0.1..=5.0)
+                    crate::workspace::slider(&mut s.detail_mm, 0.1..=5.0)
                         .clamping(egui::SliderClamping::Edits)
                         .logarithmic(true)
                         .suffix(" mm")
