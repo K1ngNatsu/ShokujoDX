@@ -237,11 +237,10 @@ fn probe_p18_stitch_files() {
             };
             let label = format!("{name}{}", if with { " (outlines)" } else { "" });
             let s = s.clone();
-            // Left as it is by the audit of P18: each layer of rows at one
-            // place is the underlay of the last, and the time grows with the
-            // square of the rows (200 layers: 4.5 s; 500 layers: 28 s).
-            let slow = if name.starts_with("one fill sewn") { 60 } else { 10 };
-            match timed(&label, Duration::from_secs(slow), Duration::from_secs(300), move || {
+            // One fill sewn 500 times took 28 s at the audit of P18: the
+            // area of its rows made a piece for each pair of rows on one
+            // line. Now the same rows of a line are one (0.4 s).
+            match timed(&label, Duration::from_secs(10), Duration::from_secs(300), move || {
                 recognize_and_sew(&s, &outlines)
             }) {
                 Ok(((objects, stitches), took)) => {
