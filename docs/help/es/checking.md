@@ -51,6 +51,7 @@ El panel **Información del diseño** muestra los números del diseño:
 
 - el tamaño, los bastidores en los que cabe, el número de objetos,
   puntadas, colores, cambios de color, cortes, saltos y paradas;
+- el desplazamiento visible: sobre puntadas cosidas y sobre la tela;
 - el tiempo de bordado a la velocidad de la máquina;
 - la tela, el hilo superior y el hilo de bobina, y el costo del hilo;
 - la densidad (el mayor número de capas de hilo);
@@ -68,7 +69,15 @@ advertencia para seleccionar el objeto. El programa avisa de:
 - en un bastidor de gorra, un orden de bordado que no va del centro hacia
   fuera;
 - en encaje independiente, una parte que no toca ninguna otra parte;
-- objetos que no hacen puntadas.
+- puntadas de desplazamiento que se ven: más de 2 mm sobre puntadas
+  cosidas en un objeto, o un tramo de 4 mm o más sobre la tela;
+- objetos que no hacen puntadas;
+- en objetos de puntadas (un archivo de máquina abierto como puntadas):
+  puntadas más largas de lo que cose la máquina, cambios de color al
+  mismo hilo, saltos largos sin corte, tramos demasiado cortos para el
+  cortahilos, inicios y finales sin puntadas de remate, y desplazamiento
+  del archivo que se ve sobre puntadas cosidas (1 mm o más en un tramo).
+  **Reparar puntadas** repara la mayoría.
 
 ## El mapa de densidad
 
@@ -140,6 +149,13 @@ comprobar un diseño antes de bordarlo.
 - **Hilo alto** marca los lugares donde el hilo es más alto que el
   límite sobre la tela (la espuma y el relleno no cuentan): un riesgo de
   roturas del hilo.
+- **Desplazamiento visible** marca las puntadas de desplazamiento que
+  ninguna puntada cubre: en rojo donde quedan sobre puntadas cosidas antes
+  que ellas, en azul donde quedan sobre la tela. El desplazamiento bajo
+  puntadas que se cosen después, entre las filas de un relleno y a lo
+  largo del borde de un área no se ve. Cambie el punto de inicio o de fin
+  del objeto, o el orden de bordado, para que el desplazamiento quede bajo
+  las puntadas que se cosen después.
 
 Defina los límites de las dos comprobaciones en **Opciones** (**La tela
 se ve** y **Límite de altura del hilo**).
@@ -157,6 +173,29 @@ objeto de puntada recta, los dos lados de una columna de satén y el
 contorno y los agujeros de un relleno. Muestra
 cómo lee el programa las puntadas de un archivo de máquina de otro
 programa, el primer paso para hacer objetos con ellas.
+
+## Reparar un archivo de máquina
+
+Un archivo de máquina se abre como objetos de puntadas. **Editar >
+Funciones de máquina > Reparar puntadas…** los comprueba y repara los
+fallos que puede:
+
+- **Unir bloques de color del mismo hilo**: el cambio de color al mismo
+  hilo desaparece.
+- **Quitar puntadas de menos de** la puntada más corta de la máquina: la
+  siguiente puntada empieza en el punto de aguja anterior.
+- **Dividir puntadas de más de** la puntada más larga de la máquina en
+  puntadas iguales.
+- **Cortar saltos de más de** la distancia de corte.
+- **Añadir puntadas de remate en inicios y finales** que no las tienen.
+
+Cada reparación tiene una casilla y el número que encontró la
+comprobación. **Aplicar reparaciones** hace las reparaciones activadas como un paso
+de deshacer. Las demás puntadas se quedan donde están. Los tramos
+demasiado cortos para el cortahilos y el desplazamiento que se ve no
+tienen reparación: la información del diseño muestra dónde están. En la
+línea de comandos, `emb-cli check` y `emb-cli fix` hacen lo mismo con un
+archivo.
 
 ## El producto
 

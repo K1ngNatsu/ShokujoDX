@@ -77,6 +77,10 @@ pub struct FontLibrary {
     /// thread (P20 Milestone 4, ADR 0144), so typing stays quick; the
     /// tests make them when the letters are laid out.
     pub background_routes: bool,
+    /// The routes of the fonts of the computer on the disk (ADR 0179),
+    /// opened when the first such font is read (`None` in the tests: they do
+    /// not write in the folders of the user).
+    route_store: Option<Option<emb_letter::RouteStore>>,
     /// The number of routes of each font that the design has (see
     /// [`AppState::poll_routes`]).
     routes_seen: HashMap<FontRef, u64>,
@@ -269,6 +273,7 @@ impl Default for FontLibrary {
                 .filter(|_| !cfg!(test))
                 .map(|d| d.join(CORRECTIONS_DIR)),
             background_routes: !cfg!(test),
+            route_store: if cfg!(test) { Some(None) } else { None },
             routes_seen: HashMap::new(),
             routes_reported: None,
         };
@@ -278,6 +283,24 @@ impl Default for FontLibrary {
         lib.sort();
         lib
     }
+}
+
+/// The route store of the fonts of the computer (ADR 0179): the folder
+/// `routes` in the folder of the program. Its build is the version of the
+/// program and the size and the time of its program file, so each build
+/// (a new release, or a new build of a developer) starts a new store.
+fn open_route_store() -> Option<emb_letter::RouteStore> {
+    let dir = crate::workspace::settings_path()?.parent()?.join("routes");
+    let exe = std::env::current_exe().ok().and_then(|p| std::fs::metadata(p).ok());
+    let (len, time) = exe.map_or((0, 0), |m| {
+        let time = m
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map_or(0, |d| d.as_nanos());
+        (m.len(), time)
+    });
+    emb_letter::RouteStore::open(dir, &format!("{} {len} {time}", env!("CARGO_PKG_VERSION")))
 }
 
 /// The folder of the letter corrections, in the folder of the user's fonts.
@@ -299,6 +322,12 @@ impl FontLibrary {
         crate::background::spawn(move || {
             tx.send(scan(&font_dirs())).ok();
         });
+    }
+
+    /// `true` while the fonts of the computer are found.
+    #[cfg(test)]
+    pub fn scanning(&self) -> bool {
+        self.scan.is_some()
     }
 
     /// Takes the result of the scan when it is ready.
@@ -392,6 +421,27 @@ impl FontLibrary {
         Ok(r)
     }
 
+    /// Adds the TrueType or OpenType font file `path` as a font of the
+    /// computer (the tutorial steps use a font that is not on each
+    /// computer).
+    #[cfg(test)]
+    pub fn add_computer_font(&mut self, path: &Path) -> Result<FontRef, String> {
+        let bytes = std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
+        let (family, style) =
+            emb_letter::face_names(&bytes, 0).ok_or_else(|| format!("{} is not a font", path.display()))?;
+        let font = FontRef::new(&family, &style);
+        self.entries.retain(|e| !e.font.same(&font));
+        self.entries.push(FontEntry {
+            font: font.clone(),
+            source: FontSource::File(path.to_path_buf(), 0),
+            tuned: false,
+            fill: false,
+            score: None,
+        });
+        self.sort();
+        Ok(font)
+    }
+
     /// Reads the font again when it is used next (after a change of its
     /// letter corrections).
     pub fn reload(&mut self, r: &FontRef) {
@@ -417,6 +467,9 @@ impl FontLibrary {
             && self.background_routes
         {
             f.set_route_mode(emb_letter::RouteMode::Background);
+            if let Some(store) = self.route_store.get_or_insert_with(open_route_store) {
+                f.set_route_store(store);
+            }
         }
         self.loaded.insert(e.font, font.clone());
         Some(font)
@@ -937,6 +990,10 @@ impl AppState {
             }
             None => {
                 let mut l = Lettering::new(&text, any.source().font_ref(), d.height_mm, d.at);
+                // New lettering suits the fabric of the design (ADR 0163).
+                let change = self.doc.design().fabric_change(&self.fabrics);
+                change.satin(&mut l.satin);
+                change.fill(&mut l.fill);
                 emb_letter::relayout(&mut l, any.source());
                 l
             }
@@ -1088,7 +1145,7 @@ pub fn windows(ctx: &egui::Context, st: &mut AppState) {
                 "The height of the capital letters, or of the Japanese, Chinese or Korean characters of the text.",
             ));
             ui.add(
-                egui::DragValue::new(&mut d.height_mm)
+                crate::workspace::drag(&mut d.height_mm)
                     .range(2.0..=300.0)
                     .clamp_existing_to_range(false)
                     .speed(0.2)
@@ -1190,10 +1247,13 @@ pub fn font_picker(ui: &mut egui::Ui, st: &mut AppState, font: &mut FontRef, sal
     ui.horizontal(|ui| {
         ui.label(tr("Font"));
         let families = st.fonts.families();
+        // A click in the list (in its search field, on its scroll bar)
+        // keeps it open; a click on a font closes it.
         egui::ComboBox::from_id_salt(("font_family", salt))
             .selected_text(&font.family)
             .width(180.0)
             .height(320.0)
+            .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
             .show_ui(ui, |ui| {
                 ui.add(
                     egui::TextEdit::singleline(&mut st.font_filter)
@@ -1252,6 +1312,7 @@ pub fn font_picker(ui: &mut egui::Ui, st: &mut AppState, font: &mut FontRef, sal
                 if let Some(f) = clicked {
                     *font = f;
                     changed = true;
+                    ui.close();
                 }
             });
         let styles = st.fonts.styles(&font.family, font.kind);
@@ -1419,7 +1480,7 @@ fn baseline_ui(ui: &mut egui::Ui, n: &mut Lettering, drag: &mut bool) -> bool {
             ui.label(tr("Radius"))
                 .on_hover_text(tr("The radius of the baseline circle."));
             let r = ui.add(
-                egui::DragValue::new(radius_mm)
+                crate::workspace::drag(radius_mm)
                     .range(emb_model::baseline::MIN_RADIUS_MM..=2000.0)
                     .clamp_existing_to_range(false)
                     .speed(0.2)
@@ -1447,7 +1508,7 @@ fn letter_ui(ui: &mut egui::Ui, n: &mut Lettering, letter: usize, drag: &mut boo
     let mut value = |ui: &mut egui::Ui, label: &str, help: &str, v: &mut f64, speed: f64, suffix: &str| {
         ui.horizontal(|ui| {
             ui.label(label).on_hover_text(help);
-            let r = ui.add(egui::DragValue::new(v).speed(speed).suffix(suffix).max_decimals(2));
+            let r = ui.add(crate::workspace::drag(v).speed(speed).suffix(suffix).max_decimals(2));
             *drag |= r.dragged();
         });
     };
@@ -1609,7 +1670,7 @@ fn envelope_ui(ui: &mut egui::Ui, n: &mut Lettering, drag: &mut bool) -> bool {
                 .on_hover_text(tr("How far the edges of the text move, as a part of the text height."));
             let mut pct = n.envelope.amount * 100.0;
             let r = ui.add(
-                egui::Slider::new(&mut pct, 0.0..=emb_model::envelope::MAX_AMOUNT * 100.0)
+                crate::workspace::slider(&mut pct, 0.0..=emb_model::envelope::MAX_AMOUNT * 100.0)
                     .clamping(egui::SliderClamping::Edits)
                     .suffix(" %")
                     .fixed_decimals(0),
@@ -1667,7 +1728,7 @@ fn order_ui(ui: &mut egui::Ui, n: &mut Lettering, drag: &mut bool) {
         ui.label(tr("Trim gaps longer than"))
             .on_hover_text(tr("A shorter gap between two parts gets a travel stitch."));
         let r = ui.add(
-            egui::DragValue::new(&mut n.trim_over_mm)
+            crate::workspace::drag(&mut n.trim_over_mm)
                 .range(0.0..=20.0)
                 .clamp_existing_to_range(false)
                 .speed(0.05)
@@ -1742,7 +1803,7 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, l: &Letter
         ui.horizontal(|ui| {
             ui.label(label).on_hover_text(help);
             let r = ui.add(
-                egui::Slider::new(v, range)
+                crate::workspace::slider(v, range)
                     .clamping(egui::SliderClamping::Edits)
                     .suffix(suffix)
                     .fixed_decimals(2),
@@ -1853,10 +1914,11 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, l: &Letter
                        v: &mut f64,
                        range: std::ops::RangeInclusive<f64>,
                        word: crate::applique::Word| {
-            ui.horizontal(|ui| {
+            // Wrapped: the word after the slider can be long in a translation.
+            ui.horizontal_wrapped(|ui| {
                 ui.label(label).on_hover_text(word.1);
                 let r = ui.add(
-                    egui::Slider::new(v, range)
+                    crate::workspace::slider(v, range)
                         .clamping(egui::SliderClamping::Edits)
                         .suffix(" mm")
                         .fixed_decimals(2),
@@ -1884,10 +1946,10 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, l: &Letter
     if fills > 0 {
         ui.separator();
         ui.strong(tr("Fill"));
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             ui.label(tr("Density")).on_hover_text(tr(words::DENSITY_HELP));
             let r = ui.add(
-                egui::Slider::new(&mut n.fill.spacing_mm, 0.2..=1.0)
+                crate::workspace::slider(&mut n.fill.spacing_mm, 0.2..=1.0)
                     .clamping(egui::SliderClamping::Edits)
                     .suffix(" mm")
                     .fixed_decimals(2),
@@ -1898,7 +1960,7 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, l: &Letter
         ui.horizontal(|ui| {
             ui.label(tr("Angle"));
             let r = ui.add(
-                egui::Slider::new(&mut n.fill.angle_deg, 0.0..=179.0)
+                crate::workspace::slider(&mut n.fill.angle_deg, 0.0..=179.0)
                     .clamping(egui::SliderClamping::Edits)
                     .suffix("°")
                     .fixed_decimals(0),
@@ -1991,7 +2053,7 @@ fn knockout_ui(ui: &mut egui::Ui, n: &mut Lettering, overlap_mm: f64, drag: &mut
             "How far the letters stay under the objects in front, so that no fabric shows at the edge.",
         ));
         let r = ui.add(
-            egui::Slider::new(&mut k.overlap_mm, 0.0..=2.0)
+            crate::workspace::slider(&mut k.overlap_mm, 0.0..=2.0)
                 .clamping(egui::SliderClamping::Edits)
                 .suffix(" mm")
                 .fixed_decimals(2),
@@ -2086,7 +2148,7 @@ fn style_ui(ui: &mut egui::Ui, st: &AppState, n: &mut Lettering, drag: &mut bool
             ui.label(tr("Underline gap"))
                 .on_hover_text(tr("From the baseline to the bar."));
             let r = ui.add(
-                egui::Slider::new(&mut u.gap_mm, 0.0..=10.0)
+                crate::workspace::slider(&mut u.gap_mm, 0.0..=10.0)
                     .clamping(egui::SliderClamping::Edits)
                     .suffix(" mm")
                     .fixed_decimals(1),
@@ -2096,7 +2158,7 @@ fn style_ui(ui: &mut egui::Ui, st: &AppState, n: &mut Lettering, drag: &mut bool
         ui.horizontal(|ui| {
             ui.label(tr("Underline width"));
             let r = ui.add(
-                egui::Slider::new(&mut u.thickness_mm, 0.5..=10.0)
+                crate::workspace::slider(&mut u.thickness_mm, 0.5..=10.0)
                     .clamping(egui::SliderClamping::Edits)
                     .suffix(" mm")
                     .fixed_decimals(1),

@@ -2,7 +2,7 @@
 id: fabrics-and-styles
 title: Telas, estilos y plantillas
 group: production
-keywords: tela, entretela, recubrimiento, refuerzo, punto, camiseta, polo, forro polar, toalla, vaquero, fieltro, cuero, seda, gorra, encaje, estilo, panel estilos, favorito, propiedades actuales, hacer actual, aplicar actual, plantilla, nuevo a partir de plantilla, guardar como plantilla, mis recursos, paquete, compartir
+keywords: tela, entretela, recubrimiento, refuerzo, punto, camiseta, polo, forro polar, toalla, vaquero, fieltro, cuero, seda, gorra, encaje, estilo, panel estilos, favorito, propiedades actuales, hacer actual, aplicar actual, plantilla, nuevo a partir de plantilla, guardar como plantilla, mis recursos, paquete, compartir, muestras de prueba, muestra, prueba de bordado, ajustes para una tela
 ---
 # Telas, estilos y plantillas
 
@@ -32,6 +32,29 @@ Cuando cambia la tela:
   muestra entonces puntadas finas que se hunden en el pelo. Un
   recubrimiento o un relleno de base bajo las puntadas las mantiene
   arriba.
+
+## Muestras de prueba
+
+Cada tela toma las puntadas a su manera. Para encontrar el mejor ajuste
+para una tela, borde muestras de prueba. Seleccione un objeto (un
+relleno, una columna de satén, una línea o letras) y haga clic en
+**Diseño > Producción > Muestras de prueba**.
+
+- **Ajuste**: el ajuste que cambia de una copia a otra: espaciado, largo
+  de puntada, compensación de tiro, ancho, ángulo, base, inclinación o
+  superposición de bandas. La lista
+  muestra solo los ajustes que tienen los objetos seleccionados.
+- **Desde**, **Hasta** y **Copias**: los valores de la primera y de la
+  última copia, y el número de copias. Los pasos entre ellas son iguales.
+  Para la base hay una copia de cada tipo (ninguno, ligero, auto, fuerte,
+  doble).
+
+La ventana muestra los valores y el tamaño de la cuadrícula. **Hacer
+muestras** pone las copias en un diseño nuevo, cada una con su valor
+debajo, en el bastidor de su diseño: su diseño no cambia. Si la
+cuadrícula es más grande que el bastidor, las muestras van en varios
+bastidores (la pestaña Bastidores). Bórdelas en su tela y use el ajuste
+que se vea mejor.
 
 ## Propiedades actuales
 

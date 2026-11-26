@@ -47,6 +47,10 @@ fn satin(d: &mut Design, t: ThreadId, center: Path, width: f64) {
     );
 }
 
+/// How far a part of a template goes into the part that it starts on, mm:
+/// enough for the parts to hold together when the stabilizer washes away.
+const JOIN: f64 = 0.3;
+
 fn segment(a: Point, b: Point) -> Path {
     Path::new().move_to(a).line_to(b)
 }
@@ -76,19 +80,28 @@ pub fn ornament() -> Design {
         let (s, c) = sin_cos_deg(deg);
         Point::new(radius * c, radius * s)
     };
+    // The parts go into the part that they start on by `JOIN` only: three
+    // satins on one point over the mesh built up 12.7 layers of thread
+    // (ADR 0178).
+    let (spoke, branch, center) = (2.4, 1.8, (6.0, 3.0));
     for k in 0..6 {
         let a = f64::from(k) * 60.0 - 90.0;
-        satin(&mut d, t, segment(at(5.0, a), at(r - 4.0, a)), 2.4);
+        // From the outer edge of the center ring.
+        let start = center.0 + center.1 / 2.0 - JOIN;
+        satin(&mut d, t, segment(at(start, a), at(r - 4.0, a)), spoke);
         for side in [-1.0, 1.0] {
-            let from = at(20.0, a);
             let (s, c) = sin_cos_deg(a + side * 40.0);
-            satin(&mut d, t, segment(from, from + Point::new(c, s) * 9.0), 1.8);
+            let dir = Point::new(c, s);
+            // From the side of the spoke, 40 degrees to it.
+            let from = at(20.0, a) + dir * ((spoke / 2.0 - JOIN) / sin_cos_deg(40.0).0);
+            satin(&mut d, t, segment(from, at(20.0, a) + dir * 9.0), branch);
         }
     }
-    satin(&mut d, t, Path::ellipse(Point::ZERO, 6.0, 6.0), 3.0);
+    satin(&mut d, t, Path::ellipse(Point::ZERO, center.0, center.0), center.1);
     satin(&mut d, t, Path::ellipse(Point::ZERO, r - 1.5, r - 1.5), 4.0);
-    // The loop overlaps the border ring at the top.
-    satin(&mut d, t, Path::ellipse(Point::new(0.0, -(r + 3.5)), 5.0, 5.0), 2.5);
+    // The loop overlaps the outer half of the border ring at the top, not
+    // the mesh (8 layers of thread where it lay on both).
+    satin(&mut d, t, Path::ellipse(Point::new(0.0, -(r + 5.0)), 5.0, 5.0), 2.5);
     d
 }
 

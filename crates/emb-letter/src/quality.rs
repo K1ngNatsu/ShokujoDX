@@ -1254,6 +1254,29 @@ mod tests {
         let (small, large) = (word(hi), word(hi + 10.0));
         assert!(small.letters.iter().all(|l| !fills(&l.parts) && l.fixed));
         assert!(large.letters.iter().all(|l| fills(&l.parts) && !l.fixed));
+        // The size of a letter in the design chooses (ADR 0181): a letter
+        // that its edit makes larger than the columns go, and text that an
+        // envelope makes so tall in its middle (the oval monogram).
+        let mut l = word(hi * 0.8);
+        l.edit_mut(1).scale = 1.5;
+        crate::relayout(&mut l, &font);
+        assert!(!fills(&l.letters[0].parts) && fills(&l.letters[1].parts));
+        let mut l = word(hi * 0.8);
+        l.envelope = emb_model::Envelope {
+            shape: emb_model::EnvelopeShape::Oval,
+            amount: 0.45,
+        };
+        crate::relayout(&mut l, &font);
+        assert!(l.letters.iter().all(|x| fills(&x.parts)));
+        l.envelope.amount = 0.1;
+        crate::relayout(&mut l, &font);
+        assert!(l.letters.iter().all(|x| !fills(&x.parts)));
+        // Stacked text has no envelope (the layout does not bend it), so
+        // the envelope does not choose (the audit of 2026-11-26).
+        l.envelope.amount = 0.45;
+        l.direction = emb_model::TextDirection::Down;
+        crate::relayout(&mut l, &font);
+        assert!(l.letters.iter().all(|x| !fills(&x.parts)));
         assert_eq!(large.range_mm, Some((lo, 300.0)));
         // The file keeps the fill letters.
         let back = EmbFont::from_json(&font.to_json()).unwrap();

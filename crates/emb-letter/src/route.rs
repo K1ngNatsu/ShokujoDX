@@ -39,6 +39,14 @@ const EDGE: f64 = 0.012;
 const SNAP: f64 = 0.12;
 /// The stitch length of a travel run, in mm (at each size).
 pub const RUN_STITCH_MM: f64 = 1.5;
+
+/// The settings of a travel run of a route.
+pub(crate) fn run_params() -> RunningParams {
+    RunningParams {
+        stitch_length_mm: RUN_STITCH_MM,
+        ..Default::default()
+    }
+}
 /// Letters with more parts than this get no search of all orders, but a
 /// beam search ([`BEAM`]).
 const MAX_PARTS: usize = 8;
@@ -274,6 +282,10 @@ type Joins = HashMap<usize, (f64, Point)>;
 struct Router {
     grid: Grid,
     pieces: Vec<Piece>,
+    /// For each cell, the parts that cover it, as bits (the first 64
+    /// parts): a check of a cell looks only at these parts, not at all the
+    /// parts of the letter.
+    cover: Vec<u64>,
     /// For each part, the columns that an end of it lies in: it sews
     /// before them, so they cover its end (P21 Milestone 5). Not where
     /// each of two columns ends in the other (the two legs at a cut from a
@@ -292,6 +304,131 @@ struct Router {
     links: HashMap<(usize, usize, usize, u64), Link>,
     /// The map of the passable cells (see [`Router::passage`]).
     passage: RefCell<Passage>,
+    /// The buffers of the searches (see [`Search`]).
+    search: RefCell<Search>,
+}
+
+/// The buffers of the searches of a router, made one time: a value of a
+/// cell is for the search of now if its `stamp` is `n` (ADR 0179:
+/// a search made and filled two buffers of all the cells, 100,000 times
+/// for the 62 letters and digits of Georgia).
+#[derive(Default)]
+struct Search {
+    /// The edge and the set of parts that are not sewn of the search of
+    /// now.
+    from: Option<(EdgeKey, u64)>,
+    n: u32,
+    stamp: Vec<u32>,
+    best: Vec<f64>,
+    prev: Vec<usize>,
+    heap: BinaryHeap<Reverse<(u64, usize)>>,
+    /// The cells that the search took from the heap, in order (a cell can
+    /// be two times in it, as in a search of one link).
+    popped: Vec<usize>,
+    /// The place in `popped` where each cell first is (for the cells with
+    /// the stamp of the search).
+    order: Vec<u32>,
+    /// The goal cells of the link of now: a cell is a goal if its mark is
+    /// `link`, with the length of its join.
+    link: u32,
+    goal_mark: Vec<u32>,
+    goal_join: Vec<f64>,
+}
+
+/// The key of a cost in the heap of a search.
+fn cost_key(c: f64) -> u64 {
+    (c * 1e6) as u64
+}
+
+impl Search {
+    /// Starts a search of a grid of `size` cells.
+    fn start(&mut self, size: usize) {
+        if self.stamp.len() != size {
+            *self = Search {
+                stamp: vec![0; size],
+                best: vec![f64::MAX; size],
+                prev: vec![usize::MAX; size],
+                order: vec![u32::MAX; size],
+                goal_mark: vec![0; size],
+                goal_join: vec![0.0; size],
+                ..Search::default()
+            };
+        }
+        self.n = self.n.wrapping_add(1);
+        if self.n == 0 {
+            // After 2^32 searches: no stamp of an earlier search stays.
+            self.stamp.fill(0);
+            self.n = 1;
+        }
+        self.heap.clear();
+    }
+
+    /// The search from `starts` (the key: their edge and the parts that are
+    /// not sewn). The search of now goes on if it has the same key.
+    fn begin(&mut self, key: (EdgeKey, u64), size: usize, starts: &Joins) {
+        if self.from == Some(key) && self.stamp.len() == size {
+            return;
+        }
+        self.start(size);
+        self.from = Some(key);
+        self.popped.clear();
+        for (&idx, &(d, _)) in starts.iter() {
+            if d < self.best(idx) {
+                self.set(idx, d, usize::MAX);
+                self.heap.push(Reverse((cost_key(d), idx)));
+            }
+        }
+    }
+
+    /// The cost of the best way to the cell that the search found.
+    fn best(&self, i: usize) -> f64 {
+        if self.stamp[i] == self.n {
+            self.best[i]
+        } else {
+            f64::MAX
+        }
+    }
+
+    /// The cell before the cell on that way.
+    fn prev(&self, i: usize) -> usize {
+        if self.stamp[i] == self.n {
+            self.prev[i]
+        } else {
+            usize::MAX
+        }
+    }
+
+    fn set(&mut self, i: usize, best: f64, prev: usize) {
+        if self.stamp[i] != self.n {
+            self.order[i] = u32::MAX;
+        }
+        self.stamp[i] = self.n;
+        self.best[i] = best;
+        self.prev[i] = prev;
+    }
+
+    /// The place in `popped` where the cell first is, if the search took it.
+    fn order_of(&self, i: usize) -> Option<usize> {
+        (self.stamp[i] == self.n && self.order[i] != u32::MAX).then_some(self.order[i] as usize)
+    }
+
+    /// Marks the goal cells of a new link.
+    fn mark_goals(&mut self, goals: &Joins) {
+        self.link = self.link.wrapping_add(1);
+        if self.link == 0 {
+            self.goal_mark.fill(0);
+            self.link = 1;
+        }
+        for (&g, &(d, _)) in goals {
+            self.goal_mark[g] = self.link;
+            self.goal_join[g] = d;
+        }
+    }
+
+    /// The length of the join of a goal cell of the link of now.
+    fn goal(&self, i: usize) -> Option<f64> {
+        (self.goal_mark[i] == self.link).then_some(self.goal_join[i])
+    }
 }
 
 /// The cells that a run can go through while the set of parts `unsewn` is
@@ -310,6 +447,10 @@ struct Passage {
     mid: Vec<f64>,
     group: Vec<u32>,
     groups: u32,
+    /// The groups that the start cells of an edge reach, for the last edge
+    /// that asked (the links from one edge to each next part ask for the
+    /// same).
+    reached: Option<(EdgeKey, Vec<u32>)>,
 }
 
 impl Router {
@@ -317,7 +458,7 @@ impl Router {
         let bounds = parts.iter().filter_map(|p| p.control_bbox()).reduce(BBox::union)?;
         let cell = Grid::cell_for(bounds, cap / CELLS);
         let grid = Grid::new(bounds, cell, 2);
-        let pieces = parts
+        let pieces: Vec<Piece> = parts
             .iter()
             .map(|kind| {
                 let (fill, holes) = area_of(kind);
@@ -345,6 +486,12 @@ impl Router {
                 }
             })
             .collect();
+        let mut cover = vec![0u64; grid.w * grid.h];
+        for (k, piece) in pieces.iter().enumerate().take(64) {
+            for (c, _) in cover.iter_mut().zip(&piece.mask).filter(|(_, m)| **m) {
+                *c |= 1 << k;
+            }
+        }
         let lies_in = joints(parts);
         // The outline with the even-odd rule: each ring alone, as one.
         let letter = outline.map(|rings| {
@@ -361,6 +508,7 @@ impl Router {
         Some(Router {
             grid,
             pieces,
+            cover,
             lies_in,
             letter,
             cap,
@@ -374,7 +522,9 @@ impl Router {
                 mid: Vec::new(),
                 group: Vec::new(),
                 groups: 0,
+                reached: None,
             }),
+            search: RefCell::new(Search::default()),
         })
     }
 
@@ -491,10 +641,19 @@ impl Router {
 
     /// The cell is in a part of `unsewn`.
     fn covered(&self, idx: usize, unsewn: u64) -> bool {
-        self.pieces
-            .iter()
-            .enumerate()
-            .any(|(i, p)| unsewn & (1 << i) != 0 && p.mask[idx])
+        self.cover[idx] & unsewn != 0
+    }
+
+    /// The parts of `unsewn` that cover the cell, as indices.
+    fn covering(&self, idx: usize, unsewn: u64) -> impl Iterator<Item = &Piece> {
+        let mut bits = self.cover[idx] & unsewn;
+        std::iter::from_fn(move || {
+            (bits != 0).then(|| {
+                let k = bits.trailing_zeros() as usize;
+                bits &= bits - 1;
+                &self.pieces[k]
+            })
+        })
     }
 
     /// The middle of the cell in a part of `unsewn` that is nearest `p`,
@@ -528,12 +687,12 @@ impl Router {
         if !self.in_letter(idx) {
             return None;
         }
+        // A cell out of a part has a distance of 0 to its edge, so only the
+        // parts that cover the cell count.
         let inside = self
-            .pieces
-            .iter()
-            .enumerate()
-            .filter(|(i, p)| unsewn & (1 << i) != 0 && p.dist[idx] >= p.edge)
-            .map(|(_, p)| (p.dist[idx] / (0.8 * p.half).max(1e-9)).min(1.0))
+            .covering(idx, unsewn)
+            .filter(|p| p.dist[idx] >= p.edge)
+            .map(|p| (p.dist[idx] / (0.8 * p.half).max(1e-9)).min(1.0))
             .reduce(f64::max);
         if inside.is_some() {
             return inside;
@@ -541,13 +700,7 @@ impl Router {
         // Where two parts that are not sewn touch (the two sides of a
         // bridge of the split, ADR 0156), the cell is near the edge of
         // each, but the parts cover all round it: the run can go across.
-        let edge = self
-            .pieces
-            .iter()
-            .enumerate()
-            .filter(|(i, p)| unsewn & (1 << i) != 0 && p.mask[idx])
-            .map(|(_, p)| p.edge)
-            .reduce(f64::max)?;
+        let edge = self.covering(idx, unsewn).map(|p| p.edge).reduce(f64::max)?;
         let n = (edge / self.grid.cell).ceil() as isize;
         let (ci, cj) = (idx % self.grid.w, idx / self.grid.w);
         for dj in -n..=n {
@@ -583,6 +736,7 @@ impl Router {
         if p.set == 0 || p.unsewn != unsewn {
             p.unsewn = unsewn;
             p.groups = 0;
+            p.reached = None;
             p.set = p.set.wrapping_add(1);
             if p.set == 0 {
                 // After 2^32 sets: no stamp of an earlier set stays.
@@ -637,18 +791,29 @@ impl Router {
     /// start (a start can be a cell that is not passable: the search goes
     /// from it to its passable neighbours). The groups of the starts are
     /// filled, so a goal with no group yet is in none of them.
-    fn reaches(&self, p: &mut Passage, starts: &Joins, goals: &Joins) -> bool {
-        let mut groups = std::collections::HashSet::new();
-        for &start in starts.keys() {
-            for idx in std::iter::once(start).chain(self.grid.neighbors(start)) {
-                if self.mid(p, idx) >= 0.0 {
-                    groups.insert(self.group(p, idx));
+    fn reaches(&self, p: &mut Passage, from: EdgeKey, starts: &Joins, goals: &Joins) -> bool {
+        let groups = match p.reached.take() {
+            Some((key, groups)) if key == from => groups,
+            _ => {
+                let mut groups: Vec<u32> = Vec::new();
+                for &start in starts.keys() {
+                    for idx in std::iter::once(start).chain(self.grid.neighbors(start)) {
+                        if self.mid(p, idx) >= 0.0 {
+                            let g = self.group(p, idx);
+                            if !groups.contains(&g) {
+                                groups.push(g);
+                            }
+                        }
+                    }
                 }
+                groups
             }
-        }
-        goals
+        };
+        let found = goals
             .keys()
-            .any(|&g| starts.contains_key(&g) || Router::group_of(p, g).is_some_and(|group| groups.contains(&group)))
+            .any(|&g| starts.contains_key(&g) || Router::group_of(p, g).is_some_and(|group| groups.contains(&group)));
+        p.reached = Some((from, groups));
+        found
     }
 
     /// The straight line from `a` to `b` is under the parts of `unsewn`
@@ -675,15 +840,7 @@ impl Router {
         if let Some(j) = self.joins.borrow().get(&key) {
             return j.clone();
         }
-        let mut out: Joins = HashMap::new();
-        for p in self.along_in(e) {
-            for (idx, d) in self.joins_of(p, key.1) {
-                if out.get(&idx).is_none_or(|(best, _)| d < *best) {
-                    out.insert(idx, (d, p));
-                }
-            }
-        }
-        let out = Rc::new(out);
+        let out = Rc::new(self.joins_along(&self.along_in(e), key.1));
         self.joins.borrow_mut().insert(key, out.clone());
         out
     }
@@ -706,12 +863,7 @@ impl Router {
                     if i < 0 || j < 0 || i as usize >= self.grid.w || j as usize >= self.grid.h {
                         continue;
                     }
-                    let idx = self.grid.idx(i as usize, j as usize);
-                    for (k, piece) in self.pieces.iter().enumerate() {
-                        if piece.mask[idx] {
-                            near |= 1 << k;
-                        }
-                    }
+                    near |= self.cover[self.grid.idx(i as usize, j as usize)];
                 }
             }
         }
@@ -719,24 +871,45 @@ impl Router {
         near
     }
 
-    fn joins_of(&self, p: Point, unsewn: u64) -> Vec<(usize, f64)> {
+    /// The joins of the points `pts` of an edge: each passable cell within
+    /// [`SNAP`] of a point with a hidden line to it, with the nearest such
+    /// point (of two as near, the first). Each cell is checked one time:
+    /// the points from the nearest, to the first with a hidden line.
+    fn joins_along(&self, pts: &[Point], unsewn: u64) -> Joins {
         let r = SNAP * self.cap;
         let n = (r / self.grid.cell).ceil() as isize;
-        let Some((ci, cj)) = self.grid.cell_of(p) else {
-            return Vec::new();
+        // The cell of each point that is in the grid.
+        let cells: Vec<(Point, isize, isize)> = pts
+            .iter()
+            .filter_map(|&p| self.grid.cell_of(p).map(|(i, j)| (p, i as isize, j as isize)))
+            .collect();
+        let mut out: Joins = HashMap::new();
+        let Some(lo_i) = cells.iter().map(|c| c.1 - n).min() else {
+            return out;
         };
-        let mut out = Vec::new();
-        for dj in -n..=n {
-            for di in -n..=n {
-                let (i, j) = (ci as isize + di, cj as isize + dj);
-                if i < 0 || j < 0 || i as usize >= self.grid.w || j as usize >= self.grid.h {
-                    continue;
-                }
+        let hi_i = cells.iter().map(|c| c.1 + n).max().unwrap_or(lo_i);
+        let lo_j = cells.iter().map(|c| c.2 - n).min().unwrap_or(0);
+        let hi_j = cells.iter().map(|c| c.2 + n).max().unwrap_or(lo_j);
+        let mut near: Vec<(f64, Point)> = Vec::with_capacity(cells.len());
+        for j in lo_j.max(0)..=hi_j.min(self.grid.h as isize - 1) {
+            for i in lo_i.max(0)..=hi_i.min(self.grid.w as isize - 1) {
                 let idx = self.grid.idx(i as usize, j as usize);
                 let c = self.grid.center_of(idx);
-                let d = c.distance(p);
-                if d <= r && self.passable(idx, unsewn).is_some() && self.hidden(p, c, unsewn) {
-                    out.push((idx, d));
+                near.clear();
+                near.extend(
+                    cells
+                        .iter()
+                        .filter(|&&(_, ci, cj)| (i - ci).abs() <= n && (j - cj).abs() <= n)
+                        .map(|&(p, _, _)| (c.distance(p), p))
+                        .filter(|&(d, _)| d <= r),
+                );
+                if near.is_empty() || self.passable(idx, unsewn).is_none() {
+                    continue;
+                }
+                // A stable sort: of two points as near, the first.
+                near.sort_by(|a, b| a.0.total_cmp(&b.0));
+                if let Some(&(d, p)) = near.iter().find(|(_, p)| self.hidden(*p, c, unsewn)) {
+                    out.insert(idx, (d, p));
                 }
             }
         }
@@ -775,9 +948,17 @@ impl Router {
             return trim;
         }
         // A short straight run is the best one.
-        let straight = pairs()
-            .filter(|(p, q)| p.distance(*q) <= 2.0 * SNAP * self.cap && self.hidden(*p, *q, unsewn))
-            .min_by(|x, y| x.0.distance(x.1).total_cmp(&y.0.distance(y.1)));
+        // The shortest pair with a hidden line (of two as short, the first):
+        // the pairs from the shortest, to the first with a hidden line.
+        let mut short: Vec<(f64, Point, Point)> = pairs()
+            .map(|(p, q)| (p.distance(q), p, q))
+            .filter(|(d, _, _)| *d <= 2.0 * SNAP * self.cap)
+            .collect();
+        short.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let straight = short
+            .into_iter()
+            .find(|(_, p, q)| self.hidden(*p, *q, unsewn))
+            .map(|(_, p, q)| (p, q));
         if let Some((p, q)) = straight {
             return Link {
                 run: Some(vec![p, q]),
@@ -791,48 +972,39 @@ impl Router {
             return trim;
         }
         let mut passage = self.passage(unsewn);
-        if groups && !self.reaches(&mut passage, &starts, &goals) {
+        if groups && !self.reaches(&mut passage, edge_key(from), &starts, &goals) {
             return trim;
         }
         // The shortest way through the passable cells; a cell near the
-        // edge of its part costs more, so the run goes down the middle.
-        let size = self.grid.w * self.grid.h;
-        let mut best = vec![f64::MAX; size];
-        let mut prev = vec![usize::MAX; size];
-        let mut heap: BinaryHeap<Reverse<(u64, usize)>> = BinaryHeap::new();
-        let key = |c: f64| (c * 1e6) as u64;
-        for (&idx, &(d, _)) in starts.iter() {
-            if d < best[idx] {
-                best[idx] = d;
-                heap.push(Reverse((key(d), idx)));
-            }
-        }
+        // edge of its part costs more, so the run goes down the middle. The
+        // links from one edge while one set of parts is not sewn share one
+        // search: each link reads the cells in the order of the search, and
+        // the search goes on when a link needs more cells (see [`Search`]).
+        let mut search = self.search.borrow_mut();
+        search.begin((edge_key(from), unsewn), self.grid.w * self.grid.h, &starts);
+        search.mark_goals(&goals);
         let mut found: Option<(f64, usize)> = None;
-        while let Some(Reverse((k, idx))) = heap.pop() {
-            if k > key(best[idx]) {
-                continue;
-            }
-            if found.is_some_and(|(c, _)| best[idx] >= c) {
+        // Before the first goal cell that the search took, nothing changes
+        // the result: the reading starts there.
+        let mut at = goals
+            .keys()
+            .filter_map(|&g| search.order_of(g))
+            .min()
+            .unwrap_or(search.popped.len());
+        loop {
+            if at == search.popped.len() && !self.grow(&mut search, &mut passage) {
                 break;
             }
-            if let Some(&(d, _)) = goals.get(&idx) {
-                let total = best[idx] + d;
+            let idx = search.popped[at];
+            at += 1;
+            let cost = search.best(idx);
+            if found.is_some_and(|(c, _)| cost >= c) {
+                break;
+            }
+            if let Some(d) = search.goal(idx) {
+                let total = cost + d;
                 if found.is_none_or(|(c, _)| total < c) {
                     found = Some((total, idx));
-                }
-            }
-            let here = self.grid.center_of(idx);
-            for next in self.grid.neighbors(idx) {
-                let mid = self.mid(&mut passage, next);
-                if mid < 0.0 {
-                    continue;
-                }
-                let step = here.distance(self.grid.center_of(next));
-                let cost = best[idx] + step * (1.0 + 4.0 * (1.0 - mid) * (1.0 - mid));
-                if cost < best[next] {
-                    best[next] = cost;
-                    prev[next] = idx;
-                    heap.push(Reverse((key(cost), next)));
                 }
             }
         }
@@ -840,12 +1012,13 @@ impl Router {
             return trim;
         };
         let mut cells = vec![goals[&idx].1, self.grid.center_of(idx)];
-        while prev[idx] != usize::MAX {
-            idx = prev[idx];
+        while search.prev(idx) != usize::MAX {
+            idx = search.prev(idx);
             cells.push(self.grid.center_of(idx));
         }
         cells.push(starts[&idx].1);
         cells.reverse();
+        drop(search);
         drop(passage);
         let run = self.simplify(&cells, unsewn);
         let length = run.windows(2).map(|w| w[0].distance(w[1])).sum();
@@ -854,6 +1027,37 @@ impl Router {
             trim: false,
             length,
         }
+    }
+
+    /// One more cell of the search: the next cell from the heap, with its
+    /// neighbours in the heap. `false` when the heap is empty. As a search of
+    /// one link (ADR 0161) took them: the cells come in the same order.
+    fn grow(&self, search: &mut Search, passage: &mut Passage) -> bool {
+        while let Some(Reverse((k, idx))) = search.heap.pop() {
+            let cost = search.best(idx);
+            if k > cost_key(cost) {
+                continue;
+            }
+            if search.order[idx] == u32::MAX {
+                search.order[idx] = search.popped.len() as u32;
+            }
+            search.popped.push(idx);
+            let here = self.grid.center_of(idx);
+            for next in self.grid.neighbors(idx) {
+                let mid = self.mid(passage, next);
+                if mid < 0.0 {
+                    continue;
+                }
+                let step = here.distance(self.grid.center_of(next));
+                let c = cost + step * (1.0 + 4.0 * (1.0 - mid) * (1.0 - mid));
+                if c < search.best(next) {
+                    search.set(next, c, idx);
+                    search.heap.push(Reverse((cost_key(c), next)));
+                }
+            }
+            return true;
+        }
+        false
     }
 
     /// Fewer points for the run `pts`: a point goes if the line between
@@ -877,7 +1081,7 @@ impl Router {
             let mut next = at + 1;
             for k in (at + 2..=last).rev() {
                 let ok = if at == 0 || k == last {
-                    self.hidden(pts[at], pts[k], unsewn) && k - at <= 3
+                    k - at <= 3 && self.hidden(pts[at], pts[k], unsewn)
                 } else {
                     clear(pts[at], pts[k])
                 };
@@ -1157,10 +1361,7 @@ pub fn route_in(letter: &EmbLetter, cap_mm: f64, outline: Option<&[Vec<Point>]>)
             }
             parts.push(ObjectKind::Running {
                 path,
-                params: RunningParams {
-                    stitch_length_mm: RUN_STITCH_MM,
-                    ..Default::default()
-                },
+                params: run_params(),
             });
             tuning.push(PartTuning::default());
             runs += 1;
@@ -1797,6 +1998,52 @@ mod tests {
         assert!(trims > 0 && runs > 0, "{trims} trims, {runs} runs");
     }
 
+    /// The links from one edge share one search (ADR 0179): each link is
+    /// the link of a search of its own, when the shared search is new and
+    /// when it went further for other links first.
+    #[test]
+    fn a_shared_search_gives_the_link_of_a_search_of_its_own() {
+        let source = crate::bundled::font("Lato", "Bold").unwrap();
+        let chars: Vec<char> = "HkWx".chars().collect();
+        let f = crate::embfont::convert(&source, "Block Sans", "", emb_model::LetterStitch::Auto, &chars);
+        let s = f.cap_height_mm / source.cap_height;
+        let mut runs = 0;
+        for c in chars {
+            let parts = &f.letters[&c].parts;
+            let outline: Vec<Vec<Point>> = source
+                .contours(source.glyph(c).unwrap())
+                .into_iter()
+                .map(|r| r.into_iter().map(|p| Point::new(p.x * s, p.y * s)).collect())
+                .collect();
+            let shared = Router::new(parts, f.cap_height_mm, Some(&outline)).unwrap();
+            let own = Router::new(parts, f.cap_height_mm, Some(&outline)).unwrap();
+            let modes = shared.modes();
+            let all: u64 = (1 << parts.len()) - 1;
+            for unsewn in (1..=all).step_by(5) {
+                for &a in &modes {
+                    let from = shared.end_edge(a, shared.start(a, Point::ZERO));
+                    let next: Vec<Mode> = modes
+                        .iter()
+                        .copied()
+                        .filter(|b| unsewn & (1 << b.0) != 0 && b.0 != a.0)
+                        .collect();
+                    // The links in their order, then the other way round.
+                    for b in next.iter().chain(next.iter().rev()) {
+                        let to = shared.start_edge(*b, from.0.midpoint(from.1));
+                        let one = shared.link_with(from, to, unsewn, true);
+                        own.search.borrow_mut().from = None;
+                        let alone = own.link_with(from, to, unsewn, true);
+                        assert_eq!(one.trim, alone.trim, "{c} {a:?} {b:?} {unsewn:b}");
+                        assert_eq!(one.run, alone.run, "{c} {a:?} {b:?} {unsewn:b}");
+                        assert_eq!(one.length.to_bits(), alone.length.to_bits());
+                        runs += usize::from(one.run.is_some());
+                    }
+                }
+            }
+        }
+        assert!(runs > 0);
+    }
+
     /// A start of a search can be a cell that is not passable: the search
     /// goes from it to its passable neighbours (ADR 0161).
     #[test]
@@ -1818,20 +2065,30 @@ mod tests {
             mid: mid.clone(),
             group: vec![u32::MAX; size],
             groups: 0,
+            reached: None,
         };
         let cells = |cells: &[usize]| -> Joins { cells.iter().map(|&c| (c, (0.0, Point::ZERO))).collect() };
+        // The keys of the start edges.
+        let (a, b) = ([1, 2, 1, 2], [20, 2, 20, 2]);
         // The start (1, 2) is not passable; its neighbour (2, 2) is.
         let start = cells(&[2 * w + 1]);
-        assert!(r.reaches(&mut map(), &start, &cells(&[2 * w + 9])));
-        assert!(!r.reaches(&mut map(), &start, &cells(&[2 * w + 20])));
+        assert!(r.reaches(&mut map(), a, &start, &cells(&[2 * w + 9])));
+        assert!(!r.reaches(&mut map(), a, &start, &cells(&[2 * w + 20])));
         // A goal that is a start; a goal that is not passable.
-        assert!(r.reaches(&mut map(), &start, &cells(&[2 * w + 1])));
-        assert!(!r.reaches(&mut map(), &start, &cells(&[3 * w + 5])));
-        // A goal in a group that an earlier link filled, not reached.
+        assert!(r.reaches(&mut map(), a, &start, &cells(&[2 * w + 1])));
+        assert!(!r.reaches(&mut map(), a, &start, &cells(&[3 * w + 5])));
+        // A goal in a group that an earlier link filled, not reached; the
+        // groups of a start edge are kept for the next link from it.
         let mut p = map();
-        assert!(!r.reaches(&mut p, &cells(&[2 * w + 20]), &cells(&[2 * w + 3])));
-        assert!(!r.reaches(&mut p, &start, &cells(&[2 * w + 20])));
-        assert!(r.reaches(&mut p, &start, &cells(&[2 * w + 5])));
+        assert!(!r.reaches(&mut p, b, &cells(&[2 * w + 20]), &cells(&[2 * w + 3])));
+        assert!(!r.reaches(&mut p, a, &start, &cells(&[2 * w + 20])));
+        assert!(r.reaches(&mut p, a, &start, &cells(&[2 * w + 5])));
+        assert!(
+            p.reached
+                .as_ref()
+                .is_some_and(|(key, groups)| *key == a && groups.len() == 1)
+        );
+        assert!(r.reaches(&mut p, b, &cells(&[2 * w + 20]), &cells(&[2 * w + 20])));
     }
 
     /// The cuts of a letter tried on threads give the route of one thread

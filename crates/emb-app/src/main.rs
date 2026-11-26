@@ -27,6 +27,7 @@ mod cleanup;
 mod clipart;
 mod clock;
 mod color_fills;
+mod column_bands;
 mod commands;
 mod corners;
 mod crash;
@@ -43,7 +44,9 @@ mod effects_ui;
 mod export;
 mod families;
 mod file;
+mod file_watch;
 mod first_start;
+mod fix_stitches;
 mod font_sheet;
 mod fonts;
 mod functions;
@@ -60,6 +63,7 @@ mod jobs;
 mod join;
 mod keyboard;
 mod kiosk;
+mod lesson;
 mod letter_edit;
 mod lettering;
 mod library;
@@ -69,6 +73,7 @@ mod monogram;
 mod motifs;
 mod my_machines;
 mod needles;
+mod one_program;
 mod order;
 mod output;
 mod overview;
@@ -92,6 +97,7 @@ mod product;
 mod product_photo;
 #[cfg(test)]
 mod product_probe;
+mod quicker;
 mod quilting;
 mod quote;
 mod recognize_objects;
@@ -99,6 +105,7 @@ mod repeats;
 mod reshape;
 mod resources;
 mod ribbon;
+mod samples;
 mod scripts;
 mod selection;
 mod send;
@@ -111,17 +118,21 @@ mod sketch;
 mod smoke;
 mod start;
 mod startup;
+mod steps;
 mod stitch_tiles;
 mod stitch_types;
 mod stock;
 mod styles;
 mod tabs;
 mod teamnames;
+mod test_swatches;
 #[cfg(test)]
 mod test_util;
 mod threads;
 mod tilt;
 mod turntable;
+#[cfg(test)]
+mod tutorial_steps;
 mod update;
 mod vectors;
 #[cfg(not(target_arch = "wasm32"))]
@@ -139,9 +150,11 @@ mod workspace;
 use eframe::egui;
 
 /// The text of `--help`.
-const USAGE: &str = "Use: shokujodx [--lang <code>] [--kiosk | <file>]
+const USAGE: &str = "Use: shokujodx [--lang <code>] [--kiosk | [--new-window] <file>]
 
-  <file>         open a design, a machine file, artwork or a picture
+  <file>         open a design, a machine file, artwork or a picture (in a
+                 tab of the program that runs, if one runs)
+  --new-window   start a second program, also if one runs
   --lang <code>  the language for this run: en, de, es or ja
   --kiosk        start in the lettering kiosk
   --thumbnail <file> <out.png> [<size>]
@@ -209,6 +222,15 @@ fn main() -> eframe::Result {
     // The speed of the canvas with the renderer of the arguments (ADR 0122).
     if let Some(out) = view_bench::wanted(&args) {
         return view_bench::run(startup::Start::from_args(&args).renderer, out);
+    }
+    // One program (P22 Milestone 8, ADR 0175): a file for a program that
+    // runs goes to it, and this process stops before it opens a window.
+    if settings.one_program
+        && let Some(file) = one_program::file_of_args(&args)
+        && let Some(root) = backup::backups_dir()
+        && one_program::hand_over(&root, &file, backup::unix_now())
+    {
+        return Ok(());
     }
     // The renderer, and the start again with the next renderer if this one
     // fails (v0.3 plan, Stage 1).

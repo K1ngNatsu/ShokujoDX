@@ -27,6 +27,13 @@
 //! - joints: a column that ends in an earlier column (on top of it) or in
 //!   a later one (under it; a digitizer puts it under);
 //! - travel runs outside the outline.
+//!
+//! The measures against the eye (P22 Milestone 6, ADR 0173): the judged
+//! set `tests/data/judged-letters.json` says for each letter of the bench
+//! if the eye sees a fault on a sew-out, and which. [`eye_faults`] gives
+//! the faults that show from the measures (the `EYE_*` limits, from the
+//! judged set), and [`compare`] lists where they do not agree with the
+//! eye (`emb-cli letter-faults --judged <file>`).
 
 use emb_geom::region::ring_contains;
 use emb_geom::{BBox, Path, Point, Transform};
@@ -74,6 +81,10 @@ const CORNER_DEG: f64 = 55.0;
 const CORNER_SPAN_MM: f64 = 0.4;
 /// The cells of the open area, in mm.
 const CELL_MM: f64 = 0.05;
+/// The erosion of the open cells for [`Faults::open_patch`], in cells: a
+/// sliver narrower than about two times this plus one cell (0.25 mm) is
+/// not a patch.
+pub const PATCH_ERODE: usize = 2;
 
 /// The faults of one letter, or the sum of the faults of several.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -99,6 +110,18 @@ pub struct Faults {
     /// Places where the needle leaves one part and the next part starts
     /// more than [`TRIM_GAP_MM`] away (P21 Milestone 5).
     pub trims: usize,
+    /// The largest open patch, mm² (P22 Milestone 6): the open cells that
+    /// stay after an erosion of [`PATCH_ERODE`] cells (the thin slivers
+    /// between stitches go), in one connected patch. Of several letters,
+    /// the largest.
+    pub open_patch: f64,
+    /// The farthest a needle point goes out of the outline with the
+    /// default pull compensation, mm (P22 Milestone 6). Of several
+    /// letters, the farthest.
+    pub out_max_mm: f64,
+    /// The area of the outline that two parts or more cover, mm² (P22
+    /// Milestone 7).
+    pub two_layers: f64,
 }
 
 impl Faults {
@@ -122,6 +145,9 @@ impl Faults {
         self.on_top += o.on_top;
         self.under += o.under;
         self.trims += o.trims;
+        self.open_patch = self.open_patch.max(o.open_patch);
+        self.out_max_mm = self.out_max_mm.max(o.out_max_mm);
+        self.two_layers += o.two_layers;
     }
 
     /// The open area as a part of the area of the outline, in percent.
@@ -393,6 +419,9 @@ pub fn measure(name: &str, parts: &[ObjectKind], o: &Outline) -> Letter {
                 "notch": f.notch,
                 "open_corner": f.open_corner,
                 "open_other": f.open_other,
+                "open_patch": f.open_patch,
+                "out_max_mm": f.out_max_mm,
+                "two_layers": f.two_layers,
                 "corners_open": f.corners_open,
                 "on_top": f.on_top,
                 "under": f.under,
@@ -461,6 +490,7 @@ fn column_faults(
     let pts = satin(g, params, entry, None)?;
     for p in &pts {
         let out = outside_by(o, *p);
+        f.out_max_mm = f.out_max_mm.max(out);
         if out > SPIKE_MM {
             let k = (0..mids.len())
                 .min_by(|x, y| mids[*x].distance(*p).total_cmp(&mids[*y].distance(*p)))
@@ -501,19 +531,28 @@ fn open_area(o: &Outline, covers: &[Cover], f: &mut Faults) -> (Vec<[f64; 2]>, V
     let cell = grid.cell;
     let glyph = emb_letter::tune::outline_mask(&grid, o);
     let mut cover = vec![false; grid.w * grid.h];
+    // The number of parts that cover each cell.
+    let mut layers = vec![0u8; grid.w * grid.h];
     for c in covers {
+        let mut part = vec![false; grid.w * grid.h];
         match c {
             Cover::Quads(quads, _) => {
                 for q in quads {
-                    emb_letter::grid::fill_into(&grid, &[q.to_vec()], &mut cover);
+                    emb_letter::grid::fill_into(&grid, &[q.to_vec()], &mut part);
                 }
             }
             Cover::Fill(fo) => {
                 for (k, m) in emb_letter::tune::outline_mask(&grid, fo).into_iter().enumerate() {
-                    cover[k] |= m;
+                    part[k] |= m;
                 }
             }
             Cover::None => {}
+        }
+        for (k, on) in part.into_iter().enumerate() {
+            if on {
+                cover[k] = true;
+                layers[k] = layers[k].saturating_add(1);
+            }
         }
     }
     for j in 0..grid.h {
@@ -524,6 +563,9 @@ fn open_area(o: &Outline, covers: &[Cover], f: &mut Faults) -> (Vec<[f64; 2]>, V
             }
             let p = grid.center(i, j);
             f.area += cell * cell;
+            if layers[k] >= 2 {
+                f.two_layers += cell * cell;
+            }
             let covered = cover[k];
             let mut at_corner = false;
             for (k, c) in corners.iter().enumerate() {
@@ -549,7 +591,60 @@ fn open_area(o: &Outline, covers: &[Cover], f: &mut Faults) -> (Vec<[f64; 2]>, V
     f.corners_open = (0..corners.len())
         .filter(|&k| near_in[k] > 0 && (near_cov[k] as f64) < CORNER_COVER * near_in[k] as f64)
         .count();
+    let open_cells: Vec<bool> = (0..grid.w * grid.h).map(|k| glyph[k] && !cover[k]).collect();
+    f.open_patch = largest_patch(&open_cells, grid.w, grid.h, PATCH_ERODE) as f64 * cell * cell;
     (open, corners)
+}
+
+/// The number of cells of the largest connected patch (4 neighbors) of
+/// `cells` (`w` by `h`) after an erosion of `r` cells: a cell stays if all
+/// cells within `r` of it (a square) are in `cells`.
+pub fn largest_patch(cells: &[bool], w: usize, h: usize, r: usize) -> usize {
+    // A cell stays if each cell of the square of side 2r + 1 round it is
+    // in `cells`.
+    let at = |i: usize, j: usize| cells[j * w + i];
+    let mut kept = vec![false; w * h];
+    for j in r..h.saturating_sub(r) {
+        for i in r..w.saturating_sub(r) {
+            kept[j * w + i] = (j - r..=j + r).all(|y| (i - r..=i + r).all(|x| at(x, y)));
+        }
+    }
+    let mut seen = vec![false; w * h];
+    let mut best = 0;
+    let mut stack = Vec::new();
+    for start in 0..w * h {
+        if !kept[start] || seen[start] {
+            continue;
+        }
+        seen[start] = true;
+        stack.push(start);
+        let mut n = 0;
+        while let Some(k) = stack.pop() {
+            n += 1;
+            let (i, j) = (k % w, k / w);
+            let mut near = |x: usize, y: usize| {
+                let q = y * w + x;
+                if kept[q] && !seen[q] {
+                    seen[q] = true;
+                    stack.push(q);
+                }
+            };
+            if i > 0 {
+                near(i - 1, j);
+            }
+            if i + 1 < w {
+                near(i + 1, j);
+            }
+            if j > 0 {
+                near(i, j - 1);
+            }
+            if j + 1 < h {
+                near(i, j + 1);
+            }
+        }
+        best = best.max(n);
+    }
+    best
 }
 
 /// The letter of `c` that lettering in the TrueType font `src` gets: the
@@ -733,6 +828,214 @@ fn worst(fonts: &[FontFaults]) -> String {
     s
 }
 
+/// A patch of open area this large or larger shows on a sew-out, mm²
+/// (P22 Milestone 6: the judged letters with an open area have 0.41 mm²
+/// or more, the clean letters 0.35 mm² or less).
+pub const EYE_OPEN_PATCH_MM2: f64 = 0.38;
+/// Open area at the convex corners of this much or more shows as a
+/// clipped corner, mm² (judged: 0.54 mm² or more; clean: 0.45 mm² or
+/// less).
+pub const EYE_OPEN_CORNER_MM2: f64 = 0.5;
+/// A needle point this far out of the outline shows, mm. No letter of the
+/// judged set has one (the farthest is 0.47 mm), so this limit is not
+/// tested by the eye yet.
+pub const EYE_OUT_MM: f64 = 0.6;
+/// A column wider than [`BULGE`] times its middle width over this length
+/// shows as a bulge, mm. Not tested by the eye yet (the most of the judged
+/// set is 2.6 mm, clean).
+pub const EYE_BULGE_MM: f64 = 3.0;
+/// This many pairs that cross in one letter show as a pile. Not tested by
+/// the eye yet (the most of the judged set is 3, clean).
+pub const EYE_CROSS: usize = 5;
+
+/// The faults of a letter that the eye sees on a sew-out, from its
+/// measures: `open-area`, `open-corner`, `spike`, `bulge`, `crossing`.
+pub fn eye_faults(f: &Faults) -> Vec<&'static str> {
+    let mut out = Vec::new();
+    if f.open_patch >= EYE_OPEN_PATCH_MM2 {
+        out.push("open-area");
+    }
+    if f.open_corner >= EYE_OPEN_CORNER_MM2 {
+        out.push("open-corner");
+    }
+    if f.out_max_mm >= EYE_OUT_MM {
+        out.push("spike");
+    }
+    if f.bulge_mm >= EYE_BULGE_MM {
+        out.push("bulge");
+    }
+    if f.cross >= EYE_CROSS {
+        out.push("crossing");
+    }
+    out
+}
+
+/// The judged letters of a judged set (`tests/data/judged-letters.json`):
+/// the name of each letter and what the eye sees (`clean` or a fault).
+pub fn load_judged(text: &str) -> Result<Vec<(String, String)>, String> {
+    let v: Value = serde_json::from_str(text).map_err(|e| format!("the judged set: {e}"))?;
+    let letters = v
+        .get("letters")
+        .and_then(Value::as_array)
+        .ok_or("the judged set has no letters")?;
+    letters
+        .iter()
+        .map(|l| match l.as_array().map(Vec::as_slice) {
+            Some([Value::String(n), Value::String(e)]) => Ok((n.clone(), e.clone())),
+            _ => Err(format!("a letter of the judged set is not [name, fault]: {l}")),
+        })
+        .collect()
+}
+
+/// The measures of the bench with their own limits, for the report of
+/// [`compare`]: the name and if the measure calls the letter faulty.
+type BenchMeasure = (&'static str, fn(&Faults) -> bool);
+const BENCH_MEASURES: [BenchMeasure; 10] = [
+    ("spikes (over 0.4 mm)", |f| f.spike_end + f.spike_mid > 0),
+    ("bare (over 0.2 mm with no pull)", |f| f.bare_out > 0),
+    ("crossing pairs", |f| f.cross > 0),
+    ("sides that go back", |f| f.back_mm > 0.0),
+    ("fans", |f| f.fan_mm > 0.0),
+    ("bulges", |f| f.bulge_mm > 0.0),
+    ("notches", |f| f.notch > 0),
+    ("corners open", |f| f.corners_open > 0),
+    ("open area (any)", |f| f.open_corner + f.open_other > 0.0),
+    ("ends on top", |f| f.on_top > 0),
+];
+
+/// The measures against the eye.
+#[derive(Debug, Clone, Default)]
+pub struct Comparison {
+    /// The judged letters that the bench measured.
+    pub total: usize,
+    /// The letters where the measures (with the `EYE_*` limits) and the eye
+    /// agree: both clean, or both faulty.
+    pub agree: usize,
+    /// The letters where they do not agree: the name, what the eye sees,
+    /// what the measures see.
+    pub differ: Vec<(String, String, Vec<&'static str>)>,
+    /// The report.
+    pub text: String,
+}
+
+/// Compares the measures of `fonts` with the judged letters `judged`
+/// (only the letters that both have).
+pub fn compare(fonts: &[FontFaults], judged: &[(String, String)]) -> Comparison {
+    let measured: std::collections::HashMap<&str, &Faults> = fonts
+        .iter()
+        .flat_map(|f| f.letters.iter().map(|l| (l.name.as_str(), &l.faults)))
+        .collect();
+    let mut c = Comparison::default();
+    let mut close = Vec::new();
+    let mut bench: Vec<(usize, usize, Vec<String>)> = vec![(0, 0, Vec::new()); BENCH_MEASURES.len()];
+    for (name, eye) in judged {
+        let Some(f) = measured.get(name.as_str()) else { continue };
+        c.total += 1;
+        let seen = eye_faults(f);
+        let eye_faulty = eye != "clean";
+        if seen.is_empty() == eye_faulty {
+            c.differ.push((name.clone(), eye.clone(), seen.clone()));
+        } else {
+            c.agree += 1;
+        }
+        for (k, (_, calls)) in BENCH_MEASURES.iter().enumerate() {
+            if calls(f) {
+                if eye_faulty {
+                    bench[k].0 += 1;
+                } else {
+                    bench[k].1 += 1;
+                    if bench[k].2.len() < 6 {
+                        bench[k].2.push(name.clone());
+                    }
+                }
+            }
+        }
+        // Within a quarter of a limit, on either side.
+        let near = |v: f64, lim: f64| v >= 0.75 * lim && v < 1.25 * lim;
+        if near(f.open_patch, EYE_OPEN_PATCH_MM2) {
+            close.push(format!("{name} (open patch {:.2} mm², eye: {eye})", f.open_patch));
+        }
+        if near(f.open_corner, EYE_OPEN_CORNER_MM2) {
+            close.push(format!("{name} (open corner {:.2} mm², eye: {eye})", f.open_corner));
+        }
+    }
+    let mut t = String::new();
+    let percent = 100.0 * c.agree as f64 / c.total.max(1) as f64;
+    t.push_str(&format!(
+        "Judged letters: {}; the measures agree with the eye on {} ({percent:.1} %).\n",
+        c.total, c.agree
+    ));
+    t.push_str(&format!(
+        "Limits: open patch {EYE_OPEN_PATCH_MM2} mm², open corner {EYE_OPEN_CORNER_MM2} mm², needle points out {EYE_OUT_MM} mm, bulges {EYE_BULGE_MM} mm, crossing pairs {EYE_CROSS}.\n"
+    ));
+    t.push_str("\nWhere they do not agree:\n");
+    if c.differ.is_empty() {
+        t.push_str("  none\n");
+    }
+    for (name, eye, seen) in &c.differ {
+        let f = measured[name.as_str()];
+        t.push_str(&format!(
+            "  {name}: the eye sees {eye}, the measures {} (open patch {:.2} mm², open corner {:.2} mm², out {:.2} mm, bulges {:.1} mm, crossing {})\n",
+            if seen.is_empty() { "none".to_string() } else { seen.join(", ") },
+            f.open_patch,
+            f.open_corner,
+            f.out_max_mm,
+            f.bulge_mm,
+            f.cross
+        ));
+    }
+    t.push_str("\nThe measures of the bench with their own limits (faulty to the eye / clean to the eye):\n");
+    for (k, (what, _)) in BENCH_MEASURES.iter().enumerate() {
+        let (hit, clean, eg) = &bench[k];
+        t.push_str(&format!("  {what}: {hit} / {clean}"));
+        if !eg.is_empty() {
+            t.push_str(&format!(" (clean: {})", eg.join(", ")));
+        }
+        t.push('\n');
+    }
+    t.push_str("\nNear a limit:\n");
+    if close.is_empty() {
+        t.push_str("  none\n");
+    }
+    for line in &close {
+        t.push_str(&format!("  {line}\n"));
+    }
+    c.text = t;
+    c
+}
+
+/// For each font and way: the letters with no fault that the eye sees
+/// ([`eye_faults`]), the open area, the area with two layers and the
+/// trims (P22 Milestone 7: the measure of the trial of overlapped
+/// strokes).
+pub fn eye_summary(fonts: &[FontFaults]) -> String {
+    let mut s = String::from(
+        "| Font | Way | Clean to the eye | Open area mm2 | Largest patch mm2 | Two layers mm2 | Trims |\n| --- | --- | --- | --- | --- | --- | --- |\n",
+    );
+    let (mut clean_all, mut n_all) = (0, 0);
+    for f in fonts {
+        let clean = f.letters.iter().filter(|l| eye_faults(&l.faults).is_empty()).count();
+        clean_all += clean;
+        n_all += f.letters.len();
+        s.push_str(&format!(
+            "| {} | {} | {} of {} | {:.1} | {:.2} | {:.1} | {} |\n",
+            f.family,
+            f.way,
+            clean,
+            f.letters.len(),
+            f.sum.open_corner + f.sum.open_other,
+            f.sum.open_patch,
+            f.sum.two_layers,
+            f.sum.trims
+        ));
+    }
+    s.push_str(&format!(
+        "\nClean to the eye: {clean_all} of {n_all} ({:.1} %).\n",
+        100.0 * clean_all as f64 / n_all.max(1) as f64
+    ));
+    s
+}
+
 /// The pictures of all letters as JSON, for `tools/letter-faults.py`.
 pub fn pictures(fonts: &[FontFaults]) -> String {
     let all: Vec<&Value> = fonts
@@ -764,6 +1067,49 @@ mod tests {
             },
             params: SatinParams::default(),
         }
+    }
+
+    /// A patch is what stays after the erosion, in one piece; a thin sliver
+    /// goes.
+    #[test]
+    fn the_largest_patch_leaves_out_thin_slivers() {
+        let (w, h) = (40, 20);
+        let mut cells = vec![false; w * h];
+        // A square of 8 by 8 cells and a sliver of 3 by 15.
+        for j in 2..10 {
+            for i in 2..10 {
+                cells[j * w + i] = true;
+            }
+        }
+        for j in 2..17 {
+            for i in 20..23 {
+                cells[j * w + i] = true;
+            }
+        }
+        assert_eq!(largest_patch(&cells, w, h, 2), 16);
+        assert_eq!(largest_patch(&cells, w, h, 1), 36);
+        // Two squares apart are two patches.
+        for j in 12..18 {
+            for i in 30..36 {
+                cells[j * w + i] = true;
+            }
+        }
+        assert_eq!(largest_patch(&cells, w, h, 2), 16);
+    }
+
+    #[test]
+    fn the_eye_sees_the_faults_over_its_limits() {
+        let mut f = Faults::default();
+        assert!(eye_faults(&f).is_empty());
+        f.open_patch = EYE_OPEN_PATCH_MM2;
+        f.open_corner = EYE_OPEN_CORNER_MM2 - 0.01;
+        assert_eq!(eye_faults(&f), ["open-area"]);
+        f.out_max_mm = 0.7;
+        f.cross = EYE_CROSS;
+        assert_eq!(eye_faults(&f), ["open-area", "spike", "crossing"]);
+        let judged = load_judged(r#"{"letters": [["A", "clean"], ["B", "open-area"]]}"#).unwrap();
+        assert_eq!(judged, [("A".into(), "clean".into()), ("B".into(), "open-area".into())]);
+        assert!(load_judged(r#"{"letters": [["A"]]}"#).is_err());
     }
 
     #[test]

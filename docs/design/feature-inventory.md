@@ -36,7 +36,7 @@ Clean-room rules (spec, "Key decisions"):
 | ⇄ | Replaced by our own approach (see note) |
 | ✕ | Out of scope (see note) |
 
-**Phase** refers to `docs/design/roadmap.md` (P1 to P20).
+**Phase** refers to `docs/design/roadmap.md` (P1 to P22).
 
 ## 1. Product structure
 
@@ -96,7 +96,7 @@ is for coverage.
 | Graphics | Import graphic, instant smart design, smart design, keep graphics, color matching method, crop/remove/finalize crop, prepare bitmap colors, edit in external app, click-to turning satin / tatami with holes / tatami / centerline run / outline run, auto trace to vectors, adjust bitmap, photo digitizing (three kinds), add bitmap colors | ◐ Import graphic (SVG, PDF, AI, EPS, EMF, WMF, pictures), crop (box, oval, shape), adjust bitmap, prepare bitmap colors, color matching to a thread chart, click-to-stitch (satin, fill with or without holes, center line, outline), auto trace to vectors, smart design (the Picture to design wizard, with background removal and subject cut-out), photo digitizing (rows, color rows, scribble; ADR 0030), add bitmap colors (Add these threads); keep graphics: vectors stay as objects. Finalize crop: not needed (undo takes a crop back). Edit in external app: the backdrop picture opens in the picture program of the computer and changes here when it is saved (P10 Milestone 6) | P6, P10 |
 | Setup | Options, manage thread charts, auto fabrics, styles, my hoops, motifs, user-refined letters, sequin fixings and shapes, alphabets, convert TrueType font, connection manager, bling machine, screen calibration, scanner, machine runtime setup | ◐ Options (with backups and screen calibration), thread charts (import, P3), fabric presets (`data/fabrics.toml`), styles in the design and in templates, My hoops (P7), motifs, sew time for each machine, convert TrueType font (Fonts window), alphabets (Alphabets window), Send to USB targets (P8) (sequin fixings and shapes: P9 Milestone 6, when a tester has a sequin machine; bling (stone-setting) machine, scanner, machine runtime setup: out of scope, no public protocol) | P3–P9 |
 | Window | New/move tab group, remove tiling, split window, dockers, toolbars, kiosk, more windows | ◐ Docker layout (dock tabs that move and float) ; the lettering kiosk is a full-window screen (P10 Milestone 5) (another design next to the active one and more views: P10 Milestone 6; toolbars: not planned, the ribbon and the quick access buttons cover them) | P3, P10 |
-| Help | Help, tutorials, about | ✅ Help tab: Help (topics and a search that answers questions from them, offline), Start page, Keyboard shortcuts, Questions and problems, About, seven tutorials; 34 topics in groups, with tables and a glossary (ADR 0055); F1 opens the help of the button or the window under the pointer, or of the active tool; the topics of the ribbon tabs and of the keyboard are made from the ribbon (P10 Milestone 4) | P10 |
+| Help | Help, tutorials, about | ✅ Help tab: Help (topics and a search that answers questions from them, offline), Start page, Keyboard shortcuts, Questions and problems, About, 31 tutorials in learning paths (All Tutorials; each has a start design or a template, pictures, and a step file that a test does in four languages, ADR 0162), each also a lesson in the program that shows one step at a time, marks what to click and checks the design (ADR 0177); 34 topics in groups, with tables and a glossary (ADR 0055); F1 opens the help of the button or the window under the pointer, or of the active tool; the topics of the ribbon tabs and of the keyboard are made from the ribbon (P10 Milestone 4) | P10 |
 
 ## 4. Toolbars and toolboxes
 
@@ -340,7 +340,9 @@ The reference product reads and writes its own native format and more than forty
 Features that the reference product does not have, or that this inventory did
 not list, from the public features of Ink/Stitch and of other free and
 commercial embroidery programs (owner request, 2026-10-25).
-Phase P11 (`docs/design/p11-plan.md`) plans them.
+Phase P11 (`docs/design/p11-plan.md`) plans them. The rows from zigzag
+(an open-source program under Apache-2.0; the comparison of 2026-11-25)
+are planned in phase P22 (`docs/design/p22-plan.md`).
 
 | Feature | In | What it does | Status | Phase |
 | --- | --- | --- | --- | --- |
@@ -361,6 +363,18 @@ Phase P11 (`docs/design/p11-plan.md`) plans them.
 | Cap sequencing | Commercial programs | Sew order from the center out and from the bottom up for caps | ✅ Arrange > Sew order > Cap order; cap frame hint in Design info (ADR 0050) | P11 (7) |
 | Cutwork needles | The programs of machine makers, others | Lines that cutting needles cut, with the needle angle | ◐ Specialty > Cutwork: cut lines by needle angle, a color for each needle (ADR 0051); files not tried on a machine | P11 (8) |
 | Update check | All | The program tells the user that a new version exists | ✅ Help > Check for Updates, and at the start if the user permits it (the installer and the first start ask): the version, its notes and the download page; no download and no install; the help topic What is new (ADR 0109) | P17 (1) |
+| Travel that shows | zigzag | A warning for travel stitches that lie on top of stitches sewn before them | ✅ Design info: the travel that shows and warnings; View > Check > Travel That Shows (ADR 0167) | P22 (1) |
+| Live numbers for trims | zigzag | While the user drags the distance up to which the machine sews across gaps, the trims, the travel that shows and the sew time change, and the canvas marks the new travel | ✅ The trim distance of a design (`Design::trim_gap_mm`), in Quicker to Sew with the numbers before and after (ADR 0169) | P22 (2) |
+| Quicker to sew | zigzag | One window: merge threads that look almost the same, remove small details, sew across small gaps, fewer color changes, with the numbers before and after | ✅ Arrange > Sew Order > Quicker to Sew… (`emb_model::quicker`, ADR 0169) | P22 (2) |
+| Test swatches | zigzag | Copies of the selection in a grid, one setting in steps, each copy with its value as lettering, to sew on the fabric | ✅ Design > Output > Test Swatches…, `emb-cli swatch` (`emb_letter::swatch`, ADR 0170); the sew-out is open | P22 (3) |
+| Satin lean | zigzag | The top stitches of a column lean from square across it by an angle (knits, a look) | ✅ Lean in Object Properties for satin, raised satin and zigzag columns (lettering has the setting in its satin settings for scripts and test swatches, with no field in the window); the underlay does not lean (ADR 0171); the sew-out is open | P22 (4) |
+| Bands of threads across a column | zigzag, Ink/Stitch | More than one thread across one satin column, each in its band | ✅ Edit > Stitch Types > Bands: a group of columns with the same rails, each sews its band, with an overlap; written to Ink/Stitch as columns (ADR 0171); the sew-out is open | P22 (4) |
+| Fix a machine file | zigzag | Check a stitch file and fix it in place: join blocks of the same thread, remove short stitches, split long ones, trim long jumps, add locks | ✅ Warnings in Design info for stitch objects, Edit > Machine Functions > Fix Stitches…, `emb-cli check` and `emb-cli fix` (`emb_art::file_check`, ADR 0172); `tools/check-writers.py` cross-checks the writers with pyembroidery (870 files the same) | P22 (5) |
+| Letter measures checked by eye | zigzag | A set of letters judged by eye, and a check that the measures of the letters agree with it | ✅ The judged set of the 496 letters of the fault bench, the open patch measure and the limits of the eye; `emb-cli letter-faults --judged` (ADR 0173); the owner agrees with 50 of them | P22 (6) |
+| Overlapped strokes in letters | zigzag | At a joint, the stroke that meets a stem goes under it to the middle of the joint and sews first (a trial) | ✗ Measured and not adopted (the owner's choice, ADR 0174): no more clean letters, 51 to 64 % more thread at the joints; on the branch `trial/overlapped-strokes` | P22 (7) |
+| The open tabs come back; one program | zigzag | After a quit the open tabs come back with their changes; a file opens in the program that runs | ✅ Options > Open tabs (a quit asks nothing, the next start opens the tabs with their changes, views and the tab in front) and Options > Files (a file opens in a tab of the program that runs, through the inbox folder of its session; `--new-window`) (ADR 0175) | P22 (8) |
+| AI agents (MCP) | zigzag | The AI agent of the user opens, changes, checks, shows and exports designs through MCP (in `emb-cli`, on standard input and output; no network code) | ✅ `emb-cli mcp` with 26 tools on one design (each change one undo step; checked arguments; `show` opens the design in the program), the File Changed question in the program, `emb-cli` in each package, help topic Agents (ADR 0176); the owner's test with an agent is open | P22 (9) |
+| Send to the Brother Skitch over Bluetooth | zigzag | Send a design to the Skitch PP1, follow the sewing | — Not planned: waits for a tester with a Skitch (open work) | — |
 
 ## 10. Shop tools
 

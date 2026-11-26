@@ -103,6 +103,11 @@ impl Default for Envelope {
 /// The largest amount; more would turn the text inside out (pinch).
 pub const MAX_AMOUNT: f64 = 0.9;
 
+/// The part of the width of an ellipse that the oval envelope uses. A whole
+/// ellipse has vertical ends: the letter at each end got a foot that was
+/// almost along its column, and its stitches fanned there (ADR 0164).
+pub const OVAL_ARC: f64 = 0.9;
+
 impl Envelope {
     pub fn is_none(&self) -> bool {
         self.shape == EnvelopeShape::None || self.amount == 0.0
@@ -130,10 +135,30 @@ impl Envelope {
             EnvelopeShape::Diamond => (a * tri / 2.0, a * tri / 2.0),
             EnvelopeShape::Wave => (a * wave, -a * wave),
             EnvelopeShape::Oval => {
-                let half = (1.0 - (2.0 * u - 1.0).powi(2)).max(0.0).sqrt() - 0.5;
+                // The middle `OVAL_ARC` of an ellipse, made as high as the
+                // whole ellipse: its ends are not vertical, so the letters
+                // at the ends do not shear without limit.
+                let end = (1.0 - OVAL_ARC * OVAL_ARC).sqrt();
+                let t = OVAL_ARC * (2.0 * u - 1.0);
+                let half = ((1.0 - t * t).max(0.0).sqrt() - end) / (1.0 - end) - 0.5;
                 (a * half, a * half)
             }
         }
+    }
+
+    /// The most that the envelope makes the text taller, as a factor (1:
+    /// not taller anywhere): the middle of the oval and the diamond is
+    /// `1 + amount` times as high as the text.
+    pub fn max_stretch(&self) -> f64 {
+        if self.is_none() {
+            return 1.0;
+        }
+        (0..=100)
+            .map(|i| {
+                let (up, down) = self.edges(f64::from(i) / 100.0);
+                1.0 + up + down
+            })
+            .fold(1.0, f64::max)
     }
 
     /// The new top and bottom of box `b` at `x`.
@@ -228,6 +253,16 @@ pub fn map_points(kind: &mut ObjectKind, f: &dyn Fn(Point) -> Point) {
 mod tests {
     use super::*;
 
+    #[test]
+    fn the_most_stretch_of_an_envelope() {
+        let e = |shape, amount| Envelope { shape, amount };
+        assert_eq!(e(EnvelopeShape::None, 0.5).max_stretch(), 1.0);
+        assert!((e(EnvelopeShape::Oval, 0.45).max_stretch() - 1.45).abs() < 1e-9);
+        assert!((e(EnvelopeShape::Diamond, 0.6).max_stretch() - 1.6).abs() < 1e-9);
+        // An envelope that makes the text only smaller: 1.
+        assert_eq!(e(EnvelopeShape::Pinch, 0.5).max_stretch(), 1.0);
+    }
+
     fn bx() -> BBox {
         BBox::new(Point::new(0.0, -10.0), Point::new(100.0, 0.0))
     }
@@ -257,6 +292,25 @@ mod tests {
             }
         }
         assert!(Envelope::default().is_none());
+    }
+
+    /// The ends of the oval are not vertical (ADR 0164): the edges move a
+    /// limited amount near the ends, and as far as before in the middle and
+    /// at the ends.
+    #[test]
+    fn the_oval_has_no_vertical_ends() {
+        let e = Envelope {
+            shape: EnvelopeShape::Oval,
+            amount: 0.5,
+        };
+        let (end, _) = e.edges(0.0);
+        let (middle, _) = e.edges(0.5);
+        assert!(
+            (end - -0.25).abs() < 1e-9 && (middle - 0.25).abs() < 1e-9,
+            "{end} {middle}"
+        );
+        let slope = (e.edges(0.001).0 - end) / 0.001;
+        assert!(slope < 4.0, "{slope}");
     }
 
     #[test]

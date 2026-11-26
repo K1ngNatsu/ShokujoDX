@@ -1,0 +1,36 @@
+# The steps of "Tutorial: sew order, trims and travel"
+# (tutorial-sew-order.md). The test each_tutorial_runs_in_each_language
+# (crates/emb-app/src/tutorial_steps.rs) does them in each language;
+# write_tutorial_pictures makes the pictures. A change of a step needs the
+# same change in the topic and its translations.
+
+# Open the start design: six dots, red and blue, one after the other.
+[[step]]
+item = ["Open the start design", 1]
+open = "sew-order"
+expect = { objects = 6, colors = 6, trims = 6 }
+
+[[step]]
+item = ["Open the start design", 3]
+command = "View > Show > Jumps"
+expect = { on = "View > Show > Jumps" }
+
+[[step]]
+picture = "sew-order-before"
+around = [[-45.0, -30.0], [45.0, 30.0]]
+
+# Fewer color changes.
+[[step]]
+item = ["Fewer color changes", 0]
+command = "Arrange > Sew Order > Fewer Color Changes"
+expect = { colors = 2, trims = 6 }
+
+# A shorter order.
+[[step]]
+item = ["A shorter way", 0]
+command = "Arrange > Sew Order > Shortest Order"
+expect = { colors = 2, trims = 6 }
+
+[[step]]
+picture = "sew-order-after"
+around = [[-45.0, -30.0], [45.0, 30.0]]

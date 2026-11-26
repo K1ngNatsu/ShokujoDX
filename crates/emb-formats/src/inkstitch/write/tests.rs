@@ -436,3 +436,55 @@ fn numbers_are_short() {
     assert_eq!(num(-0.00001), "0");
     assert_eq!(num(12.345678), "12.3457");
 }
+
+#[test]
+fn the_bands_of_a_column_are_columns_with_the_rails_of_their_band() {
+    let mut d = Design::new("bands");
+    let kind = |index: u32, lean_deg: f64| ObjectKind::Satin {
+        geometry: SatinGeometry {
+            rail_a: Path::new().move_to(Point::new(0.0, 0.0)).line_to(Point::new(0.0, 30.0)),
+            rail_b: Path::new().move_to(Point::new(4.0, 0.0)).line_to(Point::new(4.0, 30.0)),
+            rungs: Vec::new(),
+        },
+        params: SatinParams {
+            pull_compensation_mm: 0.2,
+            band: Some(emb_model::ColumnBand {
+                index,
+                count: 2,
+                overlap_mm: 0.0,
+            }),
+            lean_deg,
+            ..SatinParams::default()
+        },
+    };
+    add(&mut d, Rgb(200, 0, 0), kind(0, 0.0));
+    add(&mut d, Rgb(0, 0, 200), kind(1, 10.0));
+    let (w, back) = round_trip(&d);
+    assert_eq!(back.objects.len(), 2, "{}", w.svg);
+    let rails = |k: usize| {
+        let ObjectKind::Satin { geometry, params } = &back.objects[k].kind else {
+            panic!("{:?}", back.objects[k].kind)
+        };
+        let a: Vec<Point> = geometry.rail_a.points().collect();
+        let b: Vec<Point> = geometry.rail_b.points().collect();
+        (
+            a[0],
+            b[0],
+            params.pull_compensation_mm,
+            params.pull_b_mm.unwrap_or(params.pull_compensation_mm),
+        )
+    };
+    let (a0, b0, pull_a0, pull_b0) = rails(0);
+    let (a1, b1, pull_a1, pull_b1) = rails(1);
+    // Each band is half of the width, and the bands meet.
+    assert!(
+        close(b0.x - a0.x, 2.0) && close(b1.x - a1.x, 2.0),
+        "{a0:?} {b0:?} {a1:?} {b1:?}"
+    );
+    assert!(near(b0, a1));
+    // Pull compensation only out at the sides of the column.
+    assert!(close(pull_a0, 0.2) && close(pull_b0, 0.0), "{pull_a0} {pull_b0}");
+    assert!(close(pull_a1, 0.0) && close(pull_b1, 0.2), "{pull_a1} {pull_b1}");
+    // Ink/Stitch has no lean.
+    assert!(w.warnings.iter().any(|t| t.contains("Lean")), "{:?}", w.warnings);
+}

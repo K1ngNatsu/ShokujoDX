@@ -668,6 +668,13 @@ impl Writer<'_> {
         indent: &str,
         last: bool,
     ) -> Vec<String> {
+        // A band of a column (P22 Milestone 4) is a column with the rails
+        // of its band.
+        let band = p.active_band();
+        let band_geometry = band.and_then(|b| g.band(&b));
+        let band_params = band.map(|b| p.banded(&b));
+        let g = band_geometry.as_ref().unwrap_or(g);
+        let p = band_params.as_ref().unwrap_or(p);
         let mut params: Params = vec![("satin_column", "true".into())];
         self.column_params(p, &mut params);
         self.satin_underlay(kind, &mut params);
@@ -715,6 +722,7 @@ impl Writer<'_> {
             (p.hand_mm > 0.0, text::tr("Hand-stitch effect")),
             (p.puff, text::tr("Puff")),
             (p.omit_last, text::tr("Omit the last stitch")),
+            (p.lean_deg.abs() > 1e-9, text::tr("Lean")),
             (p.auto_jump, text::tr("Auto jump")),
             ((p.spacing_at - 0.5).abs() > 1e-9, text::tr("Fractional spacing")),
         ] {

@@ -507,13 +507,13 @@ pub const PANELS: [(Tab, &str); 9] = [
 /// The panels of simple mode.
 pub const SIMPLE_PANELS: [Tab; 5] = [Tab::Properties, Tab::Sequence, Tab::Threads, Tab::Library, Tab::Exports];
 
-/// The panels that go together when a closed panel opens again.
+/// The panels that go together when a closed panel opens again: its group
+/// of side panels (`app::SIDE_GROUPS`), or the canvas and the Library.
 pub fn panel_group(tab: Tab) -> &'static [Tab] {
-    if crate::app::SIDE_PANELS.contains(&tab) {
-        &crate::app::SIDE_PANELS
-    } else {
-        &[Tab::Canvas, Tab::Library]
-    }
+    crate::app::SIDE_GROUPS
+        .into_iter()
+        .find(|g| g.contains(&tab))
+        .unwrap_or(&[Tab::Canvas, Tab::Library])
 }
 
 /// The most favorite styles.
@@ -576,7 +576,7 @@ pub fn sync_panels(dock: &mut egui_dock::DockState<Tab>, st: &mut AppState, side
             st.set_panel_shown(tab, true);
         }
         // A command that shows a side panel shows the side panels.
-        if flag && crate::app::SIDE_PANELS.contains(&tab) {
+        if flag && crate::app::is_side_panel(tab) {
             st.side_hidden = false;
         }
     }
@@ -584,19 +584,37 @@ pub fn sync_panels(dock: &mut egui_dock::DockState<Tab>, st: &mut AppState, side
         // Simple mode shows the panels of the simple tasks only.
         let simple_hides = st.settings.simple_mode && !SIMPLE_PANELS.contains(&tab);
         // The Library is a tab next to the design, not a side panel.
-        let side_hides = side_hidden && crate::app::SIDE_PANELS.contains(&tab);
+        let side_hides = side_hidden && crate::app::is_side_panel(tab);
         match (st.panel_shown(tab) && !simple_hides && !side_hides, dock.find_tab(&tab)) {
             (false, Some(p)) => {
                 dock.remove_tab(p);
             }
             (true, None) => {
+                // With its group; if all of it is closed, its group again
+                // over or under the other side panels (not in their tab
+                // bar: the titles of a group fit a small screen); else on
+                // its own right of the canvas.
+                let groups = crate::app::SIDE_GROUPS;
                 let near = panel_group(tab)
                     .iter()
                     .filter(|t| **t != tab)
                     .find_map(|t| dock.find_tab(t));
-                match near {
-                    Some(p) => dock[p.surface][p.node].append_tab(tab),
-                    None => {
+                let first = groups[0].contains(&tab);
+                let other = if first { groups[1] } else { groups[0] };
+                let side = groups.iter().any(|g| g.contains(&tab));
+                match (
+                    near,
+                    side.then(|| other.iter().find_map(|t| dock.find_tab(t))).flatten(),
+                ) {
+                    (Some(p), _) => dock[p.surface][p.node].append_tab(tab),
+                    (None, Some(p)) if st.panels_below => dock[p.surface][p.node].append_tab(tab),
+                    (None, Some(p)) if first => {
+                        dock[p.surface].split_above(p.node, 1.0 - crate::app::FIRST_GROUP_PART, vec![tab]);
+                    }
+                    (None, Some(p)) => {
+                        dock[p.surface].split_below(p.node, crate::app::FIRST_GROUP_PART, vec![tab]);
+                    }
+                    (None, None) => {
                         if let Some(p) = dock.find_tab(&Tab::Canvas) {
                             if st.panels_below {
                                 dock[p.surface].split_below(p.node, crate::app::CANVAS_PART_ABOVE, vec![tab]);
@@ -981,10 +999,11 @@ mod tests {
         let mut h = Harness::empty();
         h.st.save_settings = false;
         let mut dock = crate::app::default_dock();
-        // The side panels are one group at the start, and they are the
-        // panels of View > Panels with no Library (it is next to the design).
-        assert!(crate::test_util::one_side_group(&dock));
-        let mut side = crate::app::SIDE_PANELS.to_vec();
+        // The side panels are in their two groups at the start, and they
+        // are the panels of View > Panels with no Library (it is next to
+        // the design).
+        assert!(crate::test_util::side_groups(&dock));
+        let mut side = crate::app::SIDE_GROUPS.concat();
         side.push(Tab::Library);
         assert!(PANELS.iter().all(|(t, _)| side.contains(t)) && side.len() == PANELS.len());
         h.st.set_panel_shown(Tab::Threads, false);
@@ -994,13 +1013,15 @@ mod tests {
         h.st.set_panel_shown(Tab::Threads, true);
         assert_eq!(h.st.focus_tab, Some(Tab::Threads));
         sync_panels(&mut dock, &mut h.st, false);
-        // Back with its group, next to the Sequence panel.
+        // Back with its group, next to the Object Properties panel.
         let (t, s) = (
             dock.find_tab(&Tab::Threads).unwrap(),
-            dock.find_tab(&Tab::Sequence).unwrap(),
+            dock.find_tab(&Tab::Properties).unwrap(),
         );
         assert_eq!((t.surface, t.node), (s.surface, s.node));
-        // All of the group closed: a panel opens on its own right of the canvas.
+        // All of the group closed: a panel of it opens as its group again,
+        // over the other side panels (not in their tab bar; the audit of
+        // 2026-11-26).
         for tab in panel_group(Tab::Properties) {
             h.st.set_panel_shown(*tab, false);
         }
@@ -1009,10 +1030,27 @@ mod tests {
         // A command that shows a closed panel opens it.
         h.st.focus_styles = true;
         sync_panels(&mut dock, &mut h.st, false);
-        assert!(dock.find_tab(&Tab::Styles).is_some());
+        let (t, s) = (
+            dock.find_tab(&Tab::Styles).unwrap(),
+            dock.find_tab(&Tab::Sequence).unwrap(),
+        );
+        assert_ne!((t.surface, t.node), (s.surface, s.node));
         assert!(h.st.panel_shown(Tab::Styles));
-        h.st.set_panel_shown(Tab::Threads, true);
+        for tab in panel_group(Tab::Properties) {
+            h.st.set_panel_shown(*tab, true);
+        }
         sync_panels(&mut dock, &mut h.st, false);
+        assert!(crate::test_util::side_groups(&dock), "the two groups again");
+        // The same for the second group.
+        for tab in panel_group(Tab::Sequence) {
+            h.st.set_panel_shown(*tab, false);
+        }
+        sync_panels(&mut dock, &mut h.st, false);
+        for tab in panel_group(Tab::Sequence) {
+            h.st.set_panel_shown(*tab, true);
+        }
+        sync_panels(&mut dock, &mut h.st, false);
+        assert!(crate::test_util::side_groups(&dock), "the two groups again");
         // Simple mode hides the panels that it does not need, and shows them again after.
         h.st.settings.simple_mode = true;
         sync_panels(&mut dock, &mut h.st, false);

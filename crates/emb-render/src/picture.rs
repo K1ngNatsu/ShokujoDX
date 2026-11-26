@@ -322,15 +322,25 @@ pub fn design_picture(
 ) -> Picture {
     let segments = crate::segments(stitches);
     let areas = crate::sheet::picture_areas(design);
+    // The whole design in at most `MAX_PICTURE_SIDE` pixels on a side: a
+    // design with objects 800 m apart made a picture of 8 million pixels
+    // on a side at 10 pixels for each mm (the audit of 2026-11-26).
+    let area = area_of(&segments, &areas, margin_mm + 0.4);
+    let px_per_mm = area.map_or(px_per_mm, |b| {
+        px_per_mm.min(f64::from(MAX_PICTURE_SIDE) / b.width().max(b.height()).max(1e-9))
+    });
     if look.lighting.is_none() {
         return crate::raster::picture_look(&segments, &areas, px_per_mm, 0.4, margin_mm, background, look);
     }
     let e = Embroidery::of_design(design, stitches, spans, ground);
-    let b = area_of(&segments, &areas, margin_mm + 0.4)
+    let b = area
         .or_else(|| e.bounds())
         .unwrap_or(BBox::new(Point::ZERO, Point::new(1.0, 1.0)));
     e.picture(b, px_per_mm, look, background, FULL_DETAIL, &|_| true)
 }
+
+/// The most pixels on a side of a design picture.
+pub const MAX_PICTURE_SIDE: u32 = 16_384;
 
 /// The area of the stitch segments `segments` and of `areas` with a margin
 /// of `margin_mm`, as `raster::picture_look` (the size of a design picture).
@@ -490,5 +500,29 @@ mod tests {
         assert_eq!(p.rgba[3], 0, "a corner is clear");
         let mid = ((16 * p.width + 36) * 4 + 3) as usize;
         assert_eq!(p.rgba[mid], 255, "a stitch is not");
+    }
+
+    /// A design with stitches 800 m apart: its picture has the whole design
+    /// in at most `MAX_PICTURE_SIDE` pixels on a side (the audit of
+    /// 2026-11-26), with the flat look and the 3D look.
+    #[test]
+    fn a_very_wide_design_is_all_in_its_picture() {
+        let stitches = emb_model::StitchDesign {
+            records: [-400_000.0, -399_990.0, 400_000.0, 400_010.0]
+                .into_iter()
+                .map(|x| emb_model::StitchRecord::stitch(x, 0.0))
+                .collect(),
+            ..Default::default()
+        };
+        let d = emb_model::Design::new("Wide");
+        for look in [Look::default(), Look::three_d(None)] {
+            let p = design_picture(&d, &stitches, std::iter::empty(), None, 10.0, 2.0, None, &look);
+            assert!(
+                p.width <= MAX_PICTURE_SIDE && p.width > MAX_PICTURE_SIDE - 4,
+                "{}",
+                p.width
+            );
+            assert!(p.height <= 4, "{}", p.height);
+        }
     }
 }

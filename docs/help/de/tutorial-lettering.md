@@ -6,31 +6,47 @@ keywords: anleitung, schrift, text, name, schriftart, bogen, kreis, grundlinie, 
 ---
 # Anleitung: ein Name auf einem Bogen
 
-In dieser Anleitung setzen Sie einen Namen auf einen Bogen, ändern die
-Schrift und verschieben einen Buchstaben.
+In dieser Anleitung setzen Sie einen Namen auf einen Bogen, legen seine
+Größe und seinen Bogen fest und lernen, wie Sie einen Buchstaben ändern.
 
 ## Die Schrift hinzufügen
 
-1. Klicken Sie auf dem Tab **Schrift** auf **Schrift**.
-2. Klicken Sie auf der Arbeitsfläche dort, wo der Text beginnt.
-3. Tippen Sie den Namen in das Schrift-Fenster.
-4. Wählen Sie eine Schrift. Die Liste zeigt eine Vorschau und den
-   Größenbereich jeder Schrift. Stickschriften sticken sich in ihrem
-   Größenbereich am besten.
-5. Legen Sie die **Höhe** fest, zum Beispiel 25 mm.
-6. Klicken Sie auf **OK**.
+1. Klicken Sie auf [Das Startdesign öffnen](sample:lettering-start). Ein
+   Konstruktionspunkt zeigt, wo der Name beginnt.
+2. Klicken Sie auf **Schrift > Schrift > Schrift**.
+3. Klicken Sie auf den Konstruktionspunkt. Das Fenster **Schrift** öffnet
+   sich.
+4. Tippen Sie den Namen, zum Beispiel `Anna`. Der Name zeigt sich auf der
+   Arbeitsfläche, während Sie tippen.
+5. Behalten Sie die Schrift **Block Sans**, oder wählen Sie eine andere
+   Schrift in der Liste. Die Liste zeigt eine Vorschau, den Größenbereich
+   und die Qualitätswertung jeder Schrift. Stickschriften sticken sich in
+   ihrem Größenbereich am besten.
+6. Setzen Sie die **Höhe** auf 25 mm. Das ist die Höhe der
+   Großbuchstaben.
+7. Klicken Sie auf **OK**. Die Schrift ist ausgewählt.
+
+![Das Fenster Schrift](lettering-window)
 
 ## Den Namen auf einen Bogen setzen
 
-1. Wählen Sie die Schrift aus.
-2. Setzen Sie in den Objekteigenschaften die **Grundlinie** auf **Bogen
-   oben** (der Text ist oben auf einem Kreis) oder **Bogen unten** (der Text
-   ist darunter).
-3. Legen Sie den **Radius** fest, um den Bogen flacher (größer) oder runder
-   (kleiner) zu machen.
+1. Setzen Sie in den Objekteigenschaften die **Grundlinie** auf
+   **Bogen oben**: Der Name ist oben auf einem Kreis. (**Bogen unten**
+   setzt ihn unter einen Kreis.)
+2. Setzen Sie den **Radius** auf 80 mm. Ein größerer Radius macht den
+   Bogen flacher, ein kleinerer macht ihn runder.
+3. Drücken Sie **Esc**, klicken Sie dann auf **Ansicht > Zeigen >
+   Garnansicht**, und wählen Sie **Garnansicht** in ihrem Menü.
+
+![Der Name auf einem Bogen](lettering-arc)
+
+Machen Sie den Bogen für die Höhe nicht zu rund: Die Füße der Buchstaben
+kommen sich nahe, und das Garn häuft sich dort an. Die Designinfo zeigt
+dann eine Warnung.
 
 **Schrift auf Linie** setzt den Text auf eine Linie, die Sie zeichnen:
-Wählen Sie die Schrift und die Linie aus, dann benutzen Sie den Befehl.
+Wählen Sie die Schrift und die Linie aus, und klicken Sie dann auf
+**Schrift > Schrift > Schrift auf Linie**.
 
 ## Die Größe und den Abstand ändern
 
@@ -38,20 +54,22 @@ Wählen Sie die Schrift und die Linie aus, dann benutzen Sie den Befehl.
   **Höhe** in den Objekteigenschaften. Oder ziehen Sie an einem Eckgriff
   der Auswahl.
 - **Buchstabenabstand** ändert den Abstand zwischen allen Buchstaben.
-- Um einen Buchstaben zu verschieben, klicken Sie auf **Umformen** und
-  klicken Sie auf den Buchstaben. Ziehen Sie den Buchstaben, oder ändern
-  Sie seinen Abstand und seinen Winkel in den Objekteigenschaften.
+- Um einen Buchstaben zu verschieben, klicken Sie auf **Digitalisieren >
+  Auswählen > Umformen** und klicken Sie auf den Buchstaben. Ziehen Sie
+  den Buchstaben, oder ändern Sie seinen Abstand und seinen Winkel in den
+  Objekteigenschaften.
 
 ## Den Text bearbeiten
 
 Doppelklicken Sie auf die Schrift, oder klicken Sie mit der rechten
 Maustaste darauf und wählen Sie **Text bearbeiten…**. Esc schließt das
-Schrift-Fenster ohne Änderung.
+Fenster Schrift ohne Änderung.
 
 ## Der Schrift-Kiosk
 
 Der Kiosk ist ein großer Bildschirm für ein Geschäft. Klicken Sie auf
-**Schrift > Schrift-Kiosk** (oder auf den Link auf der Startseite).
+**Schrift > Personalisieren > Schrift-Kiosk** (oder auf den Link auf der
+Startseite).
 
 1. **Produkt**: Wählen Sie das Produkt, seine Farbe und die Stelle des
    Designs. Das Produkt legt den Stoff fest, damit die Stiche passen.
@@ -76,11 +94,18 @@ seiner Verknüpfung hinzu, zum Beispiel `"ShokujoDX.exe" --kiosk`.
   Ornamenten.
 - **Teamnamen** erstellt ein Design mit einem anderen Namen in jeder
   Kopie.
-- **Schriften** öffnet die Schriftliste (68 Stickschriften, jede mit einer Qualitätswertung, kommen mit
-  dem Programm). Wandeln Sie dort eine TrueType- oder OpenType-Schrift in
-  eine Stickschrift um.
+- **Schriften** öffnet die Schriftliste (68 Stickschriften kommen mit dem
+  Programm, jede mit einer Qualitätswertung). Wandeln Sie dort eine
+  TrueType- oder OpenType-Schrift in eine Stickschrift um.
+
+## Wenn es nicht richtig aussieht
+
+- **Die Statuszeile zeigt nach dem Bogen eine Warnung.** Der Bogen ist zu
+  rund. Vergrößern Sie den **Radius**.
+- **OK ist grau.** Das Fenster ist leer: Tippen Sie zuerst den Namen.
+- **Dünne Säulen, oder Teile fehlen.** Siehe Schritt 5 oben.
 
 ## Weiter
 
-- [Schrift und Monogramme](lettering): alle Einstellungen der Schrift
 - [Anleitung: ein Monogramm auf einem Handtuch](tutorial-towel)
+- [Schrift und Monogramme](lettering): alle Einstellungen der Schrift

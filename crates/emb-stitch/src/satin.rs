@@ -10,9 +10,20 @@
 //!   of the two rail parts. It is the distance between two needle points on
 //!   the same side, so the thread crosses the column every half spacing.
 //! - Pull compensation makes each stitch longer at both ends.
-//! - Short stitches: where needle points on one side are nearer than
-//!   [`SHORT_DIST_MM`] (the inside of a tight curve), every second stitch on
-//!   that side ends [`SHORT_INSET`] of the width before the rail.
+//! - Short stitches: where the stitches on one side are nearer than
+//!   [`SHORT_DIST_MM`] (the inside of a tight curve, or a side that the
+//!   stitches meet at a small angle), every second stitch on that side
+//!   ends [`SHORT_INSET`] of the width before the rail. The distance is
+//!   from a needle point to the line of the pair two before it (ADR 0180).
+//! - Stitches that run almost along the column (the end of a column bent
+//!   by an envelope, where a side turns toward the stitches) come close
+//!   together across the stitches, also when they are `step` apart along
+//!   the middle. There a pair is left out while the pair after it is not
+//!   farther than one step across the stitches from the pair before it
+//!   ([`thin_across`], ADR 0180). Where the pairs are more than half a
+//!   step apart across the stitches, they do not change, but where a stitch
+//!   runs almost along a side (less than 25°), the pairs that stay are 1 to
+//!   1.5 steps apart where they were half a step apart (ADR 0181).
 //! - Auto split: a stitch longer than `split_mm` (default 7 mm) gets needle points
 //!   along it. Their positions change from stitch to stitch, so they do not
 //!   make a line.
@@ -25,10 +36,15 @@ use emb_model::{SatinGeometry, SatinParams, Underlay, UnderlayLayer};
 use crate::object::FLATTEN_TOL_MM;
 use crate::running;
 
-/// Needle points on one side nearer than this make short stitches.
+/// Stitches on one side nearer than this make short stitches: the distance
+/// from a needle point to the line of the pair two before it.
 pub const SHORT_DIST_MM: f64 = 0.25;
 /// A short stitch ends this fraction of the column width before the rail.
 pub const SHORT_INSET: f64 = 0.15;
+/// The underlay of a column of a letter stops this far before another
+/// part of the letter, in mm: the top stitches of that part go past its
+/// outline (pull compensation), and a joint is not a sharp line (ADR 0163).
+pub const JOINT_MARGIN_MM: f64 = 1.0;
 /// Smallest split length that the generator accepts, in mm.
 pub const MIN_SPLIT_MM: f64 = 1.0;
 /// The liquid effect samples the rails this often, in mm.
@@ -46,9 +62,12 @@ const AUTO_INSET_MM: f64 = 0.4;
 /// two rungs.
 const UNTANGLE_MAX_PAIRS: f64 = 20_000.0;
 const AUTO_ZIGZAG_SPACING_MM: f64 = 2.0;
+/// The distance of the pairs of a leaned column, along the rails, mm.
+const LEAN_STEP_MM: f64 = 0.5;
 const HEAVY_ZIGZAG_SPACING_MM: f64 = 1.2;
 
 /// A rail flattened to a polyline, with the length along it at each point.
+#[derive(Clone)]
 struct Rail {
     pts: Vec<Point>,
     at_len: Vec<f64>,
@@ -182,37 +201,11 @@ impl Column {
     /// Point pairs across the column, about `step` apart along the middle,
     /// from the start to the end. The first and last pairs are the rail ends.
     pub fn pairs(&self, step: f64) -> Vec<(Point, Point)> {
+        if self.even {
+            return self.even_pairs(step);
+        }
         let step = step.max(0.05);
         let mut out = vec![(self.a.at(0.0), self.b.at(0.0))];
-        if self.even {
-            // The middle length at each rung, then pairs at even steps of it.
-            let mut mid = vec![0.0];
-            for w in self.rungs.windows(2) {
-                let d = if self.across {
-                    let (a0, b0) = (self.a.at(w[0].0), self.b.at(w[0].1));
-                    let m1 = self.a.at(w[1].0).midpoint(self.b.at(w[1].1));
-                    let r = b0 - a0;
-                    match r.normalized() {
-                        Some(u) => u.cross(m1 - a0).abs(),
-                        None => a0.distance(m1),
-                    }
-                } else {
-                    ((w[1].0 - w[0].0) + (w[1].1 - w[0].1)) / 2.0
-                };
-                mid.push(mid[mid.len() - 1] + d);
-            }
-            let total = mid[mid.len() - 1];
-            let n = (total / step).round().max(1.0) as usize;
-            for q in 1..=n {
-                let m = total * q as f64 / n as f64;
-                let j = mid.partition_point(|&l| l <= m).clamp(1, mid.len() - 1);
-                let seg = mid[j] - mid[j - 1];
-                let f = if seg > 0.0 { (m - mid[j - 1]) / seg } else { 0.0 };
-                let (r0, r1) = (self.rungs[j - 1], self.rungs[j]);
-                out.push((self.a.at(r0.0 + f * (r1.0 - r0.0)), self.b.at(r0.1 + f * (r1.1 - r0.1))));
-            }
-            return out;
-        }
         for w in self.rungs.windows(2) {
             let (la, lb) = (w[1].0 - w[0].0, w[1].1 - w[0].1);
             let n = ((la + lb) / 2.0 / step).round().max(1.0) as usize;
@@ -220,6 +213,42 @@ impl Column {
                 let f = q as f64 / n as f64;
                 out.push((self.a.at(w[0].0 + f * la), self.b.at(w[0].1 + f * lb)));
             }
+        }
+        out
+    }
+
+    /// As [`Column::pairs`], at even steps of the middle length over the
+    /// whole column: not a pair at each rung. Where rungs come close (the
+    /// pivots of a column that turns), the pairs do not crowd. The
+    /// underlay uses these pairs (ADR 0163).
+    pub fn even_pairs(&self, step: f64) -> Vec<(Point, Point)> {
+        let step = step.max(0.05);
+        let mut out = vec![(self.a.at(0.0), self.b.at(0.0))];
+        // The middle length at each rung, then pairs at even steps of it.
+        let mut mid = vec![0.0];
+        for w in self.rungs.windows(2) {
+            let d = if self.across {
+                let (a0, b0) = (self.a.at(w[0].0), self.b.at(w[0].1));
+                let m1 = self.a.at(w[1].0).midpoint(self.b.at(w[1].1));
+                let r = b0 - a0;
+                match r.normalized() {
+                    Some(u) => u.cross(m1 - a0).abs(),
+                    None => a0.distance(m1),
+                }
+            } else {
+                ((w[1].0 - w[0].0) + (w[1].1 - w[0].1)) / 2.0
+            };
+            mid.push(mid[mid.len() - 1] + d);
+        }
+        let total = mid[mid.len() - 1];
+        let n = (total / step).round().max(1.0) as usize;
+        for q in 1..=n {
+            let m = total * q as f64 / n as f64;
+            let j = mid.partition_point(|&l| l <= m).clamp(1, mid.len() - 1);
+            let seg = mid[j] - mid[j - 1];
+            let f = if seg > 0.0 { (m - mid[j - 1]) / seg } else { 0.0 };
+            let (r0, r1) = (self.rungs[j - 1], self.rungs[j]);
+            out.push((self.a.at(r0.0 + f * (r1.0 - r0.0)), self.b.at(r0.1 + f * (r1.1 - r0.1))));
         }
         out
     }
@@ -342,6 +371,43 @@ impl Column {
         rungs.push((la, lb));
         self.rungs = rungs;
         self.even = true;
+    }
+
+    /// The column with its top stitches at `lean_deg` from square (P22
+    /// Milestone 4, ADR 0171): pairs about [`LEAN_STEP_MM`] apart, each with
+    /// its point on rail B moved along rail B by the width there times the
+    /// tangent of the lean. Near an end the moved point stops at the end of
+    /// rail B: the stitches there fan from the corner, and no needle point
+    /// goes out of the column. The ends of the column stay.
+    pub fn leaned(&self, lean_deg: f64) -> Column {
+        let (s, c) = emb_geom::math::sin_cos_deg(
+            lean_deg.clamp(-emb_model::object::MAX_LEAN_DEG, emb_model::object::MAX_LEAN_DEG),
+        );
+        let tan = s / c;
+        let (la, lb) = (self.a.len(), self.b.len());
+        let mut rungs = vec![(0.0, 0.0)];
+        for w in self.rungs.windows(2) {
+            let (da, db) = (w[1].0 - w[0].0, w[1].1 - w[0].1);
+            let n = ((da + db) / 2.0 / LEAN_STEP_MM).ceil().max(1.0) as usize;
+            for q in 1..=n {
+                let f = q as f64 / n as f64;
+                let (sa, sb) = (w[0].0 + f * da, w[0].1 + f * db);
+                let width = self.a.at(sa).distance(self.b.at(sb));
+                let moved = (sb + width * tan).clamp(0.0, lb);
+                let last = rungs[rungs.len() - 1];
+                if sa > last.0 + 1e-6 && moved > last.1 + 1e-6 && sa < la - 1e-6 && moved < lb - 1e-6 {
+                    rungs.push((sa, moved));
+                }
+            }
+        }
+        rungs.push((la, lb));
+        Column {
+            a: self.a.clone(),
+            b: self.b.clone(),
+            rungs,
+            even: true,
+            across: false,
+        }
     }
 
     /// Mean distance between the rails.
@@ -493,20 +559,21 @@ pub fn underlay_layers(u: &Underlay, mean_width: f64) -> Vec<UnderlayLayer> {
 fn underlay_layer(col: &Column, layer: &UnderlayLayer) -> Vec<Point> {
     match *layer {
         UnderlayLayer::CenterWalk => {
-            let mids: Vec<Point> = col.pairs(0.5).iter().map(|(a, b)| a.midpoint(*b)).collect();
+            let mids: Vec<Point> = col.even_pairs(0.5).iter().map(|(a, b)| a.midpoint(*b)).collect();
             let mut pts = walk(mids);
             let back: Vec<Point> = pts.iter().rev().skip(1).copied().collect();
             pts.extend(back);
             pts
         }
         UnderlayLayer::EdgeWalk { inset_mm } => {
-            let pairs = inset_pairs(&col.pairs(0.5), inset_mm);
+            let pairs = inset_pairs(&col.even_pairs(0.5), inset_mm);
             let mut pts = walk(pairs.iter().map(|p| p.0).collect());
             pts.extend(walk(pairs.iter().rev().map(|p| p.1).collect()));
             pts
         }
         UnderlayLayer::Zigzag { inset_mm, spacing_mm } => {
-            let pairs = inset_pairs(&col.pairs(spacing_mm.max(0.2) / 2.0), inset_mm);
+            let step = spacing_mm.max(0.2) / 2.0;
+            let pairs = inset_pairs(&thin_across(col.even_pairs(step), step), inset_mm);
             let mut pts: Vec<Point> = pairs
                 .iter()
                 .enumerate()
@@ -527,6 +594,72 @@ fn underlay_layer(col: &Column, layer: &UnderlayLayer) -> Vec<Point> {
     }
 }
 
+/// The sine of the largest angle between a stitch and a side of the column
+/// at which the stitch runs almost along the side (25°).
+const ALONG_SIDE_SIN: f64 = 0.4226;
+/// Where a stitch runs almost along a side (the cap of a wide column end at
+/// a corner), the pairs that stay can be this many steps apart across the
+/// stitches (ADR 0181). The pairs that stay are from `ALONG_SIDE_GAP - a`
+/// to `ALONG_SIDE_GAP` steps apart, where `a` is the distance across of
+/// two pairs that follow: for pairs half a step apart, 1 to 1.5 steps (in
+/// the middle of the column: one step).
+const ALONG_SIDE_GAP: f64 = 1.5;
+
+/// The pairs of a column, made `step` apart, without those that the
+/// stitches do not need (ADR 0180): where the stitches run almost along
+/// the column, pairs that are one step apart along the middle are much
+/// closer across the stitches, and the thread builds up. A pair is left
+/// out when the pair after it is not farther across the stitches from the
+/// last pair that stays than the step of the pairs there (the distance of
+/// the middles of the pair and the pair after it, not more than `step`:
+/// the spacing effects make pairs closer, and the pairs of a column fill
+/// are `step` apart across the stitches already). So the pairs that stay
+/// are not farther apart across the stitches than one step. The distance
+/// of two pairs across the stitches is the larger of the distances from
+/// the middle of each to the line of the other. Where the pairs are more
+/// than half a step apart across the stitches (all columns with stitches
+/// across them), no pair is left out. Where a stitch runs almost along a
+/// side of the column ([`ALONG_SIDE_SIN`]: the cap of a wide column end
+/// that the tuning took to a corner), the pairs that stay can be
+/// [`ALONG_SIDE_GAP`] steps apart (ADR 0181): pairs that are half a step
+/// apart across the stitches there stay 1 to 1.5 steps apart. A column
+/// whose stitches meet both sides at 25° or more (also one slanted 60°
+/// from square all along) keeps its pairs; a column slanted more than 65°
+/// all along sews up to 1.5 times lighter than its spacing. The first and
+/// the last pair stay.
+pub(crate) fn thin_across(pairs: Vec<(Point, Point)>, step: f64) -> Vec<(Point, Point)> {
+    if pairs.len() < 3 {
+        return pairs;
+    }
+    let mid = |p: &(Point, Point)| p.0.midpoint(p.1);
+    let to_line = |p: &(Point, Point), m: Point| match (p.1 - p.0).normalized() {
+        Some(u) => u.cross(m - p.0).abs(),
+        None => p.0.distance(m),
+    };
+    let across = |p: &(Point, Point), q: &(Point, Point)| to_line(p, mid(q)).max(to_line(q, mid(p)));
+    // The stitch of pair `i` runs almost along a side: the sine of its angle
+    // with the side (from the pairs before and after it) is small.
+    let along_side = |i: usize| {
+        let (p, q, r) = (pairs[i - 1], pairs[i], pairs[i + 1]);
+        let Some(u) = (q.1 - q.0).normalized() else {
+            return false;
+        };
+        let sin_to = |d: Point| d.normalized().is_some_and(|d| u.cross(d).abs() < ALONG_SIDE_SIN);
+        sin_to(r.0 - p.0) || sin_to(r.1 - p.1)
+    };
+    let mut out = Vec::with_capacity(pairs.len());
+    out.push(pairs[0]);
+    for i in 1..pairs.len() - 1 {
+        let (pr, next) = (&pairs[i], &pairs[i + 1]);
+        let gap = if along_side(i) { ALONG_SIDE_GAP } else { 1.0 };
+        if across(&out[out.len() - 1], next) >= gap * mid(pr).distance(mid(next)).min(step) {
+            out.push(*pr);
+        }
+    }
+    out.push(pairs[pairs.len() - 1]);
+    out
+}
+
 /// Satin top stitching: zigzag through `pairs` (one needle point a pair, sides
 /// in turn) from the first pair to the last.
 pub(crate) fn satin_top(pairs: &[(Point, Point)], p: &SatinParams) -> Vec<Point> {
@@ -534,6 +667,19 @@ pub(crate) fn satin_top(pairs: &[(Point, Point)], p: &SatinParams) -> Vec<Point>
     let n = pairs.len();
     // Needle point on the side of stitch j, before compensation.
     let side = |j: usize| if j.is_multiple_of(2) { pairs[j].0 } else { pairs[j].1 };
+    // The stitches on the side of stitch j are crowded: its needle point
+    // is nearer than SHORT_DIST_MM to the line of the pair two before it
+    // (on the inside of a tight curve the needle points come close; where
+    // the stitches meet the side at a small angle, the lines of the
+    // stitches come close; ADR 0180).
+    let crowded = |j: usize| {
+        let (q, r) = pairs[j - 2];
+        let d = match (r - q).normalized() {
+            Some(u) => u.cross(side(j) - q).abs(),
+            None => side(j).distance(side(j - 2)),
+        };
+        d < SHORT_DIST_MM
+    };
     let mut out: Vec<Point> = Vec::with_capacity(n * 2);
     for (j, &(a, b)) in pairs.iter().enumerate() {
         let (this, other) = if j.is_multiple_of(2) { (a, b) } else { (b, a) };
@@ -547,8 +693,8 @@ pub(crate) fn satin_top(pairs: &[(Point, Point)], p: &SatinParams) -> Vec<Point>
             if p.jagged_mm > 0.0 {
                 pt -= u * (p.jagged_mm.min(w * 0.45) * crate::effects::hash01(JAGGED_SEED, j as u64));
             }
-            // Short stitch: every second stitch on a side with crowded needle points.
-            if p.short_stitches && j >= 2 && (j / 2) % 2 == 1 && side(j).distance(side(j - 2)) < SHORT_DIST_MM {
+            // Short stitch: every second stitch on a side with crowded stitches.
+            if p.short_stitches && j >= 2 && (j / 2) % 2 == 1 && crowded(j) {
                 pt = this - u * (SHORT_INSET * w);
             }
         }
@@ -583,7 +729,70 @@ pub(crate) fn satin_top(pairs: &[(Point, Point)], p: &SatinParams) -> Vec<Point>
 /// The column starts at the end nearer to `entry`; if `exit` is set, it
 /// starts at the end farther from `exit` instead, so it ends near `exit`.
 pub fn satin(g: &SatinGeometry, p: &SatinParams, entry: Point, exit: Option<Point>) -> Option<Vec<Point>> {
-    satin_with(g, p, entry, exit, false)
+    satin_with(g, p, entry, exit, false, &[], &[])
+}
+
+/// As [`satin`], for a column of a letter with other parts (`sewn`: the
+/// areas of the other satin and fill parts of the letter, each a list of
+/// rings). The underlay leaves out the places where another part lies, and
+/// [`JOINT_MARGIN_MM`] round them: at a joint of the letter two columns lie
+/// on each other, so the fabric has two layers of satin there, and
+/// underlay under them only makes the joint stiff (ADR 0163). The underlay
+/// goes across such a place with a walk, under the top stitches of the
+/// column. `before` are the areas of the parts that sewed before this one:
+/// a puff column has no end stitches at an end in one of them, as that
+/// part closed the foam there (ADR 0165).
+pub(crate) fn satin_on(
+    g: &SatinGeometry,
+    p: &SatinParams,
+    entry: Point,
+    exit: Option<Point>,
+    sewn: &[Vec<Vec<Point>>],
+    before: &[Vec<Vec<Point>>],
+) -> Option<Vec<Point>> {
+    satin_with(g, p, entry, exit, false, sewn, before)
+}
+
+/// `true` if `q` is in one of the areas `parts`, or nearer than
+/// [`JOINT_MARGIN_MM`] to one of their rings.
+fn in_parts(q: Point, parts: &[Vec<Vec<Point>>]) -> bool {
+    let near = |r: &[Point]| (0..r.len()).any(|i| q.distance_to_segment(r[i], r[(i + 1) % r.len()]) < JOINT_MARGIN_MM);
+    parts.iter().any(|rings| {
+        rings.iter().filter(|r| emb_geom::region::ring_contains(r, q)).count() % 2 == 1 || rings.iter().any(|r| near(r))
+    })
+}
+
+/// A walk from the last point of `out` to `to` where the step is longer
+/// than a walk stitch (an underlay with its ends left out), so no long
+/// stitch goes there.
+fn walk_to(out: &mut Vec<Point>, to: Option<&Point>) {
+    if let (Some(&from), Some(&to)) = (out.last(), to)
+        && from.distance(to) > WALK_LEN_MM
+    {
+        out.extend(walk(vec![from, to]).into_iter().skip(1));
+        out.pop();
+    }
+}
+
+/// The points of an underlay with the points in `sewn` left out: the
+/// points before and after such a place are joined by a walk.
+fn underlay_off(points: Vec<Point>, sewn: &[Vec<Vec<Point>>]) -> Vec<Point> {
+    let inside = |q: Point| in_parts(q, sewn);
+    let mut out: Vec<Point> = Vec::with_capacity(points.len());
+    let mut skipped = false;
+    for q in points {
+        if inside(q) {
+            skipped = true;
+            continue;
+        }
+        if skipped && let Some(&last) = out.last() {
+            out.extend(walk(vec![last, q]).into_iter().skip(1));
+        } else {
+            out.push(q);
+        }
+        skipped = false;
+    }
+    out
 }
 
 /// As [`satin`]. With `across`, the spacing is measured across the
@@ -595,6 +804,8 @@ pub(crate) fn satin_with(
     entry: Point,
     exit: Option<Point>,
     across: bool,
+    sewn: &[Vec<Vec<Point>>],
+    before: &[Vec<Vec<Point>>],
 ) -> Option<Vec<Point>> {
     let mut col = Column::new(g)?;
     let (s, e) = (col.start(), col.end());
@@ -618,16 +829,38 @@ pub(crate) fn satin_with(
         col.even = true;
         col.across = true;
     }
-    let layers = underlay_layers(&p.underlay, col.mean_width());
+    // A band of the width (P22 Milestone 4): its top stitches sew only the
+    // band, and the first band sews the underlay of the whole column.
+    let band = p.active_band();
+    let layers = match band {
+        Some(b) if !b.sews_underlay() => Vec::new(),
+        _ => underlay_layers(&p.underlay, col.mean_width()),
+    };
     let mut out: Vec<Point> = Vec::new();
     for layer in &layers {
         // Puff: no rows across the column, they press the foam flat.
         if p.puff && !matches!(layer, UnderlayLayer::CenterWalk | UnderlayLayer::EdgeWalk { .. }) {
             continue;
         }
-        out.extend(underlay_layer(&col, layer));
+        let points = underlay_layer(&col, layer);
+        let points = if sewn.is_empty() {
+            points
+        } else {
+            // The needle comes to the start of the column: from there a
+            // walk goes to the first point that the underlay keeps.
+            if out.is_empty()
+                && let Some(&start) = points.first()
+            {
+                out.push(start);
+            }
+            underlay_off(points, sewn)
+        };
+        walk_to(&mut out, points.first());
+        out.extend(points);
     }
-    if p.puff {
+    // Puff: no end stitches at an end that a part sewn before covers.
+    let capped = |end: (Point, Point)| !in_parts(end.0.midpoint(end.1), before);
+    if p.puff && capped(col.start()) {
         out.extend(puff_cap(&col, true));
     }
     // The accordion profile goes from the start of the column as drawn, also
@@ -645,7 +878,37 @@ pub(crate) fn satin_with(
         }
         _ => p,
     };
-    let top = crate::column::top(&col, p);
+    // The band and its pull compensation: only out at the sides of the
+    // column (the first band at rail A, the last at rail B).
+    let banded;
+    let (band_col, p) = match band {
+        Some(b) => {
+            let geometry = if reverse {
+                SatinGeometry {
+                    rail_a: reverse_path(&g.rail_a),
+                    rail_b: reverse_path(&g.rail_b),
+                    rungs: g.rungs.clone(),
+                }
+            } else {
+                g.clone()
+            };
+            banded = p.banded(&b);
+            (geometry.band(&b).and_then(|g| Column::new(&g)), &banded)
+        }
+        None => (None, p),
+    };
+    let top_col = band_col.as_ref().unwrap_or(&col);
+    let leaned;
+    let top_col = if p.lean_deg.abs() > 1e-9 {
+        leaned = top_col.leaned(p.lean_deg);
+        &leaned
+    } else {
+        top_col
+    };
+    let top = crate::column::top(top_col, p);
+    // An underlay with its ends left out (on another part of a letter)
+    // ends away from the start of the top stitches: a walk goes there.
+    walk_to(&mut out, top.first());
     // Omit last stitch: the column ends on the rail before the last one.
     let keep = if p.omit_last && p.pattern.is_satin() && top.len() > 3 {
         top.len() - 1
@@ -653,7 +916,7 @@ pub(crate) fn satin_with(
         top.len()
     };
     out.extend(&top[..keep]);
-    if p.puff {
+    if p.puff && capped(col.end()) {
         out.extend(puff_cap(&col, false));
     }
     out.dedup();
@@ -815,6 +1078,192 @@ mod tests {
         }
     }
 
+    /// The exit test of the lean (P22 Milestone 4): the top stitches of a
+    /// straight column lean by the angle (their mean, away from the ends),
+    /// no needle point goes out of the column, and no two pairs across it
+    /// cross. The underlay does not lean.
+    #[test]
+    fn the_top_stitches_lean_by_the_angle() {
+        let g = straight(4.0, 30.0);
+        for lean in [-15.0_f64, 0.0, 8.0, 15.0] {
+            let p = SatinParams {
+                lean_deg: lean,
+                ..plain(0.4)
+            };
+            let pts = satin(&g, &p, Point::ZERO, None).unwrap();
+            assert!(
+                pts.iter()
+                    .all(|q| q.y > -1e-6 && q.y < 4.0 + 1e-6 && q.x > -1e-6 && q.x < 30.0 + 1e-6),
+                "a needle point out of the column at {lean}°"
+            );
+            // The stitches across the column, away from the ends: their
+            // mean slant (from rail A to rail B) is the lean.
+            let mut angles = Vec::new();
+            for w in pts.windows(2) {
+                let (a, b) = if w[0].y < w[1].y { (w[0], w[1]) } else { (w[1], w[0]) };
+                if (b.y - a.y) > 3.9 && a.x > 6.0 && a.x < 24.0 {
+                    angles.push(emb_geom::math::atan2(b.x - a.x, b.y - a.y).to_degrees());
+                }
+            }
+            let mean = angles.iter().sum::<f64>() / angles.len() as f64;
+            assert!((mean - lean).abs() <= 1.0, "{lean}°: mean {mean}°");
+            // Pairs: each stitch from rail A to rail B and the next one.
+            let pairs: Vec<(Point, Point)> = pts
+                .windows(2)
+                .filter(|w| w[0].y < 0.1 && w[1].y > 3.9)
+                .map(|w| (w[0], w[1]))
+                .collect();
+            assert!(
+                pairs.windows(2).all(|w| !pairs_cross(w[0], w[1])),
+                "pairs cross at {lean}°"
+            );
+        }
+        // The underlay stays square: a zigzag underlay is the same with a lean.
+        let under = |lean: f64| {
+            let p = SatinParams {
+                lean_deg: lean,
+                underlay: Underlay::Custom(vec![UnderlayLayer::Zigzag {
+                    inset_mm: 0.4,
+                    spacing_mm: 2.0,
+                }]),
+                ..plain(0.4)
+            };
+            let all = satin(&g, &p, Point::ZERO, None).unwrap();
+            let top = satin(
+                &g,
+                &SatinParams {
+                    underlay: Underlay::None,
+                    ..p
+                },
+                Point::ZERO,
+                None,
+            )
+            .unwrap();
+            all[..all.len() - top.len()].to_vec()
+        };
+        assert_eq!(under(0.0), under(12.0));
+    }
+
+    /// Bands of threads (P22 Milestone 4): three bands with no overlap
+    /// cover the column with no gap wider than 0.1 mm; with an overlap,
+    /// two layers only in the overlap; only the first band has underlay.
+    #[test]
+    fn bands_cover_the_column() {
+        let g = straight(6.0, 20.0);
+        let with = |index: u32, overlap: f64, underlay: Underlay| {
+            let p = SatinParams {
+                band: Some(emb_model::ColumnBand {
+                    index,
+                    count: 3,
+                    overlap_mm: overlap,
+                }),
+                pull_compensation_mm: 0.3,
+                underlay,
+                ..plain(0.4)
+            };
+            satin(&g, &p, Point::ZERO, None).unwrap()
+        };
+        let band = |index: u32, overlap: f64| with(index, overlap, Underlay::None);
+        let range = |pts: &[Point]| {
+            let inner: Vec<f64> = pts.iter().filter(|q| q.x > 2.0 && q.x < 18.0).map(|q| q.y).collect();
+            (
+                inner.iter().copied().fold(f64::INFINITY, f64::min),
+                inner.iter().copied().fold(f64::NEG_INFINITY, f64::max),
+            )
+        };
+        let r: Vec<(f64, f64)> = (0..3).map(|k| range(&band(k, 0.0))).collect();
+        // The outer sides keep the pull compensation; the inner sides meet.
+        assert!((r[0].0 + 0.3).abs() < 0.05 && (r[2].1 - 6.3).abs() < 0.05, "{r:?}");
+        assert!(
+            (r[0].1 - r[1].0).abs() <= 0.1 && (r[1].1 - r[2].0).abs() <= 0.1,
+            "{r:?}"
+        );
+        // The second and third bands have no underlay, the first band sews
+        // the underlay of the whole column.
+        assert_eq!(with(1, 0.0, Underlay::Auto), band(1, 0.0));
+        assert_eq!(with(2, 0.0, Underlay::Auto), band(2, 0.0));
+        assert!(with(0, 0.0, Underlay::Auto).iter().any(|q| q.y > 2.5 && q.y < 5.5));
+        // With an overlap of 0.6 mm, the bands go 0.3 mm into each other.
+        let o: Vec<(f64, f64)> = (0..3).map(|k| range(&band(k, 0.6))).collect();
+        assert!((o[0].1 - 2.3).abs() < 0.05 && (o[1].0 - 1.7).abs() < 0.05, "{o:?}");
+        assert!((o[1].1 - 4.3).abs() < 0.05 && (o[2].0 - 3.7).abs() < 0.05, "{o:?}");
+    }
+
+    /// A straight column 20 mm long and 4 mm wide, with the rungs of
+    /// `extra` (pairs across it) and its two ends.
+    fn ruled(rungs: Vec<(Point, Point)>) -> SatinGeometry {
+        SatinGeometry {
+            rail_a: Path::new().move_to(Point::new(0.0, 0.0)).line_to(Point::new(20.0, 0.0)),
+            rail_b: Path::new().move_to(Point::new(0.0, 4.0)).line_to(Point::new(20.0, 4.0)),
+            rungs,
+        }
+    }
+
+    /// The underlay goes at even steps along the column, not at each rung:
+    /// many rungs close together (a column that pivots) do not crowd it
+    /// (ADR 0163). The top stitches still have a needle point at each rung.
+    #[test]
+    fn the_underlay_does_not_crowd_at_close_rungs() {
+        let zigzag = SatinParams {
+            underlay: Underlay::Custom(vec![UnderlayLayer::Zigzag {
+                inset_mm: 0.4,
+                spacing_mm: 2.0,
+            }]),
+            ..plain(0.4)
+        };
+        let none = plain(0.4);
+        let count = |g: &SatinGeometry, p: &SatinParams| satin(g, p, Point::ZERO, None).unwrap().len();
+        // 40 rungs in the first 2 mm of the column.
+        let close: Vec<(Point, Point)> = (1..=40)
+            .map(|i| {
+                let x = 0.05 * f64::from(i);
+                (Point::new(x, 0.0), Point::new(x, 4.0))
+            })
+            .collect();
+        let (plain_g, ruled) = (ruled(Vec::new()), ruled(close));
+        let underlay = |g: &SatinGeometry| count(g, &zigzag) - count(g, &none);
+        assert_eq!(
+            underlay(&ruled),
+            underlay(&plain_g),
+            "the same underlay with close rungs"
+        );
+        assert!(
+            count(&ruled, &none) > count(&plain_g, &none),
+            "the top stitches keep the rungs"
+        );
+    }
+
+    /// On another part of a letter, the underlay is left out (with the
+    /// joint margin) and crossed with a walk; the top stitches stay.
+    #[test]
+    fn the_underlay_stops_on_another_part() {
+        let p = SatinParams {
+            underlay: Underlay::Custom(vec![UnderlayLayer::Zigzag {
+                inset_mm: 0.4,
+                spacing_mm: 2.0,
+            }]),
+            ..plain(0.4)
+        };
+        let g = ruled(Vec::new());
+        // Another column across the first 6 mm.
+        let other = vec![vec![
+            Point::new(-1.0, -1.0),
+            Point::new(6.0, -1.0),
+            Point::new(6.0, 5.0),
+            Point::new(-1.0, 5.0),
+        ]];
+        let near = |pts: &[Point]| pts.iter().filter(|q| q.x < 6.0 + JOINT_MARGIN_MM).count();
+        let all = satin(&g, &p, Point::ZERO, None).unwrap();
+        let on = satin_on(&g, &p, Point::ZERO, None, &[other], &[]).unwrap();
+        let top = satin(&g, &plain(0.4), Point::ZERO, None).unwrap();
+        assert!(near(&on) < near(&all), "{} of {}", near(&on), near(&all));
+        // There, only the top stitches and a walk across.
+        assert!(near(&on) <= near(&top) + (2.0 * (6.0 + JOINT_MARGIN_MM) / WALK_LEN_MM).ceil() as usize + 4);
+        // Past the other part, the underlay is there.
+        let far = |pts: &[Point]| pts.iter().filter(|q| q.x > 10.0).count();
+        assert_eq!(far(&on), far(&all));
+    }
+
     #[test]
     fn straight_column_zigzags_at_half_spacing() {
         let pts = satin(&straight(3.0, 10.0), &plain(0.4), Point::new(-5.0, 0.0), None).unwrap();
@@ -926,6 +1375,120 @@ mod tests {
         assert!(short.iter().all(|q| q.length() > 2.0 - 2.0 * FLATTEN_TOL_MM));
     }
 
+    /// A column whose rails are side by side but whose ends are slanted
+    /// far: rail B starts `shift` mm after rail A, so the pairs make an
+    /// angle of atan(width / shift) with the column.
+    fn slanted(shift: f64) -> SatinGeometry {
+        let line = |a: Point, b: Point| Path::new().move_to(a).line_to(b);
+        SatinGeometry {
+            rail_a: line(Point::new(0.0, 0.0), Point::new(20.0, 0.0)),
+            rail_b: line(Point::new(shift, 2.0), Point::new(20.0 + shift, 2.0)),
+            rungs: Vec::new(),
+        }
+    }
+
+    /// The distance of two pairs across the stitches (as `thin_across`).
+    fn across(p: (Point, Point), q: (Point, Point)) -> f64 {
+        let u = (p.1 - p.0).normalized().unwrap();
+        u.cross(q.0.midpoint(q.1) - p.0).abs()
+    }
+
+    /// Stitches that run almost along the column (ADR 0180): pairs one
+    /// step apart along the middle are a seventh of a step apart across
+    /// the stitches. The pairs that stay are not less than half a step
+    /// apart across the stitches, and not more than one step, or
+    /// [`ALONG_SIDE_GAP`] steps where the stitches run along the sides
+    /// (8° here, ADR 0181); a column with stitches across it keeps all its
+    /// pairs.
+    #[test]
+    fn stitches_along_the_column_do_not_crowd() {
+        let step = 0.2;
+        let col = Column::new(&slanted(14.0)).unwrap();
+        let all = col.pairs(step);
+        let kept = thin_across(all.clone(), step);
+        assert!(kept.len() * 5 < all.len(), "{} of {}", kept.len(), all.len());
+        assert_eq!((kept[0], kept[kept.len() - 1]), (all[0], all[all.len() - 1]));
+        for w in kept[..kept.len() - 1].windows(2) {
+            let d = across(w[0], w[1]);
+            assert!(d > 0.5 * step && d < ALONG_SIDE_GAP * step + 1e-9, "{d}");
+        }
+        // The top stitches: fewer needle points than a straight column,
+        // also with the points that split the long stitches.
+        let straight = satin(&slanted(0.0), &plain(0.4), Point::ZERO, None).unwrap();
+        let along = satin(&slanted(14.0), &plain(0.4), Point::ZERO, None).unwrap();
+        assert!(along.len() < straight.len() / 2, "{} {}", along.len(), straight.len());
+        // Pairs 30 degrees or more from the column, and a straight column:
+        // no pair goes.
+        for shift in [0.0, 1.0, 3.4] {
+            let all = Column::new(&slanted(shift)).unwrap().pairs(step);
+            assert_eq!(thin_across(all.clone(), step), all, "{shift}");
+        }
+    }
+
+    /// The cap of a wide column end at a corner (ADR 0181): the stitches
+    /// are parallel, side A is square to them and side B is 16° from them,
+    /// so pairs one step apart along the middle are half a step apart
+    /// across the stitches. Every second pair goes, and the pairs that stay
+    /// are about one step apart across the stitches.
+    #[test]
+    fn stitches_along_a_side_are_one_step_apart() {
+        let step = 0.2;
+        let u = Point::new(1.0, 0.0);
+        let (s16, c16) = emb_geom::math::sin_cos_deg(16.0);
+        let side_b = Point::new(c16, s16);
+        let start_b = Point::new(8.0, 0.0);
+        // Stitch i starts at (0, h i) on side A and goes along u to side B.
+        let h = 0.1;
+        let pairs: Vec<(Point, Point)> = (0..60)
+            .map(|i| {
+                let a = Point::new(0.0, h * f64::from(i));
+                // a + t u = start_b + s side_b: the y of both is a.y.
+                let s = a.y / side_b.y;
+                let b = start_b + side_b * s;
+                assert!((b - a).normalized().is_some_and(|d| d.distance(u) < 1e-9));
+                (a, b)
+            })
+            .collect();
+        let along = pairs[0]
+            .0
+            .midpoint(pairs[0].1)
+            .distance(pairs[1].0.midpoint(pairs[1].1));
+        assert!((along - step).abs() < 0.03, "{along}");
+        let kept = thin_across(pairs.clone(), step);
+        assert!(
+            kept.len() * 2 <= pairs.len() + 2 && kept.len() * 3 > pairs.len(),
+            "{} of {}",
+            kept.len(),
+            pairs.len()
+        );
+        for w in kept[..kept.len() - 1].windows(2) {
+            let d = across(w[0], w[1]);
+            assert!(d > 0.9 * step && d < ALONG_SIDE_GAP * step + 1e-9, "{d}");
+        }
+    }
+
+    /// Short stitches where the stitches meet a side at a small angle (ADR
+    /// 0180): the needle points on each side are 0.4 mm apart (not
+    /// crowded), but the lines of the stitches are 0.22 mm apart there.
+    #[test]
+    fn short_stitches_where_the_stitches_meet_a_side_at_a_small_angle() {
+        let shortened = |shift: f64| {
+            let g = slanted(shift);
+            let mut p = plain(0.4);
+            let long = satin(&g, &p, Point::ZERO, None).unwrap();
+            p.short_stitches = true;
+            let short = satin(&g, &p, Point::ZERO, None).unwrap();
+            assert_eq!(long.len(), short.len());
+            long.iter().zip(&short).filter(|(a, b)| a.distance(**b) > 0.1).count()
+        };
+        // 34 degrees: the pairs stay, and every second stitch on each side
+        // is short.
+        let n = Column::new(&slanted(3.0)).unwrap().pairs(0.2).len();
+        assert!(shortened(3.0) > n / 3, "{} of {n}", shortened(3.0));
+        // Stitches straight across: none.
+        assert_eq!(shortened(0.0), 0);
+    }
+
     #[test]
     fn liquid_spreads_a_sharp_turn() {
         // Rungs that turn the stitches 45° at once in the middle of a 40 mm column.
@@ -995,6 +1558,42 @@ mod tests {
             .map(|p| (p.y * 1000.0).round() as i64)
             .collect();
         assert_eq!(ys.len(), 2);
+    }
+
+    /// At a joint of a letter, the puff column that sews first closes the
+    /// foam: a column whose end lies in a part sewn before it has no end
+    /// stitches there (ADR 0165).
+    #[test]
+    fn a_puff_end_on_a_part_sewn_before_has_no_end_stitches() {
+        let p = SatinParams {
+            puff: true,
+            ..plain(0.25)
+        };
+        let col = straight(5.0, 30.0);
+        // Another column across the end of this one (x 27 to 35).
+        let other = vec![vec![
+            Point::new(27.0, -3.0),
+            Point::new(35.0, -3.0),
+            Point::new(35.0, 8.0),
+            Point::new(27.0, 8.0),
+        ]];
+        let past_end = |pts: &[Point]| pts.iter().filter(|q| q.x > 30.3).count();
+        let past_start = |pts: &[Point]| pts.iter().filter(|q| q.x < -0.3).count();
+        // The other part sews after this one: both ends are closed.
+        let after = satin_on(&col, &p, Point::ZERO, None, std::slice::from_ref(&other), &[]).unwrap();
+        assert!(past_end(&after) > 0 && past_start(&after) > 0);
+        // It sewed before: the end in it is not closed again, the start is.
+        let before = satin_on(
+            &col,
+            &p,
+            Point::ZERO,
+            None,
+            std::slice::from_ref(&other),
+            std::slice::from_ref(&other),
+        )
+        .unwrap();
+        assert_eq!(past_end(&before), 0);
+        assert!(past_start(&before) > 0);
     }
 
     #[test]

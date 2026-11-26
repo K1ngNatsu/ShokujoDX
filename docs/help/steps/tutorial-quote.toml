@@ -1,0 +1,122 @@
+# The steps of "Tutorial: a quote with a product picture"
+# (tutorial-quote.md). The test each_tutorial_runs_in_each_language
+# (crates/emb-app/src/tutorial_steps.rs) does them in each language;
+# write_tutorial_pictures makes the pictures. A change of a step needs the
+# same change in the topic and its translations. The steps do not click
+# Save Quote Sheet or Save PDF: they write files.
+
+# Open the club crest.
+[[step]]
+item = ["Open the start design", 0]
+open = "club-crest"
+expect = { objects = 4, colors = 4 }
+
+# The design on a polo shirt.
+[[step]]
+item = ["The design on the product", 1]
+command = "Design > Product > Product"
+expect = { window = "Product" }
+
+[[step]]
+item = ["The design on the product", 2]
+choose = ["Product", "Polo shirt"]
+
+[[step]]
+item = ["The design on the product", 3]
+button = "Light blue"
+
+[[step]]
+item = ["The design on the product", 4]
+button = "Left chest"
+expect = { product = ["Polo shirt", "Left chest"] }
+
+[[step]]
+item = ["The design on the product", 5]
+button = "Zoom to product"
+
+[[step]]
+close = "Product"
+
+[[step]]
+item = ["The design on the product", 6]
+command = "View > Workspace > Grid"
+
+[[step]]
+picture = "quote-product"
+
+[[step]]
+test_only = true
+command = "View > Workspace > Grid"
+
+# The prices.
+[[step]]
+item = ["The prices", 1]
+command = "Design > Orders > Quote"
+expect = { window = "Quote" }
+
+[[step]]
+item = ["The prices", 2]
+set = ["Each 1000 stitches", "1.20"]
+
+[[step]]
+set = ["Lowest price for each piece", "4"]
+
+[[step]]
+set = ["Colors in the price", "3"]
+
+[[step]]
+set = ["Each added color", "0.25"]
+
+[[step]]
+set = ["Setup", "15"]
+
+[[step]]
+set = ["Digitizing", "25"]
+
+[[step]]
+item = ["The prices", 3]
+button = "Add a Quantity Price"
+expect = { shows = "Remove the quantity price" }
+
+# The order.
+[[step]]
+item = ["The order", 1]
+set = ["Quantity", "24"]
+
+[[step]]
+item = ["The order", 2]
+button = "New design (add the digitizing price)"
+
+[[step]]
+item = ["The order", 3]
+button = "Prices"
+
+[[step]]
+picture = "quote-window"
+area = "windows"
+
+[[step]]
+item = ["The order", 4]
+close = "Quote"
+
+# The approval sheet with the product page.
+[[step]]
+item = ["The approval sheet", 1]
+command = "Design > Output > Print Preview"
+expect = { window = "Print Preview" }
+
+[[step]]
+item = ["The approval sheet", 2]
+button = "Approval sheet"
+
+[[step]]
+item = ["The approval sheet", 3]
+button = "Next page"
+
+[[step]]
+picture = "quote-approval"
+area = "windows"
+
+[[step]]
+test_only = true
+close = "Print Preview"

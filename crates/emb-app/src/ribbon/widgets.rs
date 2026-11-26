@@ -11,17 +11,45 @@ pub(super) const ROW_GAP: f32 = 1.0;
 pub(super) const CONTENT_H: f32 = 3.0 * SMALL_H + 2.0 * ROW_GAP;
 pub(super) const TITLE_H: f32 = 15.0;
 
+thread_local! {
+    /// Button rectangles by name, in the order that they draw: a lesson
+    /// marks them (ADR 0177), and tests click them.
+    pub static RECTS: std::cell::RefCell<Vec<(String, Rect)>> = const { std::cell::RefCell::new(Vec::new()) };
+    /// Keep the rectangles in `RECTS` in this frame: in the tests, and
+    /// while a lesson shows.
+    pub static RECORD: std::cell::Cell<bool> = const { std::cell::Cell::new(cfg!(test)) };
+}
+
 #[cfg(test)]
 thread_local! {
-    /// Button rectangles by name, so tests can click them.
-    pub static RECTS: std::cell::RefCell<Vec<(String, Rect)>> = const { std::cell::RefCell::new(Vec::new()) };
     /// The width of the panels of the tab that showed last.
     pub static PANELS_W: std::cell::Cell<f32> = const { std::cell::Cell::new(0.0) };
 }
 
-pub(super) fn note_rect(_label: &str, _rect: Rect) {
-    #[cfg(test)]
-    RECTS.with(|r| r.borrow_mut().push((_label.to_string(), _rect)));
+/// The start of the name of the place of a panel in `RECTS` (then its title).
+pub const PANEL_KEY: &str = "panel: ";
+
+/// The start of the name in `RECTS` of the arrow of a drop-down button,
+/// for each command under it that the button does not show (then its
+/// name): a lesson marks the arrow; a test clicks the arrow, then the
+/// command in the menu.
+pub const MORE_KEY: &str = "more: ";
+
+/// The rectangle of the ribbon button `label` in the last frame (while
+/// `RECORD` is on): the first one (a tab) or the last one (a command,
+/// after the tabs).
+pub fn button_rect(label: &str, last: bool) -> Option<Rect> {
+    RECTS.with(|r| {
+        let r = r.borrow();
+        let mut it = r.iter().filter(|(l, _)| l == label).map(|(_, rect)| *rect);
+        if last { it.next_back() } else { it.next() }
+    })
+}
+
+pub(super) fn note_rect(label: &str, rect: Rect) {
+    if RECORD.with(std::cell::Cell::get) {
+        RECTS.with(|r| r.borrow_mut().push((label.to_string(), rect)));
+    }
 }
 
 /// Paints the background of a button for its state.
@@ -235,6 +263,9 @@ pub(super) fn split_large(ui: &mut egui::Ui, st: &mut AppState, s: &SelInfo, key
         let (rect, resp) = ui.allocate_exact_size(vec2(12.0, LARGE.y), sense(enabled));
         let more = crate::i18n::fill("More: {}", &[&cmd.meta().1]);
         let resp = crate::a11y::named(resp, &more).on_hover_text(&more);
+        for c in cmds.iter().filter(|c| **c != cmd) {
+            note_rect(&format!("{MORE_KEY}{}", c.meta().1), rect);
+        }
         note_focus(ui, &resp);
         frame(ui, rect, &resp, false, enabled);
         let (fg, _) = colors(ui, enabled);
@@ -446,7 +477,7 @@ pub(super) fn folded_panel(ui: &mut egui::Ui, st: &mut AppState, s: &SelInfo, p:
 }
 
 pub(super) fn panel(ui: &mut egui::Ui, st: &mut AppState, s: &SelInfo, p: &Panel) {
-    ui.vertical(|ui| {
+    let shown = ui.vertical(|ui| {
         ui.spacing_mut().item_spacing = vec2(2.0, 2.0);
         let content = ui
             .horizontal_top(|ui| {
@@ -472,6 +503,8 @@ pub(super) fn panel(ui: &mut egui::Ui, st: &mut AppState, s: &SelInfo, p: &Panel
         let (r, _) = ui.allocate_exact_size(vec2(content.width().max(galley.size().x), TITLE_H), Sense::hover());
         ui.painter().galley(r.center() - galley.size() / 2.0, galley, color);
     });
+    // The place of the panel, for the pictures of the tutorials.
+    note_rect(&format!("{PANEL_KEY}{}", tr(p.title)), shown.response.rect);
     // A line between the panels.
     let (r, _) = ui.allocate_exact_size(vec2(11.0, LARGE.y + TITLE_H), Sense::hover());
     let stroke = ui.visuals().widgets.noninteractive.bg_stroke;

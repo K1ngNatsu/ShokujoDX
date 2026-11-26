@@ -62,6 +62,8 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
     .open(&mut open)
     .collapsible(false)
     .resizable(false)
+    // Room for the list (egui gives a fixed window 420 points).
+    .default_height(crate::dock::list_height(st.canvas_rect, 640.0))
     .show(ctx, |ui| {
         egui::ScrollArea::vertical().max_height(560.0).show(ui, |ui| {
             ui.label(tr(
@@ -129,7 +131,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                     ui.label(tr("Quantity"));
                     let mut n = o.total_quantity();
                     let r = ui.add(
-                        egui::DragValue::new(&mut n)
+                        crate::workspace::drag(&mut n)
                             .range(1..=MAX_QUANTITY)
                             .clamp_existing_to_range(false)
                             .suffix(tr(" pieces")),
@@ -150,7 +152,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                         let r = ui.add(egui::TextEdit::singleline(&mut s.size).desired_width(60.0));
                         end_merge |= r.lost_focus();
                         let r = ui.add(
-                            egui::DragValue::new(&mut s.count)
+                            crate::workspace::drag(&mut s.count)
                                 .range(0..=MAX_QUANTITY)
                                 .clamp_existing_to_range(false)
                                 .suffix(tr(" pieces")),

@@ -340,8 +340,12 @@ fn finish(s: &StitchDesign, items: Vec<Item>) -> Vec<Made> {
 }
 
 /// A stitch object of the stitch records `records` (a new part where they
-/// do not follow one another, after a trim if the file has one there).
+/// do not follow one another, after a trim if the file has one there, or
+/// if the jump is longer than the trim distance: the stitches between
+/// them in the file went to other objects, so the jump is new; P22
+/// Milestone 5, ADR 0172).
 fn stitches_kind(s: &StitchDesign, records: &[Range<usize>]) -> ObjectKind {
+    let trim_mm = emb_stitch::PlanOptions::default().trim_mm;
     let mut path = Path::new();
     let mut trims = Vec::new();
     let mut subpaths = 0usize;
@@ -351,12 +355,15 @@ fn stitches_kind(s: &StitchDesign, records: &[Range<usize>]) -> ObjectKind {
         if last == Some(r.start) {
             pts.next();
         } else {
-            if let Some(end) = last
-                && s.records[end.min(r.start)..r.start]
+            if let Some(end) = last {
+                let cut = s.records[end.min(r.start)..r.start]
                     .iter()
-                    .any(|x| x.kind == StitchKind::Trim)
-            {
-                trims.push(subpaths);
+                    .any(|x| x.kind == StitchKind::Trim);
+                let from = s.records[end.saturating_sub(1)].pos;
+                let far = pts.as_slice().first().is_some_and(|p| p.distance(from) > trim_mm);
+                if cut || far {
+                    trims.push(subpaths);
+                }
             }
             if let Some(first) = pts.next() {
                 path = path.move_to(first);

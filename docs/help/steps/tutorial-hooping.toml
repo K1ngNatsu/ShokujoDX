@@ -1,0 +1,45 @@
+# The steps of "Tutorial: a design in two hoopings" (tutorial-hooping.md).
+# The test each_tutorial_runs_in_each_language (crates/emb-app/src/
+# tutorial_steps.rs) does them in each language; write_tutorial_pictures
+# makes the pictures. A change of a step needs the same change in the topic
+# and its translations.
+
+# Open the start design: five dots in a row, 380 mm wide.
+[[step]]
+item = ["Open the start design", 1]
+open = "hooping-banner"
+expect = { objects = 5, size = [380.0, 60.0] }
+
+# Make the hoopings.
+[[step]]
+item = ["Make the hoopings", 1]
+command = "Hooping > Hooping > Hooping Mode"
+expect = { on = "Hooping > Hooping > Hooping Mode", hoopings = 2, shows = "Registration marks" }
+
+[[step]]
+picture = "hooping-layout"
+around = [[-250.0, -125.0], [250.0, 125.0]]
+
+# Check the hoopings.
+[[step]]
+item = ["Check the hoopings", 1]
+command = "Hooping > Output > Preview Hoopings"
+expect = { window = "Preview Hoopings" }
+
+[[step]]
+picture = "hooping-preview"
+area = "windows"
+
+[[step]]
+item = ["Check the hoopings", 2]
+command = "Hooping > Output > Preview Hoopings"
+
+# Write the files.
+[[step]]
+item = ["Write the files", 0]
+command = "Hooping > Output > Output Hoopings"
+check_only = true
+
+# A part of the lesson that you only read (no step of the test).
+[[step]]
+item = ["Sew the hoopings", 1]

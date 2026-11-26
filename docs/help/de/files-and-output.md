@@ -30,6 +30,19 @@ stoppt, zeigt das Fenster **Designs wiederherstellen** die Sicherungen
 beim nächsten Start. Ein Absturzbericht kommt in den Ordner `crashes` der
 Einstellungen; **Hilfe > Info** zeigt, wo er ist.
 
+## Offene Tabs und ein Programm
+
+Wenn Sie das Programm beenden, behält es die offenen Designs mit ihren
+nicht gespeicherten Änderungen und fragt nichts. Beim nächsten Start
+öffnen sich die Tabs wieder, mit demselben Tab vorne und derselben
+Ansicht (**Optionen > Offene Tabs**). Nach einem Absturz zeigt das
+Fenster **Designs wiederherstellen** die Sicherungen wie bisher.
+
+Eine Datei, die Sie öffnen, während das Programm läuft (Doppelklick,
+**Öffnen mit**, die Befehlszeile), öffnet sich in einem neuen Tab dieses
+Programms, und das Programm kommt nach vorne (**Optionen > Dateien**).
+Um ein zweites Programm zu starten, starten Sie es mit `--new-window`.
+
 ## Eine Maschinendatei exportieren
 
 **Design > Exportieren** (Strg+E, oder Datei > Maschinendatei

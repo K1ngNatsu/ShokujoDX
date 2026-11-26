@@ -278,6 +278,8 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
     .open(&mut open)
     .collapsible(false)
     .resizable(false)
+    // Room for the list (egui gives a fixed window 420 points).
+    .default_height(crate::dock::list_height(st.canvas_rect, 680.0))
     .show(ctx, |ui| {
         egui::ScrollArea::vertical().max_height(600.0).show(ui, |ui| {
             ui.label(tr("The threads that you have. Each spool that you began counts as one."));
@@ -288,6 +290,39 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
             .on_hover_text(tr(
                 "The Threads panel, Match Design to Chart, the picture tools and Picture to Design use only the threads in stock.",
             ));
+
+            // Add threads.
+            ui.separator();
+            ui.strong(tr("Add from a chart"));
+            ui.horizontal(|ui| {
+                ui.label(tr("Thread chart"));
+                let shown = charts
+                    .iter()
+                    .find(|(i, _)| *i == w.chart)
+                    .map(|(_, n)| n.clone())
+                    .unwrap_or_default();
+                egui::ComboBox::from_id_salt("stock_chart")
+                    .selected_text(shown)
+                    .show_ui(ui, |ui| {
+                        for (i, n) in &charts {
+                            ui.selectable_value(&mut w.chart, *i, n);
+                        }
+                    });
+                ui.add(
+                    egui::TextEdit::singleline(&mut w.chart_query)
+                        .hint_text(tr("name or code"))
+                        .desired_width(140.0),
+                );
+            });
+            for (k, color, text) in &hits {
+                ui.horizontal(|ui| {
+                    swatch(ui, *color);
+                    ui.label(text);
+                    if ui.small_button(tr("Add")).clicked() {
+                        add = Some(*k);
+                    }
+                });
+            }
 
             // The threads of the design.
             ui.separator();
@@ -300,6 +335,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                     swatch(ui, t.look.color);
                     ui.label(look_text(&t.look));
                     match (&t.spools, &t.nearest) {
+                        (Some(1), _) => ui.label(tr("in stock: 1 spool")),
                         (Some(n), _) => ui.label(fill("in stock: {} spools", &[n])),
                         (None, Some((name, d))) => ui.colored_label(
                             egui::Color32::from_rgb(230, 150, 20),
@@ -343,7 +379,10 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                         for b in buy {
                             swatch(ui, b.look.color);
                             ui.label(b.thread_text());
-                            ui.label(fill("{} spools", &[&b.spools]));
+                            ui.label(match b.spools {
+                                1 => tr("1 spool").to_string(),
+                                n => fill("{} spools", &[&n]),
+                            });
                             ui.weak(fill(
                                 "{}: needs {} m, has {} m",
                                 &[&tr(b.reason.label()), &format!("{:.0}", b.need_m), &format!("{:.0}", b.have_m)],
@@ -358,38 +397,6 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                 ui.weak(tr(
                     "The quantity is the quantity of Order Details. The bobbin thread is not in the list.",
                 ));
-            }
-
-            // Add threads.
-            ui.separator();
-            ui.strong(tr("Add from a chart"));
-            ui.horizontal(|ui| {
-                let shown = charts
-                    .iter()
-                    .find(|(i, _)| *i == w.chart)
-                    .map(|(_, n)| n.clone())
-                    .unwrap_or_default();
-                egui::ComboBox::from_id_salt("stock_chart")
-                    .selected_text(shown)
-                    .show_ui(ui, |ui| {
-                        for (i, n) in &charts {
-                            ui.selectable_value(&mut w.chart, *i, n);
-                        }
-                    });
-                ui.add(
-                    egui::TextEdit::singleline(&mut w.chart_query)
-                        .hint_text(tr("name or code"))
-                        .desired_width(140.0),
-                );
-            });
-            for (k, color, text) in &hits {
-                ui.horizontal(|ui| {
-                    swatch(ui, *color);
-                    ui.label(text);
-                    if ui.small_button(tr("Add")).clicked() {
-                        add = Some(*k);
-                    }
-                });
             }
 
             // The stock.
@@ -429,15 +436,15 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                         }
                         swatch(ui, t.color);
                         ui.label(text);
-                        ui.add(egui::DragValue::new(&mut t.spools).range(0..=MAX_SPOOLS));
+                        ui.add(crate::workspace::drag(&mut t.spools).range(0..=MAX_SPOOLS));
                         let mut m = t.spool_m.unwrap_or(0.0);
                         if ui
-                            .add(egui::DragValue::new(&mut m).range(0.0..=MAX_SPOOL_M).speed(10.0).suffix(" m"))
+                            .add(crate::workspace::drag(&mut m).range(0.0..=MAX_SPOOL_M).speed(10.0).suffix(" m"))
                             .changed()
                         {
                             t.spool_m = (m > 0.0).then_some(m);
                         }
-                        ui.add(egui::DragValue::new(&mut t.min_spools).range(0..=MAX_SPOOLS));
+                        ui.add(crate::workspace::drag(&mut t.min_spools).range(0..=MAX_SPOOLS));
                         if crate::a11y::named(ui.small_button(egui_phosphor::regular::X), tr("Remove the thread from the stock")).clicked() {
                             remove = Some(i);
                         }

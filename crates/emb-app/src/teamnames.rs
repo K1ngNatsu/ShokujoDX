@@ -73,7 +73,15 @@ impl AppState {
         if tn.columns.iter().any(|c| c.object == id) {
             return;
         }
-        let title = if tn.columns.is_empty() { "Name" } else { "Number" };
+        // The titles are in the language of the program: they are text of
+        // the user (the window edits them), so a saved design keeps them.
+        // "Number" is a count in other windows, so the key is "Player
+        // number".
+        let title = if tn.columns.is_empty() {
+            tr("Name")
+        } else {
+            tr("Player number")
+        };
         tn.columns.push(TeamColumn {
             object: id,
             title: title.into(),
@@ -164,10 +172,12 @@ impl AppState {
             .clone()
             .filter(|t| !t.rows.is_empty())
             .ok_or(tr("The list has no names."))?;
+        // The names go inside the safety margin of the hoop (Design Info
+        // warns of stitches outside it).
         let width = match &d.hoop.selection {
             HoopSelection::Preset { id } => self.hoops.get(id).map_or(200.0, |h| h.width_mm),
             HoopSelection::OpenField => 200.0,
-        };
+        } - 2.0 * self.margin_mm;
         let mut all = emb_letter::teamnames::layout_design(&d, &tn, &mut self.fonts_fn(), width, LAYOUT_GAP_MM)?;
         all.name = crate::i18n::fill("{} (all names)", &[&d.name]);
         self.start_design(all);
@@ -237,7 +247,9 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
     .collapsible(false)
     .default_width(460.0)
     .show(ctx, |ui| {
-        ui.strong(tr("Columns"));
+        // Not "Columns": that is the word for satin columns in some
+        // languages.
+        ui.strong(tr("List columns"));
         if tn.columns.is_empty() {
             ui.weak(tr(
                 "Select a lettering object of the design (for example the name) and add it as a column.",
@@ -246,7 +258,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         let mut remove = None;
         for (i, c) in tn.columns.iter_mut().enumerate() {
             ui.horizontal(|ui| {
-                ui.add(egui::TextEdit::singleline(&mut c.title).desired_width(90.0));
+                ui.add(egui::TextEdit::singleline(&mut c.title).desired_width(130.0));
                 let mut fit = c.max_width_mm.is_some();
                 if ui
                     .checkbox(&mut fit, tr("Fit to width"))
@@ -257,7 +269,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                 }
                 if let Some(m) = &mut c.max_width_mm {
                     ui.add(
-                        egui::DragValue::new(m)
+                        crate::workspace::drag(m)
                             .range(5.0..=400.0)
                             .clamp_existing_to_range(false)
                             .speed(0.5)
@@ -306,7 +318,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                         ui.add(egui::TextEdit::singleline(v).desired_width(120.0));
                     }
                     ui.add(
-                        egui::DragValue::new(&mut r.quantity)
+                        crate::workspace::drag(&mut r.quantity)
                             .range(1..=999)
                             .clamp_existing_to_range(false),
                     );
@@ -475,6 +487,44 @@ mod tests {
         assert_eq!(st.tab_count(), 2);
         assert_eq!(st.doc.design().objects().len(), 20);
         assert!(st.doc.design().team_names.is_none());
+        // The rows of names are not wider than the hoop in its safety
+        // margin (twenty names are higher than the hoop: the program says
+        // to check that they fit).
+        let d = st.doc.design();
+        let hoop = match &d.hoop.selection {
+            HoopSelection::Preset { id } => st.hoops.get(id).map(|h| h.width_mm),
+            HoopSelection::OpenField => None,
+        }
+        .unwrap_or(200.0);
+        let width = d.extents().unwrap().width();
+        assert!(width <= hoop - 2.0 * st.margin_mm + 1e-6, "{width} mm in {hoop} mm");
+    }
+
+    /// The titles of new columns are in the language of the program.
+    #[test]
+    fn the_column_titles_are_in_the_language_of_the_program() {
+        for (lang, titles) in [
+            ("en", ["Name", "Player number"]),
+            ("de", ["Name", "Spielernummer"]),
+            ("ja", ["名前", "背番号"]),
+        ] {
+            crate::i18n::set_language(lang);
+            let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+            for text in ["NAME", "00"] {
+                st.add_lettering(LetteringDialog::new(
+                    Point::new(0.0, 0.0),
+                    text,
+                    FontRef::embroidery("Block Sans", ""),
+                    12.0,
+                ));
+                let id = st.doc.design().objects().last().unwrap().id;
+                st.team_add_column(id);
+            }
+            crate::i18n::set_language("en");
+            let tn = st.doc.design().team_names.clone().unwrap();
+            let now: Vec<&str> = tn.columns.iter().map(|c| c.title.as_str()).collect();
+            assert_eq!(now, titles, "{lang}");
+        }
     }
 
     #[test]

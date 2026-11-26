@@ -11,8 +11,14 @@ lettering or start from a picture, and the program makes the stitches.
 Then you write a file for your embroidery machine.
 
 If embroidery is new to you, read [Embroidery basics](embroidery-basics)
-first. To learn by doing, start with [Tutorial: a patch from a
-picture](tutorial-patch).
+first. To learn by doing, start with [Tutorial: your first
+design](tutorial-first-design), then see [All tutorials](tutorials).
+
+A tutorial with **Start the Lesson** on its card is also a lesson: the
+program shows one step at a time in the **Lesson** window, marks the
+button or the place on the canvas to click, and checks the design before
+it goes on. The window has **◀ Back**, **Skip ▶** and **Stop the
+Lesson**. A lesson that stops keeps its place.
 
 ## The start page
 
@@ -43,8 +49,8 @@ picture becomes the backdrop.
   canvas and the selection](canvas).
 - **The panels** on the right show the selected object (Object
   Properties), the sew order (Sequence), the threads, the styles, the
-  design info and more. Each panel closes with its ×. **View > Panels**
-  opens it again.
+  design info and more. They are in two groups; the open tab of a group
+  has a × that closes its panel. **View > Panels** opens it again.
 - **The property bar** under the ribbon has the settings of the active
   tool, for example the stitch length of new lines.
 - **The status line** at the bottom tells you what to do next, and shows
@@ -97,7 +103,9 @@ tab to show it again.
   **Ctrl+Minus** and **Ctrl+0** change it too.
 - **High contrast**: black or white panels with strong lines.
 - **Language**: English, Deutsch, Español or 日本語. The help topics are
-  in the same language (a topic with no translation is in English).
+  in the same language (a topic with no translation is in English). In
+  all number fields you can type a decimal point or a decimal comma
+  (`0.4` or `0,4`).
 
 See [Options](options) for all the settings.
 

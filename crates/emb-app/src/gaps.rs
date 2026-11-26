@@ -256,7 +256,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                 ui.label(tr("Gap"))
                     .on_hover_text(tr("Ends nearer than this join. The nearest ends join first."));
                 ui.add(
-                    egui::Slider::new(&mut s.gap_mm, 0.1..=20.0)
+                    crate::workspace::slider(&mut s.gap_mm, 0.1..=20.0)
                         .clamping(egui::SliderClamping::Edits)
                         .logarithmic(true)
                         .suffix(" mm")

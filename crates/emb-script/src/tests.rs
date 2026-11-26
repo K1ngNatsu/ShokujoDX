@@ -269,6 +269,33 @@ fn a_script_with_no_end_stops() {
     assert!(e.message.contains("too many operations"), "{e}");
 }
 
+/// A script that prints a long text in a loop keeps at most
+/// `MAX_MESSAGE_BYTES` of messages, and one message says so (the audit of
+/// 2026-11-26).
+#[test]
+fn the_messages_of_a_script_have_a_limit() {
+    let limits = Limits {
+        time: Duration::from_millis(300),
+        ..Limits::default()
+    };
+    let e = run(
+        r#"let s = "x"; for i in 0..16 { s += s; } loop { print(s); }"#,
+        &design(),
+        &[],
+        &BTreeMap::new(),
+        None,
+        &limits,
+    )
+    .unwrap_err();
+    let bytes: usize = e.messages.iter().map(String::len).sum();
+    assert!(bytes <= MAX_MESSAGE_BYTES, "{bytes}");
+    assert_eq!(
+        e.messages.last().map(String::as_str),
+        Some("(more messages are not kept)")
+    );
+    assert_eq!(e.messages.len(), MAX_MESSAGE_BYTES / 65_537 + 1);
+}
+
 #[test]
 fn a_script_cannot_reach_files_or_programs() {
     for src in [

@@ -64,6 +64,12 @@ pub struct Run {
     /// Auto jump: stitches longer than the machine allows are sewn as
     /// jumps, not split with needle points.
     pub long_jumps: bool,
+    /// The stitches of the run that are travel: the needle goes from one
+    /// part of the object to the next, and the stitches are not a part of
+    /// its look. Ranges of segments: segment `k` goes from `points[k]` to
+    /// `points[k + 1]`. Empty for most runs. The plan keeps them in
+    /// `StitchPlan::travel` (P22 Milestone 1).
+    pub travel: Vec<std::ops::Range<usize>>,
 }
 
 /// Why the machine stops.
@@ -122,33 +128,14 @@ impl Run {
             exact: false,
             stop: None,
             long_jumps: false,
+            travel: Vec::new(),
         }
     }
 }
 
-/// The subpaths of a stitch object as needle points. All points stay, also
-/// repeated ones; curves count as their end points.
-pub fn stitch_subpaths(path: &emb_geom::Path) -> Vec<Vec<Point>> {
-    use emb_geom::path::PathCmd;
-    let mut out: Vec<Vec<Point>> = Vec::new();
-    for cmd in &path.cmds {
-        match *cmd {
-            PathCmd::MoveTo(p) => out.push(vec![p]),
-            PathCmd::LineTo(p) | PathCmd::CubicTo(_, _, p) => match out.last_mut() {
-                Some(s) => s.push(p),
-                None => out.push(vec![p]),
-            },
-            PathCmd::Close => {
-                if let Some(s) = out.last_mut()
-                    && let Some(&first) = s.first()
-                {
-                    s.push(first);
-                }
-            }
-        }
-    }
-    out
-}
+/// The subpaths of a stitch object as needle points (one function for the
+/// stitch engine and for the records of stitch objects).
+pub use emb_model::stitch_subpaths;
 
 /// The stitches of one object: one or more runs in order.
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -389,6 +376,7 @@ fn stitch_kind(kind: &ObjectKind, entry: Point, exit: Option<Point>) -> Result<O
                             exact: params.style == RunStyle::Manual,
                             stop: None,
                             long_jumps: false,
+                            travel: Vec::new(),
                         }
                     })
                     .collect()
@@ -419,7 +407,13 @@ fn stitch_kind(kind: &ObjectKind, entry: Point, exit: Option<Point>) -> Result<O
                 Err(StitchError::Empty)
             } else {
                 Ok(ObjectStitches {
-                    runs: runs.into_iter().map(Run::new).collect(),
+                    runs: runs
+                        .into_iter()
+                        .map(|(points, travel)| Run {
+                            travel,
+                            ..Run::new(points)
+                        })
+                        .collect(),
                 })
             }
         }
@@ -717,6 +711,47 @@ fn thin_points(points: &mut Vec<Point>, min: f64) {
     *points = out;
 }
 
+/// The travel of a fixed letter from `needle` to the first point of `run`
+/// along the edges where the font joins two parts: along the end edge of
+/// the part before to `p`, to `q` on the start edge of this part, and along
+/// that edge to the first point. The two points go into `run` as travel. Not
+/// when the straight line goes near them already, when it goes along the
+/// two `edges` (two parts with one edge: a cut column), or when the parts
+/// that sew from now on (`unsewn`) cover the straight line.
+fn along_edges(run: &mut Run, needle: Point, (p, q): (Point, Point), edges: [Edge; 2], unsewn: &[&ObjectKind]) {
+    let Some(&start) = run.points.first() else {
+        return;
+    };
+    let on_edges = |w: Point| edges.iter().any(|e| w.distance_to_segment(e.0, e.1) <= EDGE_WAY_MM);
+    if (0..=8).all(|i| on_edges(needle.lerp(start, f64::from(i) / 8.0))) {
+        return;
+    }
+    let off = |w: Point| w.distance_to_segment(needle, start) > EDGE_WAY_MM;
+    if !off(p) && !off(q) {
+        return;
+    }
+    let areas: Vec<Vec<Vec<Point>>> = unsewn.iter().map(|k| part_area(k)).collect();
+    if hidden(needle, start, &areas) {
+        return;
+    }
+    let mut way: Vec<Point> = Vec::with_capacity(2);
+    for w in [p, q] {
+        let last = way.last().copied().unwrap_or(needle);
+        if w.distance(last) >= MIN_TRAVEL_MM && w.distance(start) >= MIN_TRAVEL_MM {
+            way.push(w);
+        }
+    }
+    let k = way.len();
+    if k == 0 {
+        return;
+    }
+    run.points.splice(0..0, way);
+    for r in &mut run.travel {
+        *r = r.start + k..r.end + k;
+    }
+    run.travel.insert(0, 0..k);
+}
+
 /// The points of the edges `a` and `b` that are nearest to each other
 /// (from steps along each edge).
 fn nearest_points(a: (Point, Point), b: (Point, Point)) -> (Point, Point) {
@@ -930,19 +965,57 @@ fn plan_letter(
         .collect()
 }
 
+/// How a part of a fixed letter (ADR 0112) joins the part before it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum FixedJoin {
+    /// With a trim, if the gap is longer than the trim distance and the
+    /// parts that sew from now on do not cover it.
+    Apart,
+    /// With no trim: the end edge of the part before is near the start
+    /// edge of this part (the first point and the second point are the
+    /// nearest points of the two edges), or the parts that sew from now on
+    /// cover the way between them. With the two edges.
+    Near(Point, Point, [Edge; 2]),
+}
+
+/// An edge of a part: the end or the start of a column.
+type Edge = (Point, Point);
+
+/// A way along the edges is used when a point of it is farther than this
+/// from the straight line, mm (the half width of a thread and a groove).
+const EDGE_WAY_MM: f64 = 0.3;
+
 /// Sewing state of a lettering object.
 struct LetterSewer<'a> {
     l: &'a emb_model::Lettering,
     runs: Vec<Run>,
     needle: Point,
     long_gap: RunLink,
+    /// The satin and fill parts of the letter that sews, with their areas
+    /// and `true` once they are sewn: a satin sews no underlay where
+    /// another of them lies (ADR 0163), and a puff column no end stitches
+    /// where one sewn before it lies (ADR 0165).
+    parts: Vec<(&'a ObjectKind, Vec<Vec<Point>>, bool)>,
+}
+
+impl<'a> LetterSewer<'a> {
+    /// The parts of `letter` that a satin does not sew its underlay on.
+    fn start_letter(&mut self, letter: &'a emb_model::Letter) {
+        self.parts = letter
+            .parts
+            .iter()
+            .filter(|p| matches!(p, ObjectKind::Satin { .. } | ObjectKind::Fill { .. }))
+            .map(|p| (p, part_area(p), false))
+            .filter(|(_, a, _)| !a.is_empty())
+            .collect();
+    }
 }
 
 impl LetterSewer<'_> {
     /// Sews `part` from `from` (to `exit`). `unsewn` are the parts that sew
     /// from now on, `part` too: with `smart`, their stitches can cover a
-    /// connection. `joined`: a part of a fixed letter, with `true` if it
-    /// joins the part before it with no trim.
+    /// connection. `fixed`: a part of a fixed letter, and how it joins the
+    /// part before it.
     fn sew(
         &mut self,
         part: &ObjectKind,
@@ -950,13 +1023,46 @@ impl LetterSewer<'_> {
         exit: Option<Point>,
         unsewn: &[&ObjectKind],
         smart: bool,
-        joined: Option<bool>,
+        fixed: Option<FixedJoin>,
     ) {
-        let Ok(mut st) = stitch_kind(part, from, exit) else {
+        let others: Vec<Vec<Vec<Point>>> = self
+            .parts
+            .iter()
+            .filter(|(p, _, _)| !std::ptr::eq(*p, part))
+            .map(|(_, a, _)| a.clone())
+            .collect();
+        let before: Vec<Vec<Vec<Point>>> = self
+            .parts
+            .iter()
+            .filter(|(p, _, sewn)| *sewn && !std::ptr::eq(*p, part))
+            .map(|(_, a, _)| a.clone())
+            .collect();
+        if let Some(entry) = self.parts.iter_mut().find(|(p, _, _)| std::ptr::eq(*p, part)) {
+            entry.2 = true;
+        }
+        let made = match part {
+            ObjectKind::Satin { geometry, params } if !others.is_empty() => {
+                match satin::satin_on(geometry, params, from, exit, &others, &before) {
+                    Some(points) if points.len() >= 2 => Ok(ObjectStitches {
+                        runs: vec![Run {
+                            long_jumps: params.auto_jump,
+                            ..Run::new(points)
+                        }],
+                    }),
+                    _ => Err(StitchError::Empty),
+                }
+            }
+            _ => stitch_kind(part, from, exit),
+        };
+        let Ok(mut st) = made else {
             return;
         };
-        let fixed = joined.is_some();
-        let joined = joined == Some(true);
+        let near = match fixed {
+            Some(FixedJoin::Near(p, q, edges)) => Some(((p, q), edges)),
+            _ => None,
+        };
+        let joined = near.is_some();
+        let fixed = fixed.is_some();
         // A travel run of a fixed letter turns in the columns that hide it.
         // At a small size two turns are near, and each turn is a needle
         // point: the points that are too near go.
@@ -987,6 +1093,30 @@ impl LetterSewer<'_> {
                 && first.points.len() > 1
             {
                 first.points.remove(0);
+            }
+            // The font joins the two parts at their edges: the needle goes
+            // along the end edge of the part before (on its end stitches)
+            // and along the start edge of this part (under its first
+            // stitches). The straight line from the needle to the first
+            // point went across the column sewn before when the needle and
+            // the first point are at far ends of the two edges: 11 mm in
+            // a letter of Fat Face Serif at 42.5 mm (P22 Milestone 1).
+            if let Some((pq, edges)) = near
+                && first.link == RunLink::Travel
+            {
+                along_edges(first, self.needle, pq, edges, unsewn);
+            }
+        }
+        // A run in a fixed letter is a travel run (the route makes it under
+        // the parts that sew later), in the direction of the route: the
+        // plan must not turn it round. As the first run of a lettering the
+        // plan turned it to the needle, and a straight travel stitch of up to
+        // 27 mm went back over the fabric to the next part (P22 Milestone 1).
+        if fixed && matches!(part, ObjectKind::Running { .. }) {
+            for run in &mut st.runs {
+                let all = 0..run.points.len().saturating_sub(1);
+                run.travel = Vec::from([all]);
+                run.fixed = true;
             }
         }
         if let Some(p) = st.runs.last().and_then(|r| r.points.last()) {
@@ -1021,10 +1151,12 @@ fn lettering_runs(l: &emb_model::Lettering, entry: Point, exit: Option<Point>) -
             LetterConnection::Trim => RunLink::Trim,
             LetterConnection::Jump => RunLink::Jump,
         },
+        parts: Vec::new(),
     };
     let seq = letter_sequence(l, entry);
     for (n, &li) in seq.iter().enumerate() {
         let letter = &l.letters[li];
+        w.start_letter(letter);
         // Where this letter should end: near the next letter.
         let target = match seq.get(n + 1) {
             None => exit,
@@ -1060,14 +1192,17 @@ fn lettering_runs(l: &emb_model::Lettering, entry: Point, exit: Option<Point>) -
                 // stitch along an edge lies on the end stitches of its
                 // column, so it does not show.
                 let edges = part_edges(part);
-                let joined = anchor.zip(edges).is_some_and(|(a, (s, _))| {
-                    let (p, q) = nearest_points(a, s);
-                    p.distance(q) <= l.trim_over_mm || {
-                        let areas: Vec<Vec<Vec<Point>>> = unsewn.iter().map(|k| part_area(k)).collect();
-                        hidden(p, q, &areas)
-                    }
-                });
-                w.sew(part, from, to, &unsewn, true, Some(joined));
+                let join = anchor
+                    .zip(edges)
+                    .map(|(a, (s, _))| (nearest_points(a, s), [a, s]))
+                    .filter(|&((p, q), _)| {
+                        p.distance(q) <= l.trim_over_mm || {
+                            let areas: Vec<Vec<Vec<Point>>> = unsewn.iter().map(|k| part_area(k)).collect();
+                            hidden(p, q, &areas)
+                        }
+                    })
+                    .map_or(FixedJoin::Apart, |((p, q), edges)| FixedJoin::Near(p, q, edges));
+                w.sew(part, from, to, &unsewn, true, Some(join));
                 anchor = edges.map(|(_, b)| b);
             }
             continue;
@@ -1205,6 +1340,11 @@ pub fn underlay_layers(kind: &ObjectKind) -> Option<Vec<UnderlayLayer>> {
             let holes: Vec<Polyline> = holes.iter().flat_map(|h| h.flatten(FLATTEN_TOL_MM)).collect();
             Some(fill_underlay_layers(&Shape::new(&outers, &holes), &params.underlay))
         }
+        // A band after the first has no underlay (the first band sews the
+        // underlay of the whole column).
+        ObjectKind::Satin { params, .. } if params.active_band().is_some_and(|b| !b.sews_underlay()) => {
+            Some(Vec::new())
+        }
         ObjectKind::Satin { geometry, params } => {
             let width = crate::satin::Column::new(geometry).map_or(0.0, |c| c.mean_width());
             Some(crate::satin::underlay_layers(&params.underlay, width))
@@ -1240,15 +1380,27 @@ fn row_split(shape: &Shape, p: &FillParams) -> Option<crate::fill::RowSplit> {
     Some(split)
 }
 
+/// Needle paths, each with the ranges of its segments that are travel.
+type MarkedRuns = Vec<(Vec<Point>, Vec<std::ops::Range<usize>>)>;
+
 /// Needle paths of a fill: underlay, then the top rows. Underlay tatami
 /// angles are relative to the fill angle.
-fn fill_runs(shape: &Shape, p: &FillParams, entry: Point, exit: Option<Point>) -> Vec<Vec<Point>> {
+fn fill_runs(shape: &Shape, p: &FillParams, entry: Point, exit: Option<Point>) -> MarkedRuns {
     if shape.is_empty() {
         return Vec::new();
     }
     let travel = Travel::new(shape);
     let mut sewer = Sewer::new(&travel, TRAVEL_LEN_MM);
     sewer.edge_only = p.trapunto;
+    // All travel of the fill, also of its underlay, goes along the top rows
+    // where it can: the top rows cover it best there. Only straight rows
+    // have a direction: the rows of the other patterns (circular, guided,
+    // contour...) are curves, and the angle of the fill sent their travel
+    // straight across them (P22 Milestone 1).
+    let split = row_split(shape, p);
+    if split.is_some() {
+        sewer.rows = Some(emb_geom::Transform::rotate_deg(p.angle_deg).apply_vector(Point::new(1.0, 0.0)));
+    }
     let layers = fill_underlay_layers(shape, &p.underlay);
     for layer in &layers {
         match *layer {
@@ -1292,7 +1444,7 @@ fn fill_runs(shape: &Shape, p: &FillParams, entry: Point, exit: Option<Point>) -
             UnderlayLayer::CenterWalk | UnderlayLayer::Zigzag { .. } => {}
         }
     }
-    if let Some(split) = row_split(shape, p) {
+    if let Some(split) = split {
         let top = Tatami {
             spacing_mm: p.spacing_mm,
             angle_deg: p.angle_deg,
@@ -1303,9 +1455,17 @@ fn fill_runs(shape: &Shape, p: &FillParams, entry: Point, exit: Option<Point>) -
         };
         sew_tatami(shape, &top, entry, exit, &mut sewer);
     } else {
+        // Rings and guided rows: the travel between the parts goes round
+        // the rows that are sewn, else the needle path starts again (P22
+        // Milestone 1: their travel went straight across sewn rows). The
+        // other curved patterns keep their travel (a satin fill of a ring
+        // has no way round its sewn columns and got trims).
+        if matches!(p.pattern, FillPattern::Circular { .. } | FillPattern::Guided { .. }) {
+            sewer.track_sewn();
+        }
         crate::curves::sew(shape, p, entry, &mut sewer);
     }
-    sewer.finish()
+    sewer.finish_with_travel()
 }
 
 pub type CachedStitches = Arc<Result<ObjectStitches, StitchError>>;
@@ -1485,6 +1645,112 @@ mod tests {
                 .line_to(Point::new(12.0, -23.0));
         }
         assert_eq!(trims(&l), 1);
+    }
+
+    #[test]
+    fn a_fixed_letter_goes_along_the_edges_where_two_columns_meet() {
+        let rails = |a: [(f64, f64); 2], b: [(f64, f64); 2]| {
+            let line = |p: [(f64, f64); 2]| {
+                Path::new()
+                    .move_to(Point::new(p[0].0, p[0].1))
+                    .line_to(Point::new(p[1].0, p[1].1))
+            };
+            ObjectKind::Satin {
+                geometry: emb_model::SatinGeometry {
+                    rail_a: line(a),
+                    rail_b: line(b),
+                    rungs: Vec::new(),
+                },
+                params: Default::default(),
+            }
+        };
+        // A column from left to right (0 to `len`, 5 mm wide), and a column
+        // 10 mm wide down from its lower side: the end edge of the first
+        // and the start edge of the second meet at (`len`, 5). The second
+        // starts at its rail A, at (0, 5).
+        let mut far = 0;
+        for len in [10.0, 10.2, 10.4, 10.6] {
+            let mut l = emb_model::Lettering::new("L", Default::default(), 10.0, Point::ZERO);
+            l.letters = vec![emb_model::Letter {
+                text: "L".into(),
+                parts: vec![
+                    rails([(0.0, 0.0), (len, 0.0)], [(0.0, 5.0), (len, 5.0)]),
+                    rails([(0.0, 5.0), (0.0, 15.0)], [(len, 5.0), (len, 15.0)]),
+                ],
+                fixed: true,
+                ..Default::default()
+            }];
+            let runs = lettering_runs(&l, Point::new(-5.0, 0.0), None);
+            assert_eq!(runs.len(), 2);
+            assert_eq!(runs[1].link, RunLink::Travel);
+            let needle = *runs[0].points.last().unwrap();
+            if needle.distance(Point::new(len, 0.0)) < 0.5 {
+                far += 1;
+            }
+            // The travel: from the needle to the end of the travel points of
+            // the second column. No point of it is inside the first column.
+            let k = runs[1].travel.first().map_or(0, |r| r.end);
+            let way: Vec<Point> = std::iter::once(needle)
+                .chain(runs[1].points[..=k].iter().copied())
+                .collect();
+            for w in way.windows(2) {
+                for i in 0..=20 {
+                    let p = w[0].lerp(w[1], f64::from(i) / 20.0);
+                    let inside = p.x > 0.5 && p.x < len - 0.5 && p.y > 0.5 && p.y < 4.5;
+                    assert!(
+                        !inside,
+                        "len {len}: the travel {way:?} goes across the first column at {p:?}"
+                    );
+                }
+            }
+        }
+        assert!(far > 0, "a case with the needle at the far end of the first column");
+    }
+
+    /// Two columns of a fixed letter with the same edge (a cut column): the
+    /// straight travel along the edge is the way, with no turn at a corner
+    /// of the edge (the audit of 2026-11-26).
+    #[test]
+    fn a_fixed_letter_with_one_edge_for_two_columns_goes_straight() {
+        let line = |p: [(f64, f64); 2]| {
+            Path::new()
+                .move_to(Point::new(p[0].0, p[0].1))
+                .line_to(Point::new(p[1].0, p[1].1))
+        };
+        let rails = |a: [(f64, f64); 2], b: [(f64, f64); 2]| ObjectKind::Satin {
+            geometry: emb_model::SatinGeometry {
+                rail_a: line(a),
+                rail_b: line(b),
+                rungs: Vec::new(),
+            },
+            params: Default::default(),
+        };
+        for swap in [false, true] {
+            for len in [10.0, 10.2, 10.4, 10.6] {
+                let (a2, b2) = ([(0.0, 0.0), (0.0, -10.0)], [(5.0, 0.0), (5.0, -10.0)]);
+                let (a2, b2) = if swap { (b2, a2) } else { (a2, b2) };
+                let mut l = emb_model::Lettering::new("I", Default::default(), 10.0, Point::ZERO);
+                l.letters = vec![emb_model::Letter {
+                    text: "I".into(),
+                    parts: vec![rails([(0.0, len), (0.0, 0.0)], [(5.0, len), (5.0, 0.0)]), rails(a2, b2)],
+                    fixed: true,
+                    ..Default::default()
+                }];
+                let runs = lettering_runs(&l, Point::new(0.0, len + 5.0), None);
+                assert_eq!(runs.len(), 2);
+                let needle = *runs[0].points.last().unwrap();
+                let k = runs[1].travel.first().map_or(0, |r| r.end);
+                let way: Vec<Point> = std::iter::once(needle)
+                    .chain(runs[1].points[..=k].iter().copied())
+                    .collect();
+                let length: f64 = way.windows(2).map(|w| w[0].distance(w[1])).sum();
+                let straight = needle.distance(runs[1].points[k]);
+                assert!(
+                    length <= straight + 0.5,
+                    "swap {swap}, len {len}: {length:.2} mm for {straight:.2} mm: {way:?}"
+                );
+            }
+        }
     }
 
     #[test]

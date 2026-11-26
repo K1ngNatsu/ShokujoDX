@@ -102,7 +102,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                 .on_hover_text(tr("Set the number of needles of your machine. Models of one brand have 6 to 15."));
             if ui
                 .add(
-                    egui::DragValue::new(&mut count)
+                    crate::workspace::drag(&mut count)
                         .range(NEEDLES_RANGE)
                         .clamp_existing_to_range(false),
                 )

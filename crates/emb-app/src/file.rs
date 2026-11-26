@@ -69,6 +69,18 @@ impl AppState {
         let unsaved = self.doc.is_modified() && !self.doc.design().objects().is_empty();
         match action {
             Pending::Quit => {
+                // The tabs come back at the next start: no question (ADR 0175).
+                if self.settings.restore_tabs && self.backups.root.is_some() {
+                    match self.backups_keep_tabs() {
+                        Ok(()) => {
+                            self.close_now = true;
+                            return;
+                        }
+                        Err(e) => {
+                            self.message = crate::i18n::fill("The open tabs were not kept: {}", &[&e]);
+                        }
+                    }
+                }
                 self.quit_queue = self.unsaved_tabs();
                 match self.quit_queue.first() {
                     Some(&i) => {
@@ -256,6 +268,7 @@ impl AppState {
                 }
                 self.start_design(design);
                 self.file_path = Some(path.to_path_buf());
+                self.file_known(path);
                 self.add_recent(path);
                 self.message = crate::i18n::fill("Opened {}", &[&(path.display())]);
                 if !notes.is_empty() {
@@ -512,6 +525,7 @@ impl AppState {
             Ok(()) => {
                 self.doc.mark_saved();
                 self.file_path = Some(path.to_path_buf());
+                self.file_known(path);
                 self.add_recent(path);
                 self.message = crate::i18n::fill("Saved {}", &[&(path.display())]);
                 true

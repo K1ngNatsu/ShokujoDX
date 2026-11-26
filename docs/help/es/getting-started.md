@@ -12,7 +12,14 @@ un archivo para su máquina de bordar.
 
 Si el bordado es nuevo para usted, lea primero [Conceptos básicos del
 bordado](embroidery-basics). Para aprender haciendo, empiece con
-[Tutorial: un parche a partir de una imagen](tutorial-patch).
+[Tutorial: su primer diseño](tutorial-first-design) y después vea
+[Todos los tutoriales](tutorials).
+
+Un tutorial con **Empezar la lección** en su ficha es también una
+lección: el programa muestra un paso cada vez en la ventana **Lección**,
+marca el botón o el punto del lienzo donde hacer clic y comprueba el
+diseño antes de seguir. La ventana tiene **◀ Atrás**, **Omitir ▶** y
+**Detener la lección**. Una lección que se detiene guarda su punto.
 
 ## La página de inicio
 
@@ -45,8 +52,9 @@ el diseño, y una imagen pasa a ser la imagen de fondo.
   lienzo y la selección](canvas).
 - **Los paneles** de la derecha muestran el objeto seleccionado
   (Propiedades del objeto), el orden de bordado (Secuencia), los hilos,
-  los estilos, la información del diseño y más. Cada panel se cierra con
-  su ×. **Ver > Paneles** lo abre de nuevo.
+  los estilos, la información del diseño y más. Están en dos grupos; la
+  pestaña abierta de un grupo tiene una × que cierra su panel. **Ver >
+  Paneles** lo abre de nuevo.
 - **La barra de propiedades** bajo la cinta tiene los ajustes de la
   herramienta activa, por ejemplo la longitud de puntada de las líneas
   nuevas.
@@ -99,7 +107,9 @@ más espacio; haga clic en una pestaña para mostrarla de nuevo.
   **Ctrl+Más**, **Ctrl+Menos** y **Ctrl+0** también lo cambian.
 - **Alto contraste**: paneles negros o blancos con líneas marcadas.
 - **Idioma**: English, Deutsch, Español o 日本語. Los temas de ayuda están
-  en el mismo idioma (un tema sin traducción está en inglés).
+  en el mismo idioma (un tema sin traducción está en inglés). En todos
+  los campos numéricos puede escribir un punto o una coma decimal
+  (`0.4` o `0,4`).
 
 Vea [Opciones](options) para todos los ajustes.
 

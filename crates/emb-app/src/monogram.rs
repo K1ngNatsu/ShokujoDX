@@ -126,13 +126,22 @@ impl AppState {
             .replace
             .and_then(|g| self.doc.design().monograms.iter().find(|r| r.group == g).cloned());
         let center = replace.as_ref().map_or(self.doc.design().hoop.center, |r| r.center);
-        let Some(m) = self.monogram_objects(center) else {
+        let Some(mut m) = self.monogram_objects(center) else {
             self.message = crate::i18n::fill(
                 "{} is not on this computer or has none of these initials.",
                 &[&(w.spec.font.label())],
             );
             return;
         };
+        // The monogram suits the fabric of the design, as other objects
+        // (ADR 0163).
+        let change = self.doc.design().fabric_change(&self.fabrics);
+        change.satin(&mut m.letters.satin);
+        change.fill(&mut m.letters.fill);
+        m.letters.apply_params();
+        for kind in m.borders.iter_mut().chain(m.ornaments.iter_mut()) {
+            change.object(kind);
+        }
         let label = if replace.is_some() {
             tr("Change monogram")
         } else {
@@ -313,7 +322,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
             ui.label(tr("Height"))
                 .on_hover_text(tr("The height of the largest initial."));
             ui.add(
-                egui::DragValue::new(&mut w.spec.height_mm)
+                crate::workspace::drag(&mut w.spec.height_mm)
                     .range(5.0..=200.0)
                     .clamp_existing_to_range(false)
                     .speed(0.2)
@@ -343,7 +352,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                 if w.spec.border.stitch == BorderStitch::Satin {
                     ui.label(tr("Width"));
                     ui.add(
-                        egui::DragValue::new(&mut w.spec.border.width_mm)
+                        crate::workspace::drag(&mut w.spec.border.width_mm)
                             .range(0.8..=10.0)
                             .clamp_existing_to_range(false)
                             .speed(0.05)
@@ -353,7 +362,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                 ui.label(tr("Space"))
                     .on_hover_text(tr("The space between the initials and the border."));
                 ui.add(
-                    egui::DragValue::new(&mut w.spec.border.margin_mm)
+                    crate::workspace::drag(&mut w.spec.border.margin_mm)
                         .range(0.0..=30.0)
                         .clamp_existing_to_range(false)
                         .speed(0.1)
@@ -382,7 +391,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
             ui.horizontal(|ui| {
                 ui.label(tr("Size"));
                 ui.add(
-                    egui::DragValue::new(&mut w.spec.ornaments.size_mm)
+                    crate::workspace::drag(&mut w.spec.ornaments.size_mm)
                         .range(1.0..=60.0)
                         .clamp_existing_to_range(false)
                         .speed(0.1)
@@ -585,5 +594,132 @@ mod tests {
         st.monogram_window.open = false;
         frame(&mut st);
         assert!(st.monogram_window.templates.is_none() && st.monogram_window.preview.is_none());
+    }
+
+    /// The warnings of Design Info for the monogram of `initials` with
+    /// `spec`, on the fabric `fabric`, on the reference machine.
+    fn monogram_warnings(initials: &str, spec: &MonogramSpec, fabric: &str) -> Vec<String> {
+        let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        st.start_on_machine("husqvarna_topaz20", None);
+        st.new_design();
+        st.apply_fabric(Some(fabric), true);
+        st.open_monogram();
+        st.monogram_window.spec = spec.clone();
+        st.monogram_window.initials = initials.into();
+        st.place_monogram();
+        st.design_info().issues.iter().map(|i| i.text.clone()).collect()
+    }
+
+    /// The monogram templates sew with no warning: no thread that builds
+    /// up at the joints of the letters, and no short lock stitch (ADR
+    /// 0163); the oval and the diamond styles too (ADR 0164); on towel
+    /// fabric (denser, heavy underlay) too, since the stitches that meet a
+    /// side at a small angle are short (ADR 0180).
+    #[test]
+    fn the_monogram_templates_sew_with_no_warning() {
+        let mut bad = Vec::new();
+        for t in MonogramTemplate::builtin(&default_font()) {
+            for (initials, fabric) in [
+                ("JMK", "cotton"),
+                ("ABC", "cotton"),
+                ("EAN", "cotton"),
+                ("JMK", "towel"),
+                ("ABC", "towel"),
+                ("SRW", "towel"),
+            ] {
+                let w = monogram_warnings(initials, &t.spec, fabric);
+                if !w.is_empty() {
+                    bad.push(format!("{initials} on {fabric}, {}: {w:?}", t.name));
+                }
+            }
+        }
+        assert!(bad.is_empty(), "{}", bad.join("\n"));
+    }
+
+    /// The styles that make an initial larger (the middle of Classic, Oval
+    /// and Diamond) build up no thread at 60 mm, also on towel: a letter
+    /// that is larger than the columns of the font go sews as its fill
+    /// letter, and the stitches at the cap of a wide column end do not
+    /// crowd (ADR 0181). The initials with the most build-up before.
+    #[test]
+    fn the_large_styles_build_up_no_thread() {
+        let mut bad = Vec::new();
+        for style in [MonogramStyle::Classic, MonogramStyle::Diamond, MonogramStyle::Oval] {
+            let mut spec = MonogramSpec::new(default_font());
+            spec.style = style;
+            spec.height_mm = 60.0;
+            for initials in ["ABC", "SRW"] {
+                for fabric in ["cotton", "towel"] {
+                    let w = monogram_warnings(initials, &spec, fabric);
+                    if w.iter().any(|t| t.contains("builds up")) {
+                        bad.push(format!("{initials} on {fabric}, {}: {w:?}", style.name()));
+                    }
+                }
+            }
+        }
+        assert!(bad.is_empty(), "{}", bad.join("\n"));
+    }
+
+    /// A monogram and new lettering get the settings of the fabric of the
+    /// design, as the objects that the tools draw (ADR 0163).
+    #[test]
+    fn a_monogram_suits_the_fabric() {
+        let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        st.new_design();
+        st.apply_fabric(Some("towel"), true);
+        st.open_monogram();
+        st.monogram_window.spec.border.shape = BorderShape::Circle;
+        st.monogram_window.initials = "AB".into();
+        st.place_monogram();
+        let d = st.doc.design();
+        let ObjectKind::Lettering(l) = &d.objects()[0].kind else {
+            panic!("the initials")
+        };
+        assert_eq!(l.satin.underlay, emb_model::Underlay::Heavy);
+        assert!((l.satin.spacing_mm - 0.4 * 0.9).abs() < 1e-9, "{}", l.satin.spacing_mm);
+        let ObjectKind::Satin { params, .. } = &d.objects()[1].kind else {
+            panic!("the border")
+        };
+        assert_eq!(params.underlay, emb_model::Underlay::Heavy);
+        st.add_lettering(crate::lettering::LetteringDialog::new(
+            Point::new(0.0, 60.0),
+            "Zoe",
+            emb_model::FontRef::embroidery("Block Sans", ""),
+            15.0,
+        ));
+        let ObjectKind::Lettering(l) = &st.doc.design().objects()[2].kind else {
+            panic!("the lettering")
+        };
+        assert_eq!(l.satin.underlay, emb_model::Underlay::Heavy);
+    }
+
+    /// The warnings of each monogram template with more initials, and of
+    /// each style at two heights, with and without a circle.
+    /// `cargo test -p emb-app -- --ignored probe_monogram_warnings --nocapture`
+    #[test]
+    #[ignore = "a probe: prints the warnings of the monograms"]
+    fn probe_monogram_warnings() {
+        let mut cases: Vec<(String, MonogramSpec)> = MonogramTemplate::builtin(&default_font())
+            .into_iter()
+            .map(|t| (t.name, t.spec))
+            .collect();
+        for style in MonogramStyle::ALL {
+            for h in [30.0, 60.0] {
+                let mut spec = MonogramSpec::new(default_font());
+                spec.style = style;
+                spec.height_mm = h;
+                cases.push((format!("style {} {h} mm", style.name()), spec.clone()));
+                spec.border.shape = BorderShape::Circle;
+                cases.push((format!("style {} {h} mm circle", style.name()), spec));
+            }
+        }
+        for initials in ["JMK", "ABC", "SRW", "EAN"] {
+            for fabric in ["cotton", "towel"] {
+                for (name, spec) in &cases {
+                    let w = monogram_warnings(initials, spec, fabric);
+                    println!("{initials} {fabric} / {name}: {w:?}");
+                }
+            }
+        }
     }
 }

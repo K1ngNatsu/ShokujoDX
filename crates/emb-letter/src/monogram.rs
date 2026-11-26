@@ -37,6 +37,23 @@ const CLASSIC_SIDE: f64 = 0.65;
 /// Size of the small initials of the stacked style.
 const STACKED_SMALL: f64 = 0.45;
 
+/// The envelope amount of the diamond style.
+const DIAMOND_AMOUNT: f64 = 0.6;
+/// The envelope amount of the oval style.
+const OVAL_AMOUNT: f64 = 0.45;
+
+/// Gives `l` an envelope that makes the middle of the text `1 + amount`
+/// times as high as the text, and makes the text smaller by the same
+/// factor: the middle initial is the height of the spec
+/// (`MonogramSpec::height_mm`, the height of the largest initial), as in
+/// the other styles (ADR 0164).
+fn fit_envelope(l: &mut Lettering, shape: EnvelopeShape, amount: f64) {
+    l.envelope = Envelope { shape, amount };
+    let s = 1.0 / (1.0 + amount);
+    l.height_mm *= s;
+    l.letter_spacing_mm *= s;
+}
+
 /// Makes the objects of the monogram of `text` with its middle at `center`.
 /// `None` if the font has none of the initials.
 pub fn build(
@@ -89,18 +106,8 @@ pub fn build(
             }
         }
         MonogramStyle::Stacked => {}
-        MonogramStyle::Diamond => {
-            l.envelope = Envelope {
-                shape: EnvelopeShape::Diamond,
-                amount: 0.6,
-            };
-        }
-        MonogramStyle::Oval => {
-            l.envelope = Envelope {
-                shape: EnvelopeShape::Oval,
-                amount: 0.45,
-            };
-        }
+        MonogramStyle::Diamond => fit_envelope(&mut l, EnvelopeShape::Diamond, DIAMOND_AMOUNT),
+        MonogramStyle::Oval => fit_envelope(&mut l, EnvelopeShape::Oval, OVAL_AMOUNT),
     }
     relayout(&mut l, src);
     if l.letters.is_empty() {
@@ -393,6 +400,13 @@ mod tests {
         assert!(bx[1].min.x > bx[0].max.x && bx[2].min.x > bx[0].max.x);
         assert!(bx[1].height() < bx[0].height() * 0.6);
         assert_eq!(initials("a b c d", MonogramStyle::Block), "abc");
+        // The envelope styles: the middle initial is the height of the spec
+        // (ADR 0164), and the ends are lower.
+        for style in [MonogramStyle::Oval, MonogramStyle::Diamond] {
+            let h = letter_heights(&build("JMK", &spec(style), &f, at).unwrap());
+            assert!(h[1] > 27.0 && h[1] < 30.5, "{style:?}: {h:?}");
+            assert!(h[0] < h[1] && h[2] < h[1], "{style:?}: {h:?}");
+        }
     }
 
     #[test]

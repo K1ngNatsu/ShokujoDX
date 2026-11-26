@@ -2,7 +2,7 @@
 id: checking
 title: Checking a design
 group: production
-keywords: check, preview, stitch player, play, sew-out, simulate, stitch cursor, travel, stitch list, functions, design info, warnings, density map, layers, build up, thread look, 3d, light, light presets, tilt, tilt view, turn, magnifier, compare, before and after, show through, gaps, high thread, thread breaks, needle points, jumps, trims, product, t-shirt, mockup, repeats, continuous, approval, sew time, stitch count
+keywords: check, preview, stitch player, play, sew-out, simulate, stitch cursor, travel, stitch list, functions, design info, warnings, density map, layers, build up, thread look, 3d, light, light presets, tilt, tilt view, turn, magnifier, compare, before and after, show through, gaps, high thread, thread breaks, needle points, jumps, trims, product, t-shirt, mockup, repeats, continuous, approval, sew time, stitch count, travel that shows, fix stitches, machine file check
 ---
 # Checking a design
 
@@ -50,6 +50,7 @@ The **Design Info** panel shows the numbers of the design:
 
 - the size, the hoops it fits, the number of objects, stitches, colors,
   color changes, trims, jumps and stops;
+- the travel that shows: on top of sewn stitches and on the fabric;
 - the sew time at the speed of the machine;
 - the fabric, the top thread and the bobbin thread, and the thread cost;
 - the density (the most layers of thread);
@@ -66,7 +67,15 @@ object. The program warns about:
 - lettering that is smaller or larger than the size range of its font;
 - on a cap frame, a sew order that is not from the center out;
 - in free-standing lace, a part that touches no other part;
-- objects that make no stitches.
+- travel stitches that show: more than 2 mm on top of sewn stitches in
+  one object, or a piece of 4 mm or more on the fabric;
+- objects that make no stitches;
+- in stitch objects (a machine file opened as stitches): stitches longer
+  than the machine sews, color changes to the same thread, long jumps
+  with no trim, pieces too short for the trimmer, starts and ends with
+  no lock stitches, and travel of the file that shows on top of sewn
+  stitches (1 mm or more in one run). **Fix Stitches**
+  fixes most of them.
 
 ## The density map
 
@@ -136,6 +145,12 @@ you sew it.
 - **High Thread** marks the places where the thread is higher than the
   limit over the fabric (foam and padding do not count): a risk of
   thread breaks.
+- **Travel That Shows** marks the travel stitches that no stitch covers:
+  red where they lie on top of stitches sewn before them, blue where they
+  lie on the fabric. Travel under stitches that sew later, between the
+  rows of a fill and along the edge of an area does not show. Change the
+  start or the end point of the object, or the sew order, so that the
+  travel goes under the stitches that sew later.
 
 Set the limits of the two checks in **Options** (**Fabric shows
 through** and **Thread height limit**).
@@ -152,6 +167,26 @@ object, the two sides of a satin column, and the outline and the holes of
 a fill. It shows how the program
 reads the stitches of a machine file of another program, the first step
 to make objects of them.
+
+## Fix a machine file
+
+A machine file opens as stitch objects. **Edit > Machine Functions >
+Fix Stitches…** checks them and fixes the faults that it can:
+
+- **Join color blocks of the same thread**: the color change to the same
+  thread goes.
+- **Remove stitches shorter than** the shortest stitch of the machine:
+  the next stitch starts at the needle point before.
+- **Split stitches longer than** the longest stitch of the machine into
+  equal stitches.
+- **Trim jumps longer than** the trim distance.
+- **Add lock stitches at starts and ends** that have none.
+
+Each fix has a check box and the number that the check found. **Apply
+Fixes** makes the fixes that are on, as one undo step. The other needle points
+stay where they are. Pieces too short for the trimmer and travel that
+shows have no fix: Design info shows where they are. On the command
+line, `emb-cli check` and `emb-cli fix` do the same for a file.
 
 ## The product
 

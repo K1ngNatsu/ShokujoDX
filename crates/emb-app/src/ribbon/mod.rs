@@ -269,7 +269,8 @@ fn panels_row(ui: &mut egui::Ui, st: &mut AppState, s: &SelInfo, tab: RibbonTab,
 
 /// Shows the ribbon: the tab row and the panels of the current tab.
 pub fn show(ui: &mut egui::Ui, st: &mut AppState) {
-    #[cfg(test)]
+    // The places of the buttons, for a lesson (ADR 0177) and the tests.
+    RECORD.with(|r| r.set(cfg!(test) || st.lesson.is_some()));
     RECTS.with(|r| r.borrow_mut().clear());
     let s = SelInfo::of(st);
     let ctx = ui.ctx().clone();

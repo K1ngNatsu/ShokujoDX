@@ -2,7 +2,7 @@
 id: arranging
 title: Arranging and the sew order
 group: design
-keywords: arrange, rotate, turn, mirror, flip, skew, slant, reference points, center, align, space evenly, distribute, same size, copies, arrangement, mirror merge, array, wreath, kaleidoscope, reflect, group, ungroup, lock, unlock, sew order, sequence, color changes, shortest order, cap order, closest join, click order
+keywords: arrange, rotate, turn, mirror, flip, skew, slant, reference points, center, align, space evenly, distribute, same size, copies, arrangement, mirror merge, array, wreath, kaleidoscope, reflect, group, ungroup, lock, unlock, sew order, sequence, color changes, shortest order, cap order, closest join, click order, quicker to sew, merge threads, small details, trim distance, gaps
 ---
 # Arranging and the sew order
 
@@ -89,6 +89,20 @@ trim takes time.
   and how much travel it saved.
 - **Closest Join**: each object ends at the point nearest to the next
   one, which starts there. Short gaps then get travel stitches, not trims.
+- **Quicker to Sew** does four things in one window, each on or off:
+  **Merge similar threads** (threads whose colors differ by the value or
+  less become the thread that sews more), **Remove small details**
+  (fills, satin columns and lines smaller than the size, not in groups),
+  **Sew across gaps up to** (a gap to the next part of the same color up
+  to this length gets a travel stitch, not a trim; the design keeps this
+  value, and with it off the machine decides) and **Fewer color changes**.
+  A table shows the threads, color changes, trims, stitches, sew time and
+  the travel that shows, before and after, and the canvas marks the
+  travel that shows. **Standard** sets the values of the first open.
+  **Remove small details** also leaves locked objects, and the objects
+  of border traces, linked shapes, buttonholes, appliqué and sketches.
+  **OK**
+  keeps the result as one step that you can undo; **Cancel** goes back.
 
 ## Caps
 

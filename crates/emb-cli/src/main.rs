@@ -136,6 +136,36 @@ Usage:
       wider than --row (180 mm), with the size at each group. With a
       TrueType or OpenType font, the letters that lettering makes from it
       (the stitch type Automatic).
+  emb-cli swatch <design.embproj> <out.embproj> --setting <name> --from <v> --to <v>
+                 [--copies <n>] [--objects <id>,<id>,...]
+      Write test swatches (ADR 0170): a copy of the objects (all, or the
+      ids of --objects) for each value from --from to --to in equal steps
+      (--copies, 5 by default), in a grid that fits the hoop of the design,
+      each with its value under it. The setting is spacing, stitch-length,
+      pull-compensation, width, angle (degrees), underlay (none, light,
+      auto, heavy, double; --from and --to are not needed), lean (degrees)
+      or band-overlap (ADR 0171). Lengths in mm.
+  emb-cli mcp
+      An MCP server for the AI agent of the user (ADR 0176): the agent (an
+      MCP client) starts it and talks to it on standard input and output
+      (JSON-RPC, one message on each line). Its tools make and change one
+      design, check it, draw it, export it and show it in ShokujoDX. No
+      network code. The help topic Agents has the setup.
+  emb-cli check <file> [--machine <id>]
+      Check the stitches of a machine file, or of the stitch objects of a
+      design (ADR 0172): stitches shorter or longer than the machine sews,
+      color changes to the same thread, long jumps with no trim, pieces too
+      short for the trimmer, starts and ends with no lock stitches, and
+      travel that shows on top of sewn stitches. It prints the number of
+      each fault and its first places (mm). The stitch lengths are of
+      --machine, else of the machine of a design; the trim distance of a
+      design wins.
+  emb-cli fix <file> <out> [--machine <id>] [--fixes join,short,long,jumps,locks]
+      Fix the stitches of a machine file (ADR 0172): join the color blocks
+      of the same thread, remove the short stitches, split the long
+      stitches (up to 60 mm; a longer one is a jump of a damaged file, and
+      it stays), trim the long jumps and add lock stitches (all, or the
+      fixes of --fixes); the other needle points stay. Then write <out>.
   emb-cli font-audit <font.embfont> [--source <font.ttf>] [--chars ...]
                      [--sizes <mm>,...] [--corrections <file>] [--proof <out.json>]
                      [--text <text>] [--weight <n>]
@@ -163,7 +193,7 @@ Usage:
       part with two layers, and the narrowest and the widest column; and
       the trims of words. --face: the face of a font collection (.ttc; 0 is
       the first). --letters: one line for each character and size too.
-  emb-cli letter-faults [--proof <pictures.json>]
+  emb-cli letter-faults [--proof <pictures.json>] [--judged <judged.json>]
       The letter fault bench (P21): the letters A-Z, a-z and 0-9 of the
       four embroidery fonts with a source font in the program, as the
       embroidery font and as lettering in the source font, sewn at 25 mm
@@ -171,7 +201,9 @@ Usage:
       outside it, crossing stitches, fans, bulges, open area and open
       corners, columns that end on top of other columns, travel runs
       outside. --proof: the pictures of the letters as JSON, for
-      tools/letter-faults.py.
+      tools/letter-faults.py. --judged: compare the measures with the eye
+      (ADR 0173; crates/emb-cli/tests/data/judged-letters.json): the
+      letters where they do not agree, and the letters near a limit.
   emb-cli view-bench [--out <folder>] [--stress] [--sew]
       The bench of the 3D view (ADR 0122). Make the pictures of the
       reference set (twelve small corpus designs, each for one thing that a
@@ -335,6 +367,12 @@ fn run(args: &[String]) -> Result<(), String> {
     let mut order_given = false;
     let mut sheet: Option<PathBuf> = None;
     let mut script_inputs = std::collections::BTreeMap::new();
+    let mut swatch_setting: Option<emb_letter::swatch::SwatchSetting> = None;
+    let (mut swatch_from, mut swatch_to, mut swatch_copies) =
+        (None::<f64>, None::<f64>, emb_letter::swatch::DEFAULT_COPIES);
+    let mut swatch_objects: Vec<u64> = Vec::new();
+    let mut fixes = emb_art::file_check::Fixes::ALL;
+    let mut judged: Option<PathBuf> = None;
     let mut rest = Vec::new();
     let mut it = args.iter();
     while let Some(a) = it.next() {
@@ -418,6 +456,7 @@ fn run(args: &[String]) -> Result<(), String> {
             }
             "--source" => audit_source = Some(PathBuf::from(it.next().ok_or("--source needs a font file")?)),
             "--proof" => audit_proof = Some(PathBuf::from(it.next().ok_or("--proof needs a file")?)),
+            "--judged" => judged = Some(PathBuf::from(it.next().ok_or("--judged needs a file")?)),
             "--sizes" => {
                 sheet_sizes = it
                     .next()
@@ -495,6 +534,46 @@ fn run(args: &[String]) -> Result<(), String> {
                 )
             }
             "--sheet" => sheet = Some(PathBuf::from(it.next().ok_or("--sheet needs a PDF file")?)),
+            "--setting" => {
+                let name = it.next().ok_or("--setting needs a setting")?.to_lowercase();
+                swatch_setting =
+                    Some(emb_cli::swatch_setting_named(&name).ok_or_else(|| format!("unknown setting {name:?}"))?);
+            }
+            "--from" | "--to" => {
+                let v = it
+                    .next()
+                    .and_then(|v| v.parse::<f64>().ok())
+                    .filter(|v| v.is_finite())
+                    .ok_or_else(|| format!("{a} needs a number"))?;
+                if a == "--from" {
+                    swatch_from = Some(v);
+                } else {
+                    swatch_to = Some(v);
+                }
+            }
+            "--copies" => {
+                swatch_copies = it
+                    .next()
+                    .and_then(|v| v.parse::<usize>().ok())
+                    .filter(|v| (1..=emb_letter::swatch::MAX_COPIES).contains(v))
+                    .ok_or_else(|| format!("--copies needs a number from 1 to {}", emb_letter::swatch::MAX_COPIES))?;
+            }
+            "--fixes" => {
+                let list = it.next().ok_or("--fixes needs a list: join,short,long,jumps,locks")?;
+                fixes = emb_cli::parse_fixes(list)?;
+            }
+            "--objects" => {
+                swatch_objects = it
+                    .next()
+                    .ok_or("--objects needs a list of ids")?
+                    .split(',')
+                    .map(|s| {
+                        s.trim()
+                            .parse::<u64>()
+                            .map_err(|_| format!("{s:?} is not an object id"))
+                    })
+                    .collect::<Result<_, _>>()?;
+            }
             "--set" => {
                 let (k, v) = emb_cli::script_input(it.next().ok_or("--set needs name=value")?)?;
                 script_inputs.insert(k, v);
@@ -852,7 +931,7 @@ fn run(args: &[String]) -> Result<(), String> {
                 Box::new(f)
             };
             let family = source.font_ref().family.clone();
-            let label = emb_letter::bundled::embroidery("Atkinson Hyperlegible");
+            let label = emb_letter::bundled::embroidery(emb_letter::sheet::LABEL_FONT);
             let sizes = if sheet_sizes.is_empty() {
                 emb_letter::sheet::sizes(source.size_range(emb_model::LetterStitch::Satin)).to_vec()
             } else {
@@ -879,6 +958,49 @@ fn run(args: &[String]) -> Result<(), String> {
             );
             Ok(())
         }
+        ["swatch", input, output] => {
+            let design = emb_model::project::load(Path::new(input)).map_err(|e| format!("{input}: {e}"))?;
+            let setting = swatch_setting.ok_or("swatch needs --setting")?;
+            if setting != emb_letter::swatch::SwatchSetting::Underlay && (swatch_from.is_none() || swatch_to.is_none())
+            {
+                return Err("swatch needs --from and --to".into());
+            }
+            let ids: Vec<emb_model::ObjectId> = swatch_objects.iter().map(|&i| emb_model::ObjectId(i)).collect();
+            let made = emb_cli::swatch_design(&design, &ids, setting, swatch_from, swatch_to, swatch_copies)?;
+            emb_model::project::save(&made.design, Path::new(output)).map_err(|e| format!("{output}: {e}"))?;
+            println!(
+                "wrote {output}: {} copies in {} x {}, {:.0} x {:.0} mm{}",
+                made.values.len(),
+                made.columns,
+                made.rows,
+                made.size.0,
+                made.size.1,
+                if made.fits { "" } else { " (larger than the hoop)" }
+            );
+            Ok(())
+        }
+        ["mcp"] => emb_cli::mcp::serve(std::io::stdin().lock(), std::io::stdout().lock()).map_err(|e| e.to_string()),
+        ["check", input] => {
+            let input = read_input(Path::new(input))?;
+            let s = emb_cli::file_stitches(&input)?;
+            let opts = emb_cli::file_check_options(&input, machine)?;
+            let c = emb_art::file_check::check(&s, &opts);
+            print!("{}", emb_cli::check_report(&c));
+            Ok(())
+        }
+        ["fix", input, output] => {
+            let input = read_input(Path::new(input))?;
+            let s = emb_cli::file_stitches(&input)?;
+            let opts = emb_cli::file_check_options(&input, machine)?;
+            let (fixed, n) = emb_art::file_check::fix(&s, &opts, fixes);
+            let catalog = emb_model::MachineCatalog::builtin();
+            emb_cli::write_output_for(&fixed, Path::new(output), machine.and_then(|m| catalog.get(m)))?;
+            println!(
+                "wrote {output}: {} color changes joined, {} short stitches removed, {} long stitches split, {} long jumps trimmed, {} lock stitches added",
+                n.joined, n.removed, n.split, n.trimmed, n.locked
+            );
+            Ok(())
+        }
         ["content", output] => {
             let items = emb_cli::content::items();
             let count = |kind: &str| items[kind].as_array().map_or(0, Vec::len);
@@ -896,6 +1018,12 @@ fn run(args: &[String]) -> Result<(), String> {
         ["letter-faults"] => {
             let fonts = emb_cli::letter_faults::run();
             print!("{}", emb_cli::letter_faults::report(&fonts));
+            if let Some(p) = &judged {
+                let text = std::fs::read_to_string(p).map_err(|e| format!("{}: {e}", p.display()))?;
+                let set = emb_cli::letter_faults::load_judged(&text)?;
+                print!("\n{}", emb_cli::letter_faults::compare(&fonts, &set).text);
+                print!("\n{}", emb_cli::letter_faults::eye_summary(&fonts));
+            }
             if let Some(p) = &audit_proof {
                 std::fs::write(p, emb_cli::letter_faults::pictures(&fonts))
                     .map_err(|e| format!("{}: {e}", p.display()))?;

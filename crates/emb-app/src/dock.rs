@@ -62,9 +62,11 @@ struct Docks {
     dock: Vec<(Id, Dock)>,
     /// The windows that a drag moved in the last frame.
     dragged: Vec<Id>,
-    /// The frame of `placed`.
-    frame: u64,
-    /// The windows docked in this frame: their corner and size.
+    /// The pass of `placed`: egui can run the windows two times in one
+    /// frame (a second pass after a change of size), and each pass places
+    /// the windows again.
+    pass: u64,
+    /// The windows docked in this pass: their corner and size.
     placed: Vec<(Align2, Vec2)>,
 }
 
@@ -105,15 +107,42 @@ impl FitScreen for egui::Window<'_> {
 /// Sets where `window` (with the id `id`) goes in this frame: at its
 /// corner of `canvas` if it is docked, else where it is. Call it on each
 /// command window before `show`, in the same order in each frame.
+/// The height that a window with a long scroll list can take at a corner
+/// of the canvas: `want`, or less on a small screen (the canvas less the
+/// title bar and the margins). egui gives a window that is not resizable
+/// 420 points for its contents unless it sets `default_height`; with no
+/// canvas yet (the first frame), the window keeps that.
+pub fn list_height(canvas: Option<Rect>, want: f32) -> f32 {
+    canvas.map_or(want.min(EGUI_HEIGHT), |c| {
+        (c.height() - 2.0 * MARGIN - 40.0).clamp(EGUI_HEIGHT.min(want), want)
+    })
+}
+
+/// The height that egui gives a window by default.
+const EGUI_HEIGHT: f32 = 420.0;
+
 pub fn docked<'a>(window: egui::Window<'a>, ctx: &egui::Context, id: Id, canvas: Option<Rect>) -> egui::Window<'a> {
+    docked_at(window, ctx, id, canvas, Align2::LEFT_TOP)
+}
+
+/// As [`docked`], but the window docks at the corner `home` until the user
+/// moves it (the lesson window: at the bottom right, away from the
+/// command windows).
+pub fn docked_at<'a>(
+    window: egui::Window<'a>,
+    ctx: &egui::Context,
+    id: Id,
+    canvas: Option<Rect>,
+    home: Align2,
+) -> egui::Window<'a> {
     let window = window.fit_screen(ctx).drag_area(egui::WindowDrag::Anywhere);
     let Some(canvas) = canvas else {
         return window;
     };
     let mut s = ctx.data(|d| d.get_temp::<Docks>(docks_id())).unwrap_or_default();
-    let frame = ctx.cumulative_frame_nr();
-    if s.frame != frame {
-        s.frame = frame;
+    let pass = ctx.cumulative_pass_nr();
+    if s.pass != pass {
+        s.pass = pass;
         s.placed.clear();
     }
     // A drag of the title moves the window; at its end the window docks or
@@ -137,7 +166,7 @@ pub fn docked<'a>(window: egui::Window<'a>, ctx: &egui::Context, id: Id, canvas:
         .dock
         .iter()
         .find(|(i, _)| *i == id)
-        .map_or(Dock::Corner(Align2::LEFT_TOP), |(_, d)| *d);
+        .map_or(Dock::Corner(home), |(_, d)| *d);
     let window = match dock {
         Dock::Corner(c) if !dragging => {
             // Under (or over) the windows docked at this corner before it.
@@ -172,6 +201,17 @@ mod tests {
         min: Pos2::new(100.0, 100.0),
         max: Pos2::new(900.0, 700.0),
     };
+
+    /// A window with a long list is as high as it wants on a large screen,
+    /// and fits the canvas on a small one.
+    #[test]
+    fn a_list_window_fits_the_canvas() {
+        let canvas = |h: f32| Some(Rect::from_min_size(pos2(0.0, 100.0), vec2(800.0, h)));
+        assert_eq!(list_height(None, 640.0), 420.0);
+        assert_eq!(list_height(canvas(1000.0), 640.0), 640.0);
+        assert_eq!(list_height(canvas(500.0), 640.0), 444.0);
+        assert_eq!(list_height(canvas(300.0), 640.0), 420.0);
+    }
 
     #[test]
     fn a_window_near_a_corner_docks_there() {
@@ -270,5 +310,40 @@ mod tests {
         assert!((free.left_top() - (CANVAS.left_top() + vec2(MARGIN + 250.0, MARGIN + 200.0))).length() < 1.0);
         r.frame(&ids);
         assert_eq!(r.rect("One"), free);
+    }
+
+    /// egui can run the windows two times in one frame (a second pass
+    /// after a change of size, for example while a font in the list of the
+    /// Lettering window shows its preview). A docked window stays at its
+    /// corner: it did go under itself for one frame, and a click there hit
+    /// the canvas.
+    #[test]
+    fn a_docked_window_stays_in_a_frame_of_two_passes() {
+        let ctx = egui::Context::default();
+        let rect_after = |discard: bool| {
+            let input = RawInput {
+                screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(1000.0, 800.0))),
+                ..Default::default()
+            };
+            let mut out = ctx.run_ui(input, |ui| {
+                let ctx = ui.ctx().clone();
+                if discard && ctx.current_pass_index() == 0 {
+                    ctx.request_discard("a test of two passes");
+                }
+                let id = Id::new("One");
+                let w = egui::Window::new("One").id(id).resizable(false);
+                docked(w, &ctx, id, Some(CANVAS)).show(&ctx, |ui| {
+                    ui.set_min_size(vec2(200.0, 100.0));
+                });
+            });
+            out.textures_delta.clear();
+            ctx.memory(|m| m.area_rect(Id::new("One"))).unwrap()
+        };
+        for _ in 0..3 {
+            rect_after(false);
+        }
+        let corner = CANVAS.left_top() + vec2(MARGIN, MARGIN);
+        assert_eq!(rect_after(false).left_top(), corner);
+        assert_eq!(rect_after(true).left_top(), corner, "a frame of two passes");
     }
 }

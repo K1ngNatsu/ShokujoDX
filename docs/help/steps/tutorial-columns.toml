@@ -1,0 +1,109 @@
+# The steps of "Tutorial: columns that turn" (tutorial-columns.md). The
+# test each_tutorial_runs_in_each_language (crates/emb-app/src/
+# tutorial_steps.rs) does them in each language; write_tutorial_pictures
+# makes the pictures. The clicks are the points of ARCH, S_LINE, CRESCENT
+# and WAVE in crates/emb-app/src/samples.rs. A change of a step needs the
+# same change in the topic and its translations.
+
+# Open the start design.
+[[step]]
+item = ["Open the start design", 0]
+open = "columns"
+expect = { objects = 1, kinds = ["Vector"] }
+
+[[step]]
+picture = "columns-start"
+around = [[-55.0, -35.0], [50.0, 45.0]]
+
+# The arch: Column Pairs.
+[[step]]
+item = ["The arch: Column Pairs", 1]
+command = "Digitize > Columns > Column Pairs"
+
+[[step]]
+item = ["The arch: Column Pairs", 2]
+clicks = [[-50.0, 0.0], [-44.0, 0.0], [-42.7, -17.7], [-38.4, -13.4], [-25.0, -25.0], [-25.0, -19.0], [-7.3, -17.7], [-11.6, -13.4], [0.0, 0.0], [-6.0, 0.0]]
+
+[[step]]
+item = ["The arch: Column Pairs", 3]
+key = "Enter"
+expect = { objects = 2, kinds = ["Vector", "Satin"] }
+
+# The S: Column C.
+[[step]]
+item = ["The S: Column C", 1]
+command = "Digitize > Columns > Column C"
+
+[[step]]
+item = ["The S: Column C", 2]
+clicks = [[20.0, -30.0], [32.0, -22.0, 1], [20.0, -12.0, 1], [8.0, -2.0, 1], [20.0, 6.0]]
+
+[[step]]
+item = ["The S: Column C", 3]
+key = "Enter"
+expect = { objects = 3, kinds = ["Vector", "Satin", "Satin"] }
+
+# The crescent: Turning.
+[[step]]
+item = ["The crescent: Turning", 1]
+command = "Digitize > Fills > Turning"
+
+[[step]]
+item = ["The crescent: Turning", 2]
+clicks = [[-45.0, 15.0], [-25.0, 40.0, 1], [-5.0, 15.0], [-25.0, 28.0, 1]]
+
+[[step]]
+key = "Enter"
+
+[[step]]
+item = ["The crescent: Turning", 3]
+clicks = [[-38.0, 20.0], [-35.0, 33.0], [-25.0, 26.0], [-25.0, 42.0], [-12.0, 20.0], [-15.0, 33.0]]
+
+[[step]]
+item = ["The crescent: Turning", 4]
+key = "Enter"
+expect = { objects = 4, kinds = ["Vector", "Satin", "Satin", "Satin"] }
+
+[[step]]
+key = "Escape"
+
+[[step]]
+key = "Escape"
+
+# The wave: a vector line to a satin.
+[[step]]
+item = ["The wave: from a vector line", 1]
+command = "Digitize > Select > Select"
+
+[[step]]
+click = [45.0, 30.0]
+expect = { selected = 1 }
+
+[[step]]
+item = ["The wave: from a vector line", 2]
+command = "Artwork > Convert > To Satin"
+expect = { objects = 4, kinds = ["Satin", "Satin", "Satin", "Satin"] }
+
+[[step]]
+item = ["The wave: from a vector line", 3]
+key = "Escape"
+
+# Look at the stitches.
+[[step]]
+item = ["Look at the stitches", 0]
+command = "View > Show > Thread Look"
+
+[[step]]
+button = "Thread Look"
+
+[[step]]
+test_only = true
+key = "Escape"
+
+[[step]]
+picture = "columns-stitches"
+around = [[-55.0, -35.0], [50.0, 45.0]]
+
+[[step]]
+item = ["Check it", 0]
+expect = { warnings = 0 }

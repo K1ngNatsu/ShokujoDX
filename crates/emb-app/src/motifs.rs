@@ -96,43 +96,44 @@ impl AppState {
             self.message = tr("Select lines, satin columns or fills to use the motif.").into();
             return 0;
         }
-        self.doc.edit(crate::i18n::fill("Motif {}", &[&m.name]), |d| {
-            for id in &targets {
-                let Some(o) = d.object_mut(*id) else { continue };
-                match &mut o.kind {
-                    ObjectKind::Running { params, .. } => {
-                        let mut r = params.motif.take().unwrap_or_else(|| MotifRun::new(m.clone()));
-                        r.motif = m.clone();
-                        params.motif = Some(r);
-                        params.ripple = None;
-                    }
-                    ObjectKind::Satin { params, .. } => {
-                        if !matches!(params.pattern, ColumnPattern::Motif { .. }) {
-                            *params = SatinParams {
-                                pull_compensation_mm: params.pull_compensation_mm,
-                                ..SatinParams::with_pattern(ColumnPattern::Motif { aspect: 1.0 })
-                            };
+        self.doc
+            .edit(crate::i18n::fill("Motif {}", &[&crate::i18n::tr(&m.name)]), |d| {
+                for id in &targets {
+                    let Some(o) = d.object_mut(*id) else { continue };
+                    match &mut o.kind {
+                        ObjectKind::Running { params, .. } => {
+                            let mut r = params.motif.take().unwrap_or_else(|| MotifRun::new(m.clone()));
+                            r.motif = m.clone();
+                            params.motif = Some(r);
+                            params.ripple = None;
                         }
-                        params.motif = Some(m.clone());
-                    }
-                    ObjectKind::Fill { params, .. } => match &mut params.pattern {
-                        FillPattern::Motif { motif, .. } => *motif = m.clone(),
-                        _ => {
-                            let base = params.clone();
-                            *params = base.with_pattern(FillPattern::Motif {
-                                motif: m.clone(),
-                                length_mm: 6.0,
-                                height_mm: 4.0,
-                                stagger: 0.5,
-                                gradient: 1.0,
-                                globe: false,
-                            });
+                        ObjectKind::Satin { params, .. } => {
+                            if !matches!(params.pattern, ColumnPattern::Motif { .. }) {
+                                *params = SatinParams {
+                                    pull_compensation_mm: params.pull_compensation_mm,
+                                    ..SatinParams::with_pattern(ColumnPattern::Motif { aspect: 1.0 })
+                                };
+                            }
+                            params.motif = Some(m.clone());
                         }
-                    },
-                    _ => {}
+                        ObjectKind::Fill { params, .. } => match &mut params.pattern {
+                            FillPattern::Motif { motif, .. } => *motif = m.clone(),
+                            _ => {
+                                let base = params.clone();
+                                *params = base.with_pattern(FillPattern::Motif {
+                                    motif: m.clone(),
+                                    length_mm: 6.0,
+                                    height_mm: 4.0,
+                                    stagger: 0.5,
+                                    gradient: 1.0,
+                                    globe: false,
+                                });
+                            }
+                        },
+                        _ => {}
+                    }
                 }
-            }
-        });
+            });
         targets.len()
     }
 
@@ -253,7 +254,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
     .default_width(420.0)
     .show(ctx, |ui| {
         if let Some(name) = &in_use {
-            ui.label(crate::i18n::fill("The selected object uses: {}", &[&name]));
+            ui.label(crate::i18n::fill("The selected object uses: {}", &[&tr(name)]));
         }
         let accent = ui.visuals().selection.bg_fill;
         let ink = ui.visuals().text_color();
@@ -264,9 +265,9 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                         let color = if i == w.selected { accent } else { ink };
                         let r = preview(ui, m, Vec2::new(90.0, 36.0), color);
                         let label = if path.is_some() {
-                            format!("{} (yours)", m.name)
+                            crate::i18n::fill("{} (yours)", &[&m.name])
                         } else {
-                            m.name.clone()
+                            tr(&m.name).to_string()
                         };
                         let l = ui.selectable_label(i == w.selected, label);
                         if r.clicked() || l.clicked() {
@@ -331,7 +332,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         let ids = st.sel();
         let n = st.apply_motif(&ids, m);
         if n > 0 {
-            st.message = crate::i18n::fill("{} used for {} objects.", &[&m.name, &n]);
+            st.message = crate::i18n::fill("{} used for {} objects.", &[&crate::i18n::tr(&m.name), &n]);
         }
     }
     if create {

@@ -128,7 +128,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                     "How far the new outline can be from the old one. Larger: fewer nodes.",
                 ));
                 ui.add(
-                    egui::Slider::new(&mut s.tolerance_mm, 0.02..=3.0)
+                    crate::workspace::slider(&mut s.tolerance_mm, 0.02..=3.0)
                         .clamping(egui::SliderClamping::Edits)
                         .logarithmic(true)
                         .suffix(" mm")
@@ -138,7 +138,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                 ui.label(tr("Corners"))
                     .on_hover_text(tr("A turn sharper than this stays a corner. Smaller: more corners."));
                 ui.add(
-                    egui::Slider::new(&mut s.corner_deg, 5.0..=170.0)
+                    crate::workspace::slider(&mut s.corner_deg, 5.0..=170.0)
                         .clamping(egui::SliderClamping::Edits)
                         .suffix("°")
                         .fixed_decimals(0),

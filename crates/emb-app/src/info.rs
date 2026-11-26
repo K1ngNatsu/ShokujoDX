@@ -7,6 +7,8 @@
 //! - The checks look at each object: stitches outside the hoop field or the
 //!   safety margin, density too high, stitches too short, many trims, no
 //!   stitches. A click on a warning selects the object and shows it.
+//! - The stitch objects (a machine file opened as stitches) also get the
+//!   checks of a machine file (P22 Milestone 5, ADR 0172; `fix_stitches`).
 
 use std::sync::Arc;
 
@@ -26,6 +28,20 @@ pub const MANY_TRIMS: usize = 4;
 pub const THREAD_USE_HELP: &str = "An estimate from the stitches: the thread on the front, the part that the tension pulls to the back, the thickness of the fabric at each needle point and a tail at each start and trim. The tension, the thread and the fabric change it.";
 /// The most places of thread build-up in the warnings.
 pub const MAX_BUILD_UP: usize = 20;
+/// An object with more travel than this on top of sewn stitches gets a
+/// warning, mm (P22 Milestone 1, ADR 0167).
+pub const TRAVEL_ON_STITCHES_MM: f64 = 2.0;
+/// Free-standing lace and puff are dense by design (ADR 0178): a satin on
+/// the mesh of lace has about 5 layers of thread, and a puff column cuts
+/// and covers its foam with dense stitches and end stitches (3 to 4 layers
+/// at its end, about 8 where two meet). The limit of build-up is this many
+/// layers higher in a lace design and at a puff object.
+pub const DENSE_BY_DESIGN: f64 = 3.0;
+/// An object with a piece of travel on the fabric longer than this gets a
+/// warning, mm. A short travel stitch to the next part is normal: about
+/// 3 mm between the parts of small letters (the tutorial of Japanese
+/// lettering at 5 mm), 7.5 to 20 mm in the faults of the corpus.
+pub const TRAVEL_ON_FABRIC_MM: f64 = 4.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Severity {
@@ -82,6 +98,9 @@ pub struct DesignInfo {
     /// The number of threads to buy for the order (ADR 0066), if the user
     /// has a thread stock.
     pub to_buy: Option<usize>,
+    /// The travel of the plan that shows (P22 Milestone 1, ADR 0167), in
+    /// the coordinates of the plan.
+    pub travel: emb_stitch::shown_travel::ShownTravel,
     pub issues: Vec<Issue>,
 }
 
@@ -124,6 +143,8 @@ impl AppState {
     }
 
     fn compute_info(&mut self) -> DesignInfo {
+        let file_checks = self.stitch_checks();
+        let file_opts = self.file_check_options();
         let opts = self.plan_options();
         let plan = self.shown_plan().plan.clone();
         let density = self.density_map();
@@ -324,6 +345,46 @@ impl AppState {
                 );
             }
         }
+        // Travel that shows (P22 Milestone 1, ADR 0167): on top of sewn
+        // stitches, and long travel on the fabric. Lace is all thread.
+        info.travel = emb_stitch::shown_travel::shown_travel(&plan);
+        if !emb_stitch::lace::is_lace(d, &self.fabrics) {
+            use emb_stitch::shown_travel::Shows;
+            for o in info.travel.by_object() {
+                let (id, on_stitches) = (o.object, o.on_stitches_mm);
+                let longest = |shows: Shows| {
+                    match shows {
+                        Shows::OnStitches => o.longest_on_stitches,
+                        Shows::OnFabric => o.longest_on_fabric,
+                    }
+                    .map(|i| &info.travel.pieces[i])
+                };
+                let at = |p: &emb_stitch::shown_travel::ShownPiece| Some(back.apply(p.from.lerp(p.to, 0.5)));
+                if on_stitches > TRAVEL_ON_STITCHES_MM {
+                    info.issues.push(Issue {
+                        severity: Severity::Warning,
+                        object: Some(id),
+                        text: fill(
+                            "Travel shows on top of sewn stitches: {} mm; View > Travel That Shows marks it",
+                            &[&format!("{on_stitches:.0}")],
+                        ),
+                        at: longest(Shows::OnStitches).and_then(at),
+                    });
+                }
+                if let Some(p) = longest(Shows::OnFabric).filter(|p| p.length() >= TRAVEL_ON_FABRIC_MM) {
+                    info.issues.push(Issue {
+                        severity: Severity::Warning,
+                        object: Some(id),
+                        text: fill(
+                            "Travel shows on the fabric: {} mm in one piece; View > Travel That Shows marks it",
+                            &[&format!("{:.0}", p.length())],
+                        ),
+                        at: at(p),
+                    });
+                }
+            }
+        }
+        stitch_object_issues(&mut info, &file_checks, &file_opts);
         for w in &plan.warnings {
             let at = w.object.and_then(|id| d.bbox_of(&[id])).map(|b| b.center());
             info.issues.push(Issue {
@@ -368,8 +429,28 @@ impl AppState {
         // Build-up of all objects together (the density map).
         if let Some(m) = &density {
             info.max_layers = Some(m.max_layers());
-            let limit = self.settings.density_limit;
-            for spot in m.hot_spots(limit).iter().take(MAX_BUILD_UP) {
+            let lace = emb_stitch::lace::is_lace(d, &self.fabrics);
+            let base = self.settings.density_limit;
+            // The places over each limit, with the area over that limit: a
+            // place of lace or of puff has the higher limit (ADR 0178), and
+            // its area over that limit counts, not the area over the limit
+            // of other places (the audit of 2026-11-26).
+            let mut spots: Vec<(emb_render::density::HotSpot, f64)> = Vec::new();
+            for limit in [base, base + DENSE_BY_DESIGN] {
+                spots.extend(
+                    m.hot_spots(limit)
+                        .into_iter()
+                        .filter(|s| build_up_limit(d, lace, base, back.apply(s.peak)) == limit)
+                        .map(|s| (s, limit)),
+                );
+            }
+            spots.sort_by(|a, b| b.0.max_layers.total_cmp(&a.0.max_layers));
+            for (spot, limit) in spots
+                .iter()
+                .map(|(s, limit)| (s, *limit))
+                .filter(|(s, limit)| s.max_layers > *limit)
+                .take(MAX_BUILD_UP)
+            {
                 info.issues.push(Issue {
                     severity: Severity::Warning,
                     object: None,
@@ -398,6 +479,69 @@ impl AppState {
             self.zoom_to_selection();
         } else if let Some(p) = issue.at {
             self.zoom_to = Some(BBox::from_center_size(p, 30.0, 30.0));
+        }
+    }
+}
+
+/// The warnings of the checks of a machine file for the stitch objects
+/// (ADR 0172): for each object and fault, the number and the first place.
+/// Short stitches are in the checks of each object.
+fn stitch_object_issues(
+    info: &mut DesignInfo,
+    checks: &[crate::fix_stitches::RunCheck],
+    opts: &emb_stitch::PlanOptions,
+) {
+    use emb_art::file_check::Fault;
+    for run in checks {
+        // (object, kind of warning) -> (number, length, first place)
+        let mut groups: std::collections::BTreeMap<(ObjectId, u8), (usize, f64, Point)> = Default::default();
+        for f in &run.check.found {
+            let kind = match f.fault {
+                Fault::Short => continue,
+                Fault::Long => 0,
+                Fault::SameThread => 1,
+                Fault::LongJump => 2,
+                Fault::ShortPiece => 3,
+                Fault::NoLockStart | Fault::NoLockEnd => 4,
+                Fault::TravelShows => 5,
+            };
+            let Some(id) = run.object(f.record) else { continue };
+            let g = groups.entry((id, kind)).or_insert((0, 0.0, f.at));
+            g.0 += 1;
+            g.1 += f.length_mm;
+        }
+        for ((id, kind), (n, length, at)) in groups {
+            let text = match kind {
+                0 => fill(
+                    "Stitches longer than {} mm: {} (Edit > Fix Stitches splits them)",
+                    &[&format!("{:.1}", opts.max_stitch_mm), &n],
+                ),
+                1 => tr("A color change to the same thread (Edit > Fix Stitches joins the blocks)").into(),
+                2 => fill(
+                    "Jumps longer than {} mm with no trim: {} (Edit > Fix Stitches trims them)",
+                    &[&format!("{:.1}", opts.trim_mm), &n],
+                ),
+                3 => fill(
+                    "Pieces too short for the trimmer: {} (the stitches can pull out)",
+                    &[&n],
+                ),
+                4 => fill(
+                    "Starts and ends with no lock stitches: {} (Edit > Fix Stitches adds them)",
+                    &[&n],
+                ),
+                // Each travel run that the check finds (`file_check::SHOWS_MM`
+                // or more): Fix Stitches lists the same.
+                _ => fill(
+                    "Travel in the stitches of the file shows on top of sewn stitches: {} mm",
+                    &[&format!("{length:.0}")],
+                ),
+            };
+            info.issues.push(Issue {
+                severity: Severity::Warning,
+                object: Some(id),
+                text,
+                at: Some(at),
+            });
         }
     }
 }
@@ -447,7 +591,9 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
             .show(ui, |ui| {
                 let mut row = |k: &str, v: String| {
                     ui.label(k);
-                    ui.label(v);
+                    // A long value goes on more lines at the edge of the
+                    // panel (some are long in a translation).
+                    ui.add(egui::Label::new(v).wrap());
                     ui.end_row();
                 };
                 row(
@@ -465,6 +611,15 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
                 row(tr("Color changes"), info.colors.len().saturating_sub(1).to_string());
                 row(tr("Trims"), info.trims.to_string());
                 row(tr("Jumps"), info.jumps.to_string());
+                if info.travel.travel_mm > 0.0 {
+                    row(
+                        tr("Travel that shows"),
+                        fill(
+                            "{} on stitches, {} on the fabric",
+                            &[&u.fmt(info.travel.on_stitches_mm()), &u.fmt(info.travel.on_fabric_mm())],
+                        ),
+                    );
+                }
                 if info.stops > 0 {
                     row(tr("Stops"), info.stops.to_string());
                 }
@@ -512,10 +667,17 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
                     if let Some(r) = run.filter(|r| r.quantity > 1) {
                         row(
                             tr("Run time"),
-                            fill(
-                                "about {} for {} pieces on {} heads",
-                                &[&emb_model::quote::duration_text(r.minutes), &r.quantity, &r.heads],
-                            ),
+                            if r.heads == 1 {
+                                fill(
+                                    "about {} for {} pieces on one head",
+                                    &[&emb_model::quote::duration_text(r.minutes), &r.quantity],
+                                )
+                            } else {
+                                fill(
+                                    "about {} for {} pieces on {} heads",
+                                    &[&emb_model::quote::duration_text(r.minutes), &r.quantity, &r.heads],
+                                )
+                            },
                         );
                     }
                 }
@@ -627,6 +789,19 @@ pub fn warnings_list(ui: &mut egui::Ui, st: &mut AppState, info: &DesignInfo) {
     }
 }
 
+/// The limit of build-up at `at` (design coordinates): `base`, or
+/// [`DENSE_BY_DESIGN`] more in a lace design and at a puff object (a puff
+/// satin, or a part of lettering with puff).
+pub fn build_up_limit(d: &emb_model::Design, lace: bool, base: f64, at: Point) -> f64 {
+    let near = |k: &ObjectKind| k.control_bbox().is_some_and(|b| b.expand(1.0).contains(at));
+    let puff = d.objects().iter().any(|o| match &o.kind {
+        ObjectKind::Satin { params, .. } => params.puff && near(&o.kind),
+        ObjectKind::Lettering(l) => l.satin.puff && l.letters.iter().flat_map(|x| &x.parts).any(near),
+        _ => false,
+    });
+    if lace || puff { base + DENSE_BY_DESIGN } else { base }
+}
+
 #[cfg(test)]
 mod tests {
     use emb_geom::Path;
@@ -725,6 +900,55 @@ mod tests {
         // A click selects the loose part.
         st.show_issue(&issues[0]);
         assert!(st.selection.contains(id));
+    }
+
+    /// Lace and puff are dense by design (ADR 0178): their limit of
+    /// build-up is higher; other designs keep the limit of the settings.
+    #[test]
+    fn lace_and_puff_have_a_higher_limit_of_build_up() {
+        let builds_up = |st: &mut AppState| {
+            st.design_info()
+                .issues
+                .iter()
+                .filter(|i| i.text.starts_with("Thread builds up"))
+                .map(|i| i.text.clone())
+                .collect::<Vec<_>>()
+        };
+        let mut st = state();
+        let base = st.settings.density_limit;
+        // The ornament: three satins no longer start on one point over the
+        // mesh (12.7 layers before); the places where satins meet over the
+        // mesh are under the limit of lace.
+        st.new_from_lace(0);
+        let d = st.doc.design().clone();
+        assert_eq!(build_up_limit(&d, true, base, Point::ZERO), base + DENSE_BY_DESIGN);
+        let lace = builds_up(&mut st);
+        assert_eq!(lace, Vec::<String>::new());
+        // Puff letters with points (two puff columns meet at the top of
+        // "A", "V" and "M": up to 8 layers).
+        st.new_design();
+        let font = emb_letter::bundled::embroidery("Block Sans").unwrap();
+        st.doc.edit("Puff", |d| {
+            let t = d.add_thread("Red", Rgb(200, 30, 40));
+            let mut l = emb_model::Lettering::new("AVM", emb_letter::LetterSource::font_ref(&font), 30.0, Point::ZERO);
+            l.satin.puff = true;
+            l.satin.spacing_mm = emb_model::object::PUFF_SPACING_MM;
+            emb_letter::relayout(&mut l, &font);
+            d.add_object(t, ObjectKind::Lettering(Box::new(l)));
+        });
+        assert_eq!(builds_up(&mut st), Vec::<String>::new());
+        // The same letters with no puff: the limit of the settings at them.
+        let d = st.doc.design().clone();
+        let at = d.objects()[0].control_bbox().unwrap().center();
+        assert_eq!(build_up_limit(&d, false, base, at), base + DENSE_BY_DESIGN);
+        let id = d.objects()[0].id;
+        st.doc.edit("No puff", |d| {
+            if let Some(ObjectKind::Lettering(l)) = d.object_mut(id).map(|o| &mut o.kind) {
+                l.satin.puff = false;
+            }
+        });
+        let d = st.doc.design().clone();
+        assert_eq!(build_up_limit(&d, false, base, at), base);
     }
 
     #[test]

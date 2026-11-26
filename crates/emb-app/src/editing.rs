@@ -332,11 +332,11 @@ fn how_ui(ui: &mut egui::Ui, how: &mut PasteHow, units: Units, places: &[PastePl
             });
         });
     }
-    ui.checkbox(
-        &mut how.after_selected,
-        tr("Just after the selected objects in the sew order"),
-    )
-    .on_hover_text(tr("Else the copies go at the end of the sew order."));
+    // A short text: the Options window has it in a column of its own.
+    ui.checkbox(&mut how.after_selected, tr("After the selected objects"))
+        .on_hover_text(tr(
+            "Just after the selected objects in the sew order. Else the copies go at the end of the sew order.",
+        ));
 }
 
 /// The Paste special window.

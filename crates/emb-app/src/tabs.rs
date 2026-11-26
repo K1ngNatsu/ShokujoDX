@@ -91,6 +91,20 @@ impl AppState {
         }
     }
 
+    /// Puts `d` in place of the design of the active tab (a file that
+    /// another program saved, ADR 0176): a new document with no history, a
+    /// new id (no lay, tiles or backup of the design before), the same file
+    /// and view.
+    pub fn replace_tab_design(&mut self, d: Design) {
+        let old = self.take_slot();
+        self.backups_forget(old.doc_id);
+        self.stitch_tiles.forget(old.doc_id);
+        self.doc = Document::new(d);
+        self.file_path = old.file_path;
+        self.view = old.view;
+        self.reset_transient();
+    }
+
     fn put_slot(&mut self, s: DocSlot) {
         self.doc = s.doc;
         self.file_path = s.file_path;

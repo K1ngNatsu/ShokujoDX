@@ -86,7 +86,7 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, path: &Pat
         if let Some(c) = s.stroke.as_mut() {
             color_button(ui, c);
             ui.add(
-                egui::DragValue::new(&mut s.stroke_mm)
+                crate::workspace::drag(&mut s.stroke_mm)
                     .range(0.05..=10.0)
                     .clamp_existing_to_range(false)
                     .speed(0.02)

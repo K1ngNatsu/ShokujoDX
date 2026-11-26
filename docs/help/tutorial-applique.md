@@ -2,31 +2,37 @@
 id: tutorial-applique
 title: "Tutorial: an appliqué"
 group: tutorials
+path: decoration
+time: 15
+level: practice
+before: tutorial-first-design
 keywords: tutorial, appliqué, applique, fabric piece, placement, tack-down, cover, satin, stop, cut, cutter file, layers, combine, partial, from selection, back to original, border as cover
 ---
 # Tutorial: an appliqué
 
 In this tutorial you make an appliqué heart: a piece of fabric that the
-machine sews onto the garment. It takes about 15 minutes.
+machine sews onto the garment. An appliqué covers a large area with few
+stitches.
 
 You need a piece of cotton fabric for the heart, the garment fabric, a
 backing, and sharp small scissors.
 
-## Draw the appliqué
+## Make the appliqué
 
-1. On the **Design** tab, select your machine and a hoop.
-2. On the **Digitize** tab, click **Appliqué**.
-3. Click round the heart: right clicks make the curves, a left click
-   makes the point at the bottom. Push **Enter**, then **Enter** again
-   (the heart has no holes).
-4. Push **Esc** to stop the tool, and click the heart to select it.
+1. Click [Open the start design](sample:applique-heart). It has a red
+   heart: a fill.
+2. Click **Digitize > Select > Select**, then click the heart.
+3. Click **Digitize > Appliqué > To Appliqué**. The fill becomes an
+   appliqué object with the same outline.
+4. Push **Esc**.
 
-You can also draw a shape with **Shape**, or use a vector, and then click
-**Digitize > To Appliqué**.
+You can also draw an appliqué: click **Digitize > Appliqué > Appliqué**,
+click round the shape (right clicks make the curves), and push **Enter**
+two times (the shape has no holes).
 
 ## Set the steps
 
-Object Properties shows the **Steps** of the appliqué:
+Select the heart. Object Properties shows the **Steps** of the appliqué:
 
 1. **Placement line, then stop**: a line that shows where to put the
    fabric. The machine stops after it.
@@ -43,11 +49,15 @@ you do not set it).
 
 ## Check it
 
-1. Click **View > Stitch Player** and play the sew-out. Look at the two
-   stops.
-2. Turn on **View > Appliqué Fabric** to see the fabric under the
+1. **View > Show > Appliqué Fabric** is on: the fabric shows under the
    stitches.
-3. The worksheet (Design > Print Preview) lists each stop.
+2. Click **View > Show > Thread Look**, and select **Thread Look** in its
+   menu.
+3. Click **View > Stitch Cursor > Stitch Player** and play the sew-out.
+   Look at the two stops.
+4. The worksheet (**Design > Output > Print Preview**) lists each stop.
+
+![The appliqué heart with its fabric](applique-heart)
 
 ## Sew it
 
@@ -61,9 +71,10 @@ you do not set it).
 
 ## Cut the piece with a cutter
 
-If you have a fabric cutting machine, click **Digitize > Cutter File**.
-It writes the cut lines of the appliqué pieces at real size, as SVG or
-DXF. Cut the piece before you sew; then the tack-down needs no cut.
+If you have a fabric cutting machine, click **Digitize > Appliqué >
+Cutter File**. It writes the cut lines of the appliqué pieces at real
+size, as SVG or DXF. Cut the piece before you sew; then the tack-down
+needs no cut.
 
 ## More appliqué
 
@@ -82,7 +93,16 @@ DXF. Cut the piece before you sew; then the tack-down needs no cut.
 - **Edges with cover**: clear an edge where another object covers the
   fabric edge (a partial appliqué).
 
+## If it does not look right
+
+- **The fabric frays out under the cover.** Make the **Cover width**
+  larger, or use a zigzag tack-down.
+- **The cover does not reach the fabric edge.** Cut the fabric nearer to
+  the tack-down, or set **Outside the outline** larger.
+- **To Appliqué is gray.** Select a fill first.
+
 ## Next
 
+- [Tutorial: a lace ornament](tutorial-lace)
 - [Tutorial: a monogram on a towel](tutorial-towel)
 - [Objects and stitches](objects-and-stitches)

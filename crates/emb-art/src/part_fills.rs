@@ -153,13 +153,34 @@ fn angle_of(x: f64, y: f64) -> f64 {
 
 /// The mean direction of lines (as lines), with weights, degrees.
 fn mean_line(lines: impl Iterator<Item = (f64, f64, f64)>) -> Option<f64> {
-    let (mut c, mut s) = (0.0, 0.0);
+    let mut m = MeanLine::default();
     for (x, y, w) in lines {
-        let a2 = 2.0 * emb_geom::math::atan2(y, x);
-        c += w * emb_geom::math::cos(a2);
-        s += w * emb_geom::math::sin(a2);
+        m.add(x, y, w);
     }
-    (c != 0.0 || s != 0.0).then(|| as_line(emb_geom::math::to_degrees(emb_geom::math::atan2(s, c)) / 2.0))
+    m.mean()
+}
+
+/// The sums of [`mean_line`], so that lines can be added one by one: the
+/// mean after each line costs no new pass over the lines before it.
+#[derive(Default)]
+struct MeanLine {
+    c: f64,
+    s: f64,
+}
+
+impl MeanLine {
+    /// Adds the line `(x, y)` with the weight `w`.
+    fn add(&mut self, x: f64, y: f64, w: f64) {
+        let a2 = 2.0 * emb_geom::math::atan2(y, x);
+        self.c += w * emb_geom::math::cos(a2);
+        self.s += w * emb_geom::math::sin(a2);
+    }
+
+    /// The mean direction of the lines that were added, degrees.
+    fn mean(&self) -> Option<f64> {
+        (self.c != 0.0 || self.s != 0.0)
+            .then(|| as_line(emb_geom::math::to_degrees(emb_geom::math::atan2(self.s, self.c)) / 2.0))
+    }
 }
 
 /// A layer of rows: rows in one direction, one after the other.
@@ -317,6 +338,10 @@ fn staggers(rows: &[Vec<Point>], vs: &[f64], to_rows: &Transform, spacing: f64, 
     best.filter(|b| b.0 >= STAGGER_FIT).map(|b| b.1)
 }
 
+/// Two rows of one line whose ends are not farther apart than this are the
+/// same row for the area, mm.
+const SAME_ROW_MM: f64 = 1e-6;
+
 /// The area of rows at `angle_deg` and `spacing` (see the module text): the
 /// outline and the holes of each part of it, in the coordinates of the
 /// rows.
@@ -352,6 +377,14 @@ pub fn rows_area(rows: &[Vec<Point>], angle_deg: f64, spacing: f64) -> Vec<(Path
             }
             _ => lines.push((v, vec![(u0, u1)])),
         }
+    }
+    // A row of one line that is the same as another adds nothing to the
+    // area (a stitch file that sews a fill many times at one place has the
+    // row of each layer on each line: a piece for each pair of them made
+    // the time grow with the square of the layers).
+    for (_, l) in &mut lines {
+        l.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.total_cmp(&b.1)));
+        l.dedup_by(|a, b| (a.0 - b.0).abs() <= SAME_ROW_MM && (a.1 - b.1).abs() <= SAME_ROW_MM);
     }
     // The pieces of the area: between two rows next to each other, and half
     // a row out at a row with no row next to it.
@@ -532,9 +565,13 @@ fn layers(rings: &[Vec<Point>], top: &RowsShape, under: &[(Range<usize>, Vec<Poi
         .sum();
     let area = area_of_rings(rings);
     let mut out: Vec<UnderlayLayer> = Vec::new();
-    // The rows of one direction, gathered over the pieces.
+    // The rows of one direction, gathered over the pieces, and the sums of
+    // their mean direction (a stitch file that sews one fill many times at
+    // one place has thousands of rows in one direction: the time of a mean
+    // over all of them for each row grew with the square of the rows).
     let mut rows: Vec<Vec<Point>> = Vec::new();
-    let flush = |rows: &mut Vec<Vec<Point>>, out: &mut Vec<UnderlayLayer>| {
+    let mut sums = MeanLine::default();
+    let flush = |rows: &mut Vec<Vec<Point>>, sums: &mut MeanLine, out: &mut Vec<UnderlayLayer>| {
         if let Some(layer) = tatami_of(rings, top, area, perimeter, rows) {
             // The sections of one tatami layer are one layer.
             if !out.last().is_some_and(|x| alike(x, &layer)) {
@@ -542,6 +579,7 @@ fn layers(rings: &[Vec<Point>], top: &RowsShape, under: &[(Range<usize>, Vec<Poi
             }
         }
         rows.clear();
+        *sums = MeanLine::default();
     };
     for (_, pts) in under {
         let (pts, _) = clean(pts);
@@ -556,7 +594,7 @@ fn layers(rings: &[Vec<Point>], top: &RowsShape, under: &[(Range<usize>, Vec<Poi
         let length: f64 = legs.iter().map(|l| l.len()).sum();
         let along_length: f64 = legs.iter().filter(|l| along(l)).map(|l| l.len()).sum();
         if along_length >= ALONG * length && d <= EDGE_NEAR_MM && length >= EDGE_LENGTH * perimeter {
-            flush(&mut rows, &mut out);
+            flush(&mut rows, &mut sums, &mut out);
             out.push(UnderlayLayer::EdgeWalk { inset_mm: round2(d) });
             continue;
         }
@@ -567,22 +605,21 @@ fn layers(rings: &[Vec<Point>], top: &RowsShape, under: &[(Range<usize>, Vec<Poi
         let angle = |l: &parts::Leg| angle_of(l.b.x - l.a.x, l.b.y - l.a.y);
         for (i, l) in across.iter().enumerate() {
             let a = angle(l);
-            let mean = mean_line(rows.iter().map(|r| {
-                let (p, q) = (r[0], r[r.len() - 1]);
-                (q.x - p.x, q.y - p.y, p.distance(q))
-            }));
-            if let Some(m) = mean
+            if let Some(m) = sums.mean()
                 && line_diff(a, m) > ROW_DEG
             {
                 if across.get(i + 1).is_none_or(|n| line_diff(angle(n), a) > ROW_DEG) {
                     continue;
                 }
-                flush(&mut rows, &mut out);
+                flush(&mut rows, &mut sums, &mut out);
             }
-            rows.push(pts[l.start..=l.end].to_vec());
+            let row = pts[l.start..=l.end].to_vec();
+            let (p, q) = (row[0], row[row.len() - 1]);
+            sums.add(q.x - p.x, q.y - p.y, p.distance(q));
+            rows.push(row);
         }
     }
-    flush(&mut rows, &mut out);
+    flush(&mut rows, &mut sums, &mut out);
     out
 }
 

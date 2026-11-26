@@ -45,7 +45,7 @@ fn slider(
     ui.horizontal(|ui| {
         ui.label(label).on_hover_text(help);
         let resp = ui.add(
-            egui::Slider::new(&mut v, range)
+            crate::workspace::slider(&mut v, range)
                 .clamping(egui::SliderClamping::Edits)
                 .suffix(suffix)
                 .fixed_decimals(2),
@@ -176,14 +176,14 @@ fn accordion_ui(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, current: &Op
             ui.horizontal(|ui| {
                 ui.label(format!("{}.", i + 1));
                 let r1 = ui.add(
-                    egui::DragValue::new(t)
+                    crate::workspace::drag(t)
                         .range(0.0..=1.0)
                         .clamp_existing_to_range(false)
                         .speed(0.01)
                         .prefix("at "),
                 );
                 let r2 = ui.add(
-                    egui::DragValue::new(f)
+                    crate::workspace::drag(f)
                         .range(1.0..=10.0)
                         .clamp_existing_to_range(false)
                         .speed(0.05)

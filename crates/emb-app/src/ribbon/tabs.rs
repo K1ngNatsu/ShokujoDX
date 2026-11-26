@@ -453,7 +453,7 @@ pub(super) const EDIT: &[Panel] = &[
             Custom(stitch_types, &[]),
             Small(&[Cmd::Motifs, Cmd::FlorentineGuide, Cmd::SplitLines]),
             Small(&[Cmd::Tartan, Cmd::Gradient, Cmd::GuideLines]),
-            Small(&[Cmd::RippleGuide]),
+            Small(&[Cmd::RippleGuide, Cmd::ColumnBands, Cmd::Families]),
         ],
     },
     Panel {
@@ -465,6 +465,7 @@ pub(super) const EDIT: &[Panel] = &[
                 Cmd::Func(Func::TrimNever),
             ]),
             Small(&[Cmd::Func(Func::TieIn), Cmd::Func(Func::TieOff)]),
+            Small(&[Cmd::FixStitches]),
         ],
     },
     Panel {
@@ -532,6 +533,7 @@ pub(super) const ARRANGE: &[Panel] = &[
             Small(&[Cmd::ToEnd, Cmd::BackColor, Cmd::ForwardColor]),
             Small(&[Cmd::ClickOrder, Cmd::OptimizeColors, Cmd::GroupByColor]),
             Small(&[Cmd::OptimizeOrder, Cmd::CapOrder, Cmd::ClosestJoin]),
+            Small(&[Cmd::QuickerToSew]),
         ],
     },
 ];
@@ -577,6 +579,7 @@ pub(super) const VIEW: &[Panel] = &[
             Large(f(Flag::Tilt)),
             Small(&[Cmd::TiltWindow, f(Flag::Magnifier), Cmd::Compare3d]),
             Small(&[f(Flag::BeforeAfter), f(Flag::ShowThrough), f(Flag::HighThread)]),
+            Small(&[f(Flag::TravelShows)]),
             Custom(light_column, &[]),
         ],
     },
@@ -687,6 +690,7 @@ pub(super) const DESIGN: &[Panel] = &[
             Large(Cmd::SendToUsb),
             Small(&[Cmd::PrintPreview, Cmd::BatchOutput, Cmd::ExportSvg]),
             Small(&[Cmd::SendToUsbChoose, Cmd::SendByEmail, Cmd::ExportInkstitch]),
+            Small(&[Cmd::TestSwatches]),
         ],
     },
 ];
@@ -827,17 +831,22 @@ pub(super) const HELP: &[Panel] = &[
     Panel {
         title: "Tutorials",
         items: &[
+            Large(Cmd::HelpTopic(crate::help::TUTORIALS_ID)),
             Small(&[
+                Cmd::HelpTopic("tutorial-first-design"),
+                Cmd::HelpTopic("tutorial-to-machine"),
                 Cmd::HelpTopic("tutorial-patch"),
+            ]),
+            Small(&[
                 Cmd::HelpTopic("tutorial-lettering"),
                 Cmd::HelpTopic("tutorial-applique"),
+                Cmd::HelpTopic("tutorial-towel"),
             ]),
             Small(&[
-                Cmd::HelpTopic("tutorial-towel"),
                 Cmd::HelpTopic("tutorial-hooping"),
                 Cmd::HelpTopic("tutorial-lace"),
+                Cmd::HelpTopic("tutorial-output"),
             ]),
-            Small(&[Cmd::HelpTopic("tutorial-output")]),
         ],
     },
 ];

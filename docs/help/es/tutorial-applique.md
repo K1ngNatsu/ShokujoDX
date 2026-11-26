@@ -7,30 +7,33 @@ keywords: tutorial, aplique, applique, pieza de tela, colocación, fijación, cu
 # Tutorial: un aplique
 
 En este tutorial crea un corazón de aplique: un trozo de tela que la
-máquina cose sobre la prenda. Tarda unos 15 minutos.
+máquina cose sobre la prenda. Un aplique cubre un área grande con pocas
+puntadas.
 
 Necesita un trozo de tela de algodón para el corazón, la tela de la
 prenda, una entretela y unas tijeras pequeñas y afiladas.
 
-## Dibujar el aplique
+## Crear el aplique
 
-1. En la pestaña **Diseño**, seleccione su máquina y un bastidor.
-2. En la pestaña **Digitalizar**, haga clic en **Aplique**.
-3. Haga clic alrededor del corazón: los clics derechos crean las curvas,
-   un clic izquierdo crea la punta de abajo. Pulse **Intro**, y después
-   **Intro** otra vez (el corazón no tiene agujeros).
-4. Pulse **Esc** para dejar la herramienta, y haga clic en el corazón para
-   seleccionarlo.
+1. Haga clic en [Abrir el diseño inicial](sample:applique-heart). Tiene un
+   corazón rojo: un relleno.
+2. Haga clic en **Digitalizar > Seleccionar > Seleccionar** y después haga
+   clic en el corazón.
+3. Haga clic en **Digitalizar > Aplique > A aplique**. El relleno se
+   convierte en un objeto de aplique con el mismo contorno.
+4. Pulse **Esc**.
 
-También puede dibujar una forma con **Forma**, o usar un vector, y después
-hacer clic en **Digitalizar > A aplique**.
+También puede dibujar un aplique: haga clic en **Digitalizar > Aplique >
+Aplique**, haga clic alrededor de la forma (los clics derechos crean las
+curvas) y pulse **Intro** dos veces (la forma no tiene agujeros).
 
 ## Definir los pasos
 
-Propiedades del objeto muestra los **Pasos** del aplique:
+Seleccione el corazón. Propiedades del objeto muestra los **Pasos** del
+aplique:
 
-1. **Línea de colocación, luego parada**: una línea que muestra dónde va
-   la tela. La máquina se detiene después de ella.
+1. **Línea de colocación y parada**: una línea que muestra dónde va la
+   tela. La máquina se detiene después de ella.
 2. **Fijación**: puntadas que sujetan la tela. Use un **Zigzag** para tela
    que se deshilacha; defina el **Ancho del zigzag** y la distancia
    **Dentro del contorno**. **Parada para cortar la tela** hace que la
@@ -45,11 +48,16 @@ aspecto 3D (sarga si no la define).
 
 ## Comprobarlo
 
-1. Haga clic en **Ver > Reproductor de puntadas** y reproduzca el bordado.
-   Fíjese en las dos paradas.
-2. Active **Ver > Tela de aplique** para ver la tela bajo las puntadas.
-3. La hoja de trabajo (Diseño > Vista previa de impresión) lista cada
-   parada.
+1. **Ver > Mostrar > Tela de aplique** está activado: la tela se ve bajo
+   las puntadas.
+2. Haga clic en **Ver > Mostrar > Aspecto de hilo** y marque **Aspecto de
+   hilo** en su menú.
+3. Haga clic en **Ver > Cursor de puntada > Reproductor de puntadas** y
+   reproduzca el bordado. Fíjese en las dos paradas.
+4. La hoja de trabajo (**Diseño > Producción > Vista previa de
+   impresión**) lista cada parada.
+
+![El corazón de aplique con su tela](applique-heart)
 
 ## Bordarlo
 
@@ -64,9 +72,9 @@ aspecto 3D (sarga si no la define).
 ## Cortar la pieza con una cortadora
 
 Si tiene una máquina para cortar tela, haga clic en **Digitalizar >
-Archivo de plóter**. Escribe las líneas de corte de las piezas de aplique
-a tamaño real, como SVG o DXF. Corte la pieza antes de bordar; así la
-fijación no necesita corte.
+Aplique > Archivo de plóter**. Escribe las líneas de corte de las piezas
+de aplique a tamaño real, como SVG o DXF. Corte la pieza antes de bordar;
+así la fijación no necesita corte.
 
 ## Más sobre apliques
 
@@ -86,7 +94,16 @@ fijación no necesita corte.
 - **Bordes con cubierta**: desmarque un borde donde otro objeto cubre el
   filo de la tela (un aplique parcial).
 
+## Si no se ve bien
+
+- **La tela se deshilacha y sale bajo la cubierta.** Haga más grande el
+  **Ancho de cubierta**, o use una fijación en zigzag.
+- **La cubierta no llega al filo de la tela.** Corte la tela más cerca de
+  la fijación, o haga más grande **Fuera del contorno**.
+- **A aplique está atenuado.** Seleccione antes un relleno.
+
 ## Siguiente
 
+- [Tutorial: un adorno de encaje](tutorial-lace)
 - [Tutorial: un monograma en una toalla](tutorial-towel)
 - [Objetos y puntadas](objects-and-stitches)

@@ -34,7 +34,8 @@ objects, with a look at the result first.
     pointer shows the lines of its object in the picture.
   - Accept makes the change as one undo step (`actions::replace_with`:
     the objects get the thread, the group and the functions of the stitch
-    object, the stop on the last one). Stitches kept one after the other
+    object, the stop on the last one; changed by ADR 0172: they also get
+    Tie-In and Tie-Off, as the stitch object had its lock stitches). Stitches kept one after the other
     are one stitch object. Recognize All and Keep All as Stitches set the
     boxes; Cancel changes nothing.
 - **Open**: Options > **Recognize objects when a file opens**

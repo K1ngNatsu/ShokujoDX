@@ -2,7 +2,7 @@
 id: fabrics-and-styles
 title: Fabrics, styles and templates
 group: production
-keywords: fabric, backing, topping, stabilizer, knit, t-shirt, polo, fleece, towel, denim, felt, leather, silk, cap, lace, style, styles panel, favorite, current properties, make current, apply current, template, new from template, save as template, my assets, package, share
+keywords: fabric, backing, topping, stabilizer, knit, t-shirt, polo, fleece, towel, denim, felt, leather, silk, cap, lace, style, styles panel, favorite, current properties, make current, apply current, template, new from template, save as template, my assets, package, share, test swatches, swatch, sew-out test, settings for a fabric
 ---
 # Fabrics, styles and templates
 
@@ -31,6 +31,27 @@ When you change the fabric:
   topping: on a towel or fleece, the 3D thread look then shows thin
   stitches that sink into the pile. A topping or a laydown fill under the
   stitches keeps them on top.
+
+## Test swatches
+
+Each fabric takes stitches in its own way. To find the best setting for
+a fabric, sew test swatches. Select an object (a fill, a satin column, a
+line or lettering), then click **Design > Output > Test Swatches**.
+
+- **Setting**: the setting that changes from copy to copy: spacing,
+  stitch length, pull compensation, width, angle, underlay, lean or band
+  overlap. The list
+  shows only the settings that the selected objects have.
+- **From**, **To** and **Copies**: the values of the first and the last
+  copy, and the number of copies. The steps between them are equal. For
+  underlay there is one copy for each kind (none, light, auto, heavy,
+  double).
+
+The window shows the values and the size of the grid. **Make Swatches**
+puts the copies in a new design, each with its value under it, in the
+hoop of your design: your design does not change. If the grid is larger
+than the hoop, the swatches go on more hoopings (the Hooping tab). Sew
+them on your fabric and use the setting that looks best.
 
 ## Current properties
 

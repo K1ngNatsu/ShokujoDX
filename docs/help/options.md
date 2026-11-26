@@ -2,7 +2,7 @@
 id: options
 title: Options
 group: reference
-keywords: options, settings, preferences, appearance, dark, light, high contrast, text size, language, units, mm, inches, grid, rulers, guides, snap, nudge, arrow keys, backup, hoop margin, safety margin, paste, duplicate offset, zoom step, display colors, density limit, thread price, spool, bobbin, currency, screen calibration, reset, new version, update, check for updates, network, privacy
+keywords: options, settings, preferences, appearance, dark, light, high contrast, text size, language, units, mm, inches, grid, rulers, guides, snap, nudge, arrow keys, backup, hoop margin, safety margin, paste, duplicate offset, zoom step, display colors, density limit, thread price, spool, bobbin, currency, screen calibration, reset, new version, update, check for updates, network, privacy, open tabs, one program
 ---
 # Options
 
@@ -28,8 +28,8 @@ sets all options back.
   **Major line every**.
 - **Rulers and guides**: **Show rulers** and **Snap to Guides**; the
   **Snap distance**.
-- **Panels**: **Reset the Panels** puts all the panels back in one group
-  at the right and opens the closed ones.
+- **Panels**: **Reset the Panels** puts all the panels back in their two
+  groups at the right and opens the closed ones.
 - **Arrow key nudge** and **Shift + arrow nudge**: how far the arrow keys
   move the selection.
 
@@ -37,6 +37,11 @@ sets all options back.
 
 - **Automatic backup**: designs with changes go to a backup folder every
   1 to 60 minutes (2 at the start), or **off**. After a crash, the program offers to recover them.
+- **Open tabs**: with **Open them again at the next start** (on at the
+  start), a quit keeps the open designs with their changes, and the next
+  start opens them again.
+- **Files**: with **Open in the program that runs** (on at the start), a
+  file that you open while the program runs opens in a tab of it.
 - **Hoop safety margin**: the distance inside the hoop field. Stitches
   outside it get a warning.
 
@@ -58,7 +63,9 @@ the color of the theme shows.
 ## Density and thread
 
 - **Density limit**: the number of layers of thread that the density map
-  and Design info allow (5 at the start).
+  and Design info allow (5 at the start). Design info allows 3 layers
+  more in free-standing lace and at puff objects: they are dense by
+  design.
 - **Top thread spool** and **Bobbin**: the length and the **price** of
   one, and the **Currency** (the text before the cost, for example $ or
   €). Design info and the worksheet then show the thread cost. A price of

@@ -52,7 +52,7 @@ Schritt.
   Bedingung hinzufügen, am Klick stutzen, teilen oder verlängern, eine Ecke
   runden oder fasen, Konstruktion, Versatz, Spiegeln, Muster, seine
   Bedingungen löschen oder ihn löschen.
-- **Rückgängig** (Strg+Z) und **Wiederholen** wirken wie im übrigen
+- **Rückgängig** (Strg+Z) und **Wiederherstellen** wirken wie im übrigen
   Programm.
 
 ## Zeichnen

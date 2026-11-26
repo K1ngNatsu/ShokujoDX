@@ -4,7 +4,9 @@
 //! Not a port. Travel is the shortest path inside the shape: a straight
 //! line if the shape contains it, else a path through the corners of the
 //! shape moved inward by [`TRAVEL_INSET_MM`] (a visibility graph with A*
-//! search). Fill and satin objects sew all their parts as one needle path,
+//! search). In a fill, travel goes along the rows where it can: a step
+//! across the rows costs more, and the search can follow the rows to the
+//! edge (ADR 0166). Fill and satin objects sew all their parts as one needle path,
 //! and use travel to go from one part to the next. If no path inside the
 //! shape exists (two separate areas), the needle path ends and a new one
 //! starts. The stitch plan then connects them with a travel stitch or a trim.
@@ -231,11 +233,92 @@ pub struct Travel {
     nodes: Vec<Point>,
     /// For each node: the previous and the next node on its ring.
     ring_links: Vec<(usize, usize)>,
+    /// The lanes of the last row direction (see [`Travel::lanes`]).
+    lanes: RefCell<Option<(Point, Vec<Lane>)>>,
 }
 
 /// How much more a step across the inside of the shape costs than a step
 /// along the edge, for [`Travel::edge_path`].
 pub const INTERIOR_COST: f64 = 3.0;
+
+/// In a fill, how much more a step across the inside of the shape at a
+/// right angle to the rows costs than a step along the edge. A step along
+/// the rows lies between two rows and costs as much as a step along the
+/// edge; between the two, the cost goes with the sine of the angle to the
+/// rows. Travel across the rows lies on top of rows that are sewn, or makes
+/// a ridge under rows that are not.
+pub const ACROSS_ROWS_COST: f64 = 6.0;
+
+/// In a fill whose rows are curves (circular, guided, contour...), how much
+/// more each mm of a step across the inside costs where it lies on rows
+/// that are sewn (P22 Milestone 1): the travel goes round them, along the
+/// edge or under rows that are not sewn yet.
+pub const OVER_SEWN_COST: f64 = 9.0;
+
+/// Travel that would lie on rows that are sewn for more than this, away
+/// from the edge, is not made: the needle path starts again at the next
+/// part (the plan trims there, or makes a short travel stitch), mm.
+pub const MAX_OVER_SEWN_MM: f64 = 2.0;
+/// Travel nearer than this to the edge lies in the turns of the rows, mm.
+const EDGE_BAND_MM: f64 = 1.0;
+
+/// The cells that the stitches sewn so far go through (see
+/// [`Sewer::track_sewn`]).
+#[derive(Debug, Clone)]
+pub(crate) struct Sewn {
+    origin: Point,
+    nx: usize,
+    ny: usize,
+    cells: Vec<bool>,
+}
+
+impl Sewn {
+    /// The size of a cell, mm.
+    const CELL: f64 = 1.0;
+
+    fn new(bbox: emb_geom::BBox) -> Sewn {
+        let origin = bbox.min - Point::new(Sewn::CELL, Sewn::CELL);
+        let nx = ((bbox.width() / Sewn::CELL).ceil() as usize + 3).min(4000);
+        let ny = ((bbox.height() / Sewn::CELL).ceil() as usize + 3).min(4000);
+        Sewn {
+            origin,
+            nx,
+            ny,
+            cells: vec![false; nx * ny],
+        }
+    }
+
+    fn index(&self, p: Point) -> Option<usize> {
+        let (x, y) = ((p.x - self.origin.x) / Sewn::CELL, (p.y - self.origin.y) / Sewn::CELL);
+        (x >= 0.0 && y >= 0.0 && (x as usize) < self.nx && (y as usize) < self.ny)
+            .then(|| y as usize * self.nx + x as usize)
+    }
+
+    /// The cell of `p` has sewn stitches.
+    fn hit(&self, p: Point) -> bool {
+        self.index(p).is_some_and(|i| self.cells[i])
+    }
+
+    /// Marks the cells of the stitch from `a` to `b`.
+    fn mark(&mut self, a: Point, b: Point) {
+        let n = (a.distance(b) / (Sewn::CELL / 2.0)).ceil() as usize;
+        for k in 0..=n {
+            if let Some(i) = self.index(a.lerp(b, k as f64 / n.max(1) as f64)) {
+                self.cells[i] = true;
+            }
+        }
+    }
+
+    /// The length of `a`-`b` on cells with sewn stitches, mm.
+    fn over(&self, a: Point, b: Point) -> f64 {
+        let len = a.distance(b);
+        let n = (len / (Sewn::CELL / 2.0)).ceil().max(1.0) as usize;
+        let hits = (0..n)
+            .filter(|&k| self.hit(a.lerp(b, (k as f64 + 0.5) / n as f64)))
+            .count();
+        len * hits as f64 / n as f64
+    }
+}
 
 impl Travel {
     pub fn new(shape: &Shape) -> Travel {
@@ -278,6 +361,7 @@ impl Travel {
             marks: RefCell::new(Marks::default()),
             nodes,
             ring_links,
+            lanes: RefCell::new(None),
         }
     }
 
@@ -313,15 +397,35 @@ impl Travel {
         let apart = |a: Point, b: Point| {
             a.x.max(b.x) < lo.x || a.x.min(b.x) > hi.x || a.y.max(b.y) < lo.y || a.y.min(b.y) > hi.y
         };
+        // The places where the line touches an edge (at a corner, or along
+        // it): between two of them the line is inside or outside. A line
+        // through a corner of the outline goes out of the shape with no
+        // crossing (a fill of two rings that meet at a corner).
+        let mut touches: Vec<f64> = Vec::new();
         let blocked = self.grid.any_near(p, q, &mut self.marks.borrow_mut(), |i| {
             let (a, b) = self.edges[i as usize];
-            !apart(a, b) && crosses(p, q, a, b)
+            if apart(a, b) {
+                return false;
+            }
+            if crosses(p, q, a, b) {
+                return true;
+            }
+            touch_params(p, q, a, b, &mut touches);
+            false
         });
         if blocked {
             return false;
         }
-        let m = p.midpoint(q);
-        self.contains(m) || self.on_edge(m)
+        touches.push(0.0);
+        touches.push(1.0);
+        touches.sort_by(f64::total_cmp);
+        let len = p.distance(q);
+        let inside = |m: Point| self.contains(m) || self.on_edge(m);
+        let mut parts = touches.windows(2).filter(|w| (w[1] - w[0]) * len > EPS).peekable();
+        if parts.peek().is_none() {
+            return inside(p.midpoint(q));
+        }
+        parts.all(|w| inside(p.lerp(q, 0.5 * (w[0] + w[1]))))
     }
 
     /// The shortest path inside the shape from `a` to `b`, both included.
@@ -330,7 +434,7 @@ impl Travel {
         if self.visible(a, b) {
             return Some(vec![a, b]);
         }
-        self.search(a, b, 1.0)
+        self.search(a, b, 1.0, None, None)
     }
 
     /// A path inside the shape from `a` to `b` that goes along the edge
@@ -338,13 +442,113 @@ impl Travel {
     /// its length). Travel along the edge is hidden better than travel across
     /// stitches that are already sewn.
     pub fn edge_path(&self, a: Point, b: Point) -> Option<Vec<Point>> {
-        self.search(a, b, INTERIOR_COST)
+        self.search(a, b, INTERIOR_COST, None, None)
+    }
+
+    /// As [`Travel::edge_path`], with a step across the inside costing
+    /// more where it lies on stitches that are sewn ([`OVER_SEWN_COST`]).
+    pub(crate) fn edge_path_sewn(&self, a: Point, b: Point, sewn: &Sewn) -> Option<Vec<Point>> {
+        if self.visible(a, b) && sewn.over(a, b) == 0.0 {
+            return Some(vec![a, b]);
+        }
+        self.search(a, b, INTERIOR_COST, None, Some(sewn))
+    }
+
+    /// The length of `path` that lies on the stitches of `sewn` and farther
+    /// than [`EDGE_BAND_MM`] from the edge, mm.
+    pub(crate) fn over_sewn(&self, path: &[Point], sewn: &Sewn) -> f64 {
+        let mut total = 0.0;
+        for w in path.windows(2) {
+            let n = (w[0].distance(w[1]) / (Sewn::CELL / 2.0)).ceil().max(1.0) as usize;
+            let step = w[0].distance(w[1]) / n as f64;
+            for k in 0..n {
+                let m = w[0].lerp(w[1], (k as f64 + 0.5) / n as f64);
+                if sewn.hit(m) && !self.near_edge(m, EDGE_BAND_MM) {
+                    total += step;
+                }
+            }
+        }
+        total
+    }
+
+    /// `p` is nearer than `d` to an edge of the shape.
+    fn near_edge(&self, p: Point, d: f64) -> bool {
+        let r = Point::new(d, d);
+        self.grid.any_near(p - r, p + r, &mut self.marks.borrow_mut(), |i| {
+            let (a, b) = self.edges[i as usize];
+            p.distance_to_segment(a, b) < d
+        })
+    }
+
+    /// As [`Travel::edge_path`], in a fill with rows in the direction
+    /// `rows` (a unit vector): a step along the rows costs as much as a step
+    /// along the edge, and the search can go from `a` and to `b` along the
+    /// rows as far as the edge. Travel between the sections of a fill with a
+    /// hole then goes along the line between two sections, not across the
+    /// rows (on top of rows that are sewn, or as a ridge under rows that
+    /// are not).
+    pub fn edge_path_rows(&self, a: Point, b: Point, rows: Point) -> Option<Vec<Point>> {
+        self.search(a, b, INTERIOR_COST, Some(rows), None)
+    }
+
+    /// Where the line from `p` in the direction `dir` meets the edge of the
+    /// inset shape farthest from `p` while the line stays inside the shape,
+    /// and the two nodes of that edge.
+    fn row_end(&self, p: Point, dir: Point) -> Option<(Point, usize, usize)> {
+        let far = self.grid.cell * (self.grid.nx + self.grid.ny) as f64 + 1.0;
+        let q = p + dir * far;
+        let mut hits: Vec<(f64, usize, usize)> = (0..self.nodes.len())
+            .filter_map(|k| {
+                let next = self.ring_links[k].1;
+                Point::crossing(p, q, self.nodes[k], self.nodes[next]).map(|(t, _)| (t, k, next))
+            })
+            .filter(|(t, _, _)| *t * far > EPS)
+            .collect();
+        hits.sort_by(|x, y| y.0.total_cmp(&x.0));
+        hits.into_iter()
+            .map(|(t, k, next)| (p.lerp(q, t), k, next))
+            .find(|(at, _, _)| self.visible(p, *at))
+    }
+
+    /// The lanes along the rows in the direction `dir`: from each node of
+    /// the shape that is farthest across the rows on its part of the ring
+    /// (the top and the bottom of a hole, where the sections of a fill
+    /// split), the place where a line along the rows meets the edge, both
+    /// ways, with the two nodes of that edge. Travel along a lane goes
+    /// between two sections of the fill. Kept for the next searches.
+    fn lanes(&self, dir: Point) -> Vec<Lane> {
+        if let Some((d, l)) = &*self.lanes.borrow()
+            && d.distance(dir) < EPS
+        {
+            return l.clone();
+        }
+        let across = |p: Point| dir.cross(p);
+        let mut out = Vec::new();
+        for (k, &(prev, next)) in self.ring_links.iter().enumerate() {
+            let v = across(self.nodes[k]);
+            let (a, b) = (v - across(self.nodes[prev]), v - across(self.nodes[next]));
+            if !((a > EPS && b > EPS) || (a < -EPS && b < -EPS)) {
+                continue;
+            }
+            for d in [dir, -dir] {
+                if let Some((end, a, b)) = self.row_end(self.nodes[k], d) {
+                    out.push(Lane {
+                        start: self.nodes[k],
+                        end,
+                        edge: [a, b],
+                    });
+                }
+            }
+        }
+        *self.lanes.borrow_mut() = Some((dir, out.clone()));
+        out
     }
 
     /// `visible` between two points of a search; the result between two
-    /// nodes of the shape is kept for the next searches.
-    fn visible_nodes(&self, pts: &[Point], i: usize, j: usize) -> bool {
-        if i < 2 || j < 2 {
+    /// nodes of the shape is kept for the next searches (`nodes`: the
+    /// number of points of the search that are nodes of the shape).
+    fn visible_nodes(&self, pts: &[Point], nodes: usize, i: usize, j: usize) -> bool {
+        if i < 2 || j < 2 || i >= nodes || j >= nodes {
             return self.visible(pts[i], pts[j]);
         }
         let key = (i.min(j) as u32, i.max(j) as u32);
@@ -357,17 +561,57 @@ impl Travel {
     }
 
     /// A* on the visibility graph of `a`, `b` and the nodes. Node 0 is `a`, node 1 is `b`.
-    fn search(&self, a: Point, b: Point, interior_cost: f64) -> Option<Vec<Point>> {
-        let mut pts = Vec::with_capacity(self.nodes.len() + 2);
+    fn search(
+        &self,
+        a: Point,
+        b: Point,
+        interior_cost: f64,
+        rows: Option<Point>,
+        sewn: Option<&Sewn>,
+    ) -> Option<Vec<Point>> {
+        let mut pts = Vec::with_capacity(self.nodes.len() + 6);
         pts.push(a);
         pts.push(b);
         pts.extend(self.nodes.iter().copied());
+        let nodes = pts.len();
+        // The ways along the rows from `a` and to `b` as far as the edge, and
+        // the lanes near the way from `a` to `b`: the ends are points on the
+        // edge between two nodes of the shape.
+        let mut on_edge: Vec<[usize; 2]> = Vec::new();
+        if let Some(d) = rows {
+            let ends = [a, b]
+                .into_iter()
+                .flat_map(|p| [d, -d].map(|dir| self.row_end(p, dir)))
+                .flatten();
+            let reach = LANE_REACH * a.distance(b) + LANE_MARGIN_MM;
+            let near = self
+                .lanes(d)
+                .into_iter()
+                .filter(|l| a.distance(l.start) + l.start.distance(b) <= reach)
+                .map(|l| (l.end, l.edge[0], l.edge[1]));
+            for (at, k, next) in ends.chain(near) {
+                pts.push(at);
+                on_edge.push([k + 2, next + 2]);
+            }
+        }
         let n = pts.len();
         let along_edge = |i: usize, j: usize| {
-            i >= 2 && j >= 2 && {
+            let ring = i >= 2 && j >= 2 && i < nodes && j < nodes && {
                 let (prev, next) = self.ring_links[i - 2];
                 prev + 2 == j || next + 2 == j
+            };
+            let end = |e: usize, o: usize| e >= nodes && on_edge[e - nodes].contains(&o);
+            ring || end(i, j) || end(j, i)
+        };
+        // The cost of a step across the inside, for its length.
+        let inside = |i: usize, j: usize| match rows {
+            Some(d) => {
+                let v = pts[j] - pts[i];
+                let len = v.length();
+                let sin = if len > EPS { (v.cross(d) / len).abs() } else { 0.0 };
+                1.0 + (ACROSS_ROWS_COST - 1.0) * sin
             }
+            None => interior_cost,
         };
         let mut dist = vec![f64::INFINITY; n];
         let mut from = vec![usize::MAX; n];
@@ -397,9 +641,16 @@ impl Travel {
                 if dist[node] + step + pts[j].distance(b) > dist[1] + EPS {
                     continue;
                 }
-                let factor = if along_edge(node, j) { 1.0 } else { interior_cost };
-                let d = dist[node] + step * factor;
-                if d + EPS < dist[j] && self.visible_nodes(&pts, node, j) {
+                let edge = along_edge(node, j);
+                let factor = if edge { 1.0 } else { inside(node, j) };
+                let mut d = dist[node] + step * factor;
+                if d + EPS >= dist[j] {
+                    continue;
+                }
+                if let Some(s) = sewn.filter(|_| !edge) {
+                    d += OVER_SEWN_COST * s.over(pts[node], pts[j]);
+                }
+                if d + EPS < dist[j] && self.visible_nodes(&pts, nodes, node, j) {
                     dist[j] = d;
                     from[j] = node;
                     heap.push(Entry {
@@ -422,6 +673,23 @@ impl Travel {
         Some(path)
     }
 }
+
+/// A lane along the rows of a fill (see [`Travel::lanes`]): from a node of
+/// the shape to the place where it meets the edge, and the two nodes of
+/// that edge.
+#[derive(Debug, Clone, Copy)]
+struct Lane {
+    start: Point,
+    end: Point,
+    edge: [usize; 2],
+}
+
+/// A search takes the lanes that start near the way from `a` to `b`: the
+/// way through the start of the lane is at most this many times the
+/// distance from `a` to `b`, and [`LANE_MARGIN_MM`] more. Far lanes do not
+/// make a better way, and each one makes the search slower.
+const LANE_REACH: f64 = 2.0;
+const LANE_MARGIN_MM: f64 = 10.0;
 
 /// Heap entry for A*: lowest cost first, then the lowest node index, so the result is deterministic.
 #[derive(Debug, PartialEq)]
@@ -453,6 +721,35 @@ fn crosses(p: Point, q: Point, a: Point, b: Point) -> bool {
     let o3 = (b - a).cross(p - a);
     let o4 = (b - a).cross(q - a);
     ((o1 > tol && o2 < -tol) || (o1 < -tol && o2 > tol)) && ((o3 > tol && o4 < -tol) || (o3 < -tol && o4 > tol))
+}
+
+/// The places along `p`-`q` (0 at `p`, 1 at `q`) where it touches `a`-`b`
+/// with no crossing: at an end of either segment, or along it where they
+/// overlap. Proper crossings are [`crosses`].
+fn touch_params(p: Point, q: Point, a: Point, b: Point, out: &mut Vec<f64>) {
+    let (d, e) = (q - p, b - a);
+    let len2 = d.dot(d);
+    if len2 <= 0.0 {
+        return;
+    }
+    let tol = 1e-9 * (1.0 + d.length() + e.length());
+    let denom = d.cross(e);
+    if denom.abs() > tol * (1.0 + d.length() * e.length()) {
+        let t = (a - p).cross(e) / denom;
+        let u = (a - p).cross(d) / denom;
+        let slack = 1e-9;
+        if (-slack..=1.0 + slack).contains(&t) && (-slack..=1.0 + slack).contains(&u) {
+            out.push(t.clamp(0.0, 1.0));
+        }
+    } else if d.cross(a - p).abs() <= tol * (1.0 + d.length()) {
+        // On one line: the ends of `a`-`b` that lie on `p`-`q`.
+        for c in [a, b] {
+            let t = (c - p).dot(d) / len2;
+            if (0.0..=1.0).contains(&t) {
+                out.push(t);
+            }
+        }
+    }
 }
 
 /// Douglas-Peucker simplification of a closed ring.
@@ -495,6 +792,15 @@ pub struct Sewer<'a> {
     pub runs: Vec<Vec<Point>>,
     /// Trapunto: all travel goes along the edge.
     pub edge_only: bool,
+    /// The direction of the rows of the fill that is sewn (a unit vector):
+    /// travel between its sections goes along the rows where it can.
+    pub rows: Option<Point>,
+    /// The travel of [`Sewer::go_to`]: the index of a run in `runs` and
+    /// the range of its segments (segment `k` from point `k` to `k + 1`).
+    travel_marks: Vec<(usize, std::ops::Range<usize>)>,
+    /// The cells of the stitches sewn since [`Sewer::track_sewn`]: travel
+    /// goes round them.
+    sewn: Option<Sewn>,
 }
 
 impl<'a> Sewer<'a> {
@@ -504,7 +810,19 @@ impl<'a> Sewer<'a> {
             travel_len,
             runs: Vec::new(),
             edge_only: false,
+            rows: None,
+            travel_marks: Vec::new(),
+            sewn: None,
         }
+    }
+
+    /// From now on, travel between the parts goes round the stitches that
+    /// are sewn ([`Travel::edge_path_sewn`]), where the rows have no one
+    /// direction ([`Sewer::rows`] is not set). For the top rows of a fill
+    /// with curved rows: its underlay is under them.
+    pub fn track_sewn(&mut self) {
+        let bbox = emb_geom::BBox::from_points(self.travel.rings.iter().flatten().copied());
+        self.sewn = bbox.map(Sewn::new);
     }
 
     /// The needle position, if anything is sewn.
@@ -515,7 +833,7 @@ impl<'a> Sewer<'a> {
     /// Goes to `p` with travel stitches inside the shape, along the edge
     /// where it can. If there is no path inside the shape, a new needle path starts at `p`.
     pub fn go_to(&mut self, p: Point) {
-        self.travel_to(p, true);
+        self.travel_to(p, true, true);
     }
 
     /// Starts a new needle path at `p` (the plan joins it with a jump or a
@@ -529,10 +847,12 @@ impl<'a> Sewer<'a> {
 
     /// Goes to `p` the shortest way inside the shape (a straight stitch if it can).
     pub fn step_to(&mut self, p: Point) {
-        self.travel_to(p, self.edge_only);
+        self.travel_to(p, self.edge_only, false);
     }
 
-    fn travel_to(&mut self, p: Point, along_edge: bool) {
+    /// Goes to `p` inside the shape. `mark`: the stitches are travel (from
+    /// one part of the fill to the next), not a step from row to row.
+    fn travel_to(&mut self, p: Point, along_edge: bool, mark: bool) {
         let Some(cur) = self.needle() else {
             self.runs.push(vec![p]);
             return;
@@ -541,7 +861,15 @@ impl<'a> Sewer<'a> {
             return;
         }
         let path = if along_edge {
-            self.travel.edge_path(cur, p)
+            match (self.rows, &self.sewn) {
+                (Some(d), _) => self.travel.edge_path_rows(cur, p, d),
+                (None, Some(s)) if mark => self
+                    .travel
+                    .edge_path_sewn(cur, p, s)
+                    // No way round the sewn rows: start again at `p`.
+                    .filter(|path| self.travel.over_sewn(path, s) <= MAX_OVER_SEWN_MM),
+                (None, _) => self.travel.edge_path(cur, p),
+            }
         } else {
             self.travel.path(cur, p)
         };
@@ -552,10 +880,17 @@ impl<'a> Sewer<'a> {
                     closed: false,
                 };
                 let pts = running::running_points(&line, self.travel_len);
-                self.runs
-                    .last_mut()
-                    .expect("needle is set")
-                    .extend(pts.into_iter().skip(1));
+                let k = self.runs.len() - 1;
+                let run = self.runs.last_mut().expect("needle is set");
+                let from = run.len() - 1;
+                run.extend(pts.into_iter().skip(1));
+                let to = run.len() - 1;
+                if mark && to > from {
+                    match self.travel_marks.last_mut() {
+                        Some((j, r)) if *j == k && r.end == from => r.end = to,
+                        _ => self.travel_marks.push((k, from..to)),
+                    }
+                }
             }
             None => self.runs.push(vec![p]),
         }
@@ -566,7 +901,12 @@ impl<'a> Sewer<'a> {
     pub fn stitch(&mut self, pts: impl IntoIterator<Item = Point>) {
         for p in pts {
             match self.runs.last_mut() {
-                Some(r) if r.last() != Some(&p) => r.push(p),
+                Some(r) if r.last() != Some(&p) => {
+                    if let (Some(s), Some(&last)) = (self.sewn.as_mut(), r.last()) {
+                        s.mark(last, p);
+                    }
+                    r.push(p);
+                }
                 Some(_) => {}
                 None => self.runs.push(vec![p]),
             }
@@ -575,6 +915,22 @@ impl<'a> Sewer<'a> {
 
     pub fn finish(self) -> Vec<Vec<Point>> {
         self.runs.into_iter().filter(|r| r.len() >= 2).collect()
+    }
+
+    /// As [`Sewer::finish`], with the travel of each run: the ranges of
+    /// its segments that [`Sewer::go_to`] made.
+    pub fn finish_with_travel(self) -> Vec<(Vec<Point>, Vec<std::ops::Range<usize>>)> {
+        let mut out: Vec<(Vec<Point>, Vec<std::ops::Range<usize>>)> =
+            self.runs.into_iter().map(|r| (r, Vec::new())).collect();
+        for (k, r) in self.travel_marks {
+            if let Some((pts, marks)) = out.get_mut(k)
+                && r.end < pts.len()
+            {
+                marks.push(r);
+            }
+        }
+        out.retain(|(r, _)| r.len() >= 2);
+        out
     }
 }
 
@@ -607,6 +963,25 @@ mod tests {
             ],
             closed: true,
         }
+    }
+
+    /// Two triangles that point at each other, with a gap between: a line
+    /// from one to the other through both points goes over the gap, though
+    /// it crosses no edge and its middle is in a triangle (a fill of
+    /// `shaping`, whose travel went over its cut-out part; P22 Milestone 1).
+    #[test]
+    fn a_line_through_corners_of_the_outline_is_not_inside() {
+        let tri = |pts: [(f64, f64); 3]| Polyline {
+            points: pts.iter().map(|&(x, y)| Point::new(x, y)).collect(),
+            closed: true,
+        };
+        let a = tri([(0.0, 0.0), (10.0, 0.0), (5.0, 12.0)]);
+        let b = tri([(5.0, 15.0), (10.0, 20.0), (0.0, 20.0)]);
+        let t = Travel::new(&Shape::new(&[a, b], &[]));
+        assert!(!t.visible(Point::new(5.0, 1.0), Point::new(5.0, 19.0)));
+        // In one triangle, to its point: inside.
+        assert!(t.visible(Point::new(5.0, 1.0), Point::new(5.0, 12.0)));
+        assert!(t.visible(Point::new(2.0, 1.0), Point::new(8.0, 1.0)));
     }
 
     #[test]

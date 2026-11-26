@@ -340,6 +340,8 @@ pub enum Flag {
     ShowThrough,
     /// The check view: the thread higher than the limit (ADR 0129).
     HighThread,
+    /// The check view: the travel that shows (P22 Milestone 1, ADR 0167).
+    TravelShows,
     /// The stitches colored by the kind of their part (ADR 0131).
     Parts,
 }
@@ -462,7 +464,13 @@ pub enum Cmd {
     GuideLines,
     /// Two lines: the second becomes the guide of a ripple of the first.
     RippleGuide,
+    /// The Bands window: more than one thread across a satin column.
+    ColumnBands,
+    /// The Fix Stitches window: the check and the fix of stitch objects.
+    FixStitches,
     Motifs,
+    /// The Families window: an item from a family of shapes and its numbers.
+    Families,
     Laydown,
     ClosestJoin,
     RemoveHoles,
@@ -612,6 +620,10 @@ pub enum Cmd {
     RepeatLast,
     CloseGaps,
     CleanUp,
+    /// Quicker to Sew (P22 Milestone 2, ADR 0169).
+    QuickerToSew,
+    /// Test Swatches (P22 Milestone 3, ADR 0170).
+    TestSwatches,
     ExportSvg,
     ExportInkstitch,
     Simplify,
@@ -872,6 +884,13 @@ impl Cmd {
                     tr("Stitch Parts"),
                     tr(
                         "Color the stitches by the kind of their part: runs, columns, rows of a fill and other stitches; the underlay of a part is paler. Lines show the running, satin and fill objects that the parts become. It shows how the program reads the stitches of a machine file.",
+                    ),
+                ),
+                Flag::TravelShows => (
+                    g(ph::FOOTPRINTS),
+                    tr("Travel That Shows"),
+                    tr(
+                        "Mark the travel stitches that no stitch covers: red where they lie on top of sewn stitches, blue where they lie on the fabric.",
                     ),
                 ),
                 Flag::HighThread => (
@@ -1237,6 +1256,13 @@ impl Cmd {
                  from the selected objects.",
                 ),
             ),
+            Cmd::Families => (
+                g(ph::DNA),
+                tr("Families"),
+                tr(
+                    "Make a motif, a split pattern, a carving stamp or a clipart item from a family of shapes: change its numbers to make an item of your own.",
+                ),
+            ),
             Cmd::SplitLines => (
                 g(ph::LINE_SEGMENTS),
                 tr("Split Lines"),
@@ -1291,6 +1317,20 @@ impl Cmd {
                  The lines are used up.",
                 ),
             ),
+            Cmd::FixStitches => (
+                g(ph::FIRST_AID_KIT),
+                tr("Fix Stitches…"),
+                tr(
+                    "Fix the stitch objects of a machine file: join color blocks of the same thread, remove short stitches, split long stitches, trim long jumps and add lock stitches. The other needle points stay.",
+                ),
+            ),
+            Cmd::ColumnBands => (
+                g(ph::BARCODE),
+                tr("Bands"),
+                tr(
+                    "Sew a satin column in bands of two or more threads across its width: a satin column for each band.",
+                ),
+            ),
             Cmd::RippleGuide => (
                 g(ph::PATH),
                 tr("Ripple Guide"),
@@ -1332,6 +1372,20 @@ impl Cmd {
                 tr("Close Gaps…"),
                 tr(
                     "Join the ends of the selected lines where they are near, so lines drawn one at a time become one line or a closed shape. See the result before you keep it.",
+                ),
+            ),
+            Cmd::TestSwatches => (
+                g(ph::FLASK),
+                tr("Test Swatches…"),
+                tr(
+                    "Make copies of the selected objects in a grid, with one setting (spacing, stitch length, pull compensation, width, angle or underlay) in steps and its value under each copy, as a new design. Sew it on your fabric and keep the setting that looks best.",
+                ),
+            ),
+            Cmd::QuickerToSew => (
+                g(ph::LIGHTNING),
+                tr("Quicker to Sew…"),
+                tr(
+                    "Make the design quicker to sew: merge threads that look almost the same, remove small details, fewer color changes, and sew across short gaps. A table shows the numbers before and after.",
                 ),
             ),
             Cmd::CleanUp => (
@@ -1565,6 +1619,21 @@ impl Cmd {
             ),
             Cmd::HelpTopic(id) => {
                 let (icon, label, tip) = match id {
+                    crate::help::TUTORIALS_ID => (
+                        ph::BOOKS,
+                        tr("All Tutorials"),
+                        tr("The list of all tutorials, in paths from the first steps to production."),
+                    ),
+                    "tutorial-first-design" => (
+                        ph::GRADUATION_CAP,
+                        tr("Your First Design"),
+                        tr("Tutorial: draw a badge, add a border, play the sew-out and write the machine file."),
+                    ),
+                    "tutorial-to-machine" => (
+                        ph::GRADUATION_CAP,
+                        tr("To the Machine"),
+                        tr("Tutorial: your machine and hoop, the machine file on a USB stick, and the first sew-out."),
+                    ),
                     "tutorial-patch" => (
                         ph::GRADUATION_CAP,
                         tr("A Patch from a Picture"),
@@ -1672,7 +1741,7 @@ impl Cmd {
             Cmd::ResetPanels => (
                 g(ph::SIDEBAR),
                 tr("Reset the Panels"),
-                tr("Put all the panels back in their places, in one group at the right, and open the closed panels."),
+                tr("Put all the panels back in their places, in two groups at the right, and open the closed panels."),
             ),
             Cmd::RotateDesign => (
                 g(ph::ARROW_ARC_RIGHT),

@@ -12,7 +12,15 @@ schreiben Sie eine Datei für Ihre Stickmaschine.
 
 Wenn Sticken neu für Sie ist, lesen Sie zuerst [Grundlagen des
 Stickens](embroidery-basics). Um durch Tun zu lernen, beginnen Sie mit
-[Anleitung: ein Aufnäher aus einem Bild](tutorial-patch).
+[Anleitung: Ihr erstes Design](tutorial-first-design), dann sehen Sie
+[Alle Anleitungen](tutorials).
+
+Eine Anleitung mit **Lektion beginnen** auf ihrer Karte ist auch eine
+Lektion: Das Programm zeigt im Fenster **Lektion** einen Schritt nach dem
+anderen, markiert die Schaltfläche oder die Stelle auf der Arbeitsfläche,
+die Sie klicken, und prüft das Design, bevor es weitergeht. Das Fenster
+hat **◀ Zurück**, **Überspringen ▶** und **Lektion beenden**. Eine
+Lektion, die Sie beenden, behält ihre Stelle.
 
 ## Die Startseite
 
@@ -36,7 +44,7 @@ oder PDF-Datei kommt in das Design, und ein Bild wird zum Hintergrundbild.
 - **Die Datei-Schaltfläche** (oben links) öffnet das Dateimenü: Neu,
   Öffnen, Speichern, Importieren, Exportieren, Optionen und Beenden.
   Daneben sind **Neu**, **Öffnen**, **Speichern**, **Rückgängig** und
-  **Wiederholen**.
+  **Wiederherstellen**.
 - **Das Menüband** hat die Befehle in Tabs. Siehe „Wo die Befehle sind“
   unten.
 - **Die Design-Tabs** unter dem Menüband zeigen jedes offene Design. Ein
@@ -45,8 +53,9 @@ oder PDF-Datei kommt in das Design, und ein Bild wird zum Hintergrundbild.
   Siehe [Die Arbeitsfläche und die Auswahl](canvas).
 - **Die Bereiche** rechts zeigen das ausgewählte Objekt
   (Objekteigenschaften), die Stickreihenfolge (Reihenfolge), die Garne,
-  die Stile, die Designinfo und mehr. Jeder Bereich schließt mit seinem
-  ×. **Ansicht > Bereiche** öffnet ihn wieder.
+  die Stile, die Designinfo und mehr. Sie sind in zwei Gruppen; der offene
+  Tab einer Gruppe hat ein ×, das seinen Bereich schließt. **Ansicht >
+  Bereiche** öffnet ihn wieder.
 - **Die Eigenschaftsleiste** unter dem Menüband hat die Einstellungen des
   aktiven Werkzeugs, zum Beispiel die Stichlänge neuer Linien.
 - **Die Statuszeile** unten sagt Ihnen, was als Nächstes zu tun ist, und
@@ -101,7 +110,9 @@ klicken Sie auf einen Tab, um es wieder zu zeigen.
   **Strg+Plus**, **Strg+Minus** und **Strg+0** ändern sie auch.
 - **Hoher Kontrast**: schwarze oder weiße Bereiche mit kräftigen Linien.
 - **Sprache**: English, Deutsch, Español oder 日本語. Die Hilfethemen sind
-  in derselben Sprache (ein Thema ohne Übersetzung ist auf Englisch).
+  in derselben Sprache (ein Thema ohne Übersetzung ist auf Englisch). In
+  alle Zahlenfelder können Sie einen Dezimalpunkt oder ein Dezimalkomma
+  eingeben (`0.4` oder `0,4`).
 
 Siehe [Optionen](options) für alle Einstellungen.
 
@@ -137,7 +148,7 @@ Vorlagen](fabrics-and-styles).
   Projekt behält alle Objekte und Einstellungen, damit Sie sie später
   ändern können.
 - **Strg+Z** macht die letzte Änderung rückgängig. **Strg+Y** stellt sie
-  wieder her. Die Tooltips von Rückgängig und Wiederholen sagen, was sie
+  wieder her. Die Tooltips von Rückgängig und Wiederherstellen sagen, was sie
   ändern.
 - Das Programm speichert alle 2 Minuten eine Sicherung jedes geänderten
   Designs. Wenn das Programm abbricht, bietet es die Sicherungen beim

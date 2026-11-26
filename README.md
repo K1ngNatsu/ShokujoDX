@@ -31,7 +31,7 @@ ShokujoDX makes the stitches and writes the file for your machine.
   digitizer: all the stitch types, lettering, Picture to design,
   multi-hoop layouts, production sheets and shop tools.
 - **Easy to learn.** A ribbon of commands by task, a simple mode with large
-  buttons, help on every button (push **F1**) and seven step-by-step
+  buttons, help on every button (push **F1**) and 31 step-by-step
   tutorials, in English, German, Spanish and Japanese.
 - **Tested on real fabric.** The test designs of the first 14 roadmap
   phases sew correctly on a Husqvarna Viking Topaz 20.
@@ -98,6 +98,9 @@ ShokujoDX makes the stitches and writes the file for your machine.
   (PDF), a 3D thread picture, and Send to USB.
 - Quotes and run times, order details with a barcode, thread stock and
   scripts.
+- **Your own AI agent can use the program:** `emb-cli mcp` gives it tools
+  (MCP) to make, check, export and show designs. The program has no AI in
+  it and no network code (help topic "Agents").
 
 **Specialty**
 - Free-standing lace, quilting, puff (3D foam), cross stitch, rhinestones,
@@ -194,11 +197,11 @@ first.
 ## Project status
 
 Phases 1 to 14 of the roadmap are done, and their sew-out tests passed on
-the reference machine, a Husqvarna Viking Topaz 20. Phases 16 to 18 and
-20 (the product view, better lettering, designs of other programs, the 3D
-stitch view and Japanese lettering) are done in software and are in
-version 0.4.0; their tests on fabric and with users are open. Phase 21
-(letter shapes) is done in software; its sew-out is open. Also open: tests with new users, and tests on cap frames,
+the reference machine, a Husqvarna Viking Topaz 20. Phases 16 to 18, 20
+and 21 (the product view, better lettering, designs of other programs,
+the 3D stitch view, Japanese lettering and letter shapes) are done in
+software and are in version 0.5.0; their tests on fabric and with users
+are open. Also open: tests with new users, and tests on cap frames,
 cutwork machines and other machines that the owner does not have. Sew-out
 results from **your** machine help a lot:
 see [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -262,6 +265,9 @@ batch work. Build it with `cargo build --release -p emb-cli`.
 | `cutter`, `bling`, `chart` | Appliqué cutter files, rhinestone templates, cross-stitch charts |
 | `font <font.ttf> <out.embfont>` | Make an embroidery font from a TrueType font |
 | `quote <in>` | The price and the run time of an order |
+| `swatch <in> <out> --setting <name>` | Test swatches: copies of objects with a setting in steps, each with its value |
+| `check <file>`, `fix <file> <out>` | Check the stitches of a machine file, and fix what can be fixed |
+| `mcp` | The MCP server for your own AI agent (help topic "Agents") |
 | `script <script.rhai> <in>...` | Run a script on designs |
 
 `emb-cli --help` lists all commands and options.

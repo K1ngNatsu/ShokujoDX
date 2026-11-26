@@ -663,6 +663,12 @@ fn rhinestone_template_marks_sew() {
     );
 }
 
+/// P22 Milestone 4 (ADR 0171): leaned columns and a column of bands.
+#[test]
+fn satin_lean_bands() {
+    golden("satin-lean-bands");
+}
+
 #[test]
 fn tartan_fill() {
     golden("tartan-fill");

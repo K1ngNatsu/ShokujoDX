@@ -296,7 +296,7 @@ fn tartan_ui(ui: &mut egui::Ui, st: &mut AppState, can: bool) {
     ui.horizontal(|ui| {
         ui.label(tr("Width of one count"));
         ui.add(
-            egui::Slider::new(&mut w.count_mm, 0.1..=3.0)
+            crate::workspace::slider(&mut w.count_mm, 0.1..=3.0)
                 .clamping(egui::SliderClamping::Edits)
                 .suffix(" mm")
                 .fixed_decimals(2),
@@ -372,7 +372,7 @@ fn gradient_ui(ui: &mut egui::Ui, st: &mut AppState, threads: &[emb_model::Threa
                     }
                 });
             ui.add(
-                egui::Slider::new(place, 0.0..=100.0)
+                crate::workspace::slider(place, 0.0..=100.0)
                     .clamping(egui::SliderClamping::Edits)
                     .suffix(" %")
                     .fixed_decimals(0),

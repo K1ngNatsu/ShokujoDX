@@ -75,12 +75,12 @@ pub struct Picture {
 }
 
 impl Picture {
-    fn at(&self, x: usize, y: usize) -> [u8; 4] {
+    pub(crate) fn at(&self, x: usize, y: usize) -> [u8; 4] {
         self.pixels[y * self.width + x]
     }
 
     /// The part of the picture in `rect` (in pixels), cut at its edges.
-    fn crop(&self, rect: Rect) -> Picture {
+    pub(crate) fn crop(&self, rect: Rect) -> Picture {
         let x0 = (rect.min.x.floor().max(0.0) as usize).min(self.width);
         let y0 = (rect.min.y.floor().max(0.0) as usize).min(self.height);
         let x1 = (rect.max.x.ceil().max(0.0) as usize).clamp(x0, self.width);
@@ -96,7 +96,7 @@ impl Picture {
         }
     }
 
-    fn save(&self, path: &Path) -> Result<(), String> {
+    pub(crate) fn save(&self, path: &Path) -> Result<(), String> {
         let bytes: Vec<u8> = self.pixels.iter().flatten().copied().collect();
         let image = image::RgbaImage::from_raw(self.width as u32, self.height as u32, bytes)
             .ok_or("the picture has a wrong size")?;
@@ -317,22 +317,22 @@ fn texts(shapes: &[egui::epaint::ClippedShape]) -> Vec<Text> {
 }
 
 /// One frame as a picture, with what the checks need.
-struct Shot {
-    picture: Picture,
+pub(crate) struct Shot {
+    pub(crate) picture: Picture,
     texts: Vec<Text>,
     /// The windows and menus that show, in points.
-    windows: Vec<Rect>,
+    pub(crate) windows: Vec<Rect>,
 }
 
 /// An egui context with the fonts of the program and a painter. One
 /// studio draws all scenes of a language.
-struct Studio {
-    ctx: egui::Context,
+pub(crate) struct Studio {
+    pub(crate) ctx: egui::Context,
     painter: Painter,
 }
 
 impl Studio {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let ctx = egui::Context::default();
         crate::icons::install(&ctx);
         // No fade-in: a picture shows the window as it is at rest.
@@ -344,8 +344,13 @@ impl Studio {
     }
 
     fn frame(&mut self, app: &mut EmbApp, size: Vec2) -> egui::FullOutput {
+        self.frame_with(app, size, Vec::new())
+    }
+
+    fn frame_with(&mut self, app: &mut EmbApp, size: Vec2, events: Vec<egui::Event>) -> egui::FullOutput {
         let input = egui::RawInput {
             screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)),
+            events,
             ..Default::default()
         };
         let mut out = self.ctx.run_ui(input, |ui| app.draw(ui));
@@ -353,10 +358,18 @@ impl Studio {
         out
     }
 
+    /// One frame with the pointer and key `events`, as a user gives them
+    /// (the tutorial steps, `tutorial_steps.rs`).
+    pub(crate) fn input(&mut self, app: &mut EmbApp, size: Vec2, events: Vec<egui::Event>) -> egui::FullOutput {
+        let mut out = self.frame_with(app, size, events);
+        self.painter.free(&mut out.textures_delta);
+        out
+    }
+
     /// Draws frames until the windows have their sizes and the background
     /// work of the program is done (or a short time went by), and gives
     /// the picture of the last frame.
-    fn shot(&mut self, app: &mut EmbApp, size: Vec2) -> Shot {
+    pub(crate) fn shot(&mut self, app: &mut EmbApp, size: Vec2) -> Shot {
         let mut out = self.frame(app, size);
         for i in 0..40 {
             let wait = out
@@ -450,7 +463,7 @@ impl Scene {
 }
 
 /// The program with the sample design, as a user of `lang` sees it.
-fn base(lang: &str) -> AppState {
+pub(crate) fn base(lang: &str) -> AppState {
     let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
     st.start_on_machine("husqvarna_topaz20", None);
     st.add_sample_objects();
@@ -545,12 +558,62 @@ fn scenes() -> Vec<Scene> {
         }
         st.focus_tab = Some(Tab::Properties);
     }));
+    // A band of a column of bands, with a lean (ADR 0171).
+    v.push(Scene::new("object properties band", View::Screen, |st, _| {
+        let threads: Vec<_> = st.doc.design().threads.iter().take(2).map(|t| t.id).collect();
+        let Some(&first) = threads.first() else { return };
+        let id = st.doc.edit("Column", |d| {
+            let line = emb_geom::Path::new()
+                .move_to(emb_geom::Point::new(-30.0, 60.0))
+                .line_to(emb_geom::Point::new(30.0, 60.0));
+            d.add_object(
+                first,
+                emb_model::ObjectKind::Satin {
+                    geometry: emb_model::SatinGeometry::from_centerline(&line, 8.0),
+                    params: emb_model::SatinParams {
+                        lean_deg: 10.0,
+                        ..Default::default()
+                    },
+                },
+            )
+        });
+        st.selection.set(id);
+        let last = *threads.last().unwrap_or(&first);
+        st.make_bands(&[first, last], 0.3);
+        if let Some(&second) = st.selection.ids().get(1)
+            && let Some(g) = st.doc.design().object(second).and_then(|o| o.group)
+        {
+            st.selection.enter(second, g);
+        }
+        st.focus_tab = Some(Tab::Properties);
+    }));
+    // Fix Stitches with the sample design opened as a machine file with no
+    // trims (ADR 0172): long jumps with no trim.
+    v.push(Scene::new("fix stitches file", View::Windows, |st, _| {
+        let mut s = st.plan_view().plan.stitches.clone();
+        s.records.retain(|r| r.kind != emb_model::StitchKind::Trim);
+        let d = emb_model::design_from_stitches(&s, "file");
+        st.doc.edit("Open", |x| *x = d);
+        st.fix_stitches.open = true;
+    }));
     // The windows that no command opens with the sample design.
+    // A lesson (ADR 0177): its window at a step with a mark, and at the
+    // first step (the screen, with the mark on the ribbon).
+    v.push(Scene::new("lesson", View::Screen, |st, _| {
+        st.start_lesson("tutorial-first-design", 2);
+    }));
     v.push(Scene::new("first start", View::Windows, |st, _| {
         st.ask_machine = Some(crate::first_start::MachineStep::new(st));
     }));
     v.push(Scene::new("update question", View::Windows, |st, _| {
         st.updates.ask = true
+    }));
+    // An agent saved the file of the tab (ADR 0176).
+    v.push(Scene::new("file changed", View::Windows, |st, _| {
+        let path = std::env::temp_dir().join("Badge.embproj");
+        st.file_path = Some(path.clone());
+        st.file_watch.changed = Some(path);
+        st.doc.mark_unsaved();
     }));
     for (name, status) in [
         (
@@ -692,6 +755,28 @@ fn scenes() -> Vec<Scene> {
         st.stitch_tiles.sync = true;
         st.show_through = true;
         st.show_high_thread = true;
+    }));
+    // A circular fill with a hole: its travel goes across rings that are
+    // sewn (P22 Milestone 1, ADR 0167).
+    v.push(Scene::new("travel that shows", View::Screen, |st, _| {
+        use emb_geom::{BBox, Path, Point};
+        use emb_model::{FillParams, FillPattern, ObjectKind, Rgb};
+        st.doc.edit("Travel", |d| {
+            let ids: Vec<_> = d.objects().iter().map(|o| o.id).collect();
+            for id in ids {
+                d.remove_object(id);
+            }
+            let t = d.add_thread("Orange", Rgb(230, 120, 30));
+            d.add_object(
+                t,
+                ObjectKind::Fill {
+                    outer: Path::rect(BBox::new(Point::new(-25.0, -25.0), Point::new(25.0, 25.0))),
+                    holes: vec![Path::rect(BBox::new(Point::new(-7.0, -7.0), Point::new(7.0, 7.0)))],
+                    params: FillParams::default().with_pattern(FillPattern::Circular { center: None }),
+                },
+            );
+        });
+        st.show_travel = true;
     }));
     v.push(Scene::new("product photo", View::Windows, |st, _| {
         let data = crate::product_photo::tests::shirt_png();

@@ -1,0 +1,77 @@
+# The steps of "Tutorial: make a design sew well" (tutorial-sew-well.md).
+# The test each_tutorial_runs_in_each_language (crates/emb-app/src/
+# tutorial_steps.rs) does them in each language; write_tutorial_pictures
+# makes the pictures. A change of a step needs the same change in the topic
+# and its translations.
+
+# Open the start design: the leaf logo, with a fill that is too dense.
+[[step]]
+item = ["Open the start design", 0]
+open = "sew-well"
+expect = { objects = 3, warnings = 1 }
+
+# The fabric.
+[[step]]
+item = ["Tell the program the fabric", 1]
+command = "Design > Fabric and Styles > Fabric"
+expect = { window = "Fabric" }
+
+[[step]]
+item = ["Tell the program the fabric", 2]
+button = "Not set"
+
+[[step]]
+button = "T-shirt knit"
+
+[[step]]
+picture = "sew-well-fabric"
+area = "windows"
+
+[[step]]
+item = ["Tell the program the fabric", 3]
+button = "Apply"
+expect = { fabric = "knit", warnings = 1 }
+
+# The density of the leaf.
+[[step]]
+item = ["Set the density", 1]
+command = "Digitize > Select > Select"
+
+[[step]]
+click = [12.0, 8.0]
+expect = { selected = 1 }
+
+# (With a decimal comma: the field takes both.)
+[[step]]
+item = ["Set the density", 2]
+set = ["Density", "0,4"]
+expect = { warnings = 0 }
+
+# The pull compensation of the stem.
+[[step]]
+item = ["Set the pull compensation", 1]
+click = [-31.0, 32.0]
+expect = { selected = 1 }
+
+[[step]]
+item = ["Set the pull compensation", 2]
+set = ["Pull compensation", "0.3 mm"]
+
+[[step]]
+item = ["Set the pull compensation", 3]
+key = "Escape"
+
+# The density map.
+[[step]]
+item = ["Look at the density map", 1]
+command = "View > Show > Density Map"
+expect = { on = "View > Show > Density Map" }
+
+[[step]]
+picture = "sew-well-density"
+around = [[-45.0, -40.0], [40.0, 45.0]]
+
+[[step]]
+item = ["Look at the density map", 3]
+command = "View > Show > Density Map"
+expect = { objects = 3, colors = 3, warnings = 0 }

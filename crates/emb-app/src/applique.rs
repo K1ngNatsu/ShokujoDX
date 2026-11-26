@@ -188,13 +188,14 @@ pub fn properties(
     let mut drag = false;
     let mut slider =
         |ui: &mut egui::Ui, label: &str, v: &mut f64, range: std::ops::RangeInclusive<f64>, word: Option<Word>| {
-            ui.horizontal(|ui| {
+            // Wrapped: the word after the slider can be long in a translation.
+            ui.horizontal_wrapped(|ui| {
                 let l = ui.label(label);
                 if let Some((_, help)) = word {
                     l.on_hover_text(help);
                 }
                 let r = ui.add(
-                    egui::Slider::new(v, range)
+                    crate::workspace::slider(v, range)
                         .clamping(egui::SliderClamping::Edits)
                         .suffix(" mm")
                         .fixed_decimals(2),
@@ -303,7 +304,7 @@ pub fn properties(
                 let mut layer = pc.layer + 1;
                 if ui
                     .add(
-                        egui::DragValue::new(&mut layer)
+                        crate::workspace::drag(&mut layer)
                             .range(1..=emb_model::applique::MAX_LAYERS)
                             .clamp_existing_to_range(false)
                             .prefix("layer "),

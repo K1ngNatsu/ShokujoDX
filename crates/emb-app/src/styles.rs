@@ -712,8 +712,11 @@ fn fabric_window(ctx: &egui::Context, st: &mut AppState) {
             .and_then(|id| st.fabrics.get(id))
             .cloned()
             .unwrap_or_else(Fabric::base);
+        // All the fabrics show with no scrolling (the list of egui is 200
+        // points high: the fabrics at its end were out of sight).
         egui::ComboBox::from_label(tr("Fabric"))
             .width(260.0)
+            .height(480.0)
             .selected_text(tr(&to.name))
             .show_ui(ui, |ui| {
                 ui.selectable_value(&mut dlg.choice, None, tr("Not set (base settings)"));

@@ -61,6 +61,14 @@ kräftigere Linie. Die Umrissarten einer Linie sind außerdem:
 | Motivsäule | Ein Motiv, das sich entlang der Säule wiederholt, so hoch wie die Säule breit ist. |
 | Programmsplit | Satinreihen mit den Einstichpunkten in einem Muster, das sich mit der Säule biegt. |
 
+**Neigung** (in den Objekteigenschaften, für Satin-, erhabene Satin- und
+Zickzacksäulen) ist der Winkel der Deckstiche gegen die rechtwinklige
+Richtung quer über die Säule, von −45° bis 45°. Auf Strickware sinken
+leicht geneigte Stiche nicht zwischen die Maschenreihen ein; ein größerer
+Winkel ist ein Effekt. Die Unterlage ist nicht geneigt. Nahe einem Ende
+der Säule fächern die Stiche von der Ecke aus, damit kein Einstichpunkt
+außerhalb der Säule liegt.
+
 ## Füllungen
 
 | Füllart | Was sie stickt |
@@ -141,6 +149,23 @@ Der Füllwinkel legt die Richtung der Reihen fest. Jede Reihe hat eine
 Farbe, darum bleibt die Dichte gleich. Ein Verlauf mit nur einer Farbe
 blendet zum Stoff aus.
 
+## Bänder
+
+1. Wählen Sie eine Satinsäule aus, dann **Bearbeiten > Sticharten > Bänder**.
+2. Wählen Sie ein Garn für jedes Band, von der ersten Seite der Säule an.
+   **Band hinzufügen** fügt ein Band hinzu (höchstens sechs).
+3. **Überlappung** legt fest, wie weit jedes Band in das Band daneben
+   reicht. Eine kleine Überlappung verhindert, dass der Stoff zwischen den
+   Bändern zu sehen ist.
+4. Klicken Sie auf **Bänder machen**.
+
+Das Programm macht eine Satinsäule für jedes Band, in einer Gruppe, mit
+den Schienen der ausgewählten Säule. Die Bänder sind gleich breit. Das
+erste Band stickt die Unterlage der ganzen Säule, und der Zugausgleich
+geht nur an den zwei Seiten der Säule nach außen. Die Neigung eines
+Bandes ändert die Neigung aller Bänder der Säule. **Bänder entfernen**
+macht die Säule wieder zu einer Säule mit einem Garn.
+
 ## Motive
 
 **Bearbeiten > Sticharten > Motive** öffnet die Motivbibliothek:
@@ -155,14 +180,15 @@ blendet zum Stoff aus.
 
 ## Familien
 
-Eine Familie macht ein Element aus einigen Zahlen: Die Familie **Waves**
+Eine Familie macht ein Element aus einigen Zahlen: Die Familie **Wellen**
 macht ein Motiv aus der Anzahl der Wellen und ihrer Höhe. Die meisten
 Motive, Programmteilungs-Muster, Prägestempel und Clipart-Elemente des
 Programms kommen aus Familien, und Sie können ein eigenes Element machen.
 
-- **Familien…** öffnet das Fenster Familien. Die Schaltfläche ist im
-  Fenster Motive, neben den Listen der Muster und der Stempel in den
-  Objekteigenschaften und in der Gruppe Clipart.
+- **Bearbeiten > Sticharten > Familien** öffnet das Fenster Familien. Eine
+  Schaltfläche **Familien…** ist auch im Fenster Motive, neben den Listen
+  der Muster und der Stempel in den Objekteigenschaften und in der Gruppe
+  Clipart.
 - Wählen Sie die Art und die **Familie**. **Eingebaute Elemente** sind die
   Elemente der Familie, die in den Listen des Programms sind. Ändern Sie
   die Zahlen: Das Bild zeigt das Element.

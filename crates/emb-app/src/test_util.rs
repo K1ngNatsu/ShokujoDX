@@ -50,16 +50,23 @@ pub fn reader_nodes(out: &egui::FullOutput) -> Vec<(String, Rect)> {
         .collect()
 }
 
-/// All the side panels are in one group of the dock (`app::SIDE_PANELS`).
-pub fn one_side_group(dock: &egui_dock::DockState<crate::app::Tab>) -> bool {
-    let side: Vec<_> = crate::app::SIDE_PANELS
-        .iter()
-        .filter_map(|t| dock.find_tab(t))
-        .collect();
-    side.len() == crate::app::SIDE_PANELS.len()
-        && side
-            .iter()
-            .all(|p| (p.surface, p.node) == (side[0].surface, side[0].node))
+/// The side panels are in their two groups of the dock
+/// (`app::SIDE_GROUPS`): each group in one place, the two in different
+/// places.
+pub fn side_groups(dock: &egui_dock::DockState<crate::app::Tab>) -> bool {
+    let mut places = Vec::new();
+    for group in crate::app::SIDE_GROUPS {
+        let side: Vec<_> = group.iter().filter_map(|t| dock.find_tab(t)).collect();
+        if side.len() != group.len()
+            || !side
+                .iter()
+                .all(|p| (p.surface, p.node) == (side[0].surface, side[0].node))
+        {
+            return false;
+        }
+        places.push((side[0].surface, side[0].node));
+    }
+    places[0] != places[1]
 }
 
 /// A context after one empty frame, so it has its fonts. On macOS,

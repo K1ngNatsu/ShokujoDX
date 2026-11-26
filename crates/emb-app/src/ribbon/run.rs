@@ -105,9 +105,10 @@ impl AppState {
             Cmd::ExportOutlines | Cmd::ExportInkstitch => !d.objects().is_empty(),
             Cmd::FlorentineGuide => s.n == 2 && s.fills == 1 && s.lines == 1,
             Cmd::Laydown => !d.objects().is_empty(),
-            Cmd::Motifs | Cmd::Borders | Cmd::Buttonholes | Cmd::Blends => true,
+            Cmd::Motifs | Cmd::Families | Cmd::Borders | Cmd::Buttonholes | Cmd::Blends => true,
             Cmd::SplitLines | Cmd::GuideLines => s.fills == 1 && s.lines > 0 && s.n == 1 + s.lines,
-            Cmd::Tartan | Cmd::Gradient => true,
+            Cmd::Tartan | Cmd::Gradient | Cmd::ColumnBands => true,
+            Cmd::FixStitches => d.objects().iter().any(|o| matches!(o.kind, ObjectKind::Stitches { .. })),
             Cmd::RippleGuide => s.n == 2 && s.lines == 2,
             Cmd::Redwork | Cmd::Branching => s.lines > 0,
             Cmd::LetteringOnLine => {
@@ -121,6 +122,8 @@ impl AppState {
             Cmd::CleanUp => s.lines + s.vectors + s.fills > 0,
             Cmd::Align(_) | Cmd::SameSize(..) | Cmd::Group | Cmd::ClosestJoin | Cmd::ClickOrder | Cmd::Join => s.n > 1,
             Cmd::OptimizeOrder | Cmd::CapOrder => d.objects().len() > 1,
+            Cmd::QuickerToSew => !d.objects().is_empty(),
+            Cmd::TestSwatches => s.fills + s.columns + s.lines + s.letterings > 0,
             Cmd::Puff => self.selection.ids().iter().any(|id| {
                 matches!(
                     d.object(*id).map(|o| &o.kind),
@@ -256,6 +259,7 @@ impl AppState {
             Flag::BeforeAfter => self.before_after.is_some(),
             Flag::ShowThrough => self.show_through,
             Flag::HighThread => self.show_high_thread,
+            Flag::TravelShows => self.show_travel,
             Flag::Parts => self.parts_view.on,
         }
     }
@@ -340,6 +344,10 @@ impl AppState {
                 self.show_high_thread = !self.show_high_thread;
                 self.show_plan |= self.show_high_thread;
             }
+            Flag::TravelShows => {
+                self.show_travel = !self.show_travel;
+                self.show_plan |= self.show_travel;
+            }
             Flag::Parts => {
                 self.parts_view.on = !self.parts_view.on;
                 self.show_plan |= self.parts_view.on;
@@ -353,6 +361,9 @@ impl AppState {
         // The panels over the canvas of a short screen close (P15 step 3).
         self.ribbon_peek = None;
         let label = cmd.meta().1;
+        if let Some(lesson) = &mut self.lesson {
+            lesson.ran(cmd);
+        }
         // Space repeats it (not undo, redo and the view switches).
         if !matches!(cmd, Cmd::Undo | Cmd::Redo | Cmd::Toggle(_) | Cmd::RepeatLast) {
             self.last_cmd = Some(cmd);
@@ -439,6 +450,7 @@ impl AppState {
                 crate::stitch_types::add_laydown(self);
             }
             Cmd::Motifs => self.motifs_window.open = true,
+            Cmd::Families => self.families_window.open = true,
             Cmd::Borders => self.decor.borders = true,
             Cmd::Buttonholes => self.open_buttonholes(),
             Cmd::Blends => self.decor.blends = true,
@@ -452,6 +464,8 @@ impl AppState {
             Cmd::GuideLines => {
                 crate::stitch_types::guide_lines(self);
             }
+            Cmd::ColumnBands => self.column_bands.open = true,
+            Cmd::FixStitches => self.fix_stitches.open = true,
             Cmd::RippleGuide => {
                 crate::stitch_types::ripple_guide(self);
             }
@@ -649,6 +663,8 @@ impl AppState {
                 }
             }
             Cmd::CleanUp => self.open_cleanup(),
+            Cmd::QuickerToSew => self.open_quicker(),
+            Cmd::TestSwatches => self.open_test_swatches(),
             Cmd::CornerRadius => self.open_corner_dialog(),
             Cmd::HoleFromOutline => self.open_hole_dialog(),
             Cmd::PreviousView => self.previous_view(),

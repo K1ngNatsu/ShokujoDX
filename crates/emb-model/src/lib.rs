@@ -50,6 +50,7 @@ pub mod object;
 pub mod order;
 pub mod product;
 pub mod project;
+pub mod quicker;
 pub mod quilt;
 pub mod quote;
 pub mod repeat;
@@ -88,7 +89,7 @@ pub use fabric::{Fabric, FabricCatalog, FabricChange, UnderlayWeight, Weave};
 pub use history::{Document, MergeKey};
 pub use hoop::{HoopCatalog, HoopPosition, HoopPreset, HoopShape};
 pub use hooping::{Hooping, HoopingLayout, HoopingOut};
-pub use import::design_from_stitches;
+pub use import::{design_from_stitches, objects_from_stitches, records_of_stitch_objects, stitch_subpaths};
 pub use keyboard::{KeyDesign, KeyObject, KeyboardCollection};
 pub use lettering::{
     CutArea, FontKind, FontRef, Justify, Knockout, Letter, LetterConnection, LetterEdit, LetterOrder, LetterShape,
@@ -103,8 +104,8 @@ pub use monogram::{
 pub use motif::{Motif, MotifRun};
 pub use needles::{NeedlePin, NeedlePlan, NeedleSetup};
 pub use object::{
-    Accordion, ColumnPattern, Corner, CrossStyle, DesignObject, DirectionLine, FillParams, FillPattern, Functions,
-    LineBorder, MeanderTile, ObjectId, ObjectKind, Ripple, RunPass, RunStyle, RunningParams, SatinGeometry,
+    Accordion, ColumnBand, ColumnPattern, Corner, CrossStyle, DesignObject, DirectionLine, FillParams, FillPattern,
+    Functions, LineBorder, MeanderTile, ObjectId, ObjectKind, Ripple, RunPass, RunStyle, RunningParams, SatinGeometry,
     SatinParams, TrimMode, Underlay, UnderlayLayer,
 };
 pub use product::{

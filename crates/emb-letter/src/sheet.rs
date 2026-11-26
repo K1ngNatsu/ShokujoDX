@@ -10,8 +10,21 @@ use emb_model::{LetterStitch, Lettering, ObjectKind};
 use crate::layout::relayout;
 use crate::source::LetterSource;
 
-/// The capital height of the labels, in mm.
+/// The capital height of the labels, in mm, if the label font goes down
+/// to it ([`label_height`]).
 pub const LABEL_MM: f64 = 5.0;
+/// The bundled embroidery font of the labels of the font test sheets and
+/// the test swatches: a font for small text with open shapes. Atkinson
+/// Hyperlegible (made from its bold weight) closed the holes of its digits
+/// at 5 mm (the agent test of P22 Milestone 9).
+pub const LABEL_FONT: &str = "Soft Round";
+
+/// The capital height of the labels in the font `src`: [`LABEL_MM`], or
+/// the smallest size of its satin columns if that is larger.
+pub fn label_height(src: &dyn LetterSource) -> f64 {
+    src.size_range(LetterStitch::Satin)
+        .map_or(LABEL_MM, |(min, _)| min.max(LABEL_MM))
+}
 /// The space below a label, in mm.
 const LABEL_GAP_MM: f64 = 3.0;
 /// The space between two letters of a row, as a part of the size.
@@ -288,7 +301,7 @@ pub fn sheet(src: &dyn LetterSource, label: Option<&dyn LetterSource>, spec: &Sp
         let mut bbox: Option<BBox> = None;
         if let Some(label_src) = label {
             let text = format!("{} {}", spec.name, size_text(size));
-            let l = Lettering::new(&text, label_src.font_ref(), LABEL_MM, Point::ZERO);
+            let l = Lettering::new(&text, label_src.font_ref(), label_height(label_src), Point::ZERO);
             if let Some((b, _)) = place(l, label_src, top, &mut objects) {
                 top = b.max.y + LABEL_GAP_MM;
                 bbox = Some(b);
@@ -327,7 +340,7 @@ mod tests {
     #[test]
     fn a_sheet_has_each_letter_at_each_size_in_rows_that_fit() {
         let font = bundled::embroidery("Block Sans").unwrap();
-        let label = bundled::embroidery("Atkinson Hyperlegible").unwrap();
+        let label = bundled::embroidery(LABEL_FONT).unwrap();
         let range = LetterSource::size_range(&font, LetterStitch::Auto);
         let all = sizes(range);
         let spec = Spec {

@@ -20,7 +20,10 @@ design. The machine sets:
 The first start asks for your machine and your hoop. New designs at the
 start use them; until you pick one, they use the Generic machine in a
 130 × 180 mm hoop. A machine or a hoop that you pick in this panel is
-kept for the next start too.
+kept for the next start too. When you pick a machine and the hoop of the
+design does not go on it, the hoop changes to the smallest hoop of the
+machine that holds the design (a cap frame to a cap frame); the status
+line says which.
 
 **Machine Settings** (Design > Machine and Hoop) has:
 

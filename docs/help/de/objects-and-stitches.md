@@ -64,7 +64,8 @@ Zeiger auf den Namen einer Einstellung, um zu sehen, was sie tut.
 - **Stiche teilen über**: Satinstiche, die länger sind, bekommen
   zusätzliche Einstichpunkte, damit sie nicht hängen bleiben.
 - **Kurze Stiche in Kurven**: kürzere Stiche an der Innenseite enger
-  Kurven, damit die Kurve nicht zu dicht wird.
+  Kurven und an einer Seite, die die Stiche in einem kleinen Winkel
+  treffen, damit das Garn dort nicht zu dicht wird.
 - **Letzten Stich weglassen**: Die Säule endet einen Stich früher, auf der
   anderen Seite. Benutzen Sie es, wo eine Säule an die nächste Säule
   anschließt.

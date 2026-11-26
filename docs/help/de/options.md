@@ -30,7 +30,7 @@ Optionen. Änderungen gelten sofort und bleiben für den nächsten Start.
 - **Lineale und Hilfslinien**: **Lineale zeigen** und **An Hilfslinien
   einrasten**; der **Fangabstand**.
 - **Bereiche**: **Bereiche zurücksetzen** setzt alle Bereiche wieder in
-  eine Gruppe rechts und öffnet die geschlossenen.
+  ihre zwei Gruppen rechts und öffnet die geschlossenen.
 - **Verschieben mit Pfeiltasten** und **Verschieben mit Umschalt +
   Pfeil**: wie weit die Pfeiltasten die Auswahl verschieben.
 
@@ -39,6 +39,12 @@ Optionen. Änderungen gelten sofort und bleiben für den nächsten Start.
 - **Automatische Sicherung**: Designs mit Änderungen kommen alle 1 bis 60
   Minuten (am Anfang 2) in einen Sicherungsordner, oder **aus**. Nach einem
   Absturz bietet das Programm an, sie wiederherzustellen.
+- **Offene Tabs**: mit **Beim nächsten Start wieder öffnen** (am Anfang
+  an) behält Beenden die offenen Designs mit ihren Änderungen, und der
+  nächste Start öffnet sie wieder.
+- **Dateien**: mit **Im laufenden Programm öffnen** (am Anfang an) öffnet
+  sich eine Datei, die Sie öffnen, während das Programm läuft, in einem
+  Tab davon.
 - **Sicherheitsabstand im Rahmen**: der Abstand innerhalb des
   Rahmenfelds. Stiche außerhalb davon bekommen eine Warnung.
 
@@ -62,7 +68,9 @@ Farbe zu wählen; sonst erscheint die Farbe des Designs.
 ## Dichte und Garn
 
 - **Dichtegrenze**: die Zahl der Garnlagen, die die Dichtekarte und die
-  Designinfo erlauben (am Anfang 5).
+  Designinfo erlauben (am Anfang 5). Die Designinfo erlaubt 3 Lagen mehr
+  in freistehender Spitze und bei Puff-Objekten: Sie sind von Natur aus
+  dicht.
 - **Oberfadenspule** und **Unterfaden**: die Länge und der **Preis** von
   einem, und die **Währung** (der Text vor den Kosten, zum Beispiel $ oder
   €). Die Designinfo und das Arbeitsblatt zeigen dann die Garnkosten. Ein

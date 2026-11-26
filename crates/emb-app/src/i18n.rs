@@ -122,6 +122,12 @@ pub fn active() -> Option<&'static Language> {
     ACTIVE.with(Cell::get)
 }
 
+/// The language of this thread writes a decimal comma (German, Spanish):
+/// `1,250` is 1.25 in a field of decimal numbers, not 1250.
+pub fn decimal_comma() -> bool {
+    matches!(current(), "de" | "es")
+}
+
 /// The code of the language of this thread.
 pub fn current() -> &'static str {
     ACTIVE.with(|a| a.get().map_or("en", |l| l.code.as_str()))
@@ -378,6 +384,8 @@ pub(crate) mod tests {
         out.extend(emb_model::ConvertTo::ALL.iter().map(|p| p.name()));
         out.extend(emb_model::TextDirection::ALL.iter().map(|d| d.name()));
         out.extend(emb_model::ThreadKind::ALL.iter().map(|k| k.name()));
+        out.extend(emb_letter::swatch::SwatchSetting::ALL.iter().map(|s| s.name()));
+        out.push(crate::keyboard::BUILT_IN);
         // The kinds and the parameters of the families, and the shapes of
         // the borders (P17 Milestone 8, ADR 0118).
         out.extend(emb_model::family::Kind::ALL.iter().map(|k| k.name()));
@@ -436,6 +444,11 @@ pub(crate) mod tests {
         out.extend(crate::kiosk::PRODUCT_COLORS.iter().map(|(name, _)| *name));
         out.extend(crate::viewtools::PANELS.iter().map(|(_, name)| *name));
         out.extend(crate::library::LIST_COLUMNS.iter().map(|(name, _, _)| *name));
+        // The paths and levels of the tutorials, and the start designs (P19
+        // Part 2).
+        out.extend(crate::help::PATHS.iter().map(|(_, name)| *name));
+        out.extend(crate::help::LEVELS.iter().map(|(_, name)| *name));
+        out.extend(crate::samples::SAMPLES.iter().map(|(_, name)| *name));
         let mut out: BTreeSet<String> = out.into_iter().map(str::to_string).collect();
         // The fabrics of the program (`data/fabrics.toml`) and "no fabric".
         let base = emb_model::Fabric::base();
@@ -444,6 +457,22 @@ pub(crate) mod tests {
             if !f.description.is_empty() {
                 out.insert(f.description.clone());
             }
+        }
+        // The names of the built-in motifs, split patterns, stamps, borders,
+        // clipart items and families: they stay English in the designs and
+        // the files, and show through `tr(name)`.
+        out.extend(emb_model::motif::builtin().into_iter().map(|m| m.name));
+        out.extend(emb_model::split::split_patterns().into_iter().map(|p| p.name));
+        out.extend(emb_model::split::stamps().into_iter().map(|s| s.name));
+        out.extend(emb_model::decor::frames().into_iter().map(|f| f.name));
+        out.extend(
+            crate::clipart::builtins()
+                .into_iter()
+                .map(|(name, _, _)| name.to_string()),
+        );
+        for f in emb_model::family::families() {
+            out.insert(f.name.to_string());
+            out.extend(f.preset_values().into_iter().map(|(name, _)| name.to_string()));
         }
         out
     }

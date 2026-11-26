@@ -56,12 +56,25 @@ pub fn collections_dir() -> Option<PathBuf> {
     crate::workspace::settings_path()?.parent().map(|d| d.join("keyboard"))
 }
 
+/// The name of the built-in collection (data; it shows through `tr`).
+pub(crate) const BUILT_IN: &str = "Shadow (built in)";
+
+/// The name of a collection as it shows: the built-in name in the language
+/// of the program.
+fn shown_name(k: &KeyboardCollection) -> String {
+    if k.name == BUILT_IN {
+        tr(BUILT_IN).to_string()
+    } else {
+        k.name.clone()
+    }
+}
+
 /// The built-in collection and the user's (with their files).
 pub fn collections() -> Vec<(KeyboardCollection, Option<PathBuf>)> {
     let mut all = Vec::new();
     if let Some(f) = emb_letter::bundled::embroidery(emb_letter::bundled::DEFAULT_EMBROIDERY) {
         all.push((
-            emb_letter::keyboard::shadow_collection(&f, "Shadow (built in)", Rgb(25, 35, 90), Rgb(180, 140, 40)),
+            emb_letter::keyboard::shadow_collection(&f, BUILT_IN, Rgb(25, 35, 90), Rgb(180, 140, 40)),
             None,
         ));
     }
@@ -88,7 +101,7 @@ impl AppState {
         let w = self.keyboard_window.clone();
         let (objs, missing) = emb_letter::keyboard::type_text(k, &w.text, w.height_mm, w.spacing_mm, Point::ZERO);
         if objs.is_empty() {
-            self.message = crate::i18n::fill("{} has none of these keys.", &[&k.name]);
+            self.message = crate::i18n::fill("{} has none of these keys.", &[&shown_name(k)]);
             return;
         }
         let b = objs
@@ -117,7 +130,7 @@ impl AppState {
             self.message = crate::i18n::fill(
                 "{} has no design for: {}",
                 &[
-                    &k.name,
+                    &shown_name(k),
                     &(missing.iter().map(|c| c.to_string()).collect::<Vec<_>>().join(" ")),
                 ],
             );
@@ -200,13 +213,13 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         ui.horizontal(|ui| {
             ui.label(tr("Collection"));
             egui::ComboBox::from_id_salt("kdc")
-                .selected_text(all.get(w.selected).map_or("", |(k, _)| k.name.as_str()))
+                .selected_text(all.get(w.selected).map_or(String::new(), |(k, _)| shown_name(k)))
                 .show_ui(ui, |ui| {
                     for (i, (k, _)) in all.iter().enumerate() {
                         ui.selectable_value(
                             &mut w.selected,
                             i,
-                            crate::i18n::fill("{} ({} keys)", &[&k.name, &k.keys.len()]),
+                            crate::i18n::fill("{} ({} keys)", &[&shown_name(k), &k.keys.len()]),
                         );
                     }
                 });
@@ -218,7 +231,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
         ui.horizontal(|ui| {
             ui.label(tr("Height"));
             ui.add(
-                egui::DragValue::new(&mut w.height_mm)
+                crate::workspace::drag(&mut w.height_mm)
                     .range(5.0..=200.0)
                     .clamp_existing_to_range(false)
                     .speed(0.2)
@@ -226,7 +239,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
             );
             ui.label(tr("Spacing"));
             ui.add(
-                egui::DragValue::new(&mut w.spacing_mm)
+                crate::workspace::drag(&mut w.spacing_mm)
                     .range(-10.0..=30.0)
                     .clamp_existing_to_range(false)
                     .speed(0.05)

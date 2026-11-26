@@ -38,6 +38,7 @@ pub mod click;
 pub mod crop;
 pub mod cross;
 pub mod cutout;
+pub mod file_check;
 mod maxflow;
 pub mod part_fills;
 pub mod part_objects;

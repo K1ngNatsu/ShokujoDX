@@ -2,7 +2,7 @@
 id: files-and-output
 title: Files and output
 group: production
-keywords: open, save, project, embproj, backup, recover, crash, import, export, machine file, format, dst, pes, vp3, usb, stick, send, email, zip, output design, worksheet, approval sheet, pdf, print, picture, png, svg, csv, barcode, thread color files, inf, edr, col, batch, queue, exports, thumbnail, icon, explorer, finder
+keywords: open, save, project, embproj, backup, recover, crash, import, export, machine file, format, dst, pes, vp3, usb, stick, send, email, zip, output design, worksheet, approval sheet, pdf, print, picture, png, svg, csv, barcode, thread color files, inf, edr, col, batch, queue, exports, thumbnail, icon, explorer, finder, open tabs, restore tabs, one program, new window
 ---
 # Files and output
 
@@ -26,6 +26,19 @@ The program saves a backup of each design with changes every 2 minutes
 (**Options > Automatic backup**). If the program stops, the **Recover Designs** window shows the backups at the next start. A crash report goes
 to the `crashes` folder of the settings; **Help > About** shows where it
 is.
+
+## Open tabs and one program
+
+When you quit, the program keeps the open designs with their changes
+that are not saved, and asks nothing. At the next start, the tabs open
+again, with the same tab in front and the same view (**Options > Open
+tabs**). After a crash, the **Recover Designs** window shows the backups
+as before.
+
+A file that you open while the program runs (a double-click, **Open
+with**, the command line) opens in a new tab of that program, and the
+program comes to the front (**Options > Files**). To start a second
+program, start it with `--new-window`.
 
 ## Export a machine file
 

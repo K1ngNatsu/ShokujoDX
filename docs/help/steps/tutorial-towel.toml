@@ -1,0 +1,93 @@
+# The steps of "Tutorial: a monogram on a towel" (tutorial-towel.md). The
+# test each_tutorial_runs_in_each_language (crates/emb-app/src/
+# tutorial_steps.rs) does them in each language; write_tutorial_pictures
+# makes the pictures. A change of a step needs the same change in the topic
+# and its translations.
+
+# Open the start design: an empty design.
+[[step]]
+item = ["Set the fabric", 1]
+open = "towel"
+expect = { objects = 0 }
+
+# The fabric.
+[[step]]
+item = ["Set the fabric", 2]
+command = "Design > Fabric and Styles > Fabric"
+expect = { window = "Fabric" }
+
+[[step]]
+item = ["Set the fabric", 3]
+button = "Not set"
+
+[[step]]
+button = "Towel (terry)"
+
+[[step]]
+button = "Apply"
+expect = { fabric = "towel" }
+
+# The monogram.
+[[step]]
+item = ["Make the monogram", 1]
+command = "Lettering > Personalize > Monogram"
+expect = { window = "Monogram" }
+
+[[step]]
+item = ["Make the monogram", 2]
+set = ["Initials", "JMK"]
+
+[[step]]
+item = ["Make the monogram", 3]
+button = "Stacked in an oval"
+
+[[step]]
+picture = "towel-monogram"
+area = "windows"
+
+[[step]]
+item = ["Make the monogram", 4]
+button = "Add to the design"
+expect = { window = "Monogram (Selected)", warnings = 0 }
+
+[[step]]
+item = ["Make the monogram", 5]
+close = "Monogram (Selected)"
+
+# The laydown.
+[[step]]
+item = ["Add the laydown", 1]
+command = "Edit > Select > Select All"
+
+[[step]]
+item = ["Add the laydown", 2]
+command = "Specialty > Puff and Laydown > Laydown"
+expect = { selected = 1 }
+
+[[step]]
+item = ["Add the laydown", 3]
+key = "Escape"
+
+# Look at it.
+[[step]]
+item = ["Check it", 1]
+command = "View > Show > Thread Look"
+
+[[step]]
+button = "Thread Look"
+
+[[step]]
+test_only = true
+key = "Escape"
+
+[[step]]
+picture = "towel-stitches"
+around = [[-40.0, -40.0], [40.0, 40.0]]
+
+[[step]]
+item = ["Check it", 2]
+expect = { colors = 3, warnings = 0 }
+
+# A part of the lesson that you only read (no step of the test).
+[[step]]
+item = ["Sew it", 1]

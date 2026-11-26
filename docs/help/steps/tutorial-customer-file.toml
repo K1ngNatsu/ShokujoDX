@@ -1,0 +1,57 @@
+# The steps of "Tutorial: a file from a customer"
+# (tutorial-customer-file.md). The test each_tutorial_runs_in_each_language
+# (crates/emb-app/src/tutorial_steps.rs) does them in each language;
+# write_tutorial_pictures makes the pictures. A change of a step needs the
+# same change in the topic and its translations.
+
+# Open the file: the leaf logo as a DST file, read again.
+[[step]]
+item = ["Open the file", 0]
+open = "customer-dst"
+expect = { objects = 3, kinds = ["Stitches", "Stitches", "Stitches"], colors = 3 }
+
+[[step]]
+picture = "customer-file"
+
+# Recognize Objects.
+[[step]]
+item = ["Recognize Objects", 1]
+command = "Edit > Select > Select All"
+expect = { selected = 3 }
+
+[[step]]
+item = ["Recognize Objects", 2]
+command = "Artwork > Convert > Recognize Objects"
+expect = { window = "Recognize Objects" }
+
+[[step]]
+picture = "customer-recognize"
+area = "windows"
+
+[[step]]
+item = ["Recognize Objects", 4]
+button = "Accept"
+expect = { kinds = ["Fill", "Stitches", "Running", "Fill", "Satin", "Running"], colors = 3 }
+
+# Change the size.
+[[step]]
+item = ["Change the size", 1]
+command = "Edit > Select > Select All"
+
+[[step]]
+item = ["Change the size", 2]
+set = ["W", "80"]
+expect = { size = [80.0, 79.9], warnings = 0 }
+
+[[step]]
+picture = "customer-larger"
+
+# Write the file again.
+[[step]]
+item = ["Write the file again", 0]
+command = "Design > Output > Export"
+expect = { window = "Export machine file" }
+
+[[step]]
+test_only = true
+button = "Cancel"

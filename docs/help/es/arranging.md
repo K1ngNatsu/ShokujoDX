@@ -2,7 +2,7 @@
 id: arranging
 title: Organizar y el orden de bordado
 group: design
-keywords: organizar, girar, rotar, reflejar, voltear, sesgar, inclinar, puntos de referencia, centrar, alinear, espaciar por igual, distribuir, mismo tamaño, copias, disposición, espejo combinado, matriz, corona, caleidoscopio, reflejar, agrupar, desagrupar, bloquear, desbloquear, orden de bordado, secuencia, cambios de color, orden más corto, orden para gorras, unión más cercana, orden de clic
+keywords: organizar, girar, rotar, reflejar, voltear, sesgar, inclinar, puntos de referencia, centrar, alinear, espaciar por igual, distribuir, mismo tamaño, copias, disposición, espejo combinado, matriz, corona, caleidoscopio, reflejar, agrupar, desagrupar, bloquear, desbloquear, orden de bordado, secuencia, cambios de color, orden más corto, orden para gorras, unión más cercana, orden de clic, bordar más rápido, unir hilos, detalles pequeños, distancia de corte, huecos
 ---
 # Organizar y el orden de bordado
 
@@ -96,6 +96,22 @@ cuesta tiempo.
 - **Unión más cercana**: cada objeto termina en el punto más cercano al
   siguiente, que empieza allí. Así los huecos cortos reciben puntadas de
   desplazamiento, no cortes.
+- **Bordar más rápido** hace cuatro cosas en una ventana, cada una
+  activada o no: **Unir hilos parecidos** (los hilos cuyos colores
+  difieren en el valor o menos pasan a ser el hilo que borda más),
+  **Quitar detalles pequeños** (rellenos, columnas de satén y líneas más
+  pequeños que el tamaño, no en grupos), **Coser sobre huecos de hasta**
+  (un hueco hasta la siguiente parte del mismo color de hasta esta
+  longitud recibe una puntada de desplazamiento, no un corte; el diseño
+  guarda este valor, y si está desactivado decide la máquina) y **Menos
+  cambios de color**. Una tabla muestra los hilos, cambios de color,
+  cortes, puntadas, el tiempo de bordado y el desplazamiento visible,
+  antes y después, y el lienzo marca el desplazamiento visible.
+  **Estándar** pone los valores de la primera apertura. **Quitar detalles
+  pequeños** también deja los objetos bloqueados y los objetos de
+  contornos, formas enlazadas, ojales, aplicaciones y bocetos. **Aceptar**
+  guarda el resultado como un paso que puede deshacer; **Cancelar**
+  vuelve atrás.
 
 ## Gorras
 

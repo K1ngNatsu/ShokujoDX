@@ -1,0 +1,113 @@
+# The steps of "Tutorial: cross stitch" (tutorial-cross-stitch.md). The
+# test each_tutorial_runs_in_each_language (crates/emb-app/src/
+# tutorial_steps.rs) does them in each language; write_tutorial_pictures
+# makes the pictures. A change of a step needs the same change in the topic
+# and its translations.
+#
+# The steps check the Chart command only: it saves a file.
+
+# Open the start design: the picture of a navy circle with a yellow star.
+[[step]]
+item = ["Open the start design", 0]
+open = "patch-picture"
+expect = { objects = 0 }
+
+# The fabric.
+[[step]]
+item = ["The fabric", 1]
+command = "Design > Fabric and Styles > Fabric"
+expect = { window = "Fabric" }
+
+[[step]]
+item = ["The fabric", 2]
+choose = ["Fabric", "Aida cloth (cross stitch)"]
+
+[[step]]
+button = "Apply"
+expect = { fabric = "aida" }
+
+# Picture to Cross Stitch.
+[[step]]
+item = ["Picture to Cross Stitch", 1]
+command = "Specialty > Cross Stitch > Picture to Cross Stitch"
+expect = { window = "Picture to Design" }
+
+[[step]]
+item = ["Picture to Cross Stitch", 2]
+button = "Next ›"
+
+[[step]]
+button = "Remove the edge color"
+
+[[step]]
+item = ["Picture to Cross Stitch", 3]
+button = "Next ›"
+
+[[step]]
+set = ["Cell size", "1.81"]
+
+[[step]]
+item = ["Picture to Cross Stitch", 4]
+set = ["Thread colors", "2"]
+
+[[step]]
+picture = "cross-stitch-wizard"
+area = "windows"
+
+[[step]]
+item = ["Picture to Cross Stitch", 5]
+button = "Next ›"
+
+[[step]]
+button = "Finish"
+expect = { objects = 2, kinds = ["Cross stitch", "Cross stitch"], colors = 2 }
+
+# Crosses by hand: a row under the circle, then erase its first crosses.
+[[step]]
+item = ["Crosses by hand", 1]
+command = "Specialty > Cross Stitch > Cross Stitch"
+
+[[step]]
+drag = [[-9.0, 33.5], [9.0, 33.5]]
+expect = { objects = 2 }
+
+[[step]]
+item = ["Crosses by hand", 2]
+command = "Specialty > Cross Stitch > Erase Cells"
+
+[[step]]
+drag = [[-9.0, 33.5], [-5.0, 33.5]]
+expect = { objects = 2 }
+
+[[step]]
+item = ["Crosses by hand", 3]
+command = "Specialty > Cross Stitch > Backstitch"
+
+[[step]]
+clicks = [[-9.05, 36.2], [9.05, 36.2]]
+
+[[step]]
+key = "Escape"
+
+[[step]]
+test_only = true
+command = "View > Show > Thread Look"
+
+[[step]]
+test_only = true
+button = "Thread Look"
+
+[[step]]
+test_only = true
+key = "Escape"
+
+[[step]]
+picture = "cross-stitch-stitches"
+around = [[-35.0, -35.0], [35.0, 40.0]]
+
+# The chart.
+[[step]]
+item = ["The chart", 0]
+command = "Specialty > Cross Stitch > Chart"
+check_only = true
+expect = { objects = 2, colors = 2 }

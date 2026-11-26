@@ -419,7 +419,7 @@ pub fn envelope_window(ctx: &egui::Context, st: &mut AppState) {
             let mut pct = d.envelope.amount * 100.0;
             if ui
                 .add(
-                    egui::Slider::new(&mut pct, 0.0..=emb_model::envelope::MAX_AMOUNT * 100.0)
+                    crate::workspace::slider(&mut pct, 0.0..=emb_model::envelope::MAX_AMOUNT * 100.0)
                         .clamping(egui::SliderClamping::Edits)
                         .suffix(" %")
                         .fixed_decimals(0),

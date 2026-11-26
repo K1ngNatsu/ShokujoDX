@@ -8,21 +8,25 @@ keywords: tutorial, encaje, encaje independiente, fsl, adorno, soluble en agua, 
 
 En este tutorial crea un adorno de encaje independiente. El encaje
 independiente no tiene tela: lo borda sobre entretela soluble en agua y
-quita la entretela con agua. Tarda unos 15 minutos, y más en bordarse.
+quita la entretela con agua. Se tarda más en bordarlo que en crearlo.
 
 Necesita entretela soluble en agua (del tipo parecido a la tela, no la
 película fina) y el mismo hilo en la aguja y en la bobina.
 
 ## Empezar con la plantilla
 
-1. Haga clic en **Diseño > Nuevo a partir de plantilla** (o Archivo >
-   Nuevo a partir de plantilla).
-2. Seleccione **Adorno de encaje**. El diseño nuevo es un copo de nieve de
-   80 mm de diámetro: una malla de encaje redonda, seis radios con ramas,
-   un anillo en el centro, un anillo de borde y una presilla para colgarlo.
-   Su tela es **Water-soluble stabilizer (free-standing lace)**, y los
-   satenes tienen la base de encaje.
-3. Seleccione su máquina y un bastidor en la pestaña Diseño.
+1. Haga clic en **Diseño > Biblioteca y plantillas > Nuevo a partir de
+   plantilla**.
+2. Haga clic en **Adorno de encaje**. El diseño nuevo es un copo de nieve
+   de 80 mm de diámetro: una malla de encaje redonda, seis radios con
+   ramas, un anillo en el centro, un anillo de borde y una presilla para
+   colgarlo. Su tela es **Estabilizador hidrosoluble (encaje
+   independiente)**, y los satenes tienen la base de encaje.
+3. Seleccione su máquina y un bastidor en la pestaña **Diseño**.
+4. Haga clic en **Ver > Mostrar > Aspecto de hilo** y marque **Aspecto de
+   hilo** en su menú.
+
+![El adorno de encaje](lace-ornament)
 
 ## Cambiar el adorno
 
@@ -39,11 +43,15 @@ película fina) y el mismo hilo en la aguja y en la bobina.
    suelta** muestra una parte que no toca ninguna otra. Haga clic en la
    advertencia para seleccionar la parte, y después muévala o hágala más
    grande para que toque.
-2. Haga clic en **Ver > Reproductor de puntadas** y reproduzca el bordado:
-   primero se borda la malla, después los radios, los anillos y la
-   presilla.
-3. Active **Ver > Mapa de densidad**: el encaje tiene muchas capas donde
-   las partes se cruzan. Manténgalas por debajo del límite.
+2. Haga clic en **Ver > Mostrar > Mapa de densidad**: el hilo es más
+   grueso donde los radios y los anillos se encuentran sobre la malla. El
+   encaje es todo hilo, así que la Información del diseño muestra **El
+   hilo se acumula** solo por encima de un límite 3 capas más alto que
+   para la tela. Muchas capas forman un nudo duro que puede romper la
+   aguja: borde una prueba antes de bordar muchos adornos.
+3. Haga clic en **Ver > Cursor de puntada > Reproductor de puntadas** y
+   reproduzca el bordado: primero se borda la malla, después los radios,
+   los anillos y la presilla.
 
 ## Bordarlo
 
@@ -57,7 +65,17 @@ película fina) y el mismo hilo en la aguja y en la bobina.
 5. Ponga el encaje plano sobre una toalla, sujételo con alfileres en su
    forma y deje que se seque.
 
+## Si no se ve bien
+
+- **Una parte se cae después del lavado.** No tocaba otra parte. La
+  Información del diseño la muestra como una parte de encaje suelta.
+- **El encaje es blando y pierde su forma.** Enjuáguelo menos: un poco de
+  entretela que queda en el encaje lo hace más rígido.
+- **La entretela se rompe mientras la máquina borda.** Use dos capas y
+  colóquelas más tensas en el bastidor.
+
 ## Siguiente
 
+- [Tutorial: un aplique](tutorial-applique)
 - [Decoración especial](specialty)
 - [Tipos de puntada](stitch-types)

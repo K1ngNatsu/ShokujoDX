@@ -207,10 +207,11 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
     .show(ctx, |ui| {
         ui.set_max_width(420.0);
         ui.horizontal(|ui| {
+            ui.label(tr("Script"));
             let shown = w.list.get(w.selected).map(|s| s.info.title.clone()).unwrap_or_default();
             egui::ComboBox::from_id_salt("script_pick")
                 .selected_text(shown)
-                .width(260.0)
+                .width(220.0)
                 .show_ui(ui, |ui| {
                     for (i, s) in w.list.iter().enumerate() {
                         let text = if s.is_sample() {
@@ -249,7 +250,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                         let v = w.inputs.entry(i.name.clone()).or_insert_with(|| i.default.clone());
                         match v {
                             InputValue::Number(n) => {
-                                ui.add(egui::DragValue::new(n).speed(0.1));
+                                ui.add(crate::workspace::drag(n).speed(0.1));
                             }
                             InputValue::Bool(b) => {
                                 ui.checkbox(b, "");

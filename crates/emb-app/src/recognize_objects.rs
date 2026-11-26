@@ -516,7 +516,7 @@ impl AppState {
             .count();
         let new = self.doc.edit(tr("Recognize Objects"), |dd| {
             work.into_iter()
-                .flat_map(|(id, ks)| crate::actions::replace_with(dd, id, ks))
+                .flat_map(|(id, ks)| replace_locked(dd, id, ks))
                 .collect::<Vec<_>>()
         });
         self.message = fill(
@@ -557,9 +557,29 @@ pub(crate) fn recognize_all(d: &mut Design) -> (usize, usize) {
             .filter(|k| !matches!(k, ObjectKind::Stitches { .. }))
             .count();
         made += kinds.len();
-        crate::actions::replace_with(d, id, kinds);
+        replace_locked(d, id, kinds);
     }
     (made, recognized)
+}
+
+/// Puts the objects `kinds` in the place of the stitch object `id`
+/// (`actions::replace_with`). The objects get Tie-In and Tie-Off: the
+/// lock stitches of the file are not in their stitches (a stitch type
+/// makes the stitches again, and the stitches that stay are cut from
+/// their chains), so the stitch plan locks them (P22 Milestone 5, ADR
+/// 0172). An object that stays as it was keeps its functions.
+fn replace_locked(d: &mut Design, id: ObjectId, kinds: Vec<ObjectKind>) -> Vec<ObjectId> {
+    let same = kinds.len() == 1 && d.object(id).is_some_and(|o| o.kind == kinds[0]);
+    let new = crate::actions::replace_with(d, id, kinds);
+    if !same {
+        for x in &new {
+            if let Some(o) = d.object_mut(*x) {
+                o.functions.tie_in = true;
+                o.functions.tie_off = true;
+            }
+        }
+    }
+    new
 }
 
 /// The outlines of a vector file: its shapes with a fill are areas, the
@@ -854,6 +874,7 @@ mod tests {
         let kinds: Vec<&str> = d.targets[0].made.iter().map(|m| m.kind.type_name()).collect();
         assert!(kinds.iter().any(|k| *k != "Stitches"), "{kinds:?}");
         let before = h.st.doc.undo_len();
+        let old: Vec<ObjectId> = h.st.doc.design().objects().iter().map(|o| o.id).collect();
         h.st.accept_recognized(d);
         assert_eq!(h.st.doc.undo_len(), before + 1);
         assert_eq!(h.st.doc.undo_label(), Some("Recognize Objects"));
@@ -864,6 +885,16 @@ mod tests {
                 .objects()
                 .iter()
                 .any(|o| !matches!(o.kind, ObjectKind::Stitches { .. }))
+        );
+        // The made objects lock their starts and ends (ADR 0172): the lock
+        // stitches of the file are not in their stitches.
+        assert!(
+            h.st.doc
+                .design()
+                .objects()
+                .iter()
+                .filter(|o| !old.contains(&o.id))
+                .all(|o| o.functions.tie_in && o.functions.tie_off)
         );
     }
 
@@ -884,9 +915,13 @@ mod tests {
         let p = d.pictures(&ctx).expect("pictures");
         assert!(p.differ.is_empty(), "{}", p.differ.len());
         let n = h.st.doc.design().objects().len();
+        let functions: Vec<_> = h.st.doc.design().objects().iter().map(|o| o.functions).collect();
         h.st.accept_recognized(d);
-        // One stitch object for each stitch object: the same needle points.
+        // One stitch object for each stitch object: the same needle points
+        // and functions.
         assert_eq!(h.st.doc.design().objects().len(), n);
+        let after: Vec<_> = h.st.doc.design().objects().iter().map(|o| o.functions).collect();
+        assert_eq!(after, functions);
         // The window draws.
         let (mut h, id) = stitch_harness();
         h.st.selection.set(id);

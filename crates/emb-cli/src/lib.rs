@@ -8,6 +8,7 @@ pub mod corpus;
 pub mod fontaudit;
 pub mod letter_faults;
 pub mod lettering_bench;
+pub mod mcp;
 pub mod view;
 
 use std::path::Path;
@@ -28,7 +29,7 @@ fn extension(path: &Path) -> String {
         .unwrap_or_default()
 }
 
-fn stem(path: &Path) -> String {
+pub(crate) fn stem(path: &Path) -> String {
     path.file_stem()
         .map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_else(|| "design".into())
@@ -134,6 +135,138 @@ pub fn stitches(input: &Input, machine: Option<&str>) -> Result<(StitchDesign, V
 /// for checks in other tools; `.svg` writes the design picture.
 pub fn write_output(s: &StitchDesign, path: &Path) -> Result<(), String> {
     write_output_for(s, path, None)
+}
+
+/// The stitches of a machine file, or the records of the stitch objects
+/// of a design (ADR 0172), for the check and the fix of a machine file.
+pub fn file_stitches(input: &Input) -> Result<StitchDesign, String> {
+    match input {
+        Input::Stitches(s) => Ok(s.clone()),
+        Input::Design(d) => {
+            let ids: Vec<emb_model::ObjectId> = d
+                .objects()
+                .iter()
+                .filter(|o| matches!(o.kind, emb_model::ObjectKind::Stitches { .. }))
+                .map(|o| o.id)
+                .collect();
+            if ids.is_empty() {
+                return Err("the design has no stitch objects (a machine file opened as stitches)".into());
+            }
+            Ok(emb_model::records_of_stitch_objects(d, &ids).0)
+        }
+    }
+}
+
+/// The stitch lengths and the trim distance for the check and the fix of
+/// `input`: of the machine `machine` (an id of the built-in machines), else
+/// of the machine of a design, else the defaults of the stitch plan; with
+/// the trim distance of a design, as the program checks stitch objects.
+pub fn file_check_options(input: &Input, machine: Option<&str>) -> Result<emb_stitch::PlanOptions, String> {
+    match input {
+        Input::Design(d) => Ok(plan_options(d, machine)?.for_design(d)),
+        Input::Stitches(_) => plan_options(&Design::new(""), machine),
+    }
+}
+
+/// The setting of test swatches with the name `name` (`stitch length`,
+/// `stitch-length` or `stitch_length`; any case).
+pub fn swatch_setting_named(name: &str) -> Option<emb_letter::swatch::SwatchSetting> {
+    let key = |s: &str| s.to_lowercase().replace([' ', '_'], "-");
+    emb_letter::swatch::SwatchSetting::ALL
+        .into_iter()
+        .find(|s| key(s.name()) == key(name))
+}
+
+/// Test swatches (ADR 0170) of the objects `ids` of `design` (all if
+/// empty): `copies` copies with the values from `from` to `to` (not needed
+/// for underlay), in the field of the hoop of the design, with labels in
+/// the bundled label font. `emb-cli swatch` and the MCP server use it.
+pub fn swatch_design(
+    design: &Design,
+    ids: &[emb_model::ObjectId],
+    setting: emb_letter::swatch::SwatchSetting,
+    from: Option<f64>,
+    to: Option<f64>,
+    copies: usize,
+) -> Result<emb_letter::swatch::Swatches, String> {
+    use emb_letter::swatch::{SwatchSetting, SwatchSpec};
+    let (from, to) = match (setting, from, to) {
+        (SwatchSetting::Underlay, _, _) => (0.0, 0.0),
+        (_, Some(f), Some(t)) => (f, t),
+        _ => return Err("swatches need the values from and to".into()),
+    };
+    let all: Vec<emb_model::ObjectId>;
+    let ids = if ids.is_empty() {
+        all = design.objects().iter().map(|o| o.id).collect();
+        &all[..]
+    } else {
+        ids
+    };
+    let field = match &design.hoop.selection {
+        emb_model::HoopSelection::Preset { id } => emb_model::HoopCatalog::builtin()
+            .get(id)
+            .map(|h| (h.width_mm, h.height_mm)),
+        emb_model::HoopSelection::OpenField => None,
+    };
+    let spec = SwatchSpec {
+        setting,
+        from,
+        to,
+        copies,
+        field,
+    };
+    let label = emb_letter::bundled::embroidery(emb_letter::sheet::LABEL_FONT);
+    emb_letter::swatch::swatches(
+        design,
+        ids,
+        &spec,
+        label.as_ref().map(|l| l as &dyn emb_letter::source::LetterSource),
+        &|v| format!("{v:.2} mm"),
+    )
+}
+
+/// The fixes of a list such as `join,short,long,jumps,locks`.
+pub fn parse_fixes(list: &str) -> Result<emb_art::file_check::Fixes, String> {
+    let mut f = emb_art::file_check::Fixes::NONE;
+    for name in list.split(',').map(str::trim).filter(|s| !s.is_empty()) {
+        match name {
+            "join" => f.join = true,
+            "short" => f.short = true,
+            "long" => f.long = true,
+            "jumps" => f.jumps = true,
+            "locks" => f.locks = true,
+            other => return Err(format!("unknown fix {other:?} (join, short, long, jumps, locks)")),
+        }
+    }
+    Ok(f)
+}
+
+/// The text of a check of a machine file (ADR 0172): for each fault, its
+/// number, its name and its first places (mm).
+pub fn check_report(c: &emb_art::file_check::FileCheck) -> String {
+    use emb_art::file_check::Fault;
+    if c.is_empty() {
+        return "no faults\n".into();
+    }
+    let mut out = String::new();
+    for f in Fault::ALL {
+        let found: Vec<_> = c.found.iter().filter(|x| x.fault == f).collect();
+        if found.is_empty() {
+            continue;
+        }
+        out.push_str(&format!("{}: {} ({})\n", f.key(), found.len(), f.cli_text()));
+        for x in found.iter().take(5) {
+            if x.length_mm > 0.0 {
+                out.push_str(&format!("  at {:.1}, {:.1}: {:.2} mm\n", x.at.x, x.at.y, x.length_mm));
+            } else {
+                out.push_str(&format!("  at {:.1}, {:.1}\n", x.at.x, x.at.y));
+            }
+        }
+        if found.len() > 5 {
+            out.push_str(&format!("  and {} more\n", found.len() - 5));
+        }
+    }
+    out
 }
 
 /// As [`write_output`], with the encoding settings of the machine (the trim

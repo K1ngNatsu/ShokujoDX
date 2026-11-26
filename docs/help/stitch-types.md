@@ -2,7 +2,7 @@
 id: stitch-types
 title: Stitch types
 group: design
-keywords: stitch type, outline type, fill type, column type, satin, zigzag, e stitch, blanket, raised, tatami, square, coil, contour, string, motif, program split, flexi split, user split, offset, spiral, island coil, radial, maze, florentine, guide line, stipple, cross stitch, laydown, tartan, plaid, sett, gradient, meander, circular, guided, ripple, mesh, motifs, run types, backstitch, stem stitch, sculpture, blends, borders, buttonholes, carving, stamp
+keywords: stitch type, outline type, fill type, column type, satin, zigzag, e stitch, blanket, raised, tatami, square, coil, contour, string, motif, program split, flexi split, user split, offset, spiral, island coil, radial, maze, florentine, guide line, stipple, cross stitch, laydown, tartan, plaid, sett, gradient, meander, circular, guided, ripple, mesh, motifs, run types, backstitch, stem stitch, sculpture, blends, borders, buttonholes, carving, stamp, lean, bands, column bands, band overlap
 ---
 # Stitch types
 
@@ -57,6 +57,13 @@ line. The outline types of a line are also:
 | String | Slanted stitches that overlap like twisted string. |
 | Motif column | A motif repeated along the column, as high as the column is wide. |
 | Program split | Satin rows with the needle points in a pattern that bends with the column. |
+
+**Lean** (in Object Properties, for satin, raised satin and zigzag
+columns) is the angle of the top stitches from square across the column,
+from −45° to 45°. On a knit, stitches that lean a little do not sink
+between the rows of the knit; a larger angle is a look. The underlay does
+not lean. Near an end of the column the stitches fan from the corner, so
+no needle point goes out of the column.
 
 ## Fills
 
@@ -135,6 +142,22 @@ The fill angle sets the direction of the rows. Each row has one color, so
 the density stays the same. A gradient of one color alone fades to the
 fabric.
 
+## Bands
+
+1. Select a satin column, then **Edit > Stitch Types > Bands**.
+2. Choose a thread for each band, from the first side of the column.
+   **Add band** adds a band (at most six).
+3. **Overlap** sets how far each band goes into the band next to it. A
+   small overlap keeps the fabric from showing between the bands.
+4. Click **Make bands**.
+
+The program makes one satin column for each band, in one group, with the
+rails of the selected column. The bands have equal widths. The first band
+sews the underlay of the whole column, and pull compensation goes only
+out at the two sides of the column. The lean of a band changes the lean
+of all the bands of the column. **Remove bands** makes the column one
+thread again.
+
 ## Motifs
 
 **Edit > Stitch Types > Motifs** opens the motif library:
@@ -154,9 +177,10 @@ motif from the number of the waves and their height. Most of the motifs,
 the program-split patterns, the carving stamps and the clipart items of
 the program come from families, and you can make an item of your own.
 
-- **Families…** opens the Families window. The button is in the Motifs
-  window, next to the lists of the patterns and of the stamps in Object
-  Properties, and in the Clipart panel.
+- **Edit > Stitch Types > Families** opens the Families window. A
+  **Families…** button is also in the Motifs window, next to the lists of
+  the patterns and of the stamps in Object Properties, and in the Clipart
+  panel.
 - Choose the kind and the **Family**. **Built-in items** are the items of
   the family that are in the lists of the program. Change the numbers: the
   picture shows the item.

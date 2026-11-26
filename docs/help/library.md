@@ -59,7 +59,7 @@ small pictures. The program has some items, and you can add your own.
   item by its name or keywords.
 - Double-click an item, or drag it onto the design, to insert it.
   **Insert** does the same.
-- **Edit > Save As Clipart** keeps the selected objects as an item, with a
+- **Edit > Save as Clipart** keeps the selected objects as an item, with a
   **Name** and **Keywords** (words that the search finds, for example
   "rose flower red").
 - **Show the clipart folder** opens the folder; **Read the clipart folder

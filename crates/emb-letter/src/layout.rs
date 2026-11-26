@@ -273,9 +273,20 @@ fn letter_parts(
         }
         None => {
             let stitch = edit.and_then(|e| e.stitch).unwrap_or(l.stitch);
+            // The font chooses columns or fills by the size that the letter
+            // has in the design: with the scale of its edit and the most
+            // that the envelope makes the text taller (a monogram makes the
+            // middle initial larger so; ADR 0181). Stacked text has no
+            // envelope.
+            let warp = if l.baseline.is_straight() && !l.direction.is_stacked() {
+                l.envelope.max_stretch()
+            } else {
+                1.0
+            };
+            let size = scale * edit.map_or(1.0, |e| e.scale.abs()).max(1e-9) * warp;
             let mut parts = Vec::new();
             for &(glyph, dx, dy) in glyphs {
-                let mut of_glyph = src.parts(glyph, stitch, scale);
+                let mut of_glyph = src.parts(glyph, stitch, size);
                 // A letter of more glyphs (a ligature, a cluster) does not
                 // sew in the order of the route of each glyph: no travel
                 // runs (P20 Milestone 4).
@@ -297,8 +308,8 @@ fn letter_parts(
                 [(letter, ..)] => Some(*letter),
                 _ => None,
             };
-            let fixed = one.is_some_and(|letter| src.fixed(letter, stitch, scale));
-            let mut tuning = one.map(|letter| src.tuning(letter, stitch, scale)).unwrap_or_default();
+            let fixed = one.is_some_and(|letter| src.fixed(letter, stitch, size));
+            let mut tuning = one.map(|letter| src.tuning(letter, stitch, size)).unwrap_or_default();
             if l.mitre_corners {
                 if fixed {
                     // The order of the font stays: only parts that sew one

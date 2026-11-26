@@ -29,7 +29,7 @@ Los cambios se aplican enseguida y se conservan para el siguiente inicio.
 - **Reglas y guías**: **Mostrar reglas** y **Ajustar a las guías**; la
   **Distancia de ajuste**.
 - **Paneles**: **Restablecer los paneles** pone todos los paneles de
-  nuevo en un grupo a la derecha y abre los cerrados.
+  nuevo en sus dos grupos a la derecha y abre los cerrados.
 - **Desplazamiento con flechas** y **Desplazamiento con Mayús + flecha**:
   cuánto mueven la selección las teclas de flecha.
 
@@ -38,6 +38,12 @@ Los cambios se aplican enseguida y se conservan para el siguiente inicio.
 - **Copia de seguridad automática**: los diseños con cambios van a una
   carpeta de copias cada 1 a 60 minutos (2 al principio), o
   **desactivado**. Después de un fallo, el programa ofrece recuperarlos.
+- **Pestañas abiertas**: con **Volver a abrirlas en el siguiente inicio**
+  (activado al principio), salir conserva los diseños abiertos con sus
+  cambios, y el siguiente inicio los vuelve a abrir.
+- **Archivos**: con **Abrir en el programa que se ejecuta** (activado al
+  principio), un archivo que abre mientras el programa se ejecuta se abre
+  en una pestaña de él.
 - **Margen de seguridad del bastidor**: la distancia dentro del campo del
   bastidor. Las puntadas fuera de él reciben una advertencia.
 
@@ -60,7 +66,9 @@ si no, se muestra el color del tema.
 ## Densidad e hilo
 
 - **Límite de densidad**: el número de capas de hilo que permiten el mapa
-  de densidad y la información del diseño (5 al principio).
+  de densidad y la información del diseño (5 al principio). La
+  información del diseño permite 3 capas más en el encaje independiente y
+  en los objetos en relieve: son densos por su naturaleza.
 - **Carrete de hilo superior** y **Bobina**: la longitud y el **precio** de
   uno, y la **Moneda** (el texto delante del costo, por ejemplo $ o €). La
   información del diseño y la hoja de trabajo muestran entonces el costo

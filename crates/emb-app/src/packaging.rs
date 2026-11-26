@@ -89,6 +89,21 @@ fn the_windows_installer_agrees() {
     let iss = read("packaging/windows/installer.iss");
     assert!(iss.contains("#define AppExe \"ShokujoDX.exe\""));
     assert!(read("tools/package-windows.ps1").contains("'ShokujoDX.exe'"));
+    // The command-line tool with the MCP server is in each package (ADR 0176).
+    for script in [
+        "tools/package-windows.ps1",
+        "tools/package-macos.sh",
+        "tools/package-linux.sh",
+    ] {
+        assert!(
+            read(script).contains("-p emb-cli") || read(script).contains("'-p', 'emb-cli'"),
+            "{script}"
+        );
+        assert!(
+            read(script).contains("release/emb-cli") || read(script).contains("release\\emb-cli.exe"),
+            "{script}"
+        );
+    }
     assert!(iss.contains(&format!("Classes\\.{}\"", emb_model::project::FILE_EXTENSION)));
     let mut machine = 0;
     for line in iss
@@ -406,8 +421,8 @@ fn the_numbers_in_the_readme_are_the_numbers_of_the_program() {
         .flatten()
         .filter(|e| e.file_name().to_string_lossy().starts_with("tutorial-"))
         .count();
-    assert_eq!(tutorials, 7, "the README says seven tutorials");
-    has("seven step-by-step tutorials".into());
+    assert_eq!(tutorials, 31, "the README says 31 tutorials");
+    has("31 step-by-step tutorials".into());
     // The formats table: the formats to write, eight more by name, and the
     // number of the others.
     let (read_n, write) = (emb_formats::READ_EXTENSIONS.len(), emb_formats::WRITE_EXTENSIONS);

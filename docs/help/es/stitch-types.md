@@ -61,6 +61,14 @@ línea más marcada. Los tipos de contorno de una línea son también:
 | Columna de motivos | Un motivo repetido a lo largo de la columna, tan alto como ancha es la columna. |
 | División programada | Filas de satén con los puntos de aguja en un patrón que se curva con la columna. |
 
+**Inclinación** (en Propiedades del objeto, para columnas de satén, satén
+en relieve y zigzag) es el ángulo de las puntadas superiores respecto a la
+dirección perpendicular a la columna, de −45° a 45°. En un tejido de
+punto, las puntadas un poco inclinadas no se hunden entre las filas del
+punto; un ángulo mayor es un efecto. La base no se inclina. Cerca de un
+extremo de la columna, las puntadas se abren en abanico desde la esquina,
+así ningún punto de aguja queda fuera de la columna.
+
 ## Rellenos
 
 | Tipo de relleno | Qué borda |
@@ -142,6 +150,24 @@ El ángulo del relleno define la dirección de las filas. Cada fila tiene un
 color, así la densidad se mantiene. Un degradado de un solo color se
 desvanece hacia la tela.
 
+## Bandas
+
+1. Seleccione una columna de satén, y después **Editar > Tipos de puntada >
+   Bandas**.
+2. Elija un hilo para cada banda, desde el primer lado de la columna.
+   **Añadir banda** añade una banda (seis como máximo).
+3. **Superposición** define cuánto entra cada banda en la banda de al
+   lado. Una pequeña superposición evita que la tela se vea entre las
+   bandas.
+4. Haga clic en **Hacer bandas**.
+
+El programa hace una columna de satén para cada banda, en un grupo, con
+los rieles de la columna seleccionada. Las bandas tienen el mismo ancho.
+La primera banda borda la base de toda la columna, y la compensación de
+tiro solo sale por los dos lados de la columna. La inclinación de una
+banda cambia la inclinación de todas las bandas de la columna. **Quitar
+las bandas** vuelve a hacer la columna de un solo hilo.
+
 ## Motivos
 
 **Editar > Tipos de puntada > Motivos** abre la biblioteca de motivos:
@@ -158,14 +184,15 @@ desvanece hacia la tela.
 ## Familias
 
 Una familia crea un elemento a partir de unos números: la familia
-**Waves** crea un motivo a partir del número de ondas y de su altura. La
+**Ondas** crea un motivo a partir del número de ondas y de su altura. La
 mayoría de los motivos, los patrones de división programada, los sellos de
 relieve y los elementos de clipart del programa vienen de familias, y
 usted puede crear un elemento propio.
 
-- **Familias…** abre la ventana Familias. El botón está en la ventana
-  Motivos, junto a las listas de los patrones y de los sellos en
-  Propiedades del objeto, y en el panel Clipart.
+- **Editar > Tipos de puntada > Familias** abre la ventana Familias. Un
+  botón **Familias…** está también en la ventana Motivos, junto a las
+  listas de los patrones y de los sellos en Propiedades del objeto, y en
+  el panel Clipart.
 - Elija el tipo y la **Familia**. **Elementos incluidos** son los elementos
   de la familia que están en las listas del programa. Cambie los números:
   la imagen muestra el elemento.

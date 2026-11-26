@@ -29,6 +29,19 @@ detiene, la ventana **Recuperar diseños** muestra las copias en el
 siguiente inicio. Un informe de fallo va a la carpeta `crashes` de los
 ajustes; **Ayuda > Acerca de** muestra dónde está.
 
+## Pestañas abiertas y un programa
+
+Al salir, el programa conserva los diseños abiertos con sus cambios sin
+guardar, y no pregunta nada. En el siguiente inicio, las pestañas se
+abren de nuevo, con la misma pestaña delante y la misma vista
+(**Opciones > Pestañas abiertas**). Después de un fallo, la ventana
+**Recuperar diseños** muestra las copias como antes.
+
+Un archivo que abre mientras el programa se ejecuta (doble clic, **Abrir
+con**, la línea de comandos) se abre en una pestaña nueva de ese
+programa, y el programa pasa al frente (**Opciones > Archivos**). Para
+iniciar un segundo programa, inícielo con `--new-window`.
+
 ## Exportar un archivo de máquina
 
 **Diseño > Exportar** (Ctrl+E, o Archivo > Exportar archivo de máquina)

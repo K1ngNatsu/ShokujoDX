@@ -86,6 +86,8 @@ pub struct AppState {
     /// through, the high thread, and their map.
     pub show_through: bool,
     pub show_high_thread: bool,
+    /// The check view of the travel that shows (P22 Milestone 1, ADR 0167).
+    pub show_travel: bool,
     pub check_cache: crate::checks::CheckCache,
     /// The tilt view (ADR 0129).
     pub tilt: crate::tilt::TiltView,
@@ -232,6 +234,9 @@ pub struct AppState {
     pub focus_clipart: bool,
     /// A panel to show in front (View > Panels).
     pub focus_tab: Option<Tab>,
+    /// The tab that shows in each group of the dock (set before the dock
+    /// draws; only these panels have a × button).
+    pub open_tabs: Vec<Tab>,
     /// The kind of function that Shift+Page Up and Page Down go to.
     pub function_travel: crate::viewtools::FunctionTravel,
     /// The rhinestones show on the canvas.
@@ -242,6 +247,9 @@ pub struct AppState {
     pub help: crate::help::HelpState,
     /// A question for the help search, to answer when the window shows.
     pub help_ask_pending: bool,
+    /// The lesson that shows: a tutorial that the user does in the program
+    /// (P19 Part 2 Milestone 6, ADR 0177).
+    pub lesson: Option<crate::lesson::Lesson>,
     /// The ribbon command under the pointer (for F1).
     pub hover_cmd: Option<crate::ribbon::Cmd>,
     /// The start page shows as a tab; `focus_start` brings it to the front.
@@ -252,6 +260,8 @@ pub struct AppState {
     pub kiosk: Option<crate::kiosk::Kiosk>,
     /// The backdrop picture that another program edits.
     pub outside_edit: Option<crate::share::OutsideEdit>,
+    /// The files of the tabs that another program saves (ADR 0176).
+    pub file_watch: crate::file_watch::FileWatch,
     /// The My assets window.
     pub assets_window: crate::assets::AssetsWindow,
     /// The views of View > New view (`None`: closed).
@@ -371,6 +381,11 @@ pub struct AppState {
     pub gap_settings: emb_geom::gaps::Gaps,
     /// The Clean Up window, and its last settings.
     pub cleanup_dialog: Option<crate::cleanup::CleanupDialog>,
+    /// The Quicker to Sew window (P22 Milestone 2) and its last settings.
+    pub quicker_dialog: Option<crate::quicker::QuickerDialog>,
+    pub quicker_settings: emb_model::quicker::QuickerToSew,
+    /// The Test Swatches window (P22 Milestone 3).
+    pub swatch_window: crate::test_swatches::SwatchWindow,
     /// The Recognize Objects window (P18 Milestone 4).
     pub recognize_dialog: Option<crate::recognize_objects::RecognizeDialog>,
     /// The Envelope window (ADR 0092).
@@ -405,6 +420,11 @@ pub struct AppState {
     pub families_window: crate::families::FamiliesWindow,
     pub decor: crate::decor::DecorWindows,
     pub color_fills: crate::color_fills::ColorFillsWindow,
+    /// The Bands window (P22 Milestone 4, ADR 0171).
+    pub column_bands: crate::column_bands::ColumnBandsWindow,
+    /// The Fix Stitches window and the checks of stitch objects (P22
+    /// Milestone 5, ADR 0172).
+    pub fix_stitches: crate::fix_stitches::FixStitchesWindow,
     pub quilting: crate::quilting::QuiltingWindow,
     pub cutwork: crate::cutwork::CutworkWindow,
     pub alphabets_window: crate::alphabets::AlphabetsWindow,
@@ -494,21 +514,30 @@ fn load_catalogs() -> (HoopCatalog, MachineCatalog, emb_model::FabricCatalog, St
     (hoops, machines, fabrics, notes.join(" | "))
 }
 
-/// The side panels in the order of their tabs in the side group.
-pub const SIDE_PANELS: [Tab; 8] = [
-    Tab::Properties,
-    Tab::Sequence,
-    Tab::Threads,
-    Tab::Styles,
-    Tab::StitchList,
-    Tab::DesignInfo,
-    Tab::Clipart,
-    Tab::Exports,
+/// The two groups of side panels, one over the other, in the order of
+/// their tabs (the owner's choice of 2026-11-26; one group of eight tabs
+/// did not fit its tab bar). The tabs are in the groups so that the
+/// titles of each group fit the side at 1366 points in each language
+/// (`the_side_tabs_fit_a_small_screen`).
+pub const SIDE_GROUPS: [&[Tab]; 2] = [
+    &[Tab::Properties, Tab::Styles, Tab::Threads, Tab::StitchList],
+    &[Tab::Sequence, Tab::DesignInfo, Tab::Clipart, Tab::Exports],
 ];
 
+/// The part of the width for the canvas and the Library at the start; the
+/// side panels have the rest.
+pub const CANVAS_PART: f32 = 0.70;
+
+/// The part of the height of the side for the first group at the start.
+pub const FIRST_GROUP_PART: f32 = 0.6;
+
+/// A side panel: a tab of one of the two groups (`SIDE_GROUPS`).
+pub fn is_side_panel(tab: Tab) -> bool {
+    SIDE_GROUPS.iter().any(|g| g.contains(&tab))
+}
+
 /// The dock layout at the start: the canvas and the Library on the left,
-/// one group with all the side panels on the right (the owner's choice of
-/// 2026-11-22; before, two groups one over the other).
+/// the two groups of side panels (`SIDE_GROUPS`) on the right.
 pub fn default_dock() -> DockState<Tab> {
     default_dock_for(false)
 }
@@ -517,9 +546,8 @@ pub fn default_dock() -> DockState<Tab> {
 /// panels under the canvas (a phone held upright).
 const PANELS_BELOW_WIDTH: f32 = 700.0;
 
-/// The part of the dock that the canvas has when the side panels are at
-/// its right, and when they are under it.
-pub const CANVAS_PART: f32 = 0.74;
+/// The part of the height that the canvas has when the side panels are
+/// under it.
 pub const CANVAS_PART_ABOVE: f32 = 0.6;
 
 /// The default dock with the side panels under the canvas (`below`) or at
@@ -528,9 +556,10 @@ pub fn default_dock_for(below: bool) -> DockState<Tab> {
     let mut dock = DockState::new(vec![Tab::Canvas, Tab::Library]);
     let surface = dock.main_surface_mut();
     if below {
-        surface.split_below(NodeIndex::root(), CANVAS_PART_ABOVE, SIDE_PANELS.to_vec());
+        surface.split_below(NodeIndex::root(), CANVAS_PART_ABOVE, SIDE_GROUPS.concat());
     } else {
-        surface.split_right(NodeIndex::root(), CANVAS_PART, SIDE_PANELS.to_vec());
+        let [_, side] = surface.split_right(NodeIndex::root(), CANVAS_PART, SIDE_GROUPS[0].to_vec());
+        surface.split_below(side, FIRST_GROUP_PART, SIDE_GROUPS[1].to_vec());
     }
     // The Library tab is next to the canvas; the canvas shows first.
     if let Some(p) = dock.find_tab(&Tab::Canvas) {
@@ -677,6 +706,13 @@ impl EmbApp {
             state.lang_override = Some(args[1].to_string_lossy().into_owned());
             args.drain(..2);
         }
+        args.retain(|a| a != crate::one_program::NEW_WINDOW);
+        // The tabs of the last quit come back (ADR 0175), not in a kiosk.
+        if state.settings.restore_tabs && args.first().is_none_or(|a| a != "--kiosk") && state.restore_tabs() > 0 {
+            state.show_start = false;
+            state.focus_start = false;
+            state.focus_library = state.settings.library_open;
+        }
         let arg = args.into_iter().next();
         if arg.as_deref() == Some(std::ffi::OsStr::new("--kiosk")) {
             // A shop kiosk does not ask for the machine.
@@ -747,6 +783,7 @@ impl AppState {
             density_cache: None,
             show_through: false,
             show_high_thread: false,
+            show_travel: false,
             check_cache: Default::default(),
             tilt: Default::default(),
             magnifier: Default::default(),
@@ -824,17 +861,20 @@ impl AppState {
             focus_library: false,
             focus_clipart: false,
             focus_tab: None,
+            open_tabs: Vec::new(),
             function_travel: Default::default(),
             show_stones: true,
             fabric_tex: None,
             help: Default::default(),
             help_ask_pending: false,
+            lesson: None,
             hover_cmd: None,
             show_start: false,
             focus_start: false,
             start: Default::default(),
             kiosk: None,
             outside_edit: None,
+            file_watch: Default::default(),
             assets_window: Default::default(),
             views: Vec::new(),
             other_design: None,
@@ -901,6 +941,9 @@ impl AppState {
             gaps_dialog: None,
             gap_settings: emb_geom::gaps::Gaps::STANDARD,
             cleanup_dialog: None,
+            quicker_dialog: None,
+            quicker_settings: emb_model::quicker::QuickerToSew::STANDARD,
+            swatch_window: Default::default(),
             recognize_dialog: None,
             envelope_dialog: None,
             cleanup_settings: emb_geom::cleanup::Cleanup::STANDARD,
@@ -923,6 +966,8 @@ impl AppState {
             families_window: Default::default(),
             decor: Default::default(),
             color_fills: Default::default(),
+            column_bands: Default::default(),
+            fix_stitches: Default::default(),
             quilting: Default::default(),
             cutwork: Default::default(),
             alphabets_window: Default::default(),
@@ -1538,6 +1583,8 @@ impl AppState {
                 egui::Stroke::new(1.0, ui.visuals().weak_text_color())
             };
             p.rect_stroke(rect, 3.0, ring, egui::StrokeKind::Outside);
+            // The name of the thread for a screen reader (and the tutorial steps).
+            let resp = crate::a11y::named(resp, &t.name);
             let resp = resp.on_hover_text(if self.selection.is_empty() {
                 crate::i18n::fill("{}\nClick: use for new objects", &[&t.name])
             } else {
@@ -1766,8 +1813,11 @@ impl TabViewer for AppState {
     }
 
     /// The panels close with their × button; View > Panels opens them again.
+    /// A side panel has its × only when it is the open tab of its group, so
+    /// that the titles of a group fit its tab bar.
     fn is_closeable(&self, tab: &Tab) -> bool {
-        matches!(tab, Tab::Start | Tab::View(_) | Tab::Other) || crate::viewtools::PANELS.iter().any(|(t, _)| t == tab)
+        matches!(tab, Tab::Start | Tab::View(_) | Tab::Other)
+            || (crate::viewtools::PANELS.iter().any(|(t, _)| t == tab) && self.open_tabs.contains(tab))
     }
 
     fn on_close(&mut self, tab: &mut Tab) -> egui_dock::widgets::tab_viewer::OnCloseResponse {
@@ -1880,6 +1930,18 @@ impl EmbApp {
             self.state.open_any(f.path());
         }
         self.state.backups_tick(crate::clock::Instant::now());
+        // A file from another process (one program, ADR 0175): it opens in
+        // a tab, and the window comes to the front. A browser has no other
+        // process, so it only keeps the heartbeat of the backups.
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            if self.state.read_inbox(crate::clock::Instant::now()) {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
+                ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+            }
+            ctx.request_repaint_after(crate::one_program::POLL);
+        }
+        #[cfg(target_arch = "wasm32")]
         ctx.request_repaint_after(crate::backup::HEARTBEAT);
         crate::backup::recovery_window(&ctx, &mut self.state);
         crate::file::dialogs(&ctx, &mut self.state);
@@ -1930,6 +1992,8 @@ impl EmbApp {
         crate::simplify::window(&ctx, st);
         crate::gaps::window(&ctx, st);
         crate::cleanup::window(&ctx, st);
+        crate::quicker::window(&ctx, st);
+        crate::test_swatches::window(&ctx, st);
         crate::recognize_objects::window(&ctx, st);
         crate::drawing_aids::envelope_window(&ctx, st);
         crate::editing::paste_special_window(&ctx, st);
@@ -1943,6 +2007,8 @@ impl EmbApp {
         crate::families::window(&ctx, st);
         crate::decor::windows(&ctx, st);
         crate::color_fills::window(&ctx, st);
+        crate::column_bands::window(&ctx, st);
+        crate::fix_stitches::window(&ctx, st);
         crate::quilting::window(&ctx, st);
         crate::cutwork::window(&ctx, st);
         crate::artwork::windows(&ctx, st);
@@ -1953,6 +2019,8 @@ impl EmbApp {
         crate::font_sheet::window(&ctx, st);
         crate::guides::window(&ctx, st);
         crate::send::window(&ctx, st);
+        st.poll_file_changes(crate::clock::Instant::now());
+        crate::file_watch::window(&ctx, st);
         crate::clipart::window(&ctx, st);
         // Jobs and the library scan go on while their tabs are hidden.
         #[cfg(target_arch = "wasm32")]
@@ -1986,7 +2054,9 @@ impl EmbApp {
             st.panels_below = below;
             let full = self.saved_dock.as_ref().unwrap_or(&self.dock);
             fronts.extend(front_tab(&self.dock, Tab::Canvas));
-            fronts.extend(SIDE_PANELS.iter().find_map(|t| front_tab(full, *t)));
+            // The front tab of each group; in the one group under the canvas,
+            // the front tab of the first group stays in front.
+            fronts.extend(SIDE_GROUPS.concat().into_iter().rev().filter_map(|t| front_tab(full, t)));
             match &mut self.saved_dock {
                 Some(saved) => *saved = default_dock_for(below),
                 None => self.dock = default_dock_for(below),
@@ -2043,6 +2113,11 @@ impl EmbApp {
             }
         }
         if !kiosk {
+            st.open_tabs = self
+                .dock
+                .iter_leaves()
+                .filter_map(|(_, leaf)| leaf.tabs.get(leaf.active.0).copied())
+                .collect();
             egui::CentralPanel::no_frame().show(ui, |ui| {
                 // A finger needs a wider place to drag the line between
                 // two panels (P15 step 3).
@@ -2094,6 +2169,9 @@ impl EmbApp {
         {
             let _ = self.dock.set_active_tab(path);
         }
+        // The lesson: its window and its marks over all the rest (the
+        // canvas and the windows have their places of this frame).
+        crate::lesson::frame(&ctx, st);
     }
 }
 
@@ -2111,7 +2189,7 @@ mod dock_tests {
     }
 
     #[test]
-    fn reset_the_panels_puts_all_side_panels_back_in_one_group() {
+    fn reset_the_panels_puts_the_side_panels_back_in_their_groups() {
         let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
         st.save_settings = false;
         st.show_start = false;
@@ -2119,7 +2197,7 @@ mod dock_tests {
         let mut app = EmbApp::for_test(st);
         let ctx = crate::test_util::ready_context();
         frame(&ctx, &mut app);
-        assert!(crate::test_util::one_side_group(&app.dock), "one group at the start");
+        assert!(crate::test_util::side_groups(&app.dock), "the two groups at the start");
         // The user closes a panel and moves another one under the group.
         app.state().set_panel_shown(Tab::Styles, false);
         let p = app.dock.find_tab(&Tab::Threads).unwrap();
@@ -2127,14 +2205,47 @@ mod dock_tests {
         let q = app.dock.find_tab(&Tab::Properties).unwrap();
         app.dock[q.surface].split_below(q.node, 0.5, vec![Tab::Threads]);
         frame(&ctx, &mut app);
-        assert!(!crate::test_util::one_side_group(&app.dock));
+        assert!(!crate::test_util::side_groups(&app.dock));
         app.state().reset_panels = true;
         frame(&ctx, &mut app);
         assert!(
-            crate::test_util::one_side_group(&app.dock),
-            "all side panels back in one group"
+            crate::test_util::side_groups(&app.dock),
+            "the side panels back in their groups"
         );
         assert!(app.state().panel_shown(Tab::Styles), "the closed panel opens");
+        // Only the open tab of each group can close.
+        let open = app.state().open_tabs.clone();
+        assert_eq!(open.len(), 3, "{open:?}");
+        assert!(open.contains(&Tab::Properties) && open.contains(&Tab::Sequence));
+        assert!(app.state().is_closeable(&Tab::Properties) && !app.state().is_closeable(&Tab::Threads));
+    }
+
+    /// The titles of each group of side panels fit its tab bar on a screen
+    /// of 1366 points in each language: a tab is its title, 8 points at
+    /// each side, and the × of the open tab (the measure of `egui_dock`).
+    #[test]
+    fn the_side_tabs_fit_a_small_screen() {
+        let ctx = crate::test_util::ready_context();
+        crate::icons::install(&ctx);
+        ctx.run_ui(egui::RawInput::default(), |_| {}).textures_delta.clear();
+        let font = egui::TextStyle::Button.resolve(&ctx.global_style());
+        let side = 1366.0 * (1.0 - CANVAS_PART) - 4.0;
+        let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        for lang in ["en", "de", "es", "ja"] {
+            crate::i18n::set_language(lang);
+            for group in SIDE_GROUPS {
+                let titles: f32 = group
+                    .iter()
+                    .map(|t| {
+                        let text = st.title(&mut t.clone()).text().to_string();
+                        ctx.fonts_mut(|f| f.layout_no_wrap(text, font.clone(), egui::Color32::WHITE).size().x)
+                    })
+                    .sum();
+                let width = titles + 16.0 * group.len() as f32 + 24.0;
+                assert!(width <= side, "{lang} {group:?}: {width} of {side}");
+            }
+        }
+        crate::i18n::set_language("en");
     }
 
     fn frame_of(ctx: &egui::Context, app: &mut EmbApp, size: egui::Vec2) {
@@ -2161,7 +2272,8 @@ mod dock_tests {
         let ctx = crate::test_util::ready_context();
         frame_of(&ctx, &mut app, egui::vec2(390.0, 844.0));
         assert!(app.state().panels_below && side_below(&app.dock));
-        assert!(crate::test_util::one_side_group(&app.dock));
+        let side: Vec<_> = SIDE_GROUPS.concat().iter().filter_map(|t| app.dock.find_tab(t)).collect();
+        assert!(side.len() == 8 && side.iter().all(|p| p.node == side[0].node), "one group under the canvas");
         // The Threads panel in front; the phone turns: the panels go right,
         // and Threads stays in front.
         let p = app.dock.find_tab(&Tab::Threads).unwrap();

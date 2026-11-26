@@ -54,7 +54,7 @@ impl AppState {
         ui.horizontal(|ui| {
             ui.label(tr("Rotate by"));
             ui.add(
-                egui::DragValue::new(&mut rot)
+                crate::workspace::drag(&mut rot)
                     .range(-360.0..=360.0)
                     .clamp_existing_to_range(false)
                     .suffix("°"),
@@ -66,13 +66,13 @@ impl AppState {
         ui.horizontal(|ui| {
             ui.label(tr("Skew"));
             ui.add(
-                egui::DragValue::new(&mut sx)
+                crate::workspace::drag(&mut sx)
                     .range(-80.0..=80.0)
                     .clamp_existing_to_range(false)
                     .suffix("° X"),
             );
             ui.add(
-                egui::DragValue::new(&mut sy)
+                crate::workspace::drag(&mut sy)
                     .range(-80.0..=80.0)
                     .clamp_existing_to_range(false)
                     .suffix("° Y"),

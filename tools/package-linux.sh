@@ -30,7 +30,7 @@ else
     name="ShokujoDX-$version-$build"
     deb_version="$version~$build"
 fi
-cargo build --release -p emb-app
+cargo build --release -p emb-app -p emb-cli
 arch=$(uname -m)
 deb_arch=$(dpkg --print-architecture 2>/dev/null || echo amd64)
 
@@ -41,6 +41,9 @@ share="$app/usr/share"
 mkdir -p "$app/usr/bin" "$share/applications" "$share/mime/packages" "$share/metainfo" "$share/thumbnailers" \
     "$share/doc/shokujodx/licenses"
 install -m 755 target/release/emb-app "$app/usr/bin/shokujodx"
+# The command-line tool, with the MCP server for the agent of the user
+# (`emb-cli mcp`, ADR 0176): next to the program, so its tool `show` finds it.
+install -m 755 target/release/emb-cli "$app/usr/bin/emb-cli"
 install -m 644 packaging/linux/shokujodx.desktop "$share/applications/"
 install -m 644 packaging/linux/shokujodx.xml "$share/mime/packages/"
 install -m 644 packaging/linux/shokujodx.metainfo.xml "$share/metainfo/"

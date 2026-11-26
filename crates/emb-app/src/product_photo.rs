@@ -424,7 +424,7 @@ fn contents(ui: &mut egui::Ui, st: &mut AppState) {
     ui.horizontal(|ui| match st.photo_editor.tool {
         Tool::Pick | Tool::Unpick => {
             ui.label(tr("Tolerance"));
-            ui.add(egui::Slider::new(&mut st.photo_editor.tolerance, 0.0..=100.0).max_decimals(0));
+            ui.add(crate::workspace::slider(&mut st.photo_editor.tolerance, 0.0..=100.0).max_decimals(0));
         }
         Tool::Brush | Tool::Eraser => {
             ui.label(tr("Brush size"));

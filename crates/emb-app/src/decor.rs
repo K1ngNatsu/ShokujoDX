@@ -245,14 +245,14 @@ fn blends_window(ctx: &egui::Context, st: &mut AppState) {
                 .horizontal(|ui| {
                     ui.label(tr("Density from"));
                     let ra = ui.add(
-                        egui::Slider::new(&mut a, 5.0..=100.0)
+                        crate::workspace::slider(&mut a, 5.0..=100.0)
                             .clamping(egui::SliderClamping::Edits)
                             .suffix(" %")
                             .fixed_decimals(0),
                     );
                     ui.label(tr("to"));
                     let rb = ui.add(
-                        egui::Slider::new(&mut b, 5.0..=100.0)
+                        crate::workspace::slider(&mut b, 5.0..=100.0)
                             .clamping(egui::SliderClamping::Edits)
                             .suffix(" %")
                             .fixed_decimals(0),
@@ -340,21 +340,23 @@ impl AppState {
             .map(|o| o.thread)
             .or_else(|| d.threads.first().map(|t| t.id));
         let kinds = frame_objects(&frame, &b, w.frame_margin_mm);
-        let new = self.doc.edit(crate::i18n::fill("Border {}", &[&frame.name]), |d| {
-            let t = thread.unwrap_or_else(|| d.add_thread("Thread", emb_model::Rgb(30, 30, 30)));
-            let g = d.new_group_id();
-            kinds
-                .into_iter()
-                .map(|k| {
-                    let id = d.add_object(t, k);
-                    if let Some(o) = d.object_mut(id) {
-                        o.group = Some(g);
-                        o.name = Some(frame.name.clone());
-                    }
-                    id
-                })
-                .collect::<Vec<_>>()
-        });
+        let new = self
+            .doc
+            .edit(crate::i18n::fill("Border {}", &[&crate::i18n::tr(&frame.name)]), |d| {
+                let t = thread.unwrap_or_else(|| d.add_thread("Thread", emb_model::Rgb(30, 30, 30)));
+                let g = d.new_group_id();
+                kinds
+                    .into_iter()
+                    .map(|k| {
+                        let id = d.add_object(t, k);
+                        if let Some(o) = d.object_mut(id) {
+                            o.group = Some(g);
+                            o.name = Some(frame.name.clone());
+                        }
+                        id
+                    })
+                    .collect::<Vec<_>>()
+            });
         self.selection.set_all(new);
         true
     }
@@ -386,6 +388,7 @@ fn borders_window(ctx: &egui::Context, st: &mut AppState) {
             .filter(|&i| {
                 search.is_empty()
                     || all[i].name.to_lowercase().contains(&search)
+                    || tr(&all[i].name).to_lowercase().contains(&search)
                     || tr(all[i].shape.name()).to_lowercase().contains(&search)
             })
             .collect();
@@ -449,7 +452,7 @@ fn borders_window(ctx: &egui::Context, st: &mut AppState) {
             ));
             let mut pct = w.frame_scale * 100.0;
             ui.add(
-                egui::Slider::new(&mut pct, 50.0..=200.0)
+                crate::workspace::slider(&mut pct, 50.0..=200.0)
                     .clamping(egui::SliderClamping::Always)
                     .fixed_decimals(0)
                     .suffix(" %"),
@@ -459,7 +462,7 @@ fn borders_window(ctx: &egui::Context, st: &mut AppState) {
         ui.horizontal(|ui| {
             ui.label(tr("Space round the objects"));
             ui.add(
-                egui::Slider::new(&mut w.frame_margin_mm, 0.0..=20.0)
+                crate::workspace::slider(&mut w.frame_margin_mm, 0.0..=20.0)
                     .clamping(egui::SliderClamping::Edits)
                     .suffix(" mm"),
             );

@@ -256,6 +256,7 @@ impl AppState {
                 } else {
                     out.message
                 };
+                self.files_written(&out.files);
                 let j = &mut self.jobs.jobs[k];
                 j.state = JobState::Done;
                 j.files = out.files;

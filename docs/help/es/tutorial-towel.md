@@ -8,47 +8,53 @@ keywords: tutorial, toalla, rizo, monograma, iniciales, capa base, recubrimiento
 
 En este tutorial pone un monograma en una toalla. La toalla tiene un pelo
 alto, por eso el diseño necesita una capa base y los ajustes de tela
-correctos. Tarda unos 10 minutos.
+correctos.
 
 Necesita una toalla, una entretela desgarrable o recortable y un
 recubrimiento soluble en agua.
 
 ## Definir la tela
 
-1. Empiece un diseño nuevo.
-2. En la pestaña **Diseño**, seleccione su máquina y un bastidor.
-3. Haga clic en **Diseño > Tela** y seleccione **Towel (terry)**. El
-   programa hace la base más fuerte y las puntadas más densas, para que se
-   queden sobre el pelo. La hoja de trabajo muestra la entretela y el
-   recubrimiento.
+1. Haga clic en [Abrir el diseño inicial](sample:towel). Es un diseño
+   vacío.
+2. Haga clic en **Diseño > Tela y estilos > Tela**.
+3. En la lista **Tela**, seleccione **Toalla (rizo)** y haga clic en
+   **Aplicar**. El programa hace la base más fuerte y las puntadas más
+   densas, para que se queden sobre el pelo. La hoja de trabajo muestra
+   la entretela y el recubrimiento.
 
 ## Crear el monograma
 
-1. Haga clic en **Letras > Monograma**.
+1. Haga clic en **Letras > Personalizar > Monograma**.
 2. Escriba las **Iniciales**, por ejemplo `JMK`.
-3. Seleccione un **Estilo**, por ejemplo **Classic (large middle)**, y
-   ponga la **Altura** en 60 mm.
-4. En **Borde**, seleccione una **Forma** (por ejemplo **Círculo**) y la
-   **Puntada** **Satén**.
-5. Añada **Adornos** si quiere, por ejemplo una **Leaf** a la izquierda y a
-   la derecha.
-6. Haga clic en **Añadir como nuevo**. El monograma está en el lienzo.
+3. Haga clic en la plantilla **Stacked in an oval**. Define el estilo, el
+   tamaño, el borde y los adornos. Puede cambiar cada uno de ellos
+   después.
+4. Haga clic en **Añadir al diseño**. El monograma está en el lienzo, y
+   ahora la ventana cambia el monograma seleccionado.
+5. Cierre la ventana **Monograma**.
+
+![La ventana Monograma](towel-monogram)
 
 ## Añadir la capa base
 
-1. Seleccione todos los objetos (Ctrl+A).
-2. Haga clic en **Especial > Capa base**. Un relleno ligero va bajo el
-   monograma. Se borda primero, con un hilo propio.
-3. Dé a la capa base un hilo del color de la toalla, para que no se vea.
+1. Haga clic en **Editar > Seleccionar > Seleccionar todo**.
+2. Haga clic en **Especial > Relieve y capa base > Capa base**. Un relleno
+   ligero va bajo el monograma. Se borda primero, con un hilo del color de
+   la tela, para que no se vea. Aplasta el pelo.
+3. Pulse **Esc**.
 
 ## Comprobarlo
 
-1. Haga clic en **Ver > Aspecto de hilo** para ver los hilos sobre la
-   tela. La textura de la toalla se ve bajo el color de la tela (**Color >
-   Color de la tela**).
-2. Mire la **Información del diseño**: tiene el tamaño, el tiempo de
-   bordado y las advertencias.
-3. **Diseño > Producto** muestra el diseño sobre una toalla a tamaño real.
+1. Haga clic en **Ver > Mostrar > Aspecto de hilo** y marque **Aspecto de
+   hilo** en su menú. Bajo el color de la tela (**Color > Color de la
+   tela**) se ve la textura de tela de la toalla.
+2. La línea de estado muestra **Colores: 3** (la capa base, las letras y
+   el borde) y ninguna advertencia.
+3. **Diseño > Producto > Producto** muestra el diseño sobre una toalla a
+   tamaño real.
+
+![El monograma sobre la tela de la toalla](towel-stitches)
 
 ## Bordarlo
 
@@ -56,6 +62,16 @@ recubrimiento soluble en agua.
 2. Ponga el recubrimiento soluble en agua sobre la toalla, en el bastidor.
 3. Borde el diseño. Arranque la entretela, y lave o arranque el
    recubrimiento.
+
+## Si no se ve bien
+
+- **El pelo sale entre las letras.** Use el recubrimiento y conserve la
+  capa base. La tela **Toalla (rizo)** debe estar definida.
+- **La línea de estado muestra «El hilo se acumula».** Hay letras o un
+  borde unos encima de otros. Haga el monograma más grande, o seleccione
+  otra plantilla.
+- **La capa base se ve.** Dé al hilo de la capa base el color de la
+  toalla.
 
 ## Siguiente
 

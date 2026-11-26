@@ -232,7 +232,7 @@ fn mm_slider(ui: &mut egui::Ui, label: &str, v: &mut f64, range: std::ops::Range
     ui.horizontal(|ui| {
         ui.label(label);
         ui.add(
-            egui::Slider::new(v, range)
+            crate::workspace::slider(v, range)
                 .clamping(egui::SliderClamping::Edits)
                 .suffix(" mm")
                 .fixed_decimals(1),
@@ -410,7 +410,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                 ui.radio_value(&mut w.by_distance, false, tr("Number"));
                 ui.add_enabled(
                     !w.by_distance,
-                    egui::Slider::new(&mut w.count, 1..=40).clamping(egui::SliderClamping::Edits),
+                    crate::workspace::slider(&mut w.count, 1..=40).clamping(egui::SliderClamping::Edits),
                 );
             });
             ui.horizontal(|ui| {

@@ -16,8 +16,33 @@ use crate::hidden::{Cover, TRAVEL_STITCH_MM};
 use crate::object::{Run, RunLink, StitchCache, StitchError, StopReason};
 use crate::running;
 
-/// Lock stitches shorter than this are left out, in mm.
+/// Lock stitches shorter than this are left out, in mm (and shorter than
+/// the shortest stitch of the machine).
 const MIN_LOCK_MM: f64 = 0.1;
+/// A tie-off looks back at most this many needle points for a point far
+/// enough for its lock stitches (the plan and the fix of machine files).
+pub const LOCK_LOOK_BACK: usize = 12;
+
+/// The shortest lock stitch of `opts`, mm: [`MIN_LOCK_MM`] or the shortest
+/// stitch of the machine.
+pub fn min_lock_mm(opts: &PlanOptions) -> f64 {
+    opts.min_stitch_mm.max(MIN_LOCK_MM)
+}
+
+/// A lock at `at`: two short stitches forward toward `toward` and back,
+/// ending where they started. `None` if the stitches would be shorter than
+/// [`min_lock_mm`]: shorter lock stitches hold nothing, break the thread,
+/// and a machine file (0.1 mm steps) puts them all on one point. The plan
+/// and the fix of machine files make their locks with it.
+pub fn lock_points(at: Point, toward: Point, opts: &PlanOptions) -> Option<[Point; 4]> {
+    let u = (toward - at).normalized()?;
+    let len = opts.lock_mm.min(at.distance(toward) / 2.0);
+    if len < min_lock_mm(opts) {
+        return None;
+    }
+    let q = at + u * len;
+    Some([q, at, q, at])
+}
 
 /// A run that starts nearer than this to the needle starts where the
 /// needle is, in mm: a travel stitch to it is not made. The unit of the
@@ -50,6 +75,16 @@ impl Default for PlanOptions {
 }
 
 impl PlanOptions {
+    /// These options with the trim distance of `design`, if it has one: it
+    /// wins over the one of the machine (P22 Milestone 2, ADR 0169). The
+    /// plan, the check of stitch objects and `emb-cli check` use it.
+    pub fn for_design(&self, design: &Design) -> PlanOptions {
+        PlanOptions {
+            trim_mm: design.trim_gap_mm.unwrap_or(self.trim_mm),
+            ..self.clone()
+        }
+    }
+
     pub fn for_machine(m: &MachineProfile) -> Self {
         let d = Self::default();
         Self {
@@ -96,6 +131,11 @@ pub struct StitchPlan {
     pub spans: Vec<ObjectSpan>,
     /// The stops, in sew order (not the color changes).
     pub stops: Vec<PlanStop>,
+    /// The records that end a travel stitch (P22 Milestone 1): ranges of
+    /// indices in `stitches.records`, in order and apart. The travel inside
+    /// objects (`Run::travel`), the stitch to the next run of the same color
+    /// when the gap is short, and hidden travel (ADR 0082).
+    pub travel: Vec<std::ops::Range<usize>>,
 }
 
 /// One run of a color block, routed: its object, needle points (output
@@ -103,6 +143,8 @@ pub struct StitchPlan {
 struct Routed {
     id: ObjectId,
     points: Vec<Point>,
+    /// For each segment of `points`, if it is travel (empty: none).
+    travel: Vec<bool>,
     link: RunLink,
     exact: bool,
     stop: Option<StopReason>,
@@ -125,6 +167,8 @@ pub fn build_plan_until(
 ) -> Option<StitchPlan> {
     let to_out = design.output_transform();
     let to_design = to_out.inverse().unwrap_or(Transform::IDENTITY);
+    // The trim distance of the design wins over the one of the machine.
+    let opts = &opts.for_design(design);
     let mut b = Builder::new(opts);
     // Auto start (ADR 0032): the needle goes to the start point first, so
     // the first object starts from there.
@@ -183,12 +227,13 @@ pub fn build_plan_until(
                     .end
                     .filter(|_| i + 1 == runs.len() && (i > 0 || obj.start.is_none()))
                     .map(|e| to_out.apply(e));
-                let pts = route(run, &to_out, reference, end);
+                let (pts, travel) = route(run, &to_out, reference, end);
                 if let (Some(&first), Some(&last)) = (pts.first(), pts.last()) {
                     needle = last;
                     block.push(Routed {
                         id,
                         points: pts,
+                        travel,
                         link: run.link,
                         exact: run.exact,
                         stop: run.stop,
@@ -233,6 +278,7 @@ pub fn build_plan_until(
             let Routed {
                 id,
                 points: pts,
+                travel,
                 link,
                 exact,
                 stop,
@@ -259,7 +305,7 @@ pub fn build_plan_until(
             b.place = places.get(id).copied().unwrap_or(0);
             b.long_jumps = *long_jumps;
             b.want_slow = f.slow;
-            b.sew_run(pts, join, f.tie_in, *exact);
+            b.sew_run(pts, travel, join, f.tie_in, *exact);
             b.long_jumps = false;
             b.tie_off_enabled = f.tie_off;
             let end = b.recs.len();
@@ -307,6 +353,7 @@ pub fn build_plan_until(
         warnings,
         spans,
         stops: b.stops,
+        travel: b.travel,
     })
 }
 
@@ -335,11 +382,21 @@ impl StitchPlan {
 
 /// Puts the run in output coordinates, chooses where it starts, and applies
 /// the style (backstitch, stem stitch), bean stitch and the pass (backtrack,
-/// repeat). With `end`, the run ends as near to `end` as it can.
-fn route(run: &Run, to_out: &Transform, reference: Point, end: Option<Point>) -> Vec<Point> {
+/// repeat). With `end`, the run ends as near to `end` as it can. Also gives,
+/// for each segment of the points, if it is travel (empty: none is).
+fn route(run: &Run, to_out: &Transform, reference: Point, end: Option<Point>) -> (Vec<Point>, Vec<bool>) {
     let mut pts: Vec<Point> = run.points.iter().map(|p| to_out.apply(*p)).collect();
     if pts.len() < 2 {
-        return pts;
+        return (pts, Vec::new());
+    }
+    let mut travel: Vec<bool> = Vec::new();
+    if !run.travel.is_empty() {
+        travel = vec![false; pts.len() - 1];
+        for r in &run.travel {
+            for t in travel.iter_mut().take(r.end).skip(r.start) {
+                *t = true;
+            }
+        }
     }
     if run.fixed {
         // Fill and satin: the object chose its start from the needle position.
@@ -351,13 +408,20 @@ fn route(run: &Run, to_out: &Transform, reference: Point, end: Option<Point>) ->
         let start = nearest(&pts, end.unwrap_or(reference));
         pts.rotate_left(start);
         pts.push(pts[0]);
+        if !travel.is_empty() {
+            let n = travel.len();
+            travel.rotate_left(start % n);
+        }
     } else if let Some(e) = end {
         if e.distance(pts[0]) < e.distance(pts[pts.len() - 1]) {
             pts.reverse();
+            travel.reverse();
         }
     } else if reference.distance(pts[pts.len() - 1]) < reference.distance(pts[0]) {
         pts.reverse();
+        travel.reverse();
     }
+    let segments = pts.len() - 1;
     let pts = match run.style {
         RunStyle::Backstitch => running::backstitch(&pts),
         RunStyle::Stemstitch => running::stemstitch(&pts),
@@ -376,7 +440,12 @@ fn route(run: &Run, to_out: &Transform, reference: Point, end: Option<Point>) ->
         }
         RunPass::Once | RunPass::Redwork | RunPass::Branch => {}
     }
-    pts
+    // The style, the bean stitch and the pass make other points: travel
+    // stays only if all of the run was travel.
+    if !travel.is_empty() && pts.len() != segments + 1 {
+        travel = vec![travel.iter().all(|t| *t); pts.len().saturating_sub(1)];
+    }
+    (pts, travel)
 }
 
 /// Index of the point nearest to `p` (the first one on a tie).
@@ -429,6 +498,8 @@ struct Builder<'a> {
     cover: Option<Cover>,
     /// The place in the sew order of the object of the run that sews now.
     place: u32,
+    /// The records that end travel stitches (`StitchPlan::travel`).
+    travel: Vec<std::ops::Range<usize>>,
 }
 
 impl<'a> Builder<'a> {
@@ -447,6 +518,19 @@ impl<'a> Builder<'a> {
             want_slow: false,
             cover: None,
             place: 0,
+            travel: Vec::new(),
+        }
+    }
+
+    /// The records from `from` to the end are travel stitches.
+    fn mark_travel(&mut self, from: usize) {
+        let to = self.recs.len();
+        if to <= from {
+            return;
+        }
+        match self.travel.last_mut() {
+            Some(r) if r.end >= from => r.end = r.end.max(to),
+            _ => self.travel.push(from..to),
         }
     }
 
@@ -497,18 +581,20 @@ impl<'a> Builder<'a> {
         self.needle = p;
     }
 
-    /// Two short stitches forward and back toward `toward`, ending where they started.
+    /// The shortest lock stitch: the shortest stitch of the machine (a
+    /// shorter one breaks the thread, and Design Info warns of it), at
+    /// least [`MIN_LOCK_MM`].
+    fn min_lock(&self) -> f64 {
+        min_lock_mm(self.opts)
+    }
+
+    /// Two short stitches forward and back toward `toward`, ending where
+    /// they started ([`lock_points`]).
     fn lock(&mut self, toward: Point) {
-        let at = self.needle;
-        let Some(u) = (toward - at).normalized() else { return };
-        let len = self.opts.lock_mm.min(at.distance(toward) / 2.0);
-        // Shorter lock stitches hold nothing, and a machine file (0.1 mm
-        // steps) puts them all on one point.
-        if len < MIN_LOCK_MM {
+        let Some(points) = lock_points(self.needle, toward, self.opts) else {
             return;
-        }
-        let q = at + u * len;
-        for p in [q, at, q, at] {
+        };
+        for p in points {
             self.stitch(p, true);
         }
     }
@@ -518,9 +604,22 @@ impl<'a> Builder<'a> {
             return;
         }
         if let Some(prev) = self.prev {
+            // Toward a needle point before it that is far enough for a lock
+            // stitch (the end of a column in a point has very short
+            // stitches), else the one just before it.
+            let far = 2.0 * self.min_lock();
+            let toward = self
+                .recs
+                .iter()
+                .rev()
+                .take(LOCK_LOOK_BACK)
+                .take_while(|r| r.kind == StitchKind::Stitch)
+                .map(|r| r.pos)
+                .find(|p| p.distance(self.needle) >= far)
+                .unwrap_or(prev);
             // The lock stitches belong to the object that ends: its speed.
             let want = std::mem::replace(&mut self.want_slow, self.slow);
-            self.lock(prev);
+            self.lock(toward);
             self.want_slow = want;
         }
     }
@@ -581,7 +680,7 @@ impl<'a> Builder<'a> {
     /// Sews one run. `join` says how to go from the last run to this one;
     /// `tie_in` adds lock stitches when the run starts after a trim; `exact`
     /// keeps stitches shorter than the minimum.
-    fn sew_run(&mut self, run: &[Point], join: Join, tie_in: bool, exact: bool) {
+    fn sew_run(&mut self, run: &[Point], travel: &[bool], join: Join, tie_in: bool, exact: bool) {
         let Some((&first, rest)) = run.split_first() else {
             return;
         };
@@ -597,7 +696,9 @@ impl<'a> Builder<'a> {
         let apart = exact || self.needle.distance(first) >= SAME_PLACE_MM.max(self.opts.min_stitch_mm);
         if self.sewing && join == Join::Travel {
             self.stop_here();
+            let at = self.recs.len();
             self.stitch(first, apart);
+            self.mark_travel(at);
         } else if self.sewing && join == Join::Jump {
             self.stop_here();
             self.jump(first);
@@ -617,7 +718,9 @@ impl<'a> Builder<'a> {
                 }
                 TrimMode::Hidden if hidden.is_some() => {
                     self.stop_here();
+                    let at = self.recs.len();
                     self.travel(hidden.as_deref().unwrap_or_default());
+                    self.mark_travel(at);
                 }
                 TrimMode::Auto | TrimMode::Hidden if !near => {
                     self.tie_off();
@@ -627,7 +730,9 @@ impl<'a> Builder<'a> {
                 // Travel stitch to the next run of the same color.
                 TrimMode::Auto | TrimMode::Never | TrimMode::Hidden if near => {
                     self.stop_here();
+                    let at = self.recs.len();
                     self.stitch(first, apart);
+                    self.mark_travel(at);
                 }
                 // A long gap with no trim: the thread stays and the needle jumps.
                 TrimMode::Never | TrimMode::Auto | TrimMode::Hidden => {
@@ -645,7 +750,7 @@ impl<'a> Builder<'a> {
             // hold nothing: lock toward the next point past it.
             if let Some(&next) = rest
                 .iter()
-                .find(|p| p.distance(first) >= 2.0 * MIN_LOCK_MM)
+                .find(|p| p.distance(first) >= 2.0 * self.min_lock())
                 .or(rest.first())
                 && tie_in
             {
@@ -653,8 +758,12 @@ impl<'a> Builder<'a> {
             }
             self.sewing = true;
         }
-        for &p in rest {
+        for (k, &p) in rest.iter().enumerate() {
+            let at = self.recs.len();
             self.stitch(p, exact);
+            if travel.get(k).copied().unwrap_or(false) {
+                self.mark_travel(at);
+            }
         }
     }
 
@@ -680,11 +789,12 @@ mod tests {
             let mut b = Builder::new(&opts);
             b.sew_run(
                 &[Point::new(0.0, 0.0), Point::new(3.0, 0.0)],
+                &[],
                 Join::Travel,
                 false,
                 false,
             );
-            b.sew_run(&[start, Point::new(3.0, 3.0)], Join::Travel, false, exact);
+            b.sew_run(&[start, Point::new(3.0, 3.0)], &[], Join::Travel, false, exact);
             b.recs
                 .iter()
                 .filter(|r| r.kind == StitchKind::Stitch)
@@ -770,6 +880,22 @@ mod tests {
         build_plan(d, &PlanOptions::default(), &mut StitchCache::default())
     }
 
+    /// The trim distance of the design wins over the one of the machine
+    /// (P22 Milestone 2): a 3 mm gap is a trim at the 2 mm of the machine,
+    /// and a travel stitch at 4 mm.
+    #[test]
+    fn the_trim_distance_of_the_design_wins() {
+        let mut d = Design::new("gap");
+        let t = d.add_thread("Red", Rgb(200, 0, 0));
+        add_line(&mut d, t, (0.0, 0.0), (20.0, 0.0), 2.5);
+        add_line(&mut d, t, (23.0, 0.0), (40.0, 0.0), 2.5);
+        let trims = |d: &Design| count(&plan(d), StitchKind::Trim);
+        assert_eq!(trims(&d), 2, "a trim at the gap and at the end");
+        d.trim_gap_mm = Some(4.0);
+        assert_eq!(trims(&d), 1, "only at the end");
+        assert_eq!(plan(&d).travel.len(), 1, "the stitch over the gap is travel");
+    }
+
     #[test]
     fn single_line_structure() {
         let mut d = Design::new("t");
@@ -847,6 +973,47 @@ mod tests {
         // The lock stitches go 0.5 mm toward (0.05, 10), not 0.025 mm
         // toward (0.05, 0), which a machine file would put in one hole.
         assert!(s[1].distance(s[0]) > 0.4, "{:?}", &s[..4]);
+    }
+
+    /// No lock stitch is shorter than the shortest stitch of the machine:
+    /// where the first or last stitch is very short (a column that ends in
+    /// a point), the lock goes toward a needle point farther on (ADR 0163).
+    #[test]
+    fn lock_stitches_are_not_shorter_than_the_shortest_stitch() {
+        let mut d = Design::new("t");
+        let red = d.add_thread("Red", Rgb(255, 0, 0));
+        d.add_object(
+            red,
+            ObjectKind::Running {
+                path: Path::new()
+                    .move_to(Point::new(0.0, 0.0))
+                    .line_to(Point::new(0.2, 0.0))
+                    .line_to(Point::new(0.2, 10.0))
+                    .line_to(Point::new(0.4, 10.0)),
+                params: RunningParams {
+                    style: emb_model::RunStyle::Manual,
+                    ..RunningParams::default()
+                },
+            },
+        );
+        let p = plan(&d);
+        let min = PlanOptions::default().min_stitch_mm;
+        let s: Vec<Point> = p
+            .stitches
+            .records
+            .iter()
+            .filter(|r| r.kind == StitchKind::Stitch)
+            .map(|r| r.pos)
+            .collect();
+        // The tie-in: four stitches from the start; the tie-off: the last
+        // four (the path keeps its own short corners: a manual run).
+        let n = s.len();
+        let locks: Vec<f64> = s[..5]
+            .windows(2)
+            .chain(s[n - 5..].windows(2))
+            .map(|w| w[0].distance(w[1]))
+            .collect();
+        assert!(locks.iter().all(|&l| l >= min - 1e-9), "{locks:?} in {s:?}");
     }
 
     #[test]

@@ -54,6 +54,8 @@ Die Gruppe **Designinfo** zeigt die Zahlen des Designs:
 
 - die Größe, die Rahmen, in die es passt, die Zahl der Objekte, Stiche,
   Farben, Farbwechsel, Fadenschnitte, Sprünge und Stopps;
+- die sichtbaren Verbindungsstiche: auf gestickten Stichen und auf dem
+  Stoff;
 - die Stickzeit beim Tempo der Maschine;
 - den Stoff, das Obergarn und das Unterfadengarn, und die Garnkosten;
 - die Dichte (die meisten Garnlagen);
@@ -73,7 +75,16 @@ das Objekt auszuwählen. Das Programm warnt vor:
 - auf einem Kapprahmen einer Stickreihenfolge, die nicht von der Mitte
   nach außen geht;
 - in freistehender Spitze einem Teil, das kein anderes Teil berührt;
-- Objekten, die keine Stiche machen.
+- sichtbaren Verbindungsstichen: mehr als 2 mm auf gestickten Stichen in
+  einem Objekt oder ein Stück von 4 mm oder mehr auf dem Stoff;
+- Objekten, die keine Stiche machen;
+- in Stichobjekten (einer als Stiche geöffneten Maschinendatei): Stichen,
+  die länger sind, als die Maschine näht, Farbwechseln zum selben Garn,
+  langen Sprüngen ohne Fadenschnitt, Stücken, die zu kurz für den
+  Fadenschneider sind, Anfängen und Enden ohne Vernähstiche und
+  Verbindungsstichen der Datei, die auf gestickten Stichen sichtbar sind
+  (1 mm oder mehr in einem Lauf). **Stiche reparieren**
+  repariert die meisten davon.
 
 ## Die Dichtekarte
 
@@ -148,6 +159,13 @@ Design zu prüfen, bevor Sie es sticken.
 - **Hohes Garn** markiert die Stellen, an denen das Garn höher als die
   Grenze über dem Stoff ist (Schaum und Polster zählen nicht): ein Risiko
   für Fadenrisse.
+- **Sichtbare Verbindungsstiche** markiert die Verbindungsstiche, die kein
+  Stich bedeckt: rot, wo sie auf Stichen liegen, die vor ihnen gestickt
+  werden, blau, wo sie auf dem Stoff liegen. Verbindungsstiche unter
+  Stichen, die später gestickt werden, zwischen den Reihen einer Füllung
+  und am Rand einer Fläche sind nicht sichtbar. Ändern Sie den Start- oder
+  Endpunkt des Objekts oder die Stickreihenfolge, damit die
+  Verbindungsstiche unter den Stichen liegen, die später gestickt werden.
 
 Legen Sie die Grenzen der beiden Prüfungen in den **Optionen** fest
 (**Stoff scheint durch** und **Grenze der Garnhöhe**).
@@ -165,6 +183,29 @@ Steppstichobjekts, die zwei Seiten einer Satinsäule und der Umriss und die
 Löcher einer Füllung. So sehen Sie, wie
 das Programm die Stiche einer Maschinendatei eines anderen Programms
 liest, der erste Schritt, um Objekte daraus zu machen.
+
+## Eine Maschinendatei reparieren
+
+Eine Maschinendatei öffnet sich als Stichobjekte. **Bearbeiten >
+Maschinenfunktionen > Stiche reparieren…** prüft sie und repariert die
+Fehler, die es reparieren kann:
+
+- **Farbblöcke desselben Garns verbinden**: Der Farbwechsel zum selben
+  Garn fällt weg.
+- **Stiche kürzer als** der kürzeste Stich der Maschine **entfernen**:
+  Der nächste Stich beginnt am Einstich davor.
+- **Stiche länger als** der längste Stich der Maschine **teilen**, in
+  gleiche Stiche.
+- **Sprünge länger als** der Fadenschnittabstand **abschneiden**.
+- **Vernähstiche an Anfängen und Enden hinzufügen**, die keine haben.
+
+Jede Reparatur hat ein Kontrollkästchen und die Zahl, die die Prüfung
+gefunden hat. **Reparaturen ausführen** führt die eingeschalteten Reparaturen als
+einen Rückgängig-Schritt aus. Die anderen Einstiche bleiben, wo sie
+sind. Für Stücke, die zu kurz für den Fadenschneider sind, und für
+sichtbare Verbindungsstiche gibt es keine Reparatur: Die Designinfo
+zeigt, wo sie sind. Auf der Befehlszeile machen `emb-cli check` und
+`emb-cli fix` dasselbe für eine Datei.
 
 ## Das Produkt
 
