@@ -50,10 +50,12 @@ Para una columna de satén, la casilla **Relieve (espuma 3D)** de
 Propiedades del objeto hace lo mismo. Use columnas de 3 mm de ancho o más,
 y espuma de un color parecido al del hilo.
 
-La Información del diseño muestra ahora "El hilo se acumula" en la punta
-de la **A**: las dos patas de la letra están una sobre otra allí, y el
-satén en relieve es denso. Una letra con puntas agudas tiene más hilo en
-sus puntas que una letra con extremos romos. Para mucho texto en relieve,
+El satén en relieve es denso: corta la espuma y la cubre. Donde se
+encuentran las dos patas de la **A**, el hilo tiene hasta unas 8 capas,
+así que la Información del diseño muestra "El hilo se acumula" en un
+objeto en relieve solo por encima de un límite 3 capas más alto que para
+las puntadas planas. Una letra con puntas agudas tiene más hilo en sus
+puntas que una letra con extremos romos. Para mucho texto en relieve,
 use una fuente de trazo grueso con extremos romos, y mire las puntas en
 **Ver > Mostrar > Mapa de densidad**.
 

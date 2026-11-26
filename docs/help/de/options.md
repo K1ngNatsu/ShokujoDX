@@ -68,7 +68,9 @@ Farbe zu wählen; sonst erscheint die Farbe des Designs.
 ## Dichte und Garn
 
 - **Dichtegrenze**: die Zahl der Garnlagen, die die Dichtekarte und die
-  Designinfo erlauben (am Anfang 5).
+  Designinfo erlauben (am Anfang 5). Die Designinfo erlaubt 3 Lagen mehr
+  in freistehender Spitze und bei Puff-Objekten: Sie sind von Natur aus
+  dicht.
 - **Oberfadenspule** und **Unterfaden**: die Länge und der **Preis** von
   einem, und die **Währung** (der Text vor den Kosten, zum Beispiel $ oder
   €). Die Designinfo und das Arbeitsblatt zeigen dann die Garnkosten. Ein

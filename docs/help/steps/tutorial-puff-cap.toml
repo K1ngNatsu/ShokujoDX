@@ -43,13 +43,13 @@ expect = { selected = 1, warnings = 0 }
 [[step]]
 item = ["Puff letters", 2]
 command = "Specialty > Puff and Laydown > Puff"
-expect = { objects = 2, colors = 2, warnings = 1 }
+expect = { objects = 2, colors = 2, warnings = 0 }
 
 # The cap order.
 [[step]]
 item = ["The cap order", 1]
 command = "Arrange > Sew Order > Cap Order"
-expect = { objects = 2, kinds = ["Running", "Lettering"], warnings = 1 }
+expect = { objects = 2, kinds = ["Running", "Lettering"], warnings = 0 }
 
 [[step]]
 item = ["The cap order", 2]

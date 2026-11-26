@@ -43,11 +43,12 @@ película fina) y el mismo hilo en la aguja y en la bobina.
    suelta** muestra una parte que no toca ninguna otra. Haga clic en la
    advertencia para seleccionar la parte, y después muévala o hágala más
    grande para que toque.
-2. La Información del diseño también muestra **El hilo se acumula** donde
-   los radios y los anillos cruzan la malla y se cruzan entre sí. Haga
-   clic en **Ver > Mostrar > Mapa de densidad** para ver esos lugares.
-   Muchas capas forman un nudo duro que puede romper la aguja: borde una
-   prueba antes de bordar muchos adornos.
+2. Haga clic en **Ver > Mostrar > Mapa de densidad**: el hilo es más
+   grueso donde los radios y los anillos se encuentran sobre la malla. El
+   encaje es todo hilo, así que la Información del diseño muestra **El
+   hilo se acumula** solo por encima de un límite 3 capas más alto que
+   para la tela. Muchas capas forman un nudo duro que puede romper la
+   aguja: borde una prueba antes de bordar muchos adornos.
 3. Haga clic en **Ver > Cursor de puntada > Reproductor de puntadas** y
    reproduzca el bordado: primero se borda la malla, después los radios,
    los anillos y la presilla.

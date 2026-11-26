@@ -66,7 +66,9 @@ si no, se muestra el color del tema.
 ## Densidad e hilo
 
 - **Límite de densidad**: el número de capas de hilo que permiten el mapa
-  de densidad y la información del diseño (5 al principio).
+  de densidad y la información del diseño (5 al principio). La
+  información del diseño permite 3 capas más en el encaje independiente y
+  en los objetos en relieve: son densos por su naturaleza.
 - **Carrete de hilo superior** y **Bobina**: la longitud y el **precio** de
   uno, y la **Moneda** (el texto delante del costo, por ejemplo $ o €). La
   información del diseño y la hoja de trabajo muestran entonces el costo

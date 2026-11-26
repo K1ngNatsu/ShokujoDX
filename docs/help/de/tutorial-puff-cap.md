@@ -51,12 +51,14 @@ Bei einer Satinsäule macht das Kästchen **Puff (3D-Schaum)** in den
 Objekteigenschaften dasselbe. Benutzen Sie Säulen, die 3 mm breit oder
 breiter sind, und Schaum in einer Farbe wie das Garn.
 
-Die Designinfo zeigt jetzt „Faden baut sich auf“ an der Spitze des **A**:
-Die zwei Schenkel des Buchstabens liegen dort aufeinander, und Puff-Satin
-ist dicht. Ein Buchstabe mit scharfen Spitzen hat an seinen Spitzen mehr
-Garn als ein Buchstabe mit stumpfen Enden. Für viel Puff-Text benutzen
-Sie eine kräftige Schrift mit stumpfen Enden, und sehen Sie sich die
-Spitzen in **Ansicht > Zeigen > Dichtekarte** an.
+Puff-Satin ist dicht: Er schneidet den Schaum und deckt ihn. Wo sich die
+zwei Schenkel des **A** treffen, sind es bis zu etwa 8 Garnlagen. Darum
+zeigt die Designinfo „Faden baut sich auf“ bei einem Puff-Objekt erst
+über einer Grenze, die 3 Lagen höher ist als bei flachen Stichen. Ein
+Buchstabe mit scharfen Spitzen hat an seinen Spitzen mehr Garn als ein
+Buchstabe mit stumpfen Enden. Für viel Puff-Text benutzen Sie eine
+kräftige Schrift mit stumpfen Enden, und sehen Sie sich die Spitzen in
+**Ansicht > Zeigen > Dichtekarte** an.
 
 ## Die Kappenreihenfolge
 

@@ -31,6 +31,12 @@ pub const MAX_BUILD_UP: usize = 20;
 /// An object with more travel than this on top of sewn stitches gets a
 /// warning, mm (P22 Milestone 1, ADR 0167).
 pub const TRAVEL_ON_STITCHES_MM: f64 = 2.0;
+/// Free-standing lace and puff are dense by design (ADR 0178): a satin on
+/// the mesh of lace has about 5 layers of thread, and a puff column cuts
+/// and covers its foam with dense stitches and end stitches (3 to 4 layers
+/// at its end, about 8 where two meet). The limit of build-up is this many
+/// layers higher in a lace design and at a puff object.
+pub const DENSE_BY_DESIGN: f64 = 3.0;
 /// An object with a piece of travel on the fabric longer than this gets a
 /// warning, mm. A short travel stitch to the next part is normal: about
 /// 3 mm between the parts of small letters (the tutorial of Japanese
@@ -423,8 +429,15 @@ impl AppState {
         // Build-up of all objects together (the density map).
         if let Some(m) = &density {
             info.max_layers = Some(m.max_layers());
-            let limit = self.settings.density_limit;
-            for spot in m.hot_spots(limit).iter().take(MAX_BUILD_UP) {
+            let lace = emb_stitch::lace::is_lace(d, &self.fabrics);
+            let base = self.settings.density_limit;
+            for (spot, limit) in m
+                .hot_spots(base)
+                .iter()
+                .map(|s| (s, build_up_limit(d, lace, base, back.apply(s.peak))))
+                .filter(|(s, limit)| s.max_layers > *limit)
+                .take(MAX_BUILD_UP)
+            {
                 info.issues.push(Issue {
                     severity: Severity::Warning,
                     object: None,
@@ -761,6 +774,19 @@ pub fn warnings_list(ui: &mut egui::Ui, st: &mut AppState, info: &DesignInfo) {
     }
 }
 
+/// The limit of build-up at `at` (design coordinates): `base`, or
+/// [`DENSE_BY_DESIGN`] more in a lace design and at a puff object (a puff
+/// satin, or a part of lettering with puff).
+pub fn build_up_limit(d: &emb_model::Design, lace: bool, base: f64, at: Point) -> f64 {
+    let near = |k: &ObjectKind| k.control_bbox().is_some_and(|b| b.expand(1.0).contains(at));
+    let puff = d.objects().iter().any(|o| match &o.kind {
+        ObjectKind::Satin { params, .. } => params.puff && near(&o.kind),
+        ObjectKind::Lettering(l) => l.satin.puff && l.letters.iter().flat_map(|x| &x.parts).any(near),
+        _ => false,
+    });
+    if lace || puff { base + DENSE_BY_DESIGN } else { base }
+}
+
 #[cfg(test)]
 mod tests {
     use emb_geom::Path;
@@ -859,6 +885,55 @@ mod tests {
         // A click selects the loose part.
         st.show_issue(&issues[0]);
         assert!(st.selection.contains(id));
+    }
+
+    /// Lace and puff are dense by design (ADR 0178): their limit of
+    /// build-up is higher; other designs keep the limit of the settings.
+    #[test]
+    fn lace_and_puff_have_a_higher_limit_of_build_up() {
+        let builds_up = |st: &mut AppState| {
+            st.design_info()
+                .issues
+                .iter()
+                .filter(|i| i.text.starts_with("Thread builds up"))
+                .map(|i| i.text.clone())
+                .collect::<Vec<_>>()
+        };
+        let mut st = state();
+        let base = st.settings.density_limit;
+        // The ornament: three satins no longer start on one point over the
+        // mesh (12.7 layers before); the places where satins meet over the
+        // mesh are under the limit of lace.
+        st.new_from_lace(0);
+        let d = st.doc.design().clone();
+        assert_eq!(build_up_limit(&d, true, base, Point::ZERO), base + DENSE_BY_DESIGN);
+        let lace = builds_up(&mut st);
+        assert_eq!(lace, Vec::<String>::new());
+        // Puff letters with points (two puff columns meet at the top of
+        // "A", "V" and "M": up to 8 layers).
+        st.new_design();
+        let font = emb_letter::bundled::embroidery("Block Sans").unwrap();
+        st.doc.edit("Puff", |d| {
+            let t = d.add_thread("Red", Rgb(200, 30, 40));
+            let mut l = emb_model::Lettering::new("AVM", emb_letter::LetterSource::font_ref(&font), 30.0, Point::ZERO);
+            l.satin.puff = true;
+            l.satin.spacing_mm = emb_model::object::PUFF_SPACING_MM;
+            emb_letter::relayout(&mut l, &font);
+            d.add_object(t, ObjectKind::Lettering(Box::new(l)));
+        });
+        assert_eq!(builds_up(&mut st), Vec::<String>::new());
+        // The same letters with no puff: the limit of the settings at them.
+        let d = st.doc.design().clone();
+        let at = d.objects()[0].control_bbox().unwrap().center();
+        assert_eq!(build_up_limit(&d, false, base, at), base + DENSE_BY_DESIGN);
+        let id = d.objects()[0].id;
+        st.doc.edit("No puff", |d| {
+            if let Some(ObjectKind::Lettering(l)) = d.object_mut(id).map(|o| &mut o.kind) {
+                l.satin.puff = false;
+            }
+        });
+        let d = st.doc.design().clone();
+        assert_eq!(build_up_limit(&d, false, base, at), base);
     }
 
     #[test]

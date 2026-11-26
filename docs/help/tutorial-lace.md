@@ -45,10 +45,11 @@ film), and the same thread in the needle and the bobbin.
 1. Look at **Design Info**. A **Loose lace part** warning shows a part
    that touches no other part. Click the warning to select the part, then
    move it, or make it larger, so it touches.
-2. Design Info also shows **Thread builds up** where the spokes and the
-   rings cross the mesh and each other. Click **View > Show > Density
-   Map** to see these places. Many layers make a hard knot that can break
-   the needle: sew a test before you sew many ornaments.
+2. Click **View > Show > Density Map**: the thread is thickest where the
+   spokes and the rings meet over the mesh. Lace is all thread, so Design
+   Info shows **Thread builds up** only over a limit 3 layers higher than
+   for fabric. Many layers make a hard knot that can break the needle:
+   sew a test before you sew many ornaments.
 3. Click **View > Stitch Cursor > Stitch Player** and play the sew-out:
    the mesh sews first, then the spokes, the rings and the loop.
 

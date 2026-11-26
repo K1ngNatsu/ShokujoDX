@@ -59,7 +59,7 @@ meander-fill: travel 0 mm, shows on stitches 0.0 mm, on the fabric 0.0 mm
 circular-fill: travel 511 mm, shows on stitches 0.2 mm, on the fabric 0.0 mm
 guided-fill: travel 102 mm, shows on stitches 0.0 mm, on the fabric 0.0 mm
 ripple-stitch: travel 0 mm, shows on stitches 0.0 mm, on the fabric 0.0 mm
-lace-ornament: travel 55 mm, shows on stitches 0.0 mm, on the fabric 0.0 mm
+lace-ornament: travel 52 mm, shows on stitches 0.0 mm, on the fabric 0.0 mm
 lace-edge: travel 607 mm, shows on stitches 11.6 mm, on the fabric 20.9 mm
 quilting: travel 185 mm, shows on stitches 0.0 mm, on the fabric 0.0 mm
 quilt-block: travel 0 mm, shows on stitches 0.0 mm, on the fabric 0.0 mm
@@ -86,6 +86,6 @@ view-dark: travel 55 mm, shows on stitches 0.0 mm, on the fabric 0.0 mm
 view-thread-kinds: travel 0 mm, shows on stitches 0.0 mm, on the fabric 0.0 mm
 view-rhinestones: travel 0 mm, shows on stitches 0.0 mm, on the fabric 0.0 mm
 view-cutwork: travel 0 mm, shows on stitches 0.0 mm, on the fabric 0.0 mm
-view-lace: travel 55 mm, shows on stitches 0.0 mm, on the fabric 0.0 mm
+view-lace: travel 52 mm, shows on stitches 0.0 mm, on the fabric 0.0 mm
 view-cross-stitch: travel 0 mm, shows on stitches 0.0 mm, on the fabric 0.0 mm
 view-quilting: travel 18 mm, shows on stitches 0.0 mm, on the fabric 0.0 mm

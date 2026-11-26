@@ -43,11 +43,12 @@ dünne Folie) und dasselbe Garn in der Nadel und auf der Spule.
    Spitzenteil** zeigt ein Teil, das kein anderes Teil berührt. Klicken
    Sie auf die Warnung, um das Teil auszuwählen, und verschieben Sie es
    dann oder machen Sie es größer, damit es berührt.
-2. Die Designinfo zeigt auch **Faden baut sich auf**, wo die Speichen und
-   die Ringe das Netz und einander kreuzen. Klicken Sie auf **Ansicht >
-   Zeigen > Dichtekarte**, um diese Stellen zu sehen. Viele Lagen machen
-   einen harten Knoten, der die Nadel brechen kann: Sticken Sie eine
-   Probe, bevor Sie viele Ornamente sticken.
+2. Klicken Sie auf **Ansicht > Zeigen > Dichtekarte**: Das Garn ist am
+   dicksten, wo die Speichen und die Ringe sich über dem Netz treffen.
+   Spitze ist nur Garn, darum zeigt die Designinfo **Faden baut sich auf**
+   erst über einer Grenze, die 3 Lagen höher ist als bei Stoff. Viele
+   Lagen machen einen harten Knoten, der die Nadel brechen kann: Sticken
+   Sie eine Probe, bevor Sie viele Ornamente sticken.
 3. Klicken Sie auf **Ansicht > Stichcursor > Stich-Player**, und spielen
    Sie das Sticken ab: Das Netz wird zuerst gestickt, dann die Speichen,
    die Ringe und die Schlaufe.

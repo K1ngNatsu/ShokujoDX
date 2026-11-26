@@ -50,11 +50,13 @@ For a satin column, the box **Puff (3D foam)** in Object Properties does
 the same. Use columns 3 mm wide or more, and foam of a color like the
 thread.
 
-Design Info now shows "Thread builds up" at the point of the **A**: the
-two legs of the letter lie on each other there, and puff satin is dense.
-A letter with sharp points has more thread at its points than a letter
-with blunt ends. For much puff text, use a heavy font with blunt ends,
-and look at the points in **View > Show > Density Map**.
+Puff satin is dense: it cuts the foam and covers it. Where the two legs
+of the **A** meet, the thread is up to about 8 layers, so Design Info
+shows "Thread builds up" at a puff object only over a limit 3 layers
+higher than for flat stitches. A letter with sharp points has more
+thread at its points than a letter with blunt ends. For much puff text,
+use a heavy font with blunt ends, and look at the points in **View >
+Show > Density Map**.
 
 ## The cap order
 

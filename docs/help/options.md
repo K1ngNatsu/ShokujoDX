@@ -63,7 +63,9 @@ the color of the theme shows.
 ## Density and thread
 
 - **Density limit**: the number of layers of thread that the density map
-  and Design info allow (5 at the start).
+  and Design info allow (5 at the start). Design info allows 3 layers
+  more in free-standing lace and at puff objects: they are dense by
+  design.
 - **Top thread spool** and **Bobbin**: the length and the **price** of
   one, and the **Currency** (the text before the cost, for example $ or
   €). Design info and the worksheet then show the thread cost. A price of
