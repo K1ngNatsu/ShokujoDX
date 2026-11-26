@@ -9,8 +9,8 @@
 //! tab and comes to the front. This uses a folder: no network and no
 //! sockets (ADR 0109). `--new-window` starts a second program.
 
-use std::path::{Path, PathBuf};
 use crate::clock::{Duration, Instant};
+use std::path::{Path, PathBuf};
 
 use crate::app::AppState;
 

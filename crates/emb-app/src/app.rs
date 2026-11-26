@@ -2056,7 +2056,13 @@ impl EmbApp {
             fronts.extend(front_tab(&self.dock, Tab::Canvas));
             // The front tab of each group; in the one group under the canvas,
             // the front tab of the first group stays in front.
-            fronts.extend(SIDE_GROUPS.concat().into_iter().rev().filter_map(|t| front_tab(full, t)));
+            fronts.extend(
+                SIDE_GROUPS
+                    .concat()
+                    .into_iter()
+                    .rev()
+                    .filter_map(|t| front_tab(full, t)),
+            );
             match &mut self.saved_dock {
                 Some(saved) => *saved = default_dock_for(below),
                 None => self.dock = default_dock_for(below),
@@ -2272,8 +2278,15 @@ mod dock_tests {
         let ctx = crate::test_util::ready_context();
         frame_of(&ctx, &mut app, egui::vec2(390.0, 844.0));
         assert!(app.state().panels_below && side_below(&app.dock));
-        let side: Vec<_> = SIDE_GROUPS.concat().iter().filter_map(|t| app.dock.find_tab(t)).collect();
-        assert!(side.len() == 8 && side.iter().all(|p| p.node == side[0].node), "one group under the canvas");
+        let side: Vec<_> = SIDE_GROUPS
+            .concat()
+            .iter()
+            .filter_map(|t| app.dock.find_tab(t))
+            .collect();
+        assert!(
+            side.len() == 8 && side.iter().all(|p| p.node == side[0].node),
+            "one group under the canvas"
+        );
         // The Threads panel in front; the phone turns: the panels go right,
         // and Threads stays in front.
         let p = app.dock.find_tab(&Tab::Threads).unwrap();

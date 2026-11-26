@@ -7,9 +7,9 @@
 //! saves (`file_known`). Each second it compares the time on the disk of
 //! the file of the tab in front with it (`poll_file_changes`).
 
+use crate::clock::{Duration, Instant};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use crate::clock::{Duration, Instant};
 use std::time::SystemTime;
 
 use eframe::egui;
