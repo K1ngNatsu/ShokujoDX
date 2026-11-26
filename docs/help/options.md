@@ -28,8 +28,8 @@ sets all options back.
   **Major line every**.
 - **Rulers and guides**: **Show rulers** and **Snap to Guides**; the
   **Snap distance**.
-- **Panels**: **Reset the Panels** puts all the panels back in one group
-  at the right and opens the closed ones.
+- **Panels**: **Reset the Panels** puts all the panels back in their two
+  groups at the right and opens the closed ones.
 - **Arrow key nudge** and **Shift + arrow nudge**: how far the arrow keys
   move the selection.
 

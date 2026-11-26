@@ -149,8 +149,10 @@ CAD-Programmen:
 - **Ansicht > Bereiche** öffnet und schließt jeden Bereich:
   Objekteigenschaften, Stile, Designinfo, Clipart, Reihenfolge, Garne,
   Stichliste, Exporte und Bibliothek. **Bereiche zurücksetzen** (dort und
-  in den Optionen) setzt alle Bereiche wieder in eine Gruppe rechts und
-  öffnet die geschlossenen.
+  in den Optionen) setzt alle Bereiche wieder in ihre zwei Gruppen rechts
+  und öffnet die geschlossenen. Nur der offene Tab einer Gruppe hat sein
+  ×: Um einen Bereich zu schließen, klicken Sie auf seinen Tab und dann
+  auf sein ×.
 - Ziehen Sie den Tab eines Bereichs, um ihn an eine andere Stelle oder
   neben einen anderen Bereich zu setzen.
 - **Ansicht > Dunkler Modus** wechselt zwischen hellen und dunklen

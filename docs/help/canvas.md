@@ -129,7 +129,9 @@ Monogram and Fabric) dock at a corner of the canvas, as in CAD programs:
 - **View > Panels** opens and closes each panel: Object Properties,
   Styles, Design info, Clipart, Sequence, Threads, Stitch list, Exports
   and Library. **Reset the Panels** (there and in the Options) puts all
-  the panels back in one group at the right and opens the closed ones.
+  the panels back in their two groups at the right and opens the closed
+  ones. Only the open tab of a group has its ×: to close a panel, click
+  its tab, then its ×.
 - Drag the tab of a panel to put it in another place, or next to another
   panel.
 - **View > Dark Mode** changes between light and dark panels.

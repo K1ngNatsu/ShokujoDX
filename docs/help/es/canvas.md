@@ -145,8 +145,10 @@ lienzo, como en los programas de CAD:
 - **Ver > Paneles** abre y cierra cada panel: Propiedades del objeto,
   Estilos, Información del diseño, Cliparts, Secuencia, Hilos, Lista de
   puntadas, Exportaciones y Biblioteca. **Restablecer los paneles** (allí
-  y en las Opciones) pone todos los paneles de nuevo en un grupo a la
-  derecha y abre los cerrados.
+  y en las Opciones) pone todos los paneles de nuevo en sus dos grupos a
+  la derecha y abre los cerrados. Solo la pestaña abierta de un grupo
+  tiene su ×: para cerrar un panel, haga clic en su pestaña y después en
+  su ×.
 - Arrastre la pestaña de un panel para ponerlo en otro lugar, o junto a
   otro panel.
 - **Ver > Modo oscuro** cambia entre paneles claros y oscuros.

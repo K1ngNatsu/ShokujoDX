@@ -30,7 +30,7 @@ Optionen. Änderungen gelten sofort und bleiben für den nächsten Start.
 - **Lineale und Hilfslinien**: **Lineale zeigen** und **An Hilfslinien
   einrasten**; der **Fangabstand**.
 - **Bereiche**: **Bereiche zurücksetzen** setzt alle Bereiche wieder in
-  eine Gruppe rechts und öffnet die geschlossenen.
+  ihre zwei Gruppen rechts und öffnet die geschlossenen.
 - **Verschieben mit Pfeiltasten** und **Verschieben mit Umschalt +
   Pfeil**: wie weit die Pfeiltasten die Auswahl verschieben.
 

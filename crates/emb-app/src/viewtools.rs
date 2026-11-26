@@ -507,13 +507,13 @@ pub const PANELS: [(Tab, &str); 9] = [
 /// The panels of simple mode.
 pub const SIMPLE_PANELS: [Tab; 5] = [Tab::Properties, Tab::Sequence, Tab::Threads, Tab::Library, Tab::Exports];
 
-/// The panels that go together when a closed panel opens again.
+/// The panels that go together when a closed panel opens again: its group
+/// of side panels (`app::SIDE_GROUPS`), or the canvas and the Library.
 pub fn panel_group(tab: Tab) -> &'static [Tab] {
-    if crate::app::SIDE_PANELS.contains(&tab) {
-        &crate::app::SIDE_PANELS
-    } else {
-        &[Tab::Canvas, Tab::Library]
-    }
+    crate::app::SIDE_GROUPS
+        .into_iter()
+        .find(|g| g.contains(&tab))
+        .unwrap_or(&[Tab::Canvas, Tab::Library])
 }
 
 /// The most favorite styles.
@@ -582,15 +582,20 @@ pub fn sync_panels(dock: &mut egui_dock::DockState<Tab>, st: &mut AppState) {
                 dock.remove_tab(p);
             }
             (true, None) => {
+                // With its group; if all of it is closed, with the other
+                // side panels; else on its own right of the canvas.
+                let side = crate::app::SIDE_GROUPS.concat();
+                let others: &[Tab] = if side.contains(&tab) { &side } else { &[] };
                 let near = panel_group(tab)
                     .iter()
+                    .chain(others)
                     .filter(|t| **t != tab)
                     .find_map(|t| dock.find_tab(t));
                 match near {
                     Some(p) => dock[p.surface][p.node].append_tab(tab),
                     None => {
                         if let Some(p) = dock.find_tab(&Tab::Canvas) {
-                            dock[p.surface].split_right(p.node, 0.74, vec![tab]);
+                            dock[p.surface].split_right(p.node, crate::app::CANVAS_PART, vec![tab]);
                         }
                     }
                 }
@@ -969,10 +974,11 @@ mod tests {
         let mut h = Harness::empty();
         h.st.save_settings = false;
         let mut dock = crate::app::default_dock();
-        // The side panels are one group at the start, and they are the
-        // panels of View > Panels with no Library (it is next to the design).
-        assert!(crate::test_util::one_side_group(&dock));
-        let mut side = crate::app::SIDE_PANELS.to_vec();
+        // The side panels are in their two groups at the start, and they
+        // are the panels of View > Panels with no Library (it is next to
+        // the design).
+        assert!(crate::test_util::side_groups(&dock));
+        let mut side = crate::app::SIDE_GROUPS.concat();
         side.push(Tab::Library);
         assert!(PANELS.iter().all(|(t, _)| side.contains(t)) && side.len() == PANELS.len());
         h.st.set_panel_shown(Tab::Threads, false);
@@ -982,13 +988,14 @@ mod tests {
         h.st.set_panel_shown(Tab::Threads, true);
         assert_eq!(h.st.focus_tab, Some(Tab::Threads));
         sync_panels(&mut dock, &mut h.st);
-        // Back with its group, next to the Sequence panel.
+        // Back with its group, next to the Object Properties panel.
         let (t, s) = (
             dock.find_tab(&Tab::Threads).unwrap(),
-            dock.find_tab(&Tab::Sequence).unwrap(),
+            dock.find_tab(&Tab::Properties).unwrap(),
         );
         assert_eq!((t.surface, t.node), (s.surface, s.node));
-        // All of the group closed: a panel opens on its own right of the canvas.
+        // All of the group closed: a panel of it opens with the other side
+        // panels.
         for tab in panel_group(Tab::Properties) {
             h.st.set_panel_shown(*tab, false);
         }
@@ -997,7 +1004,11 @@ mod tests {
         // A command that shows a closed panel opens it.
         h.st.focus_styles = true;
         sync_panels(&mut dock, &mut h.st);
-        assert!(dock.find_tab(&Tab::Styles).is_some());
+        let (t, s) = (
+            dock.find_tab(&Tab::Styles).unwrap(),
+            dock.find_tab(&Tab::Sequence).unwrap(),
+        );
+        assert_eq!((t.surface, t.node), (s.surface, s.node));
         assert!(h.st.panel_shown(Tab::Styles));
         h.st.set_panel_shown(Tab::Threads, true);
         sync_panels(&mut dock, &mut h.st);

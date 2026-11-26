@@ -29,7 +29,7 @@ Los cambios se aplican enseguida y se conservan para el siguiente inicio.
 - **Reglas y guías**: **Mostrar reglas** y **Ajustar a las guías**; la
   **Distancia de ajuste**.
 - **Paneles**: **Restablecer los paneles** pone todos los paneles de
-  nuevo en un grupo a la derecha y abre los cerrados.
+  nuevo en sus dos grupos a la derecha y abre los cerrados.
 - **Desplazamiento con flechas** y **Desplazamiento con Mayús + flecha**:
   cuánto mueven la selección las teclas de flecha.
 

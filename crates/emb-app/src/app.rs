@@ -219,6 +219,9 @@ pub struct AppState {
     pub reset_panels: bool,
     /// A panel to show in front (View > Panels).
     pub focus_tab: Option<Tab>,
+    /// The tab that shows in each group of the dock (set before the dock
+    /// draws; only these panels have a × button).
+    pub open_tabs: Vec<Tab>,
     /// The kind of function that Shift+Page Up and Page Down go to.
     pub function_travel: crate::viewtools::FunctionTravel,
     /// The rhinestones show on the canvas.
@@ -493,25 +496,30 @@ fn load_catalogs() -> (HoopCatalog, MachineCatalog, emb_model::FabricCatalog, St
     (hoops, machines, fabrics, notes.join(" | "))
 }
 
-/// The side panels in the order of their tabs in the side group.
-pub const SIDE_PANELS: [Tab; 8] = [
-    Tab::Properties,
-    Tab::Sequence,
-    Tab::Threads,
-    Tab::Styles,
-    Tab::StitchList,
-    Tab::DesignInfo,
-    Tab::Clipart,
-    Tab::Exports,
+/// The two groups of side panels, one over the other, in the order of
+/// their tabs (the owner's choice of 2026-11-26; one group of eight tabs
+/// did not fit its tab bar). The tabs are in the groups so that the
+/// titles of each group fit the side at 1366 points in each language
+/// (`the_side_tabs_fit_a_small_screen`).
+pub const SIDE_GROUPS: [&[Tab]; 2] = [
+    &[Tab::Properties, Tab::Styles, Tab::Threads, Tab::StitchList],
+    &[Tab::Sequence, Tab::DesignInfo, Tab::Clipart, Tab::Exports],
 ];
 
+/// The part of the width for the canvas and the Library at the start; the
+/// side panels have the rest.
+pub const CANVAS_PART: f32 = 0.70;
+
+/// The part of the height of the side for the first group at the start.
+const FIRST_GROUP_PART: f32 = 0.6;
+
 /// The dock layout at the start: the canvas and the Library on the left,
-/// one group with all the side panels on the right (the owner's choice of
-/// 2026-11-22; before, two groups one over the other).
+/// the two groups of side panels (`SIDE_GROUPS`) on the right.
 pub fn default_dock() -> DockState<Tab> {
     let mut dock = DockState::new(vec![Tab::Canvas, Tab::Library]);
     let surface = dock.main_surface_mut();
-    surface.split_right(NodeIndex::root(), 0.74, SIDE_PANELS.to_vec());
+    let [_, side] = surface.split_right(NodeIndex::root(), CANVAS_PART, SIDE_GROUPS[0].to_vec());
+    surface.split_below(side, FIRST_GROUP_PART, SIDE_GROUPS[1].to_vec());
     // The Library tab is next to the canvas; the canvas shows first.
     if let Some(p) = dock.find_tab(&Tab::Canvas) {
         let _ = dock.set_active_tab(p);
@@ -792,6 +800,7 @@ impl AppState {
             reset_panels: false,
             focus_clipart: false,
             focus_tab: None,
+            open_tabs: Vec::new(),
             function_travel: Default::default(),
             show_stones: true,
             fabric_tex: None,
@@ -1737,8 +1746,11 @@ impl TabViewer for AppState {
     }
 
     /// The panels close with their × button; View > Panels opens them again.
+    /// A side panel has its × only when it is the open tab of its group, so
+    /// that the titles of a group fit its tab bar.
     fn is_closeable(&self, tab: &Tab) -> bool {
-        matches!(tab, Tab::Start | Tab::View(_) | Tab::Other) || crate::viewtools::PANELS.iter().any(|(t, _)| t == tab)
+        matches!(tab, Tab::Start | Tab::View(_) | Tab::Other)
+            || (crate::viewtools::PANELS.iter().any(|(t, _)| t == tab) && self.open_tabs.contains(tab))
     }
 
     fn on_close(&mut self, tab: &mut Tab) -> egui_dock::widgets::tab_viewer::OnCloseResponse {
@@ -1967,6 +1979,11 @@ impl EmbApp {
             _ => {}
         }
         if !kiosk {
+            st.open_tabs = self
+                .dock
+                .iter_leaves()
+                .filter_map(|(_, leaf)| leaf.tabs.get(leaf.active.0).copied())
+                .collect();
             egui::CentralPanel::no_frame().show(ui, |ui| {
                 DockArea::new(&mut self.dock)
                     .style(Style::from_egui(ui.style().as_ref()))
@@ -2031,7 +2048,7 @@ mod dock_tests {
     }
 
     #[test]
-    fn reset_the_panels_puts_all_side_panels_back_in_one_group() {
+    fn reset_the_panels_puts_the_side_panels_back_in_their_groups() {
         let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
         st.save_settings = false;
         st.show_start = false;
@@ -2039,7 +2056,7 @@ mod dock_tests {
         let mut app = EmbApp::for_test(st);
         let ctx = crate::test_util::ready_context();
         frame(&ctx, &mut app);
-        assert!(crate::test_util::one_side_group(&app.dock), "one group at the start");
+        assert!(crate::test_util::side_groups(&app.dock), "the two groups at the start");
         // The user closes a panel and moves another one under the group.
         app.state().set_panel_shown(Tab::Styles, false);
         let p = app.dock.find_tab(&Tab::Threads).unwrap();
@@ -2047,13 +2064,46 @@ mod dock_tests {
         let q = app.dock.find_tab(&Tab::Properties).unwrap();
         app.dock[q.surface].split_below(q.node, 0.5, vec![Tab::Threads]);
         frame(&ctx, &mut app);
-        assert!(!crate::test_util::one_side_group(&app.dock));
+        assert!(!crate::test_util::side_groups(&app.dock));
         app.state().reset_panels = true;
         frame(&ctx, &mut app);
         assert!(
-            crate::test_util::one_side_group(&app.dock),
-            "all side panels back in one group"
+            crate::test_util::side_groups(&app.dock),
+            "the side panels back in their groups"
         );
         assert!(app.state().panel_shown(Tab::Styles), "the closed panel opens");
+        // Only the open tab of each group can close.
+        let open = app.state().open_tabs.clone();
+        assert_eq!(open.len(), 3, "{open:?}");
+        assert!(open.contains(&Tab::Properties) && open.contains(&Tab::Sequence));
+        assert!(app.state().is_closeable(&Tab::Properties) && !app.state().is_closeable(&Tab::Threads));
+    }
+
+    /// The titles of each group of side panels fit its tab bar on a screen
+    /// of 1366 points in each language: a tab is its title, 8 points at
+    /// each side, and the × of the open tab (the measure of `egui_dock`).
+    #[test]
+    fn the_side_tabs_fit_a_small_screen() {
+        let ctx = crate::test_util::ready_context();
+        crate::icons::install(&ctx);
+        ctx.run_ui(egui::RawInput::default(), |_| {}).textures_delta.clear();
+        let font = egui::TextStyle::Button.resolve(&ctx.global_style());
+        let side = 1366.0 * (1.0 - CANVAS_PART) - 4.0;
+        let mut st = AppState::new(HoopCatalog::builtin(), MachineCatalog::builtin(), String::new());
+        for lang in ["en", "de", "es", "ja"] {
+            crate::i18n::set_language(lang);
+            for group in SIDE_GROUPS {
+                let titles: f32 = group
+                    .iter()
+                    .map(|t| {
+                        let text = st.title(&mut t.clone()).text().to_string();
+                        ctx.fonts_mut(|f| f.layout_no_wrap(text, font.clone(), egui::Color32::WHITE).size().x)
+                    })
+                    .sum();
+                let width = titles + 16.0 * group.len() as f32 + 24.0;
+                assert!(width <= side, "{lang} {group:?}: {width} of {side}");
+            }
+        }
+        crate::i18n::set_language("en");
     }
 }

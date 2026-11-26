@@ -1741,7 +1741,7 @@ impl Cmd {
             Cmd::ResetPanels => (
                 g(ph::SIDEBAR),
                 tr("Reset the Panels"),
-                tr("Put all the panels back in their places, in one group at the right, and open the closed panels."),
+                tr("Put all the panels back in their places, in two groups at the right, and open the closed panels."),
             ),
             Cmd::RotateDesign => (
                 g(ph::ARROW_ARC_RIGHT),
