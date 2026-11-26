@@ -218,16 +218,20 @@ pub fn layout_with_box(l: &Lettering, src: &(impl LetterSource + ?Sized)) -> (Ve
             });
         }
     }
-    auto_stitches(l, src, &mut letters);
     let warp = !l.envelope.is_none() && l.baseline.is_straight();
-    let Some((x0, x1)) = span.filter(|_| warp) else {
-        return (letters, None);
-    };
-    let b = BBox::new(Point::new(x0, -l.height_mm), Point::new(x1, bottom));
-    for q in letters.iter_mut().flat_map(|x| x.parts.iter_mut()) {
-        l.envelope.warp_kind(&b, q);
+    let b = span
+        .filter(|_| warp)
+        .map(|(x0, x1)| BBox::new(Point::new(x0, -l.height_mm), Point::new(x1, bottom)));
+    if let Some(b) = &b {
+        for q in letters.iter_mut().flat_map(|x| x.parts.iter_mut()) {
+            l.envelope.warp_kind(b, q);
+        }
     }
-    (letters, Some(b))
+    // After the envelope: the columns as they sew (a column across the
+    // stretch is wider; the audit of 2026-11-26, as ADR 0181 for the fonts
+    // with columns and fills).
+    auto_stitches(l, src, &mut letters);
+    (letters, b)
 }
 
 /// The stitch of the columns of the letters with the stitch type Auto, one
@@ -942,6 +946,44 @@ mod tests {
             &l.letters[0].parts[0],
             ObjectKind::Satin { params, .. } if params.pattern.is_satin()
         ));
+    }
+
+    #[test]
+    fn auto_chooses_the_columns_after_the_envelope() {
+        // The bar of a hyphen sews across the stretch of an oval envelope:
+        // at some sizes it is a satin with no envelope and a tatami column
+        // in the envelope (before the audit of 2026-11-26 the choice came
+        // before the envelope, so the two were the same).
+        let f = bundled::font("Lato", "Bold").unwrap();
+        let tatami = |envelope: EnvelopeShape, h: f64| {
+            let mut l = lettering("-");
+            l.height_mm = h;
+            l.envelope = Envelope {
+                shape: envelope,
+                amount: 0.45,
+            };
+            relayout(&mut l, &f);
+            let columns: Vec<_> = l.letters[0]
+                .parts
+                .iter()
+                .filter_map(|p| match p {
+                    ObjectKind::Satin { params, .. } => Some(!params.pattern.is_satin()),
+                    _ => None,
+                })
+                .collect();
+            assert!(!columns.is_empty(), "{h}");
+            columns.iter().all(|t| *t)
+        };
+        let sizes: Vec<f64> = (12..=30).map(|i| f64::from(i) * 5.0).collect();
+        let changed: Vec<f64> = sizes
+            .iter()
+            .copied()
+            .filter(|h| tatami(EnvelopeShape::Oval, *h) && !tatami(EnvelopeShape::None, *h))
+            .collect();
+        assert!(!changed.is_empty(), "no size where the envelope changes the column");
+        for h in sizes {
+            assert!(!tatami(EnvelopeShape::None, h) || tatami(EnvelopeShape::Oval, h), "{h}");
+        }
     }
 }
 

@@ -373,7 +373,8 @@ next release.
   satin from the regions, a changed diameter that the stitches follow)
   and "A script that does the work" (Check Before Output, Same Density
   for All Satins, one undo step, a script of your own). 31 tutorials run
-  in CI in four languages; the pictures are 154 files, 16 MB. The steps
+  in CI in four languages; the pictures are 154 files, 16 MB (9.2 MB
+  since 2026-11-26, the same pixels, ADR 0162). The steps
   found faults of the program, now fixed: the "Add from a chart" part of
   the Thread Stock window went out of sight when the stock had threads
   (it is now first), and the windows Thread Stock, Quote and Order

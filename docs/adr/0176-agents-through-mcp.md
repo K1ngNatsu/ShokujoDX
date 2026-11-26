@@ -64,7 +64,9 @@ use the program, with no AI in the program.
   `design_info` says if the design fits the hoop, and
   `check_machine_file` gives the size, stitches, colors, trims and
   threads of a file (the colors that the file keeps), and if it fits a
-  hoop.
+  hoop with the middle of its stitches at the middle of the hoop, as the
+  machine puts it (the origin of a file can be its first stitch or a
+  corner; the audit of 2026-11-26).
 - **Checked arguments.** The schema of each tool has
   `additionalProperties: false`. A tool refuses an argument that it does
   not take and names the ones that it takes, an argument that it needs
@@ -103,7 +105,12 @@ use the program, with no AI in the program.
   (`SHOKUJODX_PROGRAM` names another program, for the tests). That start
   gives the file to the program that runs (the inbox of ADR 0175; a file
   that is open already shows its tab) or opens a window. The output of
-  the program does not go to the output of the server.
+  the program does not go to the output of the server. On Windows the
+  program starts through PowerShell `Start-Process`, with the paths in
+  environment variables: a process that Rust starts gets each handle of
+  `emb-cli` that a child can take, also the pipes of the client, so the
+  client saw no end of the output of the server while the program was
+  open (measured: 15 s for a program of 15 s; through the shell 0 s).
 - **A file that another program saves.** The program knows the time of
   each file that it opened or saved (`file_watch.rs`, `file_known`). Each
   second it compares the file of the tab in front (`poll_file_changes`).

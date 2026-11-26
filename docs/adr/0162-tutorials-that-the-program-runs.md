@@ -72,7 +72,11 @@ languages by hand after each change of the program.
 7. **The size of the pictures.** The pictures of Milestone 1 are 15
    files, 0.8 MB; with Milestone 2, 54 files, 3.9 MB. Each milestone
    measures them; if all pictures go over 10 MB, they go to a help
-   package (open question 1 of the draft).
+   package (open question 1 of the draft). After Milestone 5 they were
+   154 files, 16.1 MB. The audit of 2026-11-26 wrote them again with no
+   change of a pixel (no alpha channel, as no pixel is see-through, and
+   the best compression of the PNG encoder; `pictures::write_png`, which
+   also writes new pictures): 9.2 MB.
 
 The thread colors of the Threads strip now have screen reader names (the
 names of the threads): the runner clicks them by name, and a screen
