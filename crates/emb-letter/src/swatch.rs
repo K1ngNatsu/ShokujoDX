@@ -9,7 +9,7 @@
 
 use emb_geom::path::PathCmd;
 use emb_geom::{BBox, Path, Point, Polyline, Transform, text};
-use emb_model::{Design, LetterStitch, Lettering, ObjectId, ObjectKind, SatinGeometry, Underlay};
+use emb_model::{Design, Lettering, ObjectId, ObjectKind, SatinGeometry, Underlay};
 
 use crate::layout::relayout;
 use crate::source::LetterSource;
@@ -370,10 +370,7 @@ pub fn swatches(
         .ok_or_else(|| text::tr("The objects have no size.").to_string())?;
     let values = spec.values();
     // The labels first: their sizes make the cells.
-    let label_height = label.map_or(crate::sheet::LABEL_MM, |src| {
-        src.size_range(LetterStitch::Satin)
-            .map_or(crate::sheet::LABEL_MM, |(min, _)| min.max(crate::sheet::LABEL_MM))
-    });
+    let label_height = label.map_or(crate::sheet::LABEL_MM, crate::sheet::label_height);
     let labels: Vec<Option<Lettering>> = values
         .iter()
         .map(|&v| {

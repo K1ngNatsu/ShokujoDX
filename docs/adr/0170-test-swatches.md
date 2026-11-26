@@ -31,7 +31,9 @@ kits of the project are made by Python tools. The idea is from zigzag
   The copies are in a grid round the center of the hoop, with as many
   columns as fit the field of the hoop. Under each copy is its value, as
   lettering in the bundled font for small text (`sheet::LABEL_FONT`,
-  Atkinson Hyperlegible, 5 mm or its smallest size). The copies do not
+  Soft Round, at `sheet::label_height`: 5 mm or its smallest size, 6.5
+  mm; it was Atkinson Hyperlegible until the agent test of P22 Milestone
+  9, where the bold digits closed their holes at 5 mm). The copies do not
   overlap, so their colors sew together
   (`Design::optimize_color_changes`).
 - **The window** Design > Output > Test Swatches… (`test_swatches.rs`)

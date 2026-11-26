@@ -1763,6 +1763,25 @@ fn shape_fits_hoop(d: &Design, id: ObjectId) -> Option<bool> {
     )
 }
 
+/// Puts `patch` in `into`: an object goes into the object that is there
+/// (a group of settings keeps the settings that the patch does not name),
+/// except when the patch changes its kind (`mode` or `type`); other values
+/// take the place of the value that is there.
+fn merge_value(into: &mut Value, patch: Value) {
+    match (into, patch) {
+        (Value::Object(old), Value::Object(new))
+            if ["mode", "type"]
+                .iter()
+                .all(|tag| new.get(*tag).is_none_or(|t| old.get(*tag) == Some(t))) =>
+        {
+            for (k, v) in new {
+                merge_value(old.entry(k).or_insert(Value::Null), v);
+            }
+        }
+        (slot, v) => *slot = v,
+    }
+}
+
 /// The box of the shapes of `ids` (the curves, not their control points).
 fn boxes(d: &Design, ids: &[ObjectId]) -> Option<BBox> {
     ids.iter()
@@ -1934,7 +1953,7 @@ fn with_settings(kind: &ObjectKind, patch: &Map<String, Value>) -> Result<Object
         ));
     }
     for (k, v) in patch {
-        all.insert(k, v);
+        merge_value(all.entry(k).or_insert(Value::Null), v);
     }
     let mut new = kind.clone();
     put_settings(&mut new, Value::Object(all)).map_err(|e| format!("these settings do not fit: {e}"))?;
@@ -2095,5 +2114,23 @@ mod tests {
         let b = circle.control_bbox().unwrap();
         assert!((b.width() - 60.0).abs() < 0.01 && b.center().x.abs() < 0.01, "{b:?}");
         assert!(svg_outline("M 0 0 L 10 0\" onload=\"x").is_err());
+    }
+
+    /// A group of settings keeps the settings that a change does not name;
+    /// a change of its kind takes its place.
+    #[test]
+    fn settings_go_into_their_groups() {
+        let mut v = json!({"satin": {"spacing_mm": 0.4, "split_mm": 7.0, "underlay": {"mode": "auto"}}});
+        merge_value(
+            &mut v,
+            json!({"satin": {"spacing_mm": 0.5, "underlay": {"mode": "none"}}}),
+        );
+        assert_eq!(
+            v,
+            json!({"satin": {"spacing_mm": 0.5, "split_mm": 7.0, "underlay": {"mode": "none"}}})
+        );
+        let mut v = json!({"underlay": {"mode": "custom", "layers": [{"type": "center_walk"}]}});
+        merge_value(&mut v, json!({"underlay": {"mode": "light"}}));
+        assert_eq!(v, json!({"underlay": {"mode": "light"}}));
     }
 }

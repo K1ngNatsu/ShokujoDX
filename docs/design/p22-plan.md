@@ -231,7 +231,8 @@ compensation, width, angle, underlay) with `value_in` and `set` for
 fills, satin columns, lines (and lines with a border) and lettering,
 `widened` for the width of a satin column, and `swatches`, which makes a
 new design with the copies in a grid that fits the field of the hoop and
-the labels in Atkinson Hyperlegible. The window is Design > Output >
+the labels in Soft Round (Atkinson Hyperlegible until the agent test of
+Milestone 9). The window is Design > Output >
 Test Swatches… (`test_swatches.rs`): the settings of the selection,
 From, To, Copies, the labels and the size of the grid; Make Swatches
 opens a new design tab (more hoopings when the grid is larger than the
@@ -610,7 +611,11 @@ changes (the name in a 5x7 hoop on terry, made smaller in its place, a PES
 file); from its friction: the font of lettering by its name in
 `set_settings`, if the shape of each object fits the hoop, a plain
 background with no weave, `would_change` for a dry run of Quicker to Sew,
-and the threads of a machine file in `check_machine_file`. Open: the labels of test swatches at 5 mm sew heavy, and the
+and the threads of a machine file in `check_machine_file`. After it: a
+group of settings (for example `satin`) in `set_settings` keeps the
+settings that the change does not name, and the labels of test swatches
+and font test sheets are Soft Round at `sheet::label_height` (6.5 mm): the
+digits of Atkinson Hyperlegible Bold closed their holes at 5 mm. Open: the
 travel measure does not count a short travel stitch between two letters on
 a fill (under the limit of a warning).
 

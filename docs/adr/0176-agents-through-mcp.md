@@ -71,6 +71,8 @@ use the program, with no AI in the program.
 - **Settings.** `set_settings` changes the settings of objects by the
   names that `list_objects` shows (the saved form of the settings; the
   font of lettering also by its name, as `add_lettering` takes it). A
+  group of settings in a change (for example `satin`) goes into the group
+  that is there; a change of its kind (`mode`) takes its place. A
   name that is not a setting is refused (a setting at its default value
   is not written, so the server tries values to find it). Lettering is
   laid out again with its bundled embroidery font; the server has only
@@ -115,10 +117,11 @@ use the program, with no AI in the program.
   bridge to the server. All three designs were right. Their friction made
   the changes above (boxes, the middle of lettering, the hoop checks,
   `set_design`, the background, the results of Quicker to Sew and
-  export). A fourth agent checked the changes. Two findings are open
-  (`docs/design/open-work.md`): the labels of test swatches at 5 mm sew
-  heavy, and the travel measure does not count a short travel stitch
-  between two letters on a fill (under the limit of a warning).
+  export). A fourth agent checked the changes. The labels of test
+  swatches at 5 mm sewed heavy: they are Soft Round now (ADR 0170). One
+  finding is open (`docs/design/open-work.md`): the travel measure does
+  not count a short travel stitch between two letters on a fill (under
+  the limit of a warning).
 - The agent works with the rights of the user: the tools read and write
   the files that the agent names. The server has no network code.
 - The server has one design at a time, and only the bundled embroidery
