@@ -6,48 +6,59 @@
 
 # Open the start design: no objects, three threads.
 [[step]]
+item = ["Open the start design", 0]
 open = "sketch-start"
 expect = { objects = 0 }
 
 # A new sketch.
 [[step]]
+item = ["Start a sketch", 0]
 command = "Digitize > Sketch > Parametric Sketch"
 expect = { sketch = true }
 
 # Two circles round the origin.
 [[step]]
+item = ["Draw the circles", 1]
 command = "Sketch > Create > Circle"
 
 [[step]]
+item = ["Draw the circles", 2]
 clicks = [[0.0, 0.0], [30.0, 0.0]]
 
 [[step]]
+item = ["Draw the circles", 3]
 clicks = [[0.0, 0.0], [25.0, 0.0]]
 expect = { regions = 2 }
 
 # A hexagon in the middle (the polygon tool is under the arrow of the
 # rectangle).
 [[step]]
+item = ["Draw a hexagon", 1]
 command = "Sketch > Create > Polygon"
 
 [[step]]
+item = ["Draw a hexagon", 2]
 clicks = [[0.0, 0.0], [12.0, 0.0]]
 expect = { regions = 3 }
 
 # The sizes: the diameters of the two circles.
 [[step]]
+item = ["Give the circles their sizes", 1]
 command = "Sketch > Constrain > Dimension"
 
 [[step]]
+item = ["Give the circles their sizes", 2]
 clicks = [[0.0, -30.0], [30.0, -36.0]]
 
 [[step]]
+item = ["Give the circles their sizes", 3]
 type = "60"
 
 [[step]]
 key = "Enter"
 
 [[step]]
+item = ["Give the circles their sizes", 4]
 clicks = [[0.0, 25.0], [30.0, 36.0]]
 
 [[step]]
@@ -57,6 +68,7 @@ type = "52"
 key = "Enter"
 
 [[step]]
+item = ["Give the circles their sizes", 5]
 key = "Escape"
 
 [[step]]
@@ -65,9 +77,11 @@ around = [[-45.0, -45.0], [55.0, 45.0]]
 
 # Embroidery from the regions: the disc, the hexagon, then the ring.
 [[step]]
+item = ["Make embroidery from the regions", 1]
 command = "Sketch > Sketch > Regions"
 
 [[step]]
+item = ["Make embroidery from the regions", 2]
 thread = "Navy"
 
 [[step]]
@@ -77,6 +91,7 @@ clicks = [[0.0, 18.0]]
 button = "Fill"
 
 [[step]]
+item = ["Make embroidery from the regions", 3]
 thread = "White"
 
 [[step]]
@@ -86,6 +101,7 @@ clicks = [[0.0, 0.0]]
 button = "Fill"
 
 [[step]]
+item = ["Make embroidery from the regions", 4]
 thread = "Gold"
 
 [[step]]
@@ -95,11 +111,13 @@ clicks = [[0.0, -28.0]]
 button = "Satin"
 
 [[step]]
+item = ["Make embroidery from the regions", 5]
 command = "Sketch > Exit > Finish Sketch"
 expect = { sketch = false, objects = 4, colors = 3, size = [60.0, 60.0] }
 
 # A change of the sketch: the outer circle 66 mm.
 [[step]]
+item = ["Change a size", 1]
 click = [0.0, -28.0]
 expect = { selected = 1 }
 
@@ -108,28 +126,34 @@ button = "Edit Sketch"
 expect = { sketch = true }
 
 [[step]]
+item = ["Change a size", 2]
 clicks = [[30.0, -36.0, 1]]
 
 [[step]]
 button = "Change Value"
 
 [[step]]
+item = ["Change a size", 3]
 type = "66"
 
 [[step]]
 key = "Enter"
 
 [[step]]
+item = ["Change a size", 4]
 command = "Sketch > Exit > Finish Sketch"
 expect = { sketch = false, objects = 4, colors = 3, size = [66.0, 66.0] }
 
 [[step]]
+test_only = true
 command = "View > Show > Thread Look"
 
 [[step]]
+test_only = true
 button = "Thread Look"
 
 [[step]]
+test_only = true
 key = "Escape"
 
 [[step]]

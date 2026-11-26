@@ -6,11 +6,13 @@
 
 # Open the start design: a circle line, the edge of the hole.
 [[step]]
+item = ["Open the start design", 0]
 open = "cutwork-circle"
 expect = { objects = 1, kinds = ["Running"] }
 
 # Make the cut lines, from a copy of the circle.
 [[step]]
+item = ["Make the cut lines", 1]
 command = "Edit > Select > Select All"
 expect = { selected = 1 }
 
@@ -22,10 +24,12 @@ command = "Edit > Clipboard > Paste"
 expect = { objects = 2, selected = 1 }
 
 [[step]]
+item = ["Make the cut lines", 2]
 command = "Specialty > Cutwork > Cutwork"
 expect = { window = "Cutwork" }
 
 [[step]]
+item = ["Make the cut lines", 3]
 choose = ["Kit", "Bernina"]
 
 [[step]]
@@ -33,19 +37,24 @@ picture = "cutwork-window"
 area = "windows"
 
 [[step]]
+item = ["Make the cut lines", 5]
 button = "Make cut lines"
 expect = { objects = 5, colors = 5, threads = ["Navy", "Cutwork needle 1 (|)", "Cutwork needle 2 (/)", "Cutwork needle 3 (—)", "Cutwork needle 4 (\\)"] }
 
 [[step]]
+item = ["Make the cut lines", 6]
 close = "Cutwork"
 
 # The satin edge, from a second copy.
 [[step]]
+item = ["The satin edge", 1]
 command = "Edit > Clipboard > Paste"
 expect = { objects = 6, selected = 1 }
 
 # Another tab: the Edit tab has a list "Outline Type" too.
 [[step]]
+item = ["The satin edge", 2]
+test_only = true
 tab = "View"
 
 [[step]]
@@ -53,12 +62,14 @@ choose = ["Outline Type", "Satin"]
 expect = { objects = 6, colors = 6 }
 
 [[step]]
+item = ["The satin edge", 3]
 command = "View > Show > Thread Look"
 
 [[step]]
 button = "Thread Look"
 
 [[step]]
+test_only = true
 key = "Escape"
 
 [[step]]

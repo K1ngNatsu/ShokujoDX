@@ -6,20 +6,24 @@
 
 # Open the start design: a frame line and the lettering CAP.
 [[step]]
+item = ["Open the start design", 0]
 open = "cap-front"
 expect = { objects = 2, kinds = ["Running", "Lettering"] }
 
 # The machine, the cap frame and the fabric.
 [[step]]
+item = ["The machine, the cap frame and the fabric", 1]
 tab = "Design"
 
 [[step]]
 choose = ["Machine", "Tajima multi-needle"]
 
 [[step]]
+item = ["The machine, the cap frame and the fabric", 2]
 choose = ["Hoop", "Wide cap frame 360 x 75 (270 degree class)  (360 × 75 mm)"]
 
 [[step]]
+item = ["The machine, the cap frame and the fabric", 3]
 command = "Design > Fabric and Styles > Fabric"
 expect = { window = "Fabric" }
 
@@ -32,25 +36,30 @@ expect = { fabric = "cap" }
 
 # Puff letters.
 [[step]]
+item = ["Puff letters", 1]
 drag = [[-32.0, -15.0], [32.0, 15.0]]
 expect = { selected = 1, warnings = 0 }
 
 [[step]]
+item = ["Puff letters", 2]
 command = "Specialty > Puff and Laydown > Puff"
 expect = { objects = 2, colors = 2, warnings = 1 }
 
 # The cap order.
 [[step]]
+item = ["The cap order", 1]
 command = "Arrange > Sew Order > Cap Order"
 expect = { objects = 2, kinds = ["Running", "Lettering"], warnings = 1 }
 
 [[step]]
+item = ["The cap order", 2]
 command = "View > Show > Thread Look"
 
 [[step]]
 button = "Thread Look"
 
 [[step]]
+test_only = true
 key = "Escape"
 
 [[step]]

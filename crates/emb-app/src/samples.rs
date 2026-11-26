@@ -737,6 +737,9 @@ impl AppState {
         d.machine = self.doc.design().machine.clone();
         d.hoop.selection = self.doc.design().hoop.selection.clone();
         let title = d.name.clone();
+        if let Some(lesson) = &mut self.lesson {
+            lesson.opened(name);
+        }
         self.start_design(d);
         self.message = crate::i18n::fill("Start design \"{}\"", &[&title]);
     }

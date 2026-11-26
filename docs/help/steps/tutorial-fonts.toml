@@ -6,18 +6,22 @@
 
 # Open the start design: a construction point where the name starts.
 [[step]]
+item = ["Find a font", 1]
 open = "lettering-start"
 expect = { objects = 0 }
 
 # Find a font.
 [[step]]
+item = ["Find a font", 2]
 command = "Lettering > Lettering > Fonts"
 expect = { window = "Fonts" }
 
 [[step]]
+item = ["Find a font", 3]
 button = "Quality"
 
 [[step]]
+item = ["Find a font", 4]
 field = "Search"
 
 [[step]]
@@ -31,10 +35,12 @@ picture = "fonts-window"
 area = "windows"
 
 [[step]]
+item = ["Find a font", 5]
 close = "Fonts"
 
 # Make lettering in the size range.
 [[step]]
+item = ["Make lettering in the size range", 1]
 command = "Lettering > Lettering > Lettering"
 
 [[step]]
@@ -42,12 +48,15 @@ click = [-35.0, 10.0]
 expect = { window = "Lettering" }
 
 [[step]]
+item = ["Make lettering in the size range", 2]
 type = "Sam"
 
 [[step]]
+item = ["Make lettering in the size range", 3]
 choose = ["Font", "Pacifico"]
 
 [[step]]
+item = ["Make lettering in the size range", 4]
 set = ["Height", "20"]
 
 [[step]]
@@ -56,15 +65,18 @@ expect = { objects = 1, kinds = ["Lettering"], selected = 1, warnings = 0 }
 
 # Satin or fill.
 [[step]]
+item = ["Satin or fill", 1]
 choose = ["Stitch type", "Fill"]
 
 [[step]]
+item = ["Satin or fill", 2]
 command = "View > Show > Thread Look"
 
 [[step]]
 button = "Thread Look"
 
 [[step]]
+item = ["Satin or fill", 3]
 key = "Escape"
 
 [[step]]
@@ -80,16 +92,19 @@ choose = ["Stitch type", "Automatic"]
 
 # Text that is too small.
 [[step]]
+item = ["Text that is too small", 1]
 set = ["Height", "6"]
 expect = { warnings = 1 }
 
 [[step]]
+item = ["Text that is too small", 2]
 command = "Lettering > Lettering > Fonts"
 
 [[step]]
 button = "For small text"
 
 [[step]]
+item = ["Text that is too small", 3]
 field = "Search"
 
 [[step]]

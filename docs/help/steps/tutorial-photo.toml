@@ -6,6 +6,7 @@
 
 # Open the start design: the photo of an apple.
 [[step]]
+item = ["Open the start design", 0]
 open = "photo-apple"
 expect = { objects = 0 }
 
@@ -15,22 +16,27 @@ around = [[-40.0, -40.0], [40.0, 40.0]]
 
 # The wizard: a photo stitch.
 [[step]]
+item = ["Picture to Design", 1]
 command = "Artwork > Import > Picture to Design"
 expect = { window = "Picture to Design" }
 
 [[step]]
+item = ["Picture to Design", 2]
 button = "Photo stitch (a portrait, a photo)"
 
 [[step]]
+item = ["Picture to Design", 3]
 button = "Next ›"
 
 [[step]]
 button = "Remove the edge color"
 
 [[step]]
+item = ["Picture to Design", 4]
 button = "Next ›"
 
 [[step]]
+item = ["Picture to Design", 5]
 choose = ["Style", "Color rows"]
 
 [[step]]
@@ -41,6 +47,7 @@ picture = "photo-step"
 area = "windows"
 
 [[step]]
+item = ["Picture to Design", 7]
 button = "Next ›"
 
 [[step]]
@@ -52,12 +59,14 @@ key = "Escape"
 
 # Look at the stitches.
 [[step]]
+item = ["Look at the stitches", 0]
 command = "View > Show > Thread Look"
 
 [[step]]
 button = "Thread Look"
 
 [[step]]
+test_only = true
 key = "Escape"
 
 [[step]]

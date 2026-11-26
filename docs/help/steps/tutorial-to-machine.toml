@@ -6,13 +6,19 @@
 
 # Open the badge.
 [[step]]
+item = ["Open the badge", 0]
 open = "first-badge"
 expect = { objects = 2, colors = 2, kinds = ["Fill", "Running"], threads = ["Gold", "Navy"], size = [65.0, 65.0] }
 
 # Set your machine and your hoop.
 [[step]]
+item = ["Set your machine and your hoop", 1]
 tab = "Design"
 expect = { shows = "Machine" }
+
+# A part of the lesson that you only read (no step of the test).
+[[step]]
+item = ["Set your machine and your hoop", 2]
 
 [[step]]
 picture = "to-machine-machine-hoop"
@@ -21,10 +27,12 @@ panel = "Machine and Hoop"
 
 # Write the machine file.
 [[step]]
+item = ["Write the machine file", 1]
 command = "Design > Output > Send to USB"
 check_only = true
 
 [[step]]
+test_only = true
 command = "Design > Output > Export"
 expect = { window = "Export machine file" }
 
@@ -33,4 +41,13 @@ picture = "to-machine-export"
 area = "windows"
 
 [[step]]
+test_only = true
 button = "Cancel"
+
+# A part of the lesson that you only read (no step of the test).
+[[step]]
+item = ["Prepare the machine", 1]
+
+# A part of the lesson that you only read (no step of the test).
+[[step]]
+item = ["Sew the badge", 1]

@@ -597,6 +597,11 @@ fn scenes() -> Vec<Scene> {
         st.fix_stitches.open = true;
     }));
     // The windows that no command opens with the sample design.
+    // A lesson (ADR 0177): its window at a step with a mark, and at the
+    // first step (the screen, with the mark on the ribbon).
+    v.push(Scene::new("lesson", View::Screen, |st, _| {
+        st.start_lesson("tutorial-first-design", 2);
+    }));
     v.push(Scene::new("first start", View::Windows, |st, _| {
         st.ask_machine = Some(crate::first_start::MachineStep::new(st));
     }));

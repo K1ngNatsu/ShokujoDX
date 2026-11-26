@@ -6,10 +6,12 @@
 
 # Open the start design: six dots, red and blue, one after the other.
 [[step]]
+item = ["Open the start design", 1]
 open = "sew-order"
 expect = { objects = 6, colors = 6, trims = 6 }
 
 [[step]]
+item = ["Open the start design", 3]
 command = "View > Show > Jumps"
 expect = { on = "View > Show > Jumps" }
 
@@ -19,11 +21,13 @@ around = [[-45.0, -30.0], [45.0, 30.0]]
 
 # Fewer color changes.
 [[step]]
+item = ["Fewer color changes", 0]
 command = "Arrange > Sew Order > Fewer Color Changes"
 expect = { colors = 2, trims = 6 }
 
 # A shorter order.
 [[step]]
+item = ["A shorter way", 0]
 command = "Arrange > Sew Order > Shortest Order"
 expect = { colors = 2, trims = 6 }
 

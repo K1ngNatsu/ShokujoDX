@@ -6,6 +6,7 @@
 
 # Open the file: the leaf logo as a DST file, read again.
 [[step]]
+item = ["Open the file", 0]
 open = "customer-dst"
 expect = { objects = 3, kinds = ["Stitches", "Stitches", "Stitches"], colors = 3 }
 
@@ -14,10 +15,12 @@ picture = "customer-file"
 
 # Recognize Objects.
 [[step]]
+item = ["Recognize Objects", 1]
 command = "Edit > Select > Select All"
 expect = { selected = 3 }
 
 [[step]]
+item = ["Recognize Objects", 2]
 command = "Artwork > Convert > Recognize Objects"
 expect = { window = "Recognize Objects" }
 
@@ -26,14 +29,17 @@ picture = "customer-recognize"
 area = "windows"
 
 [[step]]
+item = ["Recognize Objects", 4]
 button = "Accept"
 expect = { kinds = ["Fill", "Stitches", "Running", "Fill", "Satin", "Running"], colors = 3 }
 
 # Change the size.
 [[step]]
+item = ["Change the size", 1]
 command = "Edit > Select > Select All"
 
 [[step]]
+item = ["Change the size", 2]
 set = ["W", "80"]
 expect = { size = [80.0, 79.9], warnings = 0 }
 
@@ -42,8 +48,10 @@ picture = "customer-larger"
 
 # Write the file again.
 [[step]]
+item = ["Write the file again", 0]
 command = "Design > Output > Export"
 expect = { window = "Export machine file" }
 
 [[step]]
+test_only = true
 button = "Cancel"

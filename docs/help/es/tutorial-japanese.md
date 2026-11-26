@@ -60,7 +60,8 @@ una puntada recta.
 
 ## Texto demasiado pequeño
 
-Ponga la **Altura** en Propiedades del objeto en 5 mm. El rango de
+Haga clic en **Editar > Seleccionar > Seleccionar todo** y ponga la
+**Altura** en Propiedades del objeto en 5 mm. El rango de
 tamaños se muestra en el color de una advertencia, y la Información del
 diseño tiene una advertencia: el texto es más pequeño que el rango de
 tamaños. Haga el texto más grande, o use menos trazos (kana en lugar de

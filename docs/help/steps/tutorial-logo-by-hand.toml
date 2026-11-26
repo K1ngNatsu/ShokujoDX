@@ -7,6 +7,7 @@
 
 # Open the start design.
 [[step]]
+item = ["Open the start design", 0]
 open = "logo-backdrop"
 expect = { objects = 0 }
 
@@ -16,28 +17,34 @@ around = [[-45.0, -40.0], [40.0, 45.0]]
 
 # The leaf: a fill with a hole.
 [[step]]
+item = ["The leaf: a fill with a hole", 1]
 thread = "Green"
 
 [[step]]
+item = ["The leaf: a fill with a hole", 2]
 command = "Digitize > Fills > Complex Fill"
 
 [[step]]
+item = ["The leaf: a fill with a hole", 3]
 clicks = [[-25.0, 25.0], [-28.0, -5.0, 1], [-5.0, -25.0, 1], [28.0, -28.0], [25.0, 5.0, 1], [5.0, 25.0, 1]]
 
 [[step]]
 key = "Enter"
 
 [[step]]
+item = ["The leaf: a fill with a hole", 4]
 clicks = [[-8.0, -10.0, 1], [-4.0, -6.0, 1], [-8.0, -2.0, 1], [-12.0, -6.0, 1]]
 
 [[step]]
 key = "Enter"
 
 [[step]]
+item = ["The leaf: a fill with a hole", 5]
 key = "Enter"
 expect = { objects = 1, kinds = ["Fill"], holes = 1, threads = ["Green"] }
 
 [[step]]
+item = ["The leaf: a fill with a hole", 6]
 key = "Escape"
 
 [[step]]
@@ -46,18 +53,22 @@ expect = { selected = 0 }
 
 # The stem: a satin column.
 [[step]]
+item = ["The stem: a satin column", 1]
 thread = "Brown"
 
 [[step]]
+item = ["The stem: a satin column", 2]
 command = "Digitize > Columns > Column"
 
 [[step]]
+item = ["The stem: a satin column", 3]
 clicks = [[-23.5, 26.5], [-30.0, 32.0, 1], [-36.0, 39.5]]
 
 [[step]]
 key = "Enter"
 
 [[step]]
+item = ["The stem: a satin column", 4]
 clicks = [[-26.5, 23.5], [-33.0, 29.0, 1], [-39.5, 36.5]]
 
 [[step]]
@@ -65,6 +76,7 @@ key = "Enter"
 expect = { objects = 2, kinds = ["Fill", "Satin"], threads = ["Green", "Brown"] }
 
 [[step]]
+item = ["The stem: a satin column", 5]
 key = "Escape"
 
 [[step]]
@@ -72,12 +84,15 @@ key = "Escape"
 
 # The vein: a line.
 [[step]]
+item = ["The vein: a line", 1]
 thread = "Dark green"
 
 [[step]]
+item = ["The vein: a line", 2]
 command = "Digitize > Lines > Line"
 
 [[step]]
+item = ["The vein: a line", 3]
 clicks = [[-18.0, 18.0], [0.0, -1.0, 1], [16.0, -16.0]]
 
 [[step]]
@@ -85,6 +100,7 @@ key = "Enter"
 expect = { objects = 3, kinds = ["Fill", "Satin", "Running"], threads = ["Green", "Brown", "Dark green"] }
 
 [[step]]
+item = ["The vein: a line", 4]
 key = "Escape"
 
 [[step]]
@@ -96,12 +112,14 @@ around = [[-45.0, -40.0], [40.0, 45.0]]
 
 # Look at the stitches.
 [[step]]
+item = ["Look at the stitches", 0]
 command = "View > Show > Thread Look"
 
 [[step]]
 button = "Thread Look"
 
 [[step]]
+test_only = true
 key = "Escape"
 
 [[step]]
@@ -109,9 +127,11 @@ picture = "logo-by-hand-stitches"
 around = [[-45.0, -40.0], [40.0, 45.0]]
 
 [[step]]
+item = ["Check it", 0]
 expect = { objects = 3, colors = 3, warnings = 0 }
 
 # A picture of your own.
 [[step]]
+item = ["Your own logo", 0]
 command = "Artwork > Import > Backdrop Picture"
 check_only = true

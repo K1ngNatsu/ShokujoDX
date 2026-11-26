@@ -100,6 +100,19 @@ pub fn list_height(canvas: Option<Rect>, want: f32) -> f32 {
 const EGUI_HEIGHT: f32 = 420.0;
 
 pub fn docked<'a>(window: egui::Window<'a>, ctx: &egui::Context, id: Id, canvas: Option<Rect>) -> egui::Window<'a> {
+    docked_at(window, ctx, id, canvas, Align2::LEFT_TOP)
+}
+
+/// As [`docked`], but the window docks at the corner `home` until the user
+/// moves it (the lesson window: at the bottom right, away from the
+/// command windows).
+pub fn docked_at<'a>(
+    window: egui::Window<'a>,
+    ctx: &egui::Context,
+    id: Id,
+    canvas: Option<Rect>,
+    home: Align2,
+) -> egui::Window<'a> {
     let window = window.drag_area(egui::WindowDrag::Anywhere);
     let Some(canvas) = canvas else {
         return window;
@@ -131,7 +144,7 @@ pub fn docked<'a>(window: egui::Window<'a>, ctx: &egui::Context, id: Id, canvas:
         .dock
         .iter()
         .find(|(i, _)| *i == id)
-        .map_or(Dock::Corner(Align2::LEFT_TOP), |(_, d)| *d);
+        .map_or(Dock::Corner(home), |(_, d)| *d);
     let window = match dock {
         Dock::Corner(c) if !dragging => {
             // Under (or over) the windows docked at this corner before it.

@@ -14,13 +14,16 @@
 //!   pictures `![text](name)` on a line of their own (P19 Part 2: the
 //!   files `docs/help/pictures/<code>/<name>.png` of the language, else
 //!   `docs/help/pictures/<name>.png`, which has no text; [`HELP_PICTURES`]).
-//!   A link `[text](sample:<name>)` opens a start design (`samples`).
+//!   A link `[text](sample:<name>)` opens a start design (`samples`), and
+//!   a link `[text](lesson:<id>)` starts the lesson of a tutorial
+//!   (`lesson`).
 //! - A tutorial has a path (`path`: one of [`PATHS`]), a time in minutes
 //!   (`time`), a level (`level`: new, practice, advanced) and the tutorial
 //!   before it (`before`) in its head. The Help window shows a card with
 //!   them, the contents list the tutorials by path, and the topic
 //!   [`TUTORIALS_ID`] is made from them. The translations take them from
-//!   the English topic.
+//!   the English topic. A tutorial with a step file has **Start the
+//!   Lesson** on its card (P19 Part 2 Milestone 6, ADR 0177).
 //! - The search answers questions from the help text, with no network: it
 //!   ranks the sections (BM25) by the words of the question, with the
 //!   question words left out, each word reduced to its stem, and words of
@@ -216,6 +219,7 @@ impl Group {
 /// The help topic of each window, for F1: the id of the window (its English
 /// title, or the id that the window sets) and the topic id.
 pub const WINDOW_HELP: &[(&str, &str)] = &[
+    ("Lesson", TUTORIALS_ID),
     ("Picture to Design", "pictures"),
     ("Lettering", "lettering"),
     ("Monogram", "lettering"),
@@ -499,7 +503,7 @@ fn tutorials_topic(topics: &[Topic]) -> Topic {
         "# {}\n\n{}\n",
         tr("Tutorials"),
         tr(
-            "Each tutorial makes one thing, step by step, from a start design that it opens. Start with the first path; each tutorial says which one comes before it."
+            "Each tutorial makes one thing, step by step, from a start design that it opens. Start with the first path; each tutorial says which one comes before it. A lesson does the tutorial with you in the program: it shows one step at a time, marks what to click and checks the design."
         )
     );
     for (path, _) in PATHS {
@@ -516,7 +520,12 @@ fn tutorials_topic(topics: &[Topic]) -> Topic {
             if let Some(l) = &t.card.level {
                 about.push(level_name(l).to_string());
             }
-            body.push_str(&format!("- [{}]({}): {}\n", t.title, t.id, about.join(", ")));
+            // The lesson of the tutorial (ADR 0177).
+            let lesson = match crate::steps::file(&t.id) {
+                Some(_) => format!(" · [{}]({}{})", tr("lesson"), crate::lesson::LINK, t.id),
+                None => String::new(),
+            };
+            body.push_str(&format!("- [{}]({}): {}{lesson}\n", t.title, t.id, about.join(", ")));
         }
     }
     Topic {
@@ -1168,7 +1177,7 @@ impl AppState {
 }
 
 /// Shows Markdown spans in a wrapped line. Returns a link that was clicked.
-fn show_spans(ui: &mut egui::Ui, text: &str, strong: bool) -> Option<String> {
+pub(crate) fn show_spans(ui: &mut egui::Ui, text: &str, strong: bool) -> Option<String> {
     let mut clicked = None;
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing.x = 0.0;
@@ -1198,7 +1207,7 @@ fn show_spans(ui: &mut egui::Ui, text: &str, strong: bool) -> Option<String> {
 /// Shows a topic. Returns a link that was clicked.
 /// The texture of the help picture `name` in the language of the program,
 /// made one time (`None`: no such picture).
-fn picture_texture(ctx: &egui::Context, name: &str) -> Option<egui::TextureHandle> {
+pub(crate) fn picture_texture(ctx: &egui::Context, name: &str) -> Option<egui::TextureHandle> {
     let lang = crate::i18n::current();
     let id = egui::Id::new(("help picture", lang, name));
     if let Some(t) = ctx.data(|d| d.get_temp::<Option<egui::TextureHandle>>(id)) {
@@ -1216,9 +1225,10 @@ fn picture_texture(ctx: &egui::Context, name: &str) -> Option<egui::TextureHandl
     made
 }
 
-/// The card of a tutorial: its time, its level, its path and the tutorial
-/// before it (a link). Returns a link that was clicked.
-fn show_card(ui: &mut egui::Ui, card: &Card, all: &[Topic]) -> Option<String> {
+/// The card of a tutorial: its time, its level, its path, the tutorial
+/// before it (a link) and its lesson (`id` of the tutorial; `place`: the
+/// stage where its lesson stopped). Returns a link that was clicked.
+fn show_card(ui: &mut egui::Ui, id: &str, card: &Card, all: &[Topic], place: Option<usize>) -> Option<String> {
     let mut link = None;
     egui::Frame::group(ui.style()).show(ui, |ui| {
         ui.horizontal_wrapped(|ui| {
@@ -1244,6 +1254,25 @@ fn show_card(ui: &mut egui::Ui, card: &Card, all: &[Topic]) -> Option<String> {
                 }
             });
         }
+        if crate::steps::file(id).is_some() {
+            ui.horizontal_wrapped(|ui| {
+                let tip = tr("Do this tutorial in the program: the lesson shows one step at a time, marks what to click and checks the design.");
+                if let Some(at) = place {
+                    if ui
+                        .button(crate::i18n::fill("Go On at Step {}", &[&(at + 1)]))
+                        .on_hover_text(tip)
+                        .clicked()
+                    {
+                        link = Some(format!("{}{id}@{at}", crate::lesson::LINK));
+                    }
+                    if ui.button(tr("Start Again")).on_hover_text(tip).clicked() {
+                        link = Some(format!("{}{id}", crate::lesson::LINK));
+                    }
+                } else if ui.button(tr("Start the Lesson")).on_hover_text(tip).clicked() {
+                    link = Some(format!("{}{id}", crate::lesson::LINK));
+                }
+            });
+        }
     });
     link
 }
@@ -1256,6 +1285,7 @@ fn show_topic(
     all: &[Topic],
     find: Option<&str>,
     scrolled: &mut bool,
+    place: Option<usize>,
 ) -> Option<String> {
     let mut link = None;
     let find = find.map(str::to_lowercase);
@@ -1279,7 +1309,7 @@ fn show_topic(
                 ui.label(RichText::new(plain(t)).size(size).strong());
                 if *level == 1 && topic.card != Card::default() {
                     ui.add_space(4.0);
-                    if let Some(l) = show_card(ui, &topic.card, all) {
+                    if let Some(l) = show_card(ui, &topic.id, &topic.card, all, place) {
                         link = Some(l);
                     }
                 }
@@ -1392,6 +1422,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
     let mut open = true;
     let mut go: Option<(String, Option<String>)> = None;
     let h = &mut st.help;
+    let places = &st.settings.lessons;
     egui::Window::new(tr("Help"))
         .id(egui::Id::new("Help"))
         .open(&mut open)
@@ -1489,8 +1520,10 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                         }
                     }
                     None => {
+                        let place = places.get(&h.current).copied().filter(|at| *at > 0);
                         if let Some(topic) = h.topics.iter().find(|t| t.id == h.current)
-                            && let Some(id) = show_topic(ui, topic, &h.topics, h.find.as_deref(), &mut h.scrolled)
+                            && let Some(id) =
+                                show_topic(ui, topic, &h.topics, h.find.as_deref(), &mut h.scrolled, place)
                         {
                             go = Some((id, None));
                         }
@@ -1498,10 +1531,15 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                 });
         });
     if let Some((id, find)) = go {
-        match id.strip_prefix(crate::samples::LINK) {
+        if let Some(name) = id.strip_prefix(crate::samples::LINK) {
             // A start design opens; the help stays.
-            Some(name) => st.open_sample(name),
-            None => st.help.go(&id, find),
+            st.open_sample(name);
+        } else if let Some(rest) = id.strip_prefix(crate::lesson::LINK) {
+            // A lesson starts (at its stage); the help closes.
+            let (tutorial, at) = rest.split_once('@').unwrap_or((rest, "0"));
+            st.start_lesson(tutorial, at.parse().unwrap_or(0));
+        } else {
+            st.help.go(&id, find);
         }
     }
     if !open {
@@ -1552,13 +1590,16 @@ mod tests {
                 for s in texts {
                     for sp in spans(&s) {
                         if let Span::Link(_, id) = sp {
-                            match id.strip_prefix(crate::samples::LINK) {
-                                Some(name) => assert!(
+                            if let Some(name) = id.strip_prefix(crate::samples::LINK) {
+                                assert!(
                                     crate::samples::design(name).is_some(),
                                     "{}: no start design {name}",
                                     t.id
-                                ),
-                                None => assert!(ids.contains(id.as_str()), "{}: a link to {id}", t.id),
+                                );
+                            } else if let Some(lesson) = id.strip_prefix(crate::lesson::LINK) {
+                                assert!(crate::steps::file(lesson).is_some(), "{}: no lesson {lesson}", t.id);
+                            } else {
+                                assert!(ids.contains(id.as_str()), "{}: a link to {id}", t.id);
                             }
                         }
                     }

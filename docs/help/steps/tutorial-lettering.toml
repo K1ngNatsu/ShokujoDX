@@ -6,21 +6,26 @@
 
 # Open the start design: a construction point where the name starts.
 [[step]]
+item = ["Add the lettering", 1]
 open = "lettering-start"
 expect = { objects = 0 }
 
 # Add the lettering.
 [[step]]
+item = ["Add the lettering", 2]
 command = "Lettering > Lettering > Lettering"
 
 [[step]]
+item = ["Add the lettering", 3]
 click = [-35.0, 10.0]
 expect = { window = "Lettering" }
 
 [[step]]
+item = ["Add the lettering", 4]
 type = "Anna"
 
 [[step]]
+item = ["Add the lettering", 6]
 set = ["Height", "25"]
 
 [[step]]
@@ -28,17 +33,21 @@ picture = "lettering-window"
 area = "windows"
 
 [[step]]
+item = ["Add the lettering", 7]
 button = "OK"
 expect = { objects = 1, kinds = ["Lettering"], selected = 1 }
 
 # Put the name on an arc.
 [[step]]
+item = ["Put the name on an arc", 1]
 choose = ["Baseline", "Arc over"]
 
 [[step]]
+item = ["Put the name on an arc", 2]
 set = ["Radius", "80"]
 
 [[step]]
+item = ["Put the name on an arc", 3]
 key = "Escape"
 
 [[step]]
@@ -48,6 +57,7 @@ command = "View > Show > Thread Look"
 button = "Thread Look"
 
 [[step]]
+test_only = true
 key = "Escape"
 
 [[step]]
@@ -56,3 +66,7 @@ around = [[-45.0, -35.0], [45.0, 20.0]]
 
 [[step]]
 expect = { objects = 1, colors = 1, warnings = 0 }
+
+# A part of the lesson that you only read (no step of the test).
+[[step]]
+item = ["The lettering kiosk", 1]

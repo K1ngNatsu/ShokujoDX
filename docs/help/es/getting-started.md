@@ -15,6 +15,12 @@ bordado](embroidery-basics). Para aprender haciendo, empiece con
 [Tutorial: su primer diseño](tutorial-first-design) y después vea
 [Todos los tutoriales](tutorials).
 
+Un tutorial con **Empezar la lección** en su ficha es también una
+lección: el programa muestra un paso cada vez en la ventana **Lección**,
+marca el botón o el punto del lienzo donde hacer clic y comprueba el
+diseño antes de seguir. La ventana tiene **◀ Atrás**, **Omitir ▶** y
+**Detener la lección**. Una lección que se detiene guarda su punto.
+
 ## La página de inicio
 
 La página de inicio aparece cuando el programa se inicia. Tiene:

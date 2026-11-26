@@ -62,8 +62,8 @@ running stitch.
 
 ## Text that is too small
 
-Set **Height** in Object Properties to 5 mm. The size range shows in
-the color of a warning, and Design Info has a warning: the text is
+Click **Edit > Select > Select All**, and set **Height** in Object
+Properties to 5 mm. The size range shows in the color of a warning, and Design Info has a warning: the text is
 smaller than the size range. Make the text larger, or use fewer strokes
 (kana in place of kanji).
 

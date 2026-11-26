@@ -14,6 +14,12 @@ If embroidery is new to you, read [Embroidery basics](embroidery-basics)
 first. To learn by doing, start with [Tutorial: your first
 design](tutorial-first-design), then see [All tutorials](tutorials).
 
+A tutorial with **Start the Lesson** on its card is also a lesson: the
+program shows one step at a time in the **Lesson** window, marks the
+button or the place on the canvas to click, and checks the design before
+it goes on. The window has **◀ Back**, **Skip ▶** and **Stop the
+Lesson**. A lesson that stops keeps its place.
+
 ## The start page
 
 The start page shows when the program starts. It has:

@@ -6,15 +6,18 @@
 
 # Open the start design: a heart and a wave line.
 [[step]]
+item = ["Open the start design", 0]
 open = "quilt-heart"
 expect = { objects = 2, kinds = ["Fill", "Running"] }
 
 # The fabric.
 [[step]]
+item = ["The fabric", 1]
 command = "Design > Fabric and Styles > Fabric"
 expect = { window = "Fabric" }
 
 [[step]]
+item = ["The fabric", 2]
 choose = ["Fabric", "Quilt (top, batting and backing)"]
 
 [[step]]
@@ -23,14 +26,17 @@ expect = { fabric = "quilt" }
 
 # Echo lines.
 [[step]]
+item = ["Echo lines", 1]
 click = [0.0, 0.0]
 expect = { selected = 1 }
 
 [[step]]
+item = ["Echo lines", 2]
 command = "Specialty > Quilting > Quilting"
 expect = { window = "Quilting" }
 
 [[step]]
+item = ["Echo lines", 3]
 set = ["Distance", "3"]
 
 [[step]]
@@ -44,43 +50,53 @@ picture = "quilt-window"
 area = "windows"
 
 [[step]]
+item = ["Echo lines", 4]
 button = "Add echo lines"
 expect = { objects = 3, kinds = ["Fill", "Running", "Running"] }
 
 # A background.
 [[step]]
+item = ["A background", 1]
 click = [0.0, 0.0]
 expect = { selected = 1 }
 
 [[step]]
+item = ["A background", 2]
 button = "Background"
 
 [[step]]
+item = ["A background", 3]
 set = ["Gap", "16"]
 
 [[step]]
+item = ["A background", 4]
 button = "Add background"
 expect = { objects = 4, kinds = ["Fill", "Fill", "Running", "Running"] }
 
 # A quilt block.
 [[step]]
+item = ["A quilt block", 1]
 click = [0.0, 85.0]
 expect = { selected = 1 }
 
 [[step]]
+item = ["A quilt block", 2]
 button = "Quilt block"
 
 [[step]]
+item = ["A quilt block", 3]
 set = ["Width", "110"]
 
 [[step]]
 set = ["Height", "50"]
 
 [[step]]
+item = ["A quilt block", 4]
 button = "Make quilt block"
 expect = { objects = 5, kinds = ["Fill", "Fill", "Running", "Running", "Running"], hoopings = 0, colors = 1 }
 
 [[step]]
+item = ["A quilt block", 5]
 close = "Quilting"
 
 [[step]]
@@ -90,6 +106,7 @@ command = "View > Show > Thread Look"
 button = "Thread Look"
 
 [[step]]
+test_only = true
 key = "Escape"
 
 [[step]]

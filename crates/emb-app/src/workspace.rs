@@ -482,6 +482,9 @@ pub struct Settings {
     /// The point of the selection that scaling keeps in place (Object
     /// Properties, Scale from; the center unless the user changes it).
     pub scale_from: crate::manipulate::ScaleFrom,
+    /// The stage where each lesson stopped, by the id of its tutorial
+    /// (P19 Part 2 Milestone 6, ADR 0177).
+    pub lessons: std::collections::BTreeMap<String, usize>,
 }
 
 impl Default for Settings {
@@ -541,6 +544,7 @@ impl Default for Settings {
             price_lists: vec![Default::default()],
             thread_stock: Default::default(),
             scale_from: Default::default(),
+            lessons: Default::default(),
         }
     }
 }

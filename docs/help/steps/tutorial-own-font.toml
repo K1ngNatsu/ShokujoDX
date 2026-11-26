@@ -8,6 +8,8 @@
 # the folder of the fonts of the user.
 
 [[step]]
+item = ["Convert the font", 1]
+test_only = true
 open = "lettering-start"
 expect = { objects = 0 }
 
@@ -17,9 +19,11 @@ command = "Lettering > Lettering > Fonts"
 expect = { window = "Fonts" }
 
 [[step]]
+item = ["Convert the font", 2]
 button = "TrueType"
 
 [[step]]
+item = ["Convert the font", 3]
 field = "Search"
 
 [[step]]
@@ -29,27 +33,38 @@ type = "Graduate"
 button = "Graduate"
 
 [[step]]
+item = ["Convert the font", 4]
 button = "Convert to embroidery font…"
 
 [[step]]
 picture = "own-font-convert"
 area = "windows"
 
+# A part of the lesson that you only read (no step of the test).
 [[step]]
+item = ["Convert the font", 5]
+
+[[step]]
+test_only = true
 button = "Cancel"
 
 # Make a test sheet: of an embroidery font of the program (the letters of
 # a TrueType font take too long in a test).
 [[step]]
+item = ["Make a test sheet", 1]
+test_only = true
 button = "Embroidery"
 
 [[step]]
+test_only = true
 field = "Search"
 
 [[step]]
+test_only = true
 type = "Varsity"
 
 [[step]]
+test_only = true
 button = "Varsity"
 
 [[step]]
@@ -57,9 +72,11 @@ button = "Test Sheet…"
 expect = { window = "Font Test Sheet" }
 
 [[step]]
+item = ["Make a test sheet", 2]
 choose = ["Characters", "Capital letters"]
 
 [[step]]
+item = ["Make a test sheet", 3]
 button = "Make Test Sheet"
 expect = { objects = 2 }
 
@@ -68,19 +85,27 @@ picture = "own-font-sheet"
 
 # Correct a letter, in a new design.
 [[step]]
+item = ["Correct a letter", 1]
 command = "New"
 expect = { objects = 0 }
 
 [[step]]
+item = ["Correct a letter", 2]
 command = "Lettering > Lettering > Alphabets"
 expect = { window = "Alphabets" }
 
 [[step]]
+item = ["Correct a letter", 3]
 set = ["Character", "A"]
 
 [[step]]
+item = ["Correct a letter", 4]
 button = "Place Letter"
 expect = { objects = 4 }
 
 [[step]]
 picture = "own-font-letter"
+
+# A part of the lesson that you only read (no step of the test).
+[[step]]
+item = ["Correct a letter", 5]

@@ -268,6 +268,14 @@ pub fn page(ui: &mut egui::Ui, st: &mut AppState) {
                             st.open_help(id, None);
                         }
                     }
+                    // The first tutorial as a lesson in the program (ADR 0177).
+                    if ui
+                        .link(tr("Your first design as a lesson"))
+                        .on_hover_text(tr("Do the first tutorial in the program: the lesson shows one step at a time, marks what to click and checks the design."))
+                        .clicked()
+                    {
+                        st.start_lesson("tutorial-first-design", 0);
+                    }
                     if ui.link(tr("Keyboard Shortcuts")).clicked() {
                         st.open_help(crate::help::KEYBOARD_ID, None);
                     }

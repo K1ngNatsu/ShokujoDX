@@ -59,7 +59,8 @@ ist ein Steppstich.
 
 ## Text, der zu klein ist
 
-Setzen Sie die **Höhe** in den Objekteigenschaften auf 5 mm. Der
+Klicken Sie auf **Bearbeiten > Auswählen > Alles auswählen**, und
+setzen Sie die **Höhe** in den Objekteigenschaften auf 5 mm. Der
 Größenbereich zeigt sich in der Farbe einer Warnung, und die Designinfo
 hat eine Warnung: Der Text ist kleiner als der Größenbereich. Machen Sie
 den Text größer, oder benutzen Sie weniger Striche (Kana statt Kanji).

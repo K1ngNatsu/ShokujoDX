@@ -6,6 +6,7 @@
 
 # Open the start design: the logo picture.
 [[step]]
+item = ["Open the start design", 0]
 open = "patch-picture"
 expect = { objects = 0 }
 
@@ -15,14 +16,17 @@ around = [[-36.0, -36.0], [36.0, 36.0]]
 
 # The wizard.
 [[step]]
+item = ["Picture to Design", 1]
 command = "Artwork > Import > Picture to Design"
 expect = { window = "Picture to Design" }
 
 # Background.
 [[step]]
+item = ["Picture to Design", 2]
 button = "Next ›"
 
 [[step]]
+item = ["Picture to Design", 3]
 button = "Remove the edge color"
 
 [[step]]
@@ -31,6 +35,7 @@ area = "windows"
 
 # Simplify: the number of thread colors.
 [[step]]
+item = ["Picture to Design", 4]
 button = "Next ›"
 
 [[step]]
@@ -38,15 +43,19 @@ set = ["Colors", "2"]
 
 # Colors, Stitches, Finish.
 [[step]]
+item = ["Picture to Design", 5]
 button = "Next ›"
 
 [[step]]
+item = ["Picture to Design", 6]
 button = "Next ›"
 
 [[step]]
+item = ["Picture to Design", 7]
 button = "Next ›"
 
 [[step]]
+item = ["Picture to Design", 8]
 button = "Finish"
 expect = { colors = 2, warnings = 0 }
 
@@ -55,12 +64,14 @@ key = "Escape"
 
 # Look at the stitches.
 [[step]]
+item = ["Look at the stitches", 0]
 command = "View > Show > Thread Look"
 
 [[step]]
 button = "Thread Look"
 
 [[step]]
+test_only = true
 key = "Escape"
 
 [[step]]
@@ -69,8 +80,10 @@ around = [[-36.0, -36.0], [36.0, 36.0]]
 
 # Write the machine file.
 [[step]]
+item = ["Write the machine file", 1]
 command = "Design > Output > Export"
 expect = { window = "Export machine file" }
 
 [[step]]
+test_only = true
 button = "Cancel"

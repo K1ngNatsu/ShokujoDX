@@ -7,19 +7,23 @@
 
 # Open the badge.
 [[step]]
+item = ["Output design", 1]
 open = "first-badge"
 expect = { objects = 2 }
 
 # Output design.
 [[step]]
+item = ["Output design", 2]
 command = "Design > Output > Output Design"
 expect = { window = "Output Design" }
 
 [[step]]
+test_only = true
 close = "Output Design"
 
 # The production worksheet.
 [[step]]
+item = ["The production worksheet", 0]
 command = "Design > Output > Print Preview"
 expect = { window = "Print Preview" }
 
@@ -28,13 +32,16 @@ picture = "output-worksheet"
 area = "windows"
 
 [[step]]
+test_only = true
 close = "Print Preview"
 
 # Send to USB, and many designs at once.
 [[step]]
+item = ["Send to USB", 0]
 command = "Design > Output > Send to USB"
 check_only = true
 
 [[step]]
+item = ["Many designs at once", 0]
 command = "Design > Output > Batch Output"
 check_only = true

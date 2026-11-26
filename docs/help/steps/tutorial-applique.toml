@@ -6,11 +6,13 @@
 
 # Open the start design: a heart (a fill).
 [[step]]
+item = ["Make the appliqué", 1]
 open = "applique-heart"
 expect = { objects = 1, kinds = ["Fill"] }
 
 # Make it an appliqué.
 [[step]]
+item = ["Make the appliqué", 2]
 command = "Digitize > Select > Select"
 
 [[step]]
@@ -18,33 +20,51 @@ click = [0.0, 0.0]
 expect = { selected = 1 }
 
 [[step]]
+item = ["Make the appliqué", 3]
 command = "Digitize > Appliqué > To Appliqué"
 expect = { objects = 1, kinds = ["Appliqué"] }
 
 [[step]]
+item = ["Make the appliqué", 4]
 key = "Escape"
+
+# A part of the lesson that you only read (no step of the test).
+[[step]]
+item = ["Set the steps", 1]
 
 # Check it.
 [[step]]
+item = ["Check it", 1]
 expect = { on = "View > Show > Appliqué Fabric" }
 
 [[step]]
+item = ["Check it", 2]
 command = "View > Show > Thread Look"
 
 [[step]]
 button = "Thread Look"
 
 [[step]]
+test_only = true
 key = "Escape"
 
 [[step]]
 picture = "applique-heart"
 around = [[-34.0, -32.0], [34.0, 30.0]]
 
+# A part of the lesson that you only read (no step of the test).
+[[step]]
+item = ["Check it", 3]
+
 [[step]]
 expect = { warnings = 0 }
 
+# A part of the lesson that you only read (no step of the test).
+[[step]]
+item = ["Sew it", 1]
+
 # Cut the piece with a cutter.
 [[step]]
+item = ["Cut the piece with a cutter", 0]
 command = "Digitize > Appliqué > Cutter File"
 check_only = true

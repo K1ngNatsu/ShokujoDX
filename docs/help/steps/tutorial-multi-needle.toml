@@ -7,11 +7,13 @@
 
 # Open the club crest: four colors.
 [[step]]
+item = ["Open the start design", 0]
 open = "club-crest"
 expect = { objects = 4, colors = 4 }
 
 # The machine and its needles.
 [[step]]
+item = ["The machine and its needles", 1]
 tab = "Design"
 
 # The hoop of the Topaz does not go on the Tajima: the smallest hoop of
@@ -21,10 +23,12 @@ choose = ["Machine", "Tajima multi-needle"]
 expect = { hoop = "small_100x100" }
 
 [[step]]
+item = ["The machine and its needles", 2]
 command = "Design > Machine and Hoop > Needles"
 expect = { window = "Needles" }
 
 [[step]]
+item = ["The machine and its needles", 3]
 set = ["Needles on the machine", "6"]
 
 [[step]]
@@ -32,17 +36,21 @@ picture = "multi-needle-needles"
 area = "windows"
 
 [[step]]
+item = ["The machine and its needles", 4]
 close = "Needles"
 
 # The threads in stock.
 [[step]]
+item = ["Your threads", 1]
 command = "Design > Orders > Thread Stock"
 expect = { window = "Thread Stock" }
 
 [[step]]
+item = ["Your threads", 2]
 choose = ["Thread chart", "Madeira Polyneon"]
 
 [[step]]
+item = ["Your threads", 3]
 field = "name or code"
 type = "1967"
 
@@ -51,6 +59,7 @@ button = "Add"
 expect = { stock = 1 }
 
 [[step]]
+item = ["Your threads", 4]
 field = "name or code"
 type = "1804"
 
@@ -75,18 +84,22 @@ button = "Add"
 expect = { stock = 4 }
 
 [[step]]
+item = ["Your threads", 5]
 button = "Use Threads in Stock"
 expect = { colors = 4, threads = ["Light Navy", "Blanc de Blanc", "Warm Red", "Gold"] }
 
 [[step]]
+item = ["Your threads", 6]
 close = "Thread Stock"
 
 # The order.
 [[step]]
+item = ["The order", 1]
 command = "Design > Orders > Order Details"
 expect = { window = "Order Details" }
 
 [[step]]
+item = ["The order", 2]
 set = ["Order number", "A-1042"]
 
 [[step]]
@@ -96,24 +109,30 @@ set = ["Customer", "Riverside Football Club"]
 set = ["Garment", "Polo shirt"]
 
 [[step]]
+item = ["The order", 3]
 set = ["Quantity", "120"]
 
 [[step]]
+item = ["The order", 4]
 close = "Order Details"
 
 # The run time.
 [[step]]
+item = ["The run time", 1]
 command = "Design > Machine and Hoop > Machine Settings"
 expect = { window = "Machine Settings" }
 
 [[step]]
+item = ["The run time", 2]
 set = ["Heads", "4"]
 
 [[step]]
+item = ["The run time", 3]
 close = "Machine Settings"
 
 # The threads to buy.
 [[step]]
+item = ["The threads to buy", 0]
 command = "Design > Orders > Thread Stock"
 expect = { window = "Thread Stock" }
 
@@ -122,10 +141,12 @@ picture = "multi-needle-stock"
 area = "windows"
 
 [[step]]
+test_only = true
 close = "Thread Stock"
 
 # The worksheet.
 [[step]]
+item = ["The worksheet", 0]
 command = "Design > Output > Print Preview"
 expect = { window = "Print Preview" }
 
@@ -134,4 +155,5 @@ picture = "multi-needle-worksheet"
 area = "windows"
 
 [[step]]
+test_only = true
 close = "Print Preview"

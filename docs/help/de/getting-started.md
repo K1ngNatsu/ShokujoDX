@@ -15,6 +15,13 @@ Stickens](embroidery-basics). Um durch Tun zu lernen, beginnen Sie mit
 [Anleitung: Ihr erstes Design](tutorial-first-design), dann sehen Sie
 [Alle Anleitungen](tutorials).
 
+Eine Anleitung mit **Lektion beginnen** auf ihrer Karte ist auch eine
+Lektion: Das Programm zeigt im Fenster **Lektion** einen Schritt nach dem
+anderen, markiert die Schaltfläche oder die Stelle auf der Arbeitsfläche,
+die Sie klicken, und prüft das Design, bevor es weitergeht. Das Fenster
+hat **◀ Zurück**, **Überspringen ▶** und **Lektion beenden**. Eine
+Lektion, die Sie beenden, behält ihre Stelle.
+
 ## Die Startseite
 
 Die Startseite zeigt sich, wenn das Programm startet. Sie hat:

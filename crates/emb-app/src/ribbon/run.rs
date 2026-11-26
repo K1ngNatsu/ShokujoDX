@@ -359,6 +359,9 @@ impl AppState {
     /// Runs a ribbon command.
     pub fn run(&mut self, cmd: Cmd, ctx: &egui::Context) {
         let label = cmd.meta().1;
+        if let Some(lesson) = &mut self.lesson {
+            lesson.ran(cmd);
+        }
         // Space repeats it (not undo, redo and the view switches).
         if !matches!(cmd, Cmd::Undo | Cmd::Redo | Cmd::Toggle(_) | Cmd::RepeatLast) {
             self.last_cmd = Some(cmd);

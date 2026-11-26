@@ -6,15 +6,18 @@
 
 # Open the start design: a cloud of four vector shapes and a sun.
 [[step]]
+item = ["Open the start design", 0]
 open = "vector-logo"
 expect = { objects = 5, kinds = ["Vector", "Vector", "Vector", "Vector", "Vector"] }
 
 # Weld the cloud.
 [[step]]
+item = ["Weld the cloud", 1]
 drag = [[-33.0, -23.0], [31.0, 19.0]]
 expect = { selected = 4 }
 
 [[step]]
+item = ["Weld the cloud", 2]
 command = "Artwork > Shaping > Weld"
 expect = { objects = 2 }
 
@@ -24,21 +27,26 @@ around = [[-35.0, -38.0], [42.0, 20.0]]
 
 # Convert to stitches.
 [[step]]
+item = ["Convert to stitches", 1]
 command = "Edit > Select > Select All"
 expect = { selected = 2 }
 
 [[step]]
+item = ["Convert to stitches", 2]
 command = "Artwork > Convert > To Fill"
 expect = { kinds = ["Fill", "Fill"], colors = 2 }
 
 [[step]]
+test_only = true
 key = "Escape"
 
 [[step]]
+item = ["Convert to stitches", 3]
 drag = [[-33.0, -23.0], [31.0, 19.0]]
 expect = { selected = 1 }
 
 [[step]]
+item = ["Convert to stitches", 4]
 command = "Artwork > Borders and Offsets > Add Border"
 expect = { window = "Offsets" }
 
@@ -47,12 +55,14 @@ button = "Add outlines"
 expect = { objects = 3 }
 
 [[step]]
+item = ["Convert to stitches", 5]
 command = "View > Show > Thread Look"
 
 [[step]]
 button = "Thread Look"
 
 [[step]]
+test_only = true
 key = "Escape"
 
 [[step]]
@@ -61,10 +71,12 @@ around = [[-35.0, -38.0], [42.0, 20.0]]
 
 # Trace a picture.
 [[step]]
+item = ["Trace a picture", 1]
 open = "logo-backdrop"
 expect = { objects = 0 }
 
 [[step]]
+item = ["Trace a picture", 2]
 command = "Artwork > Trace > Trace Picture"
 expect = { objects = 3, kinds = ["Vector", "Vector", "Vector"] }
 

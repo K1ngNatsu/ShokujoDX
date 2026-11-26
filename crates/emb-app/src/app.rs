@@ -229,6 +229,9 @@ pub struct AppState {
     pub help: crate::help::HelpState,
     /// A question for the help search, to answer when the window shows.
     pub help_ask_pending: bool,
+    /// The lesson that shows: a tutorial that the user does in the program
+    /// (P19 Part 2 Milestone 6, ADR 0177).
+    pub lesson: Option<crate::lesson::Lesson>,
     /// The ribbon command under the pointer (for F1).
     pub hover_cmd: Option<crate::ribbon::Cmd>,
     /// The start page shows as a tab; `focus_start` brings it to the front.
@@ -794,6 +797,7 @@ impl AppState {
             fabric_tex: None,
             help: Default::default(),
             help_ask_pending: false,
+            lesson: None,
             hover_cmd: None,
             show_start: false,
             focus_start: false,
@@ -2007,6 +2011,9 @@ impl EmbApp {
         {
             let _ = self.dock.set_active_tab(path);
         }
+        // The lesson: its window and its marks over all the rest (the
+        // canvas and the windows have their places of this frame).
+        crate::lesson::frame(&ctx, st);
     }
 }
 

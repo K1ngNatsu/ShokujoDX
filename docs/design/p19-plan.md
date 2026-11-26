@@ -1,6 +1,6 @@
 # Plan: help and tutorials (phase P19)
 
-Date: 2026-11-18 · Status: Proposed. The owner wants much better
+Date: 2026-11-18 · Status: Proposed; Part 2 made (2026-11-25). The owner wants much better
 tutorials and help (2026-11-18); the owner selects the milestones and
 their order before the work starts. On 2026-11-24 the owner asked to
 expand the tutorials thoroughly: Part 2 (at the end) is that work. The
@@ -392,6 +392,43 @@ next release.
   rows (on top of sewn rows, or as a ridge under the next rows); it now
   goes along the rows (ADR 0166). The steps do not save a
   quote sheet, a PDF or a copy of a script (they write files).
+- **Milestone 6: made (2026-11-25, ADR 0177).** The lessons: each of the
+  31 tutorials is a lesson in the program. A step with `item` starts a
+  stage that shows that item of the topic (and the items after it) in
+  the language of the program; `test_only` marks the steps that only the
+  test needs. The **Lesson** window shows the stage and what to do now,
+  an orange mark is round the button (or its tab, its folded panel, the
+  arrow of its drop-down button), on the points of the canvas, or on the
+  item of an open list, and the lesson goes on when the user did the
+  step and the design is as the step says (the checks that do not
+  depend on the machine and the hand of the user). **◀ Back**, **Skip
+  ▶**, **Tutorial**, **Stop the Lesson**; the place of a lesson that
+  stops is kept, and the card of the tutorial can go on from it. The
+  lesson starts from the card of each tutorial (**Start the Lesson**),
+  from "All tutorials" and from the start page (the first tutorial).
+  The exit test passes: `each_lesson_follows_its_steps` starts the lesson
+  of each tutorial (the first one also in Japanese) and does its steps;
+  the lesson marks what each step clicks, sees each step done and comes
+  to its end. Three agents wrote the markers of the step files (one set
+  of files each). They found places where a topic and its steps do not
+  agree; the lesson shows the step in its own line, so a user can do
+  them, but the topics can say them better:
+  - "Japanese text": the topic did not say to select the lettering
+    before it sets **Height** (Esc takes the selection away; the step
+    clicks **Edit > Select > Select All**). Fixed: the topic and its
+    translations now say it.
+  - "Choose a font and a size": a step types `Atkinson` in the search
+    field of the font list, which the text does not ask for (the field
+    keeps `Pacifico` from before).
+  - "Cross stitch" and "A badge in sketch mode": the steps turn on the
+    thread look for a picture, which no item asks for (test_only now).
+  - "Your own embroidery font": the steps use a font of the program in
+    place of the converted font (a test does not convert), so those
+    steps are test_only and the items are stages that the user reads.
+  - Numbered items with no step (for example "Select your machine and a
+    hoop") show with the item before them, or as a stage to read.
+  Lessons that users and shops write (Milestone 3 of Part 1, item 4) are
+  not in this milestone.
 
 ### Answers to the open questions
 

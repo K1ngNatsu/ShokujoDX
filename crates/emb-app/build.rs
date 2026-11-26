@@ -71,10 +71,38 @@ fn help_translations() {
     }
     out.push_str("];\n");
     out.push_str(&help_pictures(&help.join("pictures")));
-    let dest = std::path::Path::new(&std::env::var("OUT_DIR").unwrap_or_default()).join("help_translations.rs");
-    if let Err(e) = std::fs::write(&dest, out) {
+    let out_dir = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap_or_default());
+    if let Err(e) = std::fs::write(out_dir.join("help_translations.rs"), out) {
         println!("cargo:warning=The help translations are not built in: {e}");
     }
+    if let Err(e) = std::fs::write(out_dir.join("help_steps.rs"), help_steps(&help.join("steps"))) {
+        println!("cargo:warning=The step files of the tutorials are not built in: {e}");
+    }
+}
+
+/// The list `HELP_STEPS`: (tutorial id, text) of each step file
+/// `<dir>/<id>.toml` (P19 Part 2). The lessons do them in the program
+/// (ADR 0177), and the tests of the tutorials read them from here.
+fn help_steps(dir: &std::path::Path) -> String {
+    println!("cargo:rerun-if-changed={}", dir.display());
+    let mut files: Vec<_> = std::fs::read_dir(dir)
+        .map(|r| {
+            r.filter_map(|e| e.ok().map(|e| e.path()))
+                .filter(|p| p.extension().is_some_and(|x| x == "toml"))
+                .collect()
+        })
+        .unwrap_or_default();
+    files.sort();
+    let mut out = String::from("/// Made by build.rs: (tutorial id, text) of each step file of the tutorials.\n");
+    out.push_str("pub const HELP_STEPS: &[(&str, &str)] = &[\n");
+    for f in files {
+        println!("cargo:rerun-if-changed={}", f.display());
+        let id = f.file_stem().unwrap_or_default().to_string_lossy().into_owned();
+        let path = f.display().to_string();
+        out.push_str(&format!("    ({id:?}, include_str!({path:?})),\n"));
+    }
+    out.push_str("];\n");
+    out
 }
 
 /// The list `HELP_PICTURES`: (language code, name, PNG bytes) for each
