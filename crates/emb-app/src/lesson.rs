@@ -79,8 +79,14 @@ pub struct Eyes {
     nodes: Vec<Node>,
     input: Vec<Input>,
     /// A screen reader tree came while no lesson showed (a screen reader
-    /// uses it): the tree stays on after the lesson.
+    /// uses it): the tree stays on after the lesson. The eyes look from the
+    /// first frame of the program, so they see a screen reader that was on
+    /// before the first lesson.
     tree_before: bool,
+    /// The trees to leave out: the tree of the frame in which a lesson
+    /// stops is the tree of the lesson (the audit of 2026-11-26: it made
+    /// `tree_before` true, and the tree stayed on after each later lesson).
+    skip: u8,
 }
 
 impl egui::plugin::Plugin for Eyes {
@@ -117,6 +123,8 @@ impl egui::plugin::Plugin for Eyes {
         if let Some(update) = &output.platform_output.accesskit_update {
             if self.on {
                 self.nodes = steps::nodes_of(update);
+            } else if self.skip > 0 {
+                self.skip -= 1;
             } else {
                 self.tree_before = true;
             }
@@ -224,6 +232,10 @@ pub struct Lesson {
     pub finished: bool,
     /// The user stopped the lesson: it goes at the end of the frame.
     stopped: bool,
+    /// The user came to this stage with Back or Go On at Step: when the
+    /// design does its steps already, it does not go on by itself (Next
+    /// goes on), until a step waits for the user.
+    held: bool,
 }
 
 impl Lesson {
@@ -261,6 +273,7 @@ impl Lesson {
             texts: Texts::default(),
             finished: false,
             stopped: false,
+            held: at > 0,
         };
         lesson.texts = lesson.make_texts("en")?;
         Ok(lesson)
@@ -286,6 +299,7 @@ impl Lesson {
         self.done_at = None;
         self.misses.clear();
         self.checked_at = f64::NEG_INFINITY;
+        self.held = false;
     }
 
     /// The texts of the stages in the language `lang`: the items of the
@@ -403,6 +417,7 @@ impl Lesson {
                     }
                     if from.distance(p) < CLICK_PX {
                         if let Some(Mark::Widget(r, true)) = &self.mark
+                            && !self.mark_off
                             && r.expand(2.0).contains(p)
                         {
                             self.seen.hit = true;
@@ -532,7 +547,9 @@ impl Lesson {
             return button_rect(label, true)
                 .map(|r| Mark::Widget(r, true))
                 .or_else(|| button_rect(&format!("{MORE_KEY}{label}"), true).map(|r| Mark::Widget(r, false)))
-                .or_else(|| button_rect(&folded, true).map(|r| Mark::Widget(r, false)));
+                .or_else(|| button_rect(&folded, true).map(|r| Mark::Widget(r, false)))
+                // The ribbon is folded: its tab opens it.
+                .or_else(|| button_rect(tab.label(), false).map(|r| Mark::Widget(r, false)));
         }
         if let Some(name) = &s.thread {
             return widget(screen.node(name));
@@ -636,6 +653,7 @@ impl Lesson {
         while let Some(s) = self.current().cloned() {
             if !self.did(&s, st, screen) {
                 self.misses.clear();
+                self.held = false;
                 return;
             }
             if let Some(e) = s.expect.as_ref().filter(|_| !s.test_only) {
@@ -654,7 +672,7 @@ impl Lesson {
             self.misses.clear();
         }
         // The stage is done.
-        if self.stage().acts() {
+        if self.stage().acts() && !self.held {
             let at = *self.done_at.get_or_insert(now);
             if now - at >= NEXT_AFTER {
                 let next = self.at + 1;
@@ -704,15 +722,16 @@ impl AppState {
 /// the marks and the window. Call it at the end of the frame, when the
 /// canvas and the windows have their places.
 pub fn frame(ctx: &egui::Context, st: &mut AppState) {
-    let Some(mut l) = st.lesson.take() else { return };
     if ctx.plugin_opt::<Eyes>().is_none() {
         ctx.add_plugin(Eyes::default());
     }
+    let Some(mut l) = st.lesson.take() else { return };
     if l.stopped {
         // The screen reader tree stays on for a screen reader.
         let keep = ctx
             .with_plugin(|e: &mut Eyes| {
                 e.on = false;
+                e.skip = 1;
                 e.nodes.clear();
                 e.input.clear();
                 e.tree_before
@@ -753,7 +772,13 @@ pub fn frame(ctx: &egui::Context, st: &mut AppState) {
     l.take_input(input, st.canvas_rect);
     l.windows = steps::windows(ctx);
     l.advance(st, &screen, now);
-    l.mark = l.current().and_then(|s| Lesson::mark_of(s, st, &screen));
+    // A finished lesson marks nothing (the stage of the end is the last
+    // stage again).
+    l.mark = if l.finished {
+        None
+    } else {
+        l.current().and_then(|s| Lesson::mark_of(s, st, &screen))
+    };
     if let Some(Mark::Points(_, done)) = &mut l.mark {
         *done = l.seen.canvas_clicks;
     }
@@ -770,7 +795,11 @@ pub fn frame(ctx: &egui::Context, st: &mut AppState) {
         ctx.request_repaint_after(std::time::Duration::from_secs_f64(CHECK_EVERY));
     }
     let changed = before != (l.at, l.finished) || l.stopped;
-    st.lesson = Some(l);
+    // A lesson link in the window started another lesson: it takes the
+    // place of this one.
+    if st.lesson.is_none() {
+        st.lesson = Some(l);
+    }
     if changed {
         st.keep_lesson_place();
     }
@@ -823,6 +852,8 @@ fn window(ctx: &egui::Context, st: &mut AppState, l: &mut Lesson) {
     let mut open = true;
     let mut link: Option<String> = None;
     let mut go: Option<usize> = None;
+    let mut back = false;
+    let mut full_ribbon = false;
     let win = crate::dock::docked_at(
         egui::Window::new(tr("Lesson")).id(id),
         ctx,
@@ -837,6 +868,13 @@ fn window(ctx: &egui::Context, st: &mut AppState, l: &mut Lesson) {
         .show(ctx, |ui| {
             ui.set_max_width(360.0);
             ui.label(RichText::new(&l.texts.title).strong());
+            // Simple mode hides commands and tabs that the steps use.
+            if st.settings.simple_mode && !l.finished {
+                ui.horizontal_wrapped(|ui| {
+                    ui.colored_label(ui.visuals().warn_fg_color, tr("The lessons use the full ribbon."));
+                    full_ribbon = ui.button(tr("Full Ribbon")).clicked();
+                });
+            }
             if l.finished {
                 ui.add_space(6.0);
                 ui.label(RichText::new(tr("You did all the steps of the lesson.")).color(ok_color(ui)));
@@ -925,8 +963,9 @@ fn window(ctx: &egui::Context, st: &mut AppState, l: &mut Lesson) {
             ui.horizontal(|ui| {
                 if ui.add_enabled(l.at > 0, egui::Button::new(tr("◀ Back"))).clicked() {
                     go = Some(l.at - 1);
+                    back = true;
                 }
-                let next = if done && !l.stage().acts() {
+                let next = if done && (!l.stage().acts() || l.held) {
                     tr("Next ▶")
                 } else {
                     tr("Skip ▶")
@@ -960,14 +999,21 @@ fn window(ctx: &egui::Context, st: &mut AppState, l: &mut Lesson) {
     }
     if let Some(at) = go {
         l.go(at);
+        l.held = back;
+    }
+    if full_ribbon {
+        st.run(Cmd::Toggle(crate::ribbon::Flag::SimpleMode), ctx);
     }
     if let Some(to) = link {
-        match to.strip_prefix(crate::samples::LINK) {
-            Some(name) => {
-                l.opened(name);
-                st.open_sample(name);
-            }
-            None => st.open_help(&to, None),
+        if let Some(name) = to.strip_prefix(crate::samples::LINK) {
+            st.open_sample(name);
+            l.opened(name);
+        } else if let Some(rest) = to.strip_prefix(LINK) {
+            // A lesson link in the lesson: that lesson in place of this one.
+            let (tutorial, at) = rest.split_once('@').unwrap_or((rest, "0"));
+            st.start_lesson(tutorial, at.parse().unwrap_or(0));
+        } else {
+            st.open_help(&to, None);
         }
     }
 }

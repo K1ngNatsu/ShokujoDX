@@ -530,7 +530,7 @@ fn motif_row(ui: &mut egui::Ui, st: &mut AppState, m: &emb_model::Motif) {
     ui.horizontal(|ui| {
         ui.label(tr("Motif")).on_hover_text(tr(words::MOTIF_HELP));
         crate::motifs::preview(ui, m, Vec2::new(60.0, 22.0), ui.visuals().text_color());
-        ui.label(&m.name);
+        ui.label(crate::i18n::tr(&m.name));
         if ui.button(tr("Motifs…")).on_hover_text(tr(words::MOTIF_HELP)).clicked() {
             st.motifs_window.open = true;
         }
@@ -1803,20 +1803,23 @@ fn split_pattern_ui(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, current:
         }
     });
     if let Some(p) = pick {
-        st.doc.edit(crate::i18n::fill("Pattern {}", &[&p.name]), |d| {
-            let Some(o) = d.object_mut(id) else { return };
-            match &mut o.kind {
-                ObjectKind::Fill { params, .. } => match &mut params.pattern {
-                    FillPattern::ProgramSplit { pattern, .. } | FillPattern::FlexiSplit { pattern, .. } => *pattern = p,
-                    _ => {}
-                },
-                k => {
-                    if let Some(c) = column_params(k) {
-                        c.split_pattern = Some(p);
+        st.doc
+            .edit(crate::i18n::fill("Pattern {}", &[&crate::i18n::tr(&p.name)]), |d| {
+                let Some(o) = d.object_mut(id) else { return };
+                match &mut o.kind {
+                    ObjectKind::Fill { params, .. } => match &mut params.pattern {
+                        FillPattern::ProgramSplit { pattern, .. } | FillPattern::FlexiSplit { pattern, .. } => {
+                            *pattern = p
+                        }
+                        _ => {}
+                    },
+                    k => {
+                        if let Some(c) = column_params(k) {
+                            c.split_pattern = Some(p);
+                        }
                     }
                 }
-            }
-        });
+            });
     }
     let set = move |k: &mut ObjectKind, v: f64| match k {
         ObjectKind::Fill { params, .. } => match &mut params.pattern {
@@ -1875,7 +1878,7 @@ fn stamps_ui(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &FillPa
     let mut remove = None;
     for (i, s) in params.stamps.iter().enumerate() {
         ui.horizontal(|ui| {
-            ui.label(&s.stamp.name);
+            ui.label(crate::i18n::tr(&s.stamp.name));
             if ui.small_button(tr("Remove")).clicked() {
                 remove = Some(i);
             }
@@ -1971,16 +1974,17 @@ fn stamps_ui(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &FillPa
             .object(id)
             .and_then(|o| o.control_bbox())
             .map_or(20.0, |b| (b.width().min(b.height()) * 0.6).max(5.0));
-        st.doc.edit(crate::i18n::fill("Stamp {}", &[&stamp.name]), |d| {
-            if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(id).map(|o| &mut o.kind) {
-                params.stamps.push(emb_model::StampPlacement {
-                    stamp,
-                    center: middle,
-                    size_mm: size,
-                    angle_deg: 0.0,
-                });
-            }
-        });
+        st.doc
+            .edit(crate::i18n::fill("Stamp {}", &[&crate::i18n::tr(&stamp.name)]), |d| {
+                if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(id).map(|o| &mut o.kind) {
+                    params.stamps.push(emb_model::StampPlacement {
+                        stamp,
+                        center: middle,
+                        size_mm: size,
+                        angle_deg: 0.0,
+                    });
+                }
+            });
     }
 }
 

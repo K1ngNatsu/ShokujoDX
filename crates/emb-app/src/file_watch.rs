@@ -40,11 +40,25 @@ impl AppState {
         }
     }
 
+    /// A job of the program (Output, for example) wrote `files`: the times
+    /// on the disk of the files that the program knows are its own (the
+    /// audit of 2026-11-26: Output saved the project of the tab two times,
+    /// and the second save got the question).
+    pub fn files_written(&mut self, files: &[PathBuf]) {
+        for f in files {
+            if self.file_watch.known.contains_key(f) {
+                self.file_known(f);
+            }
+        }
+    }
+
     /// Looks at the file of the tab in front, at most each [`CHECK_EVERY`]:
-    /// a file that another program saved gets the question.
+    /// a file that another program saved gets the question. Not while a
+    /// job of the program runs: it can write the file.
     pub fn poll_file_changes(&mut self, now: Instant) {
+        let busy = self.jobs.busy();
         let w = &mut self.file_watch;
-        if w.changed.is_some() || w.last.is_some_and(|t| now.duration_since(t) < CHECK_EVERY) {
+        if busy || w.changed.is_some() || w.last.is_some_and(|t| now.duration_since(t) < CHECK_EVERY) {
             return;
         }
         w.last = Some(now);
@@ -84,10 +98,12 @@ impl AppState {
     }
 
     /// Keep This Version: the design of the tab stays, and the file on the
-    /// disk gets no second question until it changes again.
+    /// disk gets no second question until it changes again. The design is
+    /// not the file now, so it is not saved (a close asks).
     pub fn keep_changed_file(&mut self) {
         if let Some(p) = self.file_watch.changed.take() {
             self.file_known(&p);
+            self.doc.mark_unsaved();
         }
     }
 }
@@ -213,8 +229,33 @@ mod tests {
         assert!(h.st.file_watch.changed.is_some());
         h.st.keep_changed_file();
         assert_eq!(h.st.doc.design().objects().len(), 3);
+        assert!(h.st.doc.is_modified(), "the kept design is not the file");
         h.st.poll_file_changes(t0 + Duration::from_secs(8));
         assert!(h.st.file_watch.changed.is_none(), "no second question");
         std::fs::remove_file(&path).ok();
+    }
+
+    /// Output saves the project of the tab in its folder, and its job
+    /// writes the project again: no question (the audit of 2026-11-26).
+    #[test]
+    fn the_output_of_the_program_gets_no_question() {
+        let dir = file("output");
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut h = Harness::empty();
+        h.st.start_on_machine("husqvarna_topaz20", None);
+        h.st.add_sample_objects();
+        let t0 = Instant::now();
+        h.st.queue_output_design(&dir, "badge").unwrap();
+        let proj = dir.join(format!("badge.{}", project::FILE_EXTENSION));
+        assert_eq!(h.st.file_path.as_deref(), Some(proj.as_path()));
+        // A look while the job runs asks nothing.
+        h.st.poll_file_changes(t0);
+        assert!(h.st.file_watch.changed.is_none());
+        h.st.wait_jobs();
+        for k in 1..4 {
+            h.st.poll_file_changes(t0 + Duration::from_secs(2 * k));
+            assert!(h.st.file_watch.changed.is_none(), "the program wrote it");
+        }
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

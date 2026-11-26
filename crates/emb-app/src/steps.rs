@@ -526,8 +526,13 @@ impl Screen {
                 .map(|w| w.id.value())
                 .collect()
         });
-        self.nodes
-            .retain(|n| !quiet.contains(&n.id) && !rects.iter().any(|r| r.contains_rect(n.rect)));
+        // A widget in another window (under the Lesson or Help window)
+        // stays: a step can name it (the audit of 2026-11-26).
+        let others: Vec<Rect> = self.windows.iter().filter(|w| !rects.contains(w)).copied().collect();
+        self.nodes.retain(|n| {
+            !quiet.contains(&n.id)
+                && (others.iter().any(|w| w.contains_rect(n.rect)) || !rects.iter().any(|r| r.contains_rect(n.rect)))
+        });
         self.windows.retain(|w| !rects.contains(w));
         self
     }

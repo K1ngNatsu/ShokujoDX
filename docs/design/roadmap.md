@@ -161,6 +161,152 @@ The audit of Stages 1 to 6 and the IP review of the release (the rules of the re
 - Open: the start test on the PC of the owner's friends. Passed (owner, 2026-11-16): endless pan with a real mouse, the My Machines window. The installer removes the older version before it asks to close a running ShokujoDX, so a Cancel at that question leaves no version installed (install again to fix).
 
 
+## Audit of the work after P22 (2026-11-26)
+
+A check of the 14 commits after the audit of P22 that are not on GitHub
+yet: Milestone 9 of P22 (agents through MCP, ADR 0176), the lessons
+(P19 Part 2 Milestone 6, ADR 0177), travel along the edges of fixed
+letters, the decimal comma and the limit for lace and puff (ADR 0178),
+the faster route part 2 (ADR 0179), the stitches along a column (ADR
+0180, 0181), Recognize Objects, the small gaps of the audits, the two
+groups of side panels, and the size of a letter in the design. Five
+reviews of the code (one for each part), a probe of the MCP server with
+wrong input (`p22_mcp` in `crates/emb-cli/tests/p22_probe.rs`: each tool
+with each argument of a wrong type and with hard numbers and texts,
+each setting of each kind of object with hard values, lines that are
+not messages), the pictures of the windows, the rules of the spec, and
+the documents against the code.
+
+**Fixed.**
+
+- **The MCP server.**
+  - A line that was not UTF-8 text stopped the server, and the design of
+    the agent was lost. It is an error now, and the session goes on. JSON
+    that is not an object and a request with no method got no reply (the
+    client waits); they get error -32600.
+  - A color with a letter that is not ASCII (`€abc`) stopped the server
+    (a slice inside a character). The colors go through `Rgb::from_hex`,
+    and a fault in a tool is an error of that tool: the session and its
+    design stay.
+  - A text of lettering of 1 MB kept the server busy for more than 30 s.
+    The text has at most 2,000 characters (`MAX_TEXT_CHARS`).
+  - An id two times in a list moved, scaled or turned its object two
+    times; a move of 0 made an undo step.
+  - `picture` said that it only reads, but it wrote any path (also over a
+    project file). It writes only a `.png` file, and the tools that write
+    over files have `destructiveHint`.
+  - `show` made the name of its temporary file from the name of the
+    design (a name with `/` failed, `..\x` went out of the folder), and
+    marked the design saved: `new_design` then discarded it with no
+    question, and `save_design` wrote into the temporary folder. The name
+    is clean now, with the number of the process, and the design stays
+    not saved. The end of the program that `show` starts is read (no
+    process entry stays on Linux and macOS).
+  - A script that printed a long text in a loop kept gigabytes of
+    messages (also in the Scripts window of the program). The messages
+    have at most 1 MB (`emb_script::MAX_MESSAGE_BYTES`).
+  - A picture of a design with objects far apart (800 m) was cut at
+    16,384 pixels on a side. A design picture (export, Output, sharing)
+    now makes its scale smaller so that all of the design is in it.
+- **File Changed.** Output saves the project of the tab in its folder,
+  and its job wrote the project again: the program asked about its own
+  file after each Output (a test with the fix taken out confirmed it).
+  The files that a job writes are the program's own now
+  (`files_written`), and the program does not look while a job runs.
+  Keep This Version left the tab marked saved, so a close did not ask;
+  it is not saved now.
+- **The route store.** A program of one build that ran when a program of
+  another build started wrote its routes into the store of the new build.
+  Each build has its own folder now. A stored route with no parts made a
+  letter with no stitches; the check of a far point used 64 em from the
+  origin of the glyph (now the box of its outline and one em round it); a
+  file had no size limit (now 8 MB); a temporary file that was not moved
+  stayed. ADR 0179 had two sets of times; it has one.
+- **The lessons.** After the first lesson stopped, the screen reader
+  tree stayed on for the rest of the session (or went off for a screen
+  reader that used it). A finished lesson marked a step of its last
+  stage. A stage that the design did already went on by itself after
+  **◀ Back**. A click on a marked button that was off did the step. A
+  widget of a command window under the Lesson window did not count. A
+  lesson link in the lesson window opened no lesson. A command on a
+  folded ribbon has its mark on its tab now, and in Simple mode the
+  lesson window has **Full Ribbon**.
+- **Number fields.** In English, `5,000` in a field of decimal numbers
+  (the length of a spool) was 5: commas between groups of three digits
+  are thousands now in English and Japanese, a decimal comma in German
+  and Spanish. Full-width digits and signs (`１，５`, `－３`, from a
+  Japanese input method) are read.
+- **Names.** The motif of an object, the placed stamps, a message and
+  four undo steps showed the English names of built-in items; the
+  built-in keyboard collection "Shadow (built in)" too.
+- **Panels.** A group of side panels that the user closed came back in
+  the tab bar of the other group (eight tabs). It comes back as its group.
+- **Stitches.** Stacked lettering used the stretch of an envelope that
+  it does not apply to choose columns or fills. Where two columns of a
+  fixed letter have the same edge (a cut column), the travel went to a
+  corner of the edge and back (0.8 mm more). In lace and at puff, a place
+  over the limit of the settings with a small peak over the higher limit
+  got a warning; the area over the higher limit counts now. The travel
+  fix changed seven corpus designs (`embroidery-fonts`, `-2`, `-3`, `-4`,
+  `-7`, `monogram`, `view-lettering`): 1 to 3 stitches fewer, 1 to 4 mm
+  less travel, the same trims and the same travel that shows; and the
+  pictures of `view-lettering` and of the lettering on knit, felt and
+  leather in the bench of the 3D view.
+- **Documents.** ADR 0176, 0177, 0178, 0179 and 0181 say what the code
+  does (ADR 0181: pairs half a step apart stay 1 to 1.5 steps apart, not
+  one step). `open-work.md` said that the side panels are one group. The
+  help: the × of the panels (Getting started), `show` and Keep This
+  Version (Agents), and the family names in the Japanese Stitch types
+  topic and the German, Spanish and Japanese Borders tutorial. Three
+  Spanish warnings said "Vista >" for the View tab ("Ver"). The roadmap
+  marks three leftovers of the audit of P17 as done.
+
+**Left as it is** (in `docs/design/open-work.md`).
+
+- `satin::ALONG_SIDE_GAP` stays 1.5 (measured with the monogram probe):
+  a column slanted more than 65° all along sews up to 1.5 times lighter.
+- TrueType lettering in Auto chooses satin or tatami columns before the
+  envelope makes it taller.
+- The Japanese lesson asks for Noto Sans JP; another font needs Skip.
+- `show` on Windows: the program that it starts can keep the pipes of
+  `emb-cli` open (not measured). `check_machine_file` says if a file fits
+  a hoop from the coordinates of the file. A line of the MCP input has no
+  length limit.
+- The Clipart search finds a translated name only as one part.
+- A field of whole numbers takes `2,5` as 2.
+- Code written two times that a change of it can change results: the
+  area of the parts of a letter (three times for each part in the travel
+  of a fixed letter), the way to a command (the lesson and the test
+  runner), the stitch plans that some MCP tools make two or three times.
+
+**Checked, no change.**
+
+- The probe of the MCP server after the fixes (`p22_mcp`, release): 677
+  calls of the tools with arguments of wrong types and hard values, and
+  440 changes of the settings of five objects (141 taken), each with
+  `check_design` (and a picture) after it: no problem, the slowest call
+  0.11 s; the 17 lines that are not messages get 15 replies, and the
+  session goes on. Before the fixes: the text of 1 MB took more than
+  30 s, and the line that was not UTF-8 stopped the server.
+
+- The rules: no `unsafe` code, no trigonometry of `f64` in the engine
+  crates, no new dependency, and no name of a closed-source program in
+  the new text (the hits "Hatch" and "Pulse" are a fill pattern and a
+  Spanish word).
+- The translations: 4,707 texts in each language, none missing, none
+  that the template does not have, none empty, the same `{}` (five drop
+  a plural value, as permitted).
+- The shared search of the route gives the link of a search of its own
+  (no fault found); `thin_across` with no pairs, one pair, a step of 0
+  or a step that is not a number, pairs of no length and the same pairs
+  keeps the first and the last pair and does not stop.
+- The pictures of the windows (120 s): 423 scenes in four languages, 696
+  pictures, no error, and each window fits a screen of 1366 × 768. The
+  texts that do not fit: the label 1200 of the ruler at the edge of the
+  canvas in German and Spanish (the canvas is narrower), two names of
+  borders in Spanish in their cells, and the hint of a field in Keyboard
+  Designs (before).
+
 ## Audit of P22 (2026-11-25)
 
 After Milestones 1 to 8, a check of the code and the documents: probes
@@ -1015,13 +1161,17 @@ help and the numbers in the documents.
   trim for the accent.
 - The names of the motifs, patterns, stamps, borders, clipart items and
   families are in English only. The lists of the patterns (48), stamps
-  (39) and borders (50) are names with no pictures.
+  (39) and borders (50) are names with no pictures. (Done: the lists
+  show pictures, and since 2026-11-26 the names show in the language of
+  the program.)
 - The Families window has no ribbon command: the Motifs window, Object
-  Properties and the Clipart panel open it.
+  Properties and the Clipart panel open it. (Done 2026-11-26: Edit >
+  Stitch Types > Families.)
 - The pictures of the windows show the titles of some dock tabs cut
   ("Clipart", "Información del diseño"; 115 texts in the report, 31 of
   them only in a translation), and the View Options window is wider in
-  German and in Spanish than in English.
+  German and in Spanish than in English. (Done 2026-11-26: the side
+  panels are two groups, and all their titles show.)
 - The Motifs window reads the motifs folder at each frame while it is
   open (as before the phase).
 - A join under the strokes that sew later can be one stitch of up to

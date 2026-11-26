@@ -340,21 +340,23 @@ impl AppState {
             .map(|o| o.thread)
             .or_else(|| d.threads.first().map(|t| t.id));
         let kinds = frame_objects(&frame, &b, w.frame_margin_mm);
-        let new = self.doc.edit(crate::i18n::fill("Border {}", &[&frame.name]), |d| {
-            let t = thread.unwrap_or_else(|| d.add_thread("Thread", emb_model::Rgb(30, 30, 30)));
-            let g = d.new_group_id();
-            kinds
-                .into_iter()
-                .map(|k| {
-                    let id = d.add_object(t, k);
-                    if let Some(o) = d.object_mut(id) {
-                        o.group = Some(g);
-                        o.name = Some(frame.name.clone());
-                    }
-                    id
-                })
-                .collect::<Vec<_>>()
-        });
+        let new = self
+            .doc
+            .edit(crate::i18n::fill("Border {}", &[&crate::i18n::tr(&frame.name)]), |d| {
+                let t = thread.unwrap_or_else(|| d.add_thread("Thread", emb_model::Rgb(30, 30, 30)));
+                let g = d.new_group_id();
+                kinds
+                    .into_iter()
+                    .map(|k| {
+                        let id = d.add_object(t, k);
+                        if let Some(o) = d.object_mut(id) {
+                            o.group = Some(g);
+                            o.name = Some(frame.name.clone());
+                        }
+                        id
+                    })
+                    .collect::<Vec<_>>()
+            });
         self.selection.set_all(new);
         true
     }

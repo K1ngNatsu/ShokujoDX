@@ -209,8 +209,32 @@ struct Ctx {
     design: Design,
     selection: Vec<ObjectId>,
     messages: Vec<String>,
+    /// The bytes of `messages`, and one for each message.
+    message_bytes: usize,
     changed: bool,
     machine: Option<MachineProfile>,
+}
+
+/// The most bytes of the messages of a script (`print`, `debug`; each
+/// message counts one byte more): a script that printed a long text in a
+/// loop for its time made gigabytes (the audit of 2026-11-26).
+pub const MAX_MESSAGE_BYTES: usize = 1 << 20;
+
+impl Ctx {
+    /// Keeps a message while the messages have less than
+    /// [`MAX_MESSAGE_BYTES`]; then one message says that the others are
+    /// not kept.
+    fn message(&mut self, s: &str) {
+        if self.message_bytes > MAX_MESSAGE_BYTES {
+            return;
+        }
+        self.message_bytes += s.len() + 1;
+        if self.message_bytes <= MAX_MESSAGE_BYTES {
+            self.messages.push(s.to_string());
+        } else {
+            self.messages.push(text::tr("(more messages are not kept)").to_string());
+        }
+    }
 }
 
 type Shared = Rc<RefCell<Ctx>>;
@@ -680,9 +704,9 @@ fn engine(ctx: &Shared, limits: &Limits) -> Engine {
     let time = limits.time;
     e.on_progress(move |_| (start.elapsed() > time).then(|| Dynamic::from("time")));
     let c = ctx.clone();
-    e.on_print(move |s| c.borrow_mut().messages.push(s.to_string()));
+    e.on_print(move |s| c.borrow_mut().message(s));
     let c = ctx.clone();
-    e.on_debug(move |s, _, _| c.borrow_mut().messages.push(s.to_string()));
+    e.on_debug(move |s, _, _| c.borrow_mut().message(s));
     register(&mut e, ctx);
     e
 }
@@ -718,6 +742,7 @@ pub fn check(src: &str) -> Result<(), ScriptError> {
         design: Design::new(""),
         selection: Vec::new(),
         messages: Vec::new(),
+        message_bytes: 0,
         changed: false,
         machine: None,
     }));
@@ -746,6 +771,7 @@ pub fn run(
         design: design.clone(),
         selection: selection.to_vec(),
         messages: Vec::new(),
+        message_bytes: 0,
         changed: false,
         machine: machine.cloned(),
     }));

@@ -511,7 +511,7 @@ pub const SIDE_GROUPS: [&[Tab]; 2] = [
 pub const CANVAS_PART: f32 = 0.70;
 
 /// The part of the height of the side for the first group at the start.
-const FIRST_GROUP_PART: f32 = 0.6;
+pub const FIRST_GROUP_PART: f32 = 0.6;
 
 /// The dock layout at the start: the canvas and the Library on the left,
 /// the two groups of side panels (`SIDE_GROUPS`) on the right.

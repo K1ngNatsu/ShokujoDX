@@ -431,10 +431,23 @@ impl AppState {
             info.max_layers = Some(m.max_layers());
             let lace = emb_stitch::lace::is_lace(d, &self.fabrics);
             let base = self.settings.density_limit;
-            for (spot, limit) in m
-                .hot_spots(base)
+            // The places over each limit, with the area over that limit: a
+            // place of lace or of puff has the higher limit (ADR 0178), and
+            // its area over that limit counts, not the area over the limit
+            // of other places (the audit of 2026-11-26).
+            let mut spots: Vec<(emb_render::density::HotSpot, f64)> = Vec::new();
+            for limit in [base, base + DENSE_BY_DESIGN] {
+                spots.extend(
+                    m.hot_spots(limit)
+                        .into_iter()
+                        .filter(|s| build_up_limit(d, lace, base, back.apply(s.peak)) == limit)
+                        .map(|s| (s, limit)),
+                );
+            }
+            spots.sort_by(|a, b| b.0.max_layers.total_cmp(&a.0.max_layers));
+            for (spot, limit) in spots
                 .iter()
-                .map(|s| (s, build_up_limit(d, lace, base, back.apply(s.peak))))
+                .map(|(s, limit)| (s, *limit))
                 .filter(|(s, limit)| s.max_layers > *limit)
                 .take(MAX_BUILD_UP)
             {

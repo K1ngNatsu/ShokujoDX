@@ -113,25 +113,25 @@ impl AppState {
                     return 0;
                 }
                 let n = ids.len();
-                self.doc.edit(crate::i18n::fill("Pattern {}", &[&p.name]), |d| {
-                    for id in ids {
-                        match d.object_mut(id).map(|o| &mut o.kind) {
-                            Some(ObjectKind::Fill { params, .. }) => match &mut params.pattern {
-                                FillPattern::ProgramSplit { pattern, .. } | FillPattern::FlexiSplit { pattern, .. } => {
-                                    *pattern = p.clone()
-                                }
-                                other => {
-                                    *other = FillPattern::ProgramSplit {
-                                        pattern: p.clone(),
-                                        scale: 1.0,
+                self.doc
+                    .edit(crate::i18n::fill("Pattern {}", &[&crate::i18n::tr(&p.name)]), |d| {
+                        for id in ids {
+                            match d.object_mut(id).map(|o| &mut o.kind) {
+                                Some(ObjectKind::Fill { params, .. }) => match &mut params.pattern {
+                                    FillPattern::ProgramSplit { pattern, .. }
+                                    | FillPattern::FlexiSplit { pattern, .. } => *pattern = p.clone(),
+                                    other => {
+                                        *other = FillPattern::ProgramSplit {
+                                            pattern: p.clone(),
+                                            scale: 1.0,
+                                        }
                                     }
-                                }
-                            },
-                            Some(ObjectKind::Satin { params, .. }) => params.split_pattern = Some(p.clone()),
-                            _ => {}
+                                },
+                                Some(ObjectKind::Satin { params, .. }) => params.split_pattern = Some(p.clone()),
+                                _ => {}
+                            }
                         }
-                    }
-                });
+                    });
                 n
             }
             Item::Stamp(stamp) => {
@@ -151,18 +151,19 @@ impl AppState {
                     return 0;
                 }
                 let n = places.len();
-                self.doc.edit(crate::i18n::fill("Stamp {}", &[&stamp.name]), |d| {
-                    for (id, center, size_mm) in places {
-                        if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(id).map(|o| &mut o.kind) {
-                            params.stamps.push(emb_model::StampPlacement {
-                                stamp: stamp.clone(),
-                                center,
-                                size_mm,
-                                angle_deg: 0.0,
-                            });
+                self.doc
+                    .edit(crate::i18n::fill("Stamp {}", &[&crate::i18n::tr(&stamp.name)]), |d| {
+                        for (id, center, size_mm) in places {
+                            if let Some(ObjectKind::Fill { params, .. }) = d.object_mut(id).map(|o| &mut o.kind) {
+                                params.stamps.push(emb_model::StampPlacement {
+                                    stamp: stamp.clone(),
+                                    center,
+                                    size_mm,
+                                    angle_deg: 0.0,
+                                });
+                            }
                         }
-                    }
-                });
+                    });
                 n
             }
             Item::Clipart(item) => {

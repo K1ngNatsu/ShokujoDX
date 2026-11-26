@@ -39,6 +39,14 @@ const EDGE: f64 = 0.012;
 const SNAP: f64 = 0.12;
 /// The stitch length of a travel run, in mm (at each size).
 pub const RUN_STITCH_MM: f64 = 1.5;
+
+/// The settings of a travel run of a route.
+pub(crate) fn run_params() -> RunningParams {
+    RunningParams {
+        stitch_length_mm: RUN_STITCH_MM,
+        ..Default::default()
+    }
+}
 /// Letters with more parts than this get no search of all orders, but a
 /// beam search ([`BEAM`]).
 const MAX_PARTS: usize = 8;
@@ -1353,10 +1361,7 @@ pub fn route_in(letter: &EmbLetter, cap_mm: f64, outline: Option<&[Vec<Point>]>)
             }
             parts.push(ObjectKind::Running {
                 path,
-                params: RunningParams {
-                    stitch_length_mm: RUN_STITCH_MM,
-                    ..Default::default()
-                },
+                params: run_params(),
             });
             tuning.push(PartTuning::default());
             runs += 1;

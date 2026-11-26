@@ -1271,6 +1271,12 @@ mod tests {
         l.envelope.amount = 0.1;
         crate::relayout(&mut l, &font);
         assert!(l.letters.iter().all(|x| !fills(&x.parts)));
+        // Stacked text has no envelope (the layout does not bend it), so
+        // the envelope does not choose (the audit of 2026-11-26).
+        l.envelope.amount = 0.45;
+        l.direction = emb_model::TextDirection::Down;
+        crate::relayout(&mut l, &font);
+        assert!(l.letters.iter().all(|x| !fills(&x.parts)));
         assert_eq!(large.range_mm, Some((lo, 300.0)));
         // The file keeps the fill letters.
         let back = EmbFont::from_json(&font.to_json()).unwrap();

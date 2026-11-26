@@ -61,12 +61,16 @@ herramienta no acepta un argumento que no conoce.
 ## Ver el diseño en el programa
 
 La herramienta **show** guarda el diseño y lo abre en ShokujoDX: en una
-pestaña nueva del programa abierto, o si no, en un programa nuevo.
+pestaña nueva del programa abierto (o en su pestaña, si ya está abierto),
+o si no, en un programa nuevo. Un diseño sin archivo va a un archivo de
+la carpeta de los archivos temporales y sigue sin guardar:
+**save_design** lo guarda.
 
 Cuando el agente guarda un archivo que está abierto en una pestaña, el
 programa pregunta por él. **Abrir de nuevo** muestra la versión nueva
 (los cambios no guardados de la pestaña se pierden). **Conservar esta
-versión** deja la pestaña como está.
+versión** deja la pestaña como está, y la pestaña queda sin guardar (al
+cerrarla, el programa pregunta).
 
 ## Pruébelo
 

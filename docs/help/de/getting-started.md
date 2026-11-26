@@ -53,8 +53,9 @@ oder PDF-Datei kommt in das Design, und ein Bild wird zum Hintergrundbild.
   Siehe [Die Arbeitsfläche und die Auswahl](canvas).
 - **Die Bereiche** rechts zeigen das ausgewählte Objekt
   (Objekteigenschaften), die Stickreihenfolge (Reihenfolge), die Garne,
-  die Stile, die Designinfo und mehr. Jeder Bereich schließt mit seinem
-  ×. **Ansicht > Bereiche** öffnet ihn wieder.
+  die Stile, die Designinfo und mehr. Sie sind in zwei Gruppen; der offene
+  Tab einer Gruppe hat ein ×, das seinen Bereich schließt. **Ansicht >
+  Bereiche** öffnet ihn wieder.
 - **Die Eigenschaftsleiste** unter dem Menüband hat die Einstellungen des
   aktiven Werkzeugs, zum Beispiel die Stichlänge neuer Linien.
 - **Die Statuszeile** unten sagt Ihnen, was als Nächstes zu tun ist, und

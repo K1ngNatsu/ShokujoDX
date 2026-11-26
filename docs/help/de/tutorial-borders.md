@@ -60,7 +60,7 @@ ist ein eigenes Design.
 1. Klicken Sie im Fenster **Motive** auf **Familien…**. Das Fenster
    **Familien** öffnet sich.
 2. Klicken Sie auf **Clipart**, dann auf **Sechszackiger Stern** (ein
-   eingebautes Element der Familie Star).
+   eingebautes Element der Familie Stern).
 3. Ändern Sie **Spitzen** oder **Innerer Teil**, um den Stern zu ändern.
    Das Bild zeigt das Element.
 

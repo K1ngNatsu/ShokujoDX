@@ -64,13 +64,16 @@ nimmt kein Argument an, das es nicht kennt.
 ## Das Design im Programm sehen
 
 Das Werkzeug **show** speichert das Design und öffnet es in ShokujoDX:
-in einem neuen Tab des laufenden Programms, sonst in einem neuen
-Programm.
+in einem neuen Tab des laufenden Programms (oder in seinem Tab, wenn es
+schon geöffnet ist), sonst in einem neuen Programm. Ein Design ohne
+Datei kommt in eine Datei im Ordner der temporären Dateien und bleibt
+nicht gespeichert: **save_design** speichert es.
 
 Wenn der Agent eine Datei speichert, die in einem Tab geöffnet ist,
 fragt das Programm danach. **Erneut öffnen** zeigt die neue Version (die
 nicht gespeicherten Änderungen des Tabs gehen verloren). **Diese Version
-behalten** lässt den Tab, wie er ist.
+behalten** lässt den Tab, wie er ist, und der Tab ist nicht gespeichert
+(beim Schließen fragt das Programm).
 
 ## Ausprobieren
 

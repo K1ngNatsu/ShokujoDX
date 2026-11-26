@@ -39,12 +39,17 @@ layout, so a middle initial of 60 mm sewed as columns.
    parts are scaled as before. The stretch of the envelope is for the
    whole text, so the letters of an envelope are the same kind.
 2. **Stitches along a side of a column** (`satin::thin_across`): where a
-   stitch is 25° or less from a side, the pairs that stay can be 1.5
+   stitch is less than 25° from a side, the pairs that stay can be 1.5
    steps apart across the stitches (`ALONG_SIDE_GAP`), so pairs half a
-   step apart there stay one step apart, as in the middle of the column.
-   A column whose stitches meet both sides at more than 25° (also one
-   slanted all along) keeps its pairs: a factor of 1.5 for all pairs would
-   sew such a column lighter than its spacing.
+   step apart there stay 1 to 1.5 steps apart (from `1.5 - a` to 1.5
+   steps, where `a` is the distance across of two pairs that follow; in
+   the middle of the column: one step). A column whose stitches meet both
+   sides at 25° or more (also one slanted 60° all along) keeps its pairs:
+   a factor of 1.5 for all pairs would sew such a column lighter than its
+   spacing. A column slanted more than 65° all along (its stitches less
+   than 25° from its sides) sews up to 1.5 times lighter; a factor of
+   about 1.25 would give one step on average there (the audit of
+   2026-11-26), but it needs the monogram probe again.
 3. **Not done.** The underlay that stops short of the ends of a column
    (tried with 0.6 to 1.5 mm) took the worst place only from 8.4 to 7.9.
    Travel in a tatami fill that goes round the sewn rows (as in circular
@@ -65,6 +70,8 @@ layout, so a middle initial of 60 mm sewed as columns.
   that shows): the travel goes from one side of the leg to the other at
   the end of a section, and no way round is open.
 - The letter fault bench and the judged letters: the same to the eye.
+- The audit of 2026-11-26: stacked text has no envelope, so its
+  envelope does not choose columns or fills.
 - Tests: `stitches_along_a_side_are_one_step_apart`,
   `the_most_stretch_of_an_envelope`, the letters by size in
   `a_font_has_fill_letters_for_large_lettering` (an edit and an envelope),

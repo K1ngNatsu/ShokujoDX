@@ -7,8 +7,9 @@ Changes how ADR 0161 finds a route, not the route that it finds.
 ## Context
 
 After ADR 0161 the route thread of a font of the computer made the 62
-letters and digits of Georgia in 6.7 s, Times New Roman in 4.4 s, Arial
-in 0.6 s and Webdings in 20.4 s (measured again for this work). A first
+letters and digits of Georgia in 6.6 s, Times New Roman in 4.4 s, Arial
+in 0.6 s and Webdings in 20.3 s (measured again for this work; the table
+below has the values). A first
 use of a letter in a new session waits for its route, also when the
 program made it in an earlier session (a kanji: 0.004 s to 0.56 s).
 
@@ -48,18 +49,21 @@ letter, and routes kept on the disk.
    under the parts. A map of the parts that cover each cell
    (`Router::cover`) replaces a look at all the parts.
 4. **Routes on the disk** (`RouteStore`, `Font::set_route_store`). The
-   app keeps the routes of the fonts of the computer in the folder
-   `routes` of the folder of the program: one folder for each font (a
-   hash of the font file, the face and the values of its axes), one file
-   for each glyph with the shapes of its columns and travel runs (the
+   app keeps the routes of the TrueType fonts (of the computer and the
+   bundled ones) in the folder `routes` of the folder of the program: one
+   folder for each build (a hash of the version of the program and the
+   size and the time of its program file), in it one folder for each font
+   (a hash of the font file, the face and the values of its axes), and one
+   file for each glyph with the shapes of its columns and travel runs (the
    program gives them the settings of a route, so a damaged file cannot
    give others). A route in the store is read at once, also with the
-   route thread (`RouteMode::Background`). The store is for one build: the
-   version of the program and the size and the time of its program file;
-   the store of another build is moved out of the way and deleted on a
-   thread. A file that is damaged, or has a point far out of the letter,
-   is not used: the route is made again. The tests do not open a store
-   (they do not write in the folders of the user).
+   route thread (`RouteMode::Background`). A build reads and writes only
+   its own folder; the folders of other builds are moved out of the way
+   and deleted on a thread. A file that is larger than 8 MB
+   (`MAX_STORED_BYTES`) or damaged, a route with no parts, and a route
+   with a point more than one em out of the box of the outline of its
+   glyph are not used: the route is made again. The tests do not open a
+   store (they do not write in the folders of the user).
 5. **Not done.** A search toward the goal (A*): tried with the distance
    to the box of the goal cells; it took 14 % fewer cells and gave other
    routes (two ways of the same length change places), so it is not
@@ -95,5 +99,13 @@ letter, and routes kept on the disk.
   letter.
 - Tests: `a_shared_search_gives_the_link_of_a_search_of_its_own`, the
   groups test with the kept groups, `routes_are_kept_on_the_disk` (a
-  second font reads the route, a changed file is read, a damaged file and
-  a far point are not), `a_store_of_another_build_is_not_used`.
+  second font reads the route, a changed file is read; a damaged file, a
+  far point, a route with no parts and a file that is too large are not),
+  `a_store_of_another_build_is_not_used` (also: a program of the old build
+  that runs on writes in its own folder).
+- The audit of 2026-11-26 changed the store: it was one folder for all
+  builds with a file of the build in it, so a program of one build that
+  ran when a program of another build started wrote its routes into the
+  store of the new build. A route with no parts made a letter with no
+  stitches, the check of a far point used 64 em from the origin of the
+  glyph, and a file that was not moved stayed in the store.

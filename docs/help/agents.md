@@ -60,11 +60,14 @@ argument that it does not know.
 ## See the design in the program
 
 The tool **show** saves the design and opens it in ShokujoDX: in a new
-tab of the program that runs, else in a new program.
+tab of the program that runs (or its tab, if it is open already), else in
+a new program. A design with no file goes to a file in the folder of the
+temporary files, and it stays not saved: **save_design** keeps it.
 
 When the agent saves a file that is open in a tab, the program asks
 about it. **Open Again** shows the new version (the changes of the tab
-that are not saved go). **Keep This Version** keeps the tab as it is.
+that are not saved go). **Keep This Version** keeps the tab as it is,
+and the tab is not saved (a close asks).
 
 ## Try it
 

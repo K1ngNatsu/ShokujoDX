@@ -122,6 +122,12 @@ pub fn active() -> Option<&'static Language> {
     ACTIVE.with(Cell::get)
 }
 
+/// The language of this thread writes a decimal comma (German, Spanish):
+/// `1,250` is 1.25 in a field of decimal numbers, not 1250.
+pub fn decimal_comma() -> bool {
+    matches!(current(), "de" | "es")
+}
+
 /// The code of the language of this thread.
 pub fn current() -> &'static str {
     ACTIVE.with(|a| a.get().map_or("en", |l| l.code.as_str()))
@@ -379,6 +385,7 @@ pub(crate) mod tests {
         out.extend(emb_model::TextDirection::ALL.iter().map(|d| d.name()));
         out.extend(emb_model::ThreadKind::ALL.iter().map(|k| k.name()));
         out.extend(emb_letter::swatch::SwatchSetting::ALL.iter().map(|s| s.name()));
+        out.push(crate::keyboard::BUILT_IN);
         // The kinds and the parameters of the families, and the shapes of
         // the borders (P17 Milestone 8, ADR 0118).
         out.extend(emb_model::family::Kind::ALL.iter().map(|k| k.name()));

@@ -277,7 +277,7 @@ impl TypedParser<'_> {
 }
 
 fn parse_typed(text: &str, units: Units) -> Option<Typed> {
-    let t = text
+    let t = narrow(text)
         .trim()
         .replace(',', ".")
         .replace('×', "x")
@@ -316,28 +316,57 @@ pub fn parse_number(text: &str) -> Option<f64> {
     }
 }
 
+/// The characters of a typed number in their narrow form: the full-width
+/// digits and signs that a Japanese input method types (`１，５`, `－３`),
+/// and the minus sign `−`.
+fn narrow(text: &str) -> String {
+    text.chars()
+        .map(|c| match c {
+            '０'..='９' => char::from(b'0' + (c as u32 - '０' as u32) as u8),
+            '，' => ',',
+            '．' => '.',
+            '－' | '−' => '-',
+            '＋' => '+',
+            '＊' => '*',
+            '／' => '/',
+            '　' => ' ',
+            _ => c,
+        })
+        .collect()
+}
+
 /// A number that the user types in a number field: with a decimal comma or
 /// a decimal point (`0,4` or `0.4`: German and Spanish users type a comma),
 /// `+ - * /` and a degree sign, as [`parse_number`]. In a field of whole
-/// numbers (`whole`), a comma, a point or a space between groups of three
-/// digits groups the thousands (`1,000`, `1.000` or `1 000`).
+/// numbers (`whole`), a comma, a point, a space or `'` between groups of
+/// three digits groups the thousands (`1,000`, `1.000` or `1 000`). In a
+/// field of decimal numbers, commas between groups of three digits group
+/// the thousands in the languages with a decimal point (English and
+/// Japanese: `5,000` is 5000, not 5; the audit of 2026-11-26).
 pub fn parse_field(text: &str, whole: bool) -> Option<f64> {
-    let t: String = text.trim().chars().map(|c| if c == '−' { '-' } else { c }).collect();
-    if whole && let Some(n) = thousands(&t) {
+    let t = narrow(text.trim());
+    let seps: &[char] = if whole {
+        &[',', '.', ' ', '\'']
+    } else if crate::i18n::decimal_comma() {
+        &[]
+    } else {
+        &[',']
+    };
+    if let Some(n) = thousands(&t, seps) {
         return Some(n);
     }
     parse_number(&t)
 }
 
 /// A whole number with its thousands in groups of three digits, with one
-/// kind of separator: `1,000`, `-12.500`, `1 000 000`.
-fn thousands(t: &str) -> Option<f64> {
+/// kind of separator of `seps`: `1,000`, `-12.500`, `1 000 000`.
+fn thousands(t: &str, seps: &[char]) -> Option<f64> {
     let (sign, digits) = match t.strip_prefix('-') {
         Some(rest) => (-1.0, rest),
         None => (1.0, t),
     };
     let sep = digits.chars().find(|c| !c.is_ascii_digit())?;
-    if ![',', '.', ' ', '\''].contains(&sep) {
+    if !seps.contains(&sep) {
         return None;
     }
     let groups: Vec<&str> = digits.split(sep).collect();
@@ -1855,6 +1884,27 @@ mod tests {
         for bad in ["", "abc", "1,2,3x", "2 in"] {
             assert_eq!(parse_field(bad, false), None, "{bad}");
         }
+        // Full-width digits and signs (a Japanese input method).
+        for (text, v) in [("１，５", 1.5), ("１．５", 1.5), ("－３", -3.0), ("２０　＋　５", 25.0)] {
+            assert!(near(parse_field(text, false), v), "{text}");
+        }
+        assert!(near(parse_length("－３", Units::Mm), -3.0));
+        // A field of decimal numbers: commas between groups of three digits
+        // are thousands in English and Japanese, a decimal comma in German
+        // and Spanish.
+        for (lang, five_thousand, one_two_five) in [
+            ("en", 5000.0, 1250.0),
+            ("ja", 5000.0, 1250.0),
+            ("de", 5.0, 1.25),
+            ("es", 5.0, 1.25),
+        ] {
+            crate::i18n::set_language(lang);
+            assert!(near(parse_field("5,000", false), five_thousand), "{lang}");
+            assert!(near(parse_field("1,250", false), one_two_five), "{lang}");
+            assert!(near(parse_field("0,4", false), 0.4), "{lang}");
+            assert!(near(parse_field("12,5", false), 12.5), "{lang}");
+        }
+        crate::i18n::set_language("en");
     }
 
     /// A number typed with a decimal comma into a field of the program gets

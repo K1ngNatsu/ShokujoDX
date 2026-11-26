@@ -49,8 +49,8 @@ picture becomes the backdrop.
   canvas and the selection](canvas).
 - **The panels** on the right show the selected object (Object
   Properties), the sew order (Sequence), the threads, the styles, the
-  design info and more. Each panel closes with its ×. **View > Panels**
-  opens it again.
+  design info and more. They are in two groups; the open tab of a group
+  has a × that closes its panel. **View > Panels** opens it again.
 - **The property bar** under the ribbon has the settings of the active
   tool, for example the stitch length of new lines.
 - **The status line** at the bottom tells you what to do next, and shows

@@ -103,13 +103,14 @@ fn records(n: usize, f: impl Fn(usize) -> StitchRecord) -> StitchDesign {
 }
 
 /// The names of the cases.
-const CASES: [&str; 6] = [
+const CASES: [&str; 7] = [
     "p22_travel_far_apart",
     "p22_travel_many",
     "p22_quicker",
     "p22_swatches",
     "p22_lean_and_bands",
     "p22_machine_files",
+    "p22_mcp",
 ];
 
 /// Runs each case in a process of its own, and lists the result of each.
@@ -533,4 +534,354 @@ fn p22_machine_files() {
             Err(e) => println!("  PROBLEM {e}"),
         }
     }
+}
+
+/// One message to the MCP server: the result of a tool, or the error.
+fn mcp_call(s: &mut emb_cli::mcp::Session, tool: &str, args: serde_json::Value) -> serde_json::Value {
+    let m = serde_json::json!({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+        "params": {"name": tool, "arguments": args}});
+    let r = s.handle(&m).expect("a reply");
+    if r.get("error").is_some() {
+        r
+    } else {
+        r["result"].clone()
+    }
+}
+
+/// A session with a fill, a run, a satin, a vector shape and lettering.
+fn mcp_seeded() -> emb_cli::mcp::Session {
+    use serde_json::json;
+    let mut s = emb_cli::mcp::Session::new();
+    for (stitch, d) in [
+        ("fill", "M -10 -10 L 10 -10 L 10 10 L -10 10 Z"),
+        ("run", "M -20 20 L 20 20"),
+        ("satin", "M -20 30 L 20 30"),
+        ("vector", "M 0 0 L 5 5"),
+    ] {
+        let r = mcp_call(&mut s, "add_shape", json!({"svg_path": d, "stitch": stitch}));
+        assert_eq!(r["isError"], false, "{r}");
+    }
+    let r = mcp_call(&mut s, "add_lettering", json!({"text": "AB"}));
+    assert_eq!(r["isError"], false, "{r}");
+    s
+}
+
+/// Runs `f` on the session in a thread with a time limit; the session back,
+/// or a problem text (then the session is lost).
+fn mcp_timed<R: Send + 'static>(
+    name: &str,
+    s: emb_cli::mcp::Session,
+    f: impl FnOnce(&mut emb_cli::mcp::Session) -> R + Send + 'static,
+) -> Result<(emb_cli::mcp::Session, R, Duration), String> {
+    timed(name, Duration::from_secs(5), Duration::from_secs(30), move || {
+        let mut s = s;
+        let r = f(&mut s);
+        (s, r)
+    })
+    .map(|((s, r), took)| (s, r, took))
+}
+
+/// The leaves of a value of settings: the path of each number, flag and
+/// text.
+fn setting_leaves(v: &serde_json::Value, at: Vec<String>, out: &mut Vec<(Vec<String>, serde_json::Value)>) {
+    match v {
+        serde_json::Value::Object(m) => {
+            for (k, x) in m {
+                let mut p = at.clone();
+                p.push(k.clone());
+                setting_leaves(x, p, out);
+            }
+        }
+        serde_json::Value::Array(_) | serde_json::Value::Null => {}
+        _ => out.push((at, v.clone())),
+    }
+}
+
+/// The MCP server (Milestone 9) with wrong arguments: each tool with each
+/// argument of a wrong type and with hard numbers and texts; each setting
+/// of each object kind with hard values (the design checked after each
+/// change); and lines that are not messages.
+#[test]
+#[ignore]
+fn p22_mcp() {
+    use serde_json::{Value, json};
+    let dir = std::env::temp_dir().join("shokujodx-p22-mcp");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    // The texts of the probe are also paths: relative ones go in the
+    // folder of the probe (this case runs in a process of its own).
+    std::env::set_current_dir(&dir).unwrap();
+    let file = |n: &str| dir.join(n).to_string_lossy().to_string();
+    // A project file and a machine file to open.
+    let mut s = mcp_seeded();
+    let r = mcp_call(&mut s, "save_design", json!({"path": file("seed.embproj")}));
+    assert_eq!(r["isError"], false, "{r}");
+    let dst = records(200, |i| StitchRecord::stitch((i % 20) as f64, (i / 20) as f64));
+    emb_cli::write_output(&dst, &dir.join("seed.dst")).unwrap();
+
+    let list = s
+        .handle(&json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}))
+        .unwrap();
+    let tools = list["result"]["tools"].as_array().unwrap().clone();
+    let big = "x".repeat(1_000_000);
+    let numbers = [
+        json!(0),
+        json!(-1),
+        json!(1e-300),
+        json!(1e300),
+        json!(-1e300),
+        json!(1e9),
+        json!(-1e9),
+        json!(0.5),
+        json!("1"),
+        json!(true),
+    ];
+    let texts = [
+        json!(""),
+        json!(" "),
+        json!(big),
+        json!("\u{0}"),
+        json!("../../../x"),
+        json!("ア"),
+        json!("-1"),
+        json!("1e999"),
+        json!("NaN"),
+        json!("#zzzzzz"),
+        json!("\n\n"),
+        json!(5),
+    ];
+    let many: Vec<u64> = (1..=20_000).collect();
+    let ids = [
+        json!([]),
+        json!([0]),
+        json!([u64::MAX]),
+        json!([1, 1, 1]),
+        json!(many),
+        json!([-1]),
+        json!([1.5]),
+        json!(["1"]),
+        json!(5),
+    ];
+    let flags = [json!("true"), json!(1)];
+    let text_lists = [json!([]), json!([""]), json!([big]), json!([1]), json!("x")];
+    let objects = [json!({}), json!({"a": 1}), json!([1]), json!("x")];
+    let default_for = |tool: &str, name: &str| -> Value {
+        match (tool, name) {
+            ("open_design", "path") => json!(file("seed.embproj")),
+            ("check_machine_file" | "fix_machine_file", "path") => json!(file("seed.dst")),
+            (_, "path") => json!(file("out.embproj")),
+            (_, "out") => json!(file("out.dst")),
+            (_, "folder") => json!(file("")),
+            (_, "svg_path") => json!("M 0 0 L 10 0 L 10 10 Z"),
+            (_, "stitch") => json!("fill"),
+            (_, "text") => json!("A"),
+            (_, "ids") => json!([1]),
+            (_, "settings") => json!({"zz": 1}),
+            (_, "color") => json!("#ff0000"),
+            (_, "degrees") => json!(10),
+            (_, "source") => json!("1"),
+            (_, "setting") => json!("spacing"),
+            (_, "from") => json!(0.3),
+            (_, "to") => json!(0.5),
+            (_, "what") => json!("fonts"),
+            _ => json!(1),
+        }
+    };
+    let mut calls = 0;
+    let mut problems = 0;
+    let mut slowest = (Duration::ZERO, String::new());
+    let mut session = Some(mcp_seeded());
+    for t in &tools {
+        let tool = t["name"].as_str().unwrap().to_string();
+        if tool == "show" {
+            continue;
+        }
+        let schema = &t["inputSchema"];
+        let required: Vec<String> = schema["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_string())
+            .collect();
+        for (param, p) in schema["properties"].as_object().unwrap() {
+            let values: &[Value] = match p["type"].as_str().unwrap() {
+                "number" => &numbers,
+                "string" => &texts,
+                "boolean" => &flags,
+                "array" if p["items"]["type"] == "integer" => &ids,
+                "array" => &text_lists,
+                _ => &objects,
+            };
+            for v in values {
+                let mut args = serde_json::Map::new();
+                for r in &required {
+                    args.insert(r.clone(), default_for(&tool, r));
+                }
+                args.insert(param.clone(), v.clone());
+                let shown = v.to_string();
+                let shown = if shown.len() > 40 {
+                    format!("{}…", &shown[..40])
+                } else {
+                    shown
+                };
+                let label = format!("{tool} {param}={shown}");
+                let s = session.take().unwrap_or_else(mcp_seeded);
+                let tool2 = tool.clone();
+                calls += 1;
+                match mcp_timed(&label, s, move |s| {
+                    let r = mcp_call(s, &tool2, Value::Object(args));
+                    let check = mcp_call(s, "check_design", json!({}));
+                    (r, check)
+                }) {
+                    Ok((s, (r, check), took)) => {
+                        if took > slowest.0 {
+                            slowest = (took, label.clone());
+                        }
+                        if check["isError"] != false {
+                            problems += 1;
+                            println!("  PROBLEM {label}: check_design after it: {check}");
+                        }
+                        if r.get("error").is_some() {
+                            println!("  {label}: a protocol error {}", r["error"]);
+                        }
+                        session = Some(s);
+                    }
+                    Err(e) => {
+                        problems += 1;
+                        println!("  PROBLEM {e}");
+                    }
+                }
+            }
+        }
+    }
+    println!(
+        "  tools: {calls} calls, {problems} problems, the slowest {:.2?} ({})",
+        slowest.0, slowest.1
+    );
+
+    // Each setting of each kind with hard values.
+    let hard = [
+        json!(0),
+        json!(-1),
+        json!(1e-300),
+        json!(1e300),
+        json!(-1e300),
+        json!(1e9),
+        json!(0.001),
+        json!("zz"),
+        json!(true),
+        json!([]),
+        json!({}),
+    ];
+    let mut s = mcp_seeded();
+    let listed = mcp_call(&mut s, "list_objects", json!({}));
+    let objs = listed["structuredContent"]["objects"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    let (mut tried, mut taken, mut problems, mut slowest) = (0, 0, 0, (Duration::ZERO, String::new()));
+    let mut session = Some(s);
+    for o in &objs {
+        let id = o["id"].as_u64().unwrap();
+        let kind = o["kind"].as_str().unwrap_or("?").to_string();
+        let mut leaves = Vec::new();
+        setting_leaves(&o["settings"], Vec::new(), &mut leaves);
+        for (path, _) in &leaves {
+            for v in &hard {
+                let mut patch = v.clone();
+                for k in path.iter().rev() {
+                    patch = json!({ k.clone(): patch });
+                }
+                let label = format!("{kind} {}={v}", path.join("."));
+                let s = session.take().unwrap_or_else(mcp_seeded);
+                tried += 1;
+                match mcp_timed(&label, s, move |s| {
+                    let r = mcp_call(s, "set_settings", json!({"ids": [id], "settings": patch}));
+                    let check = mcp_call(s, "check_design", json!({}));
+                    let picture = mcp_call(s, "picture", json!({"px_per_mm": 2}));
+                    if r["isError"] == false {
+                        mcp_call(s, "undo", json!({}));
+                    }
+                    (r, check, picture)
+                }) {
+                    Ok((s, (r, check, picture), took)) => {
+                        if took > slowest.0 {
+                            slowest = (took, label.clone());
+                        }
+                        if r["isError"] == false {
+                            taken += 1;
+                        }
+                        if check["isError"] != false || picture["isError"] != false {
+                            problems += 1;
+                            println!("  PROBLEM {label}: {check} {}", picture["content"][0]);
+                        }
+                        session = Some(s);
+                    }
+                    Err(e) => {
+                        problems += 1;
+                        println!("  PROBLEM {e}");
+                    }
+                }
+            }
+        }
+    }
+    println!(
+        "  settings: {} objects, {tried} changes, {taken} taken, {problems} problems, the slowest {:.2?} ({})",
+        objs.len(),
+        slowest.0,
+        slowest.1
+    );
+
+    // Lines that are not messages, through `serve`.
+    let deep = format!("{}{}", "[".repeat(100_000), "]".repeat(100_000));
+    let lines = [
+        "{".to_string(),
+        "null".into(),
+        "5".into(),
+        "[]".into(),
+        r#"[{"jsonrpc":"2.0","id":1,"method":"ping"}]"#.into(),
+        deep,
+        format!(r#"{{"jsonrpc":"2.0","id":1,"method":"{}"}}"#, "x".repeat(5_000_000)),
+        r#"{"jsonrpc":"2.0","id":{"a":[1,2]},"method":"ping"}"#.into(),
+        r#"{"jsonrpc":"2.0","id":null,"method":"ping"}"#.into(),
+        r#"{"jsonrpc":"2.0","method":"tools/call","params":{"name":"delete_objects","arguments":{"ids":[1]}}}"#.into(),
+        r#"{"jsonrpc":"2.0","id":2,"method":"tools/call","params":5}"#.into(),
+        r#"{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":5}}"#.into(),
+        r#"{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"undo","arguments":[]}}"#.into(),
+        r#"{"jsonrpc":"2.0","id":5,"result":{}}"#.into(),
+        "\u{feff}{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"ping\"}".into(),
+    ];
+    let mut input = Vec::new();
+    for l in &lines {
+        input.extend_from_slice(l.as_bytes());
+        input.push(b'\n');
+    }
+    input.extend_from_slice(&[0xff, 0xfe, b'\n']);
+    input.extend_from_slice(br#"{"jsonrpc":"2.0","id":7,"method":"ping"}"#);
+    input.push(b'\n');
+    let n = lines.len() + 2;
+    match timed("serve", Duration::from_secs(5), Duration::from_secs(30), move || {
+        let mut out = Vec::new();
+        let r = emb_cli::mcp::serve(std::io::Cursor::new(input), &mut out);
+        (r.map_err(|e| e.to_string()), String::from_utf8_lossy(&out).to_string())
+    }) {
+        Ok(((r, out), took)) => {
+            let replies: Vec<&str> = out.lines().collect();
+            let not_json = replies
+                .iter()
+                .filter(|l| serde_json::from_str::<Value>(l).is_err())
+                .count();
+            println!(
+                "  serve: {n} lines, {} replies ({not_json} not JSON), the end {r:?}, {took:.2?}",
+                replies.len()
+            );
+            for l in replies {
+                let end = l.char_indices().nth(160).map_or(l.len(), |(i, _)| i);
+                println!("    {}", &l[..end]);
+            }
+        }
+        Err(e) => println!("  PROBLEM {e}"),
+    }
+    std::env::set_current_dir(std::env::temp_dir()).unwrap();
+    let _ = std::fs::remove_dir_all(&dir);
 }

@@ -652,14 +652,7 @@ mod tests {
                 }
             }
         }
-        assert!(
-            bad.is_empty(),
-            "{}",
-            bad.join(
-                "
-"
-            )
-        );
+        assert!(bad.is_empty(), "{}", bad.join("\n"));
     }
 
     /// A monogram and new lettering get the settings of the fabric of the

@@ -45,19 +45,38 @@ delete_objects, look at it with picture and check_design, and keep it with save_
 export. show opens it in the program. Each change is one undo step (undo, redo). Coordinates \
 are mm from the middle of the hoop, x to the right and y down; angles are degrees.";
 
+/// The most characters of the text of lettering that the tools take: a
+/// text of 1 MB kept the server busy for more than 30 s (the audit of
+/// 2026-11-26), and no hoop holds 2,000 letters.
+const MAX_TEXT_CHARS: usize = 2_000;
+
 /// Serves one agent: reads messages from `input` until it ends, and
-/// writes the replies to `output`, one on each line.
-pub fn serve(input: impl BufRead, mut output: impl Write) -> std::io::Result<()> {
+/// writes the replies to `output`, one on each line. A line that is not
+/// UTF-8 text gets an error, and the session goes on (its design is not
+/// lost).
+pub fn serve(mut input: impl BufRead, mut output: impl Write) -> std::io::Result<()> {
     let mut server = Session::new();
-    for line in input.lines() {
-        let line = line?;
-        if line.trim().is_empty() {
-            continue;
+    let mut bytes = Vec::new();
+    loop {
+        bytes.clear();
+        if input.read_until(b'\n', &mut bytes)? == 0 {
+            return Ok(());
         }
-        let reply = match serde_json::from_str::<Value>(&line) {
-            Ok(Value::Array(_)) => Some(error(Value::Null, -32600, "a batch of messages is not taken")),
-            Ok(message) => server.handle(&message),
-            Err(e) => Some(error(Value::Null, -32700, &format!("not JSON: {e}"))),
+        let reply = match std::str::from_utf8(&bytes) {
+            Err(_) => Some(error(Value::Null, -32700, "the line is not UTF-8 text")),
+            Ok(line) => {
+                // A byte order mark at the start of the stream is not JSON.
+                let line = line.trim_start_matches('\u{feff}');
+                if line.trim().is_empty() {
+                    continue;
+                }
+                match serde_json::from_str::<Value>(line) {
+                    Ok(Value::Array(_)) => Some(error(Value::Null, -32600, "a batch of messages is not taken")),
+                    Ok(message @ Value::Object(_)) => server.handle(&message),
+                    Ok(_) => Some(error(Value::Null, -32600, "a message must be a JSON object")),
+                    Err(e) => Some(error(Value::Null, -32700, &format!("not JSON: {e}"))),
+                }
+            }
         };
         if let Some(r) = reply {
             serde_json::to_writer(&mut output, &r)?;
@@ -65,7 +84,6 @@ pub fn serve(input: impl BufRead, mut output: impl Write) -> std::io::Result<()>
             output.flush()?;
         }
     }
-    Ok(())
 }
 
 fn error(id: Value, code: i64, message: &str) -> Value {
@@ -84,6 +102,9 @@ fn server_info() -> Value {
 pub struct Session {
     doc: Document,
     path: Option<PathBuf>,
+    /// The file in the temp folder that `show` writes for a design with no
+    /// file (the design stays not saved).
+    shown: Option<PathBuf>,
 }
 
 impl Default for Session {
@@ -97,13 +118,24 @@ impl Session {
         Session {
             doc: Document::new(Design::new("Design")),
             path: None,
+            shown: None,
         }
     }
 
     /// The reply to one message (`None` for a notification or a reply of
     /// the client).
     pub fn handle(&mut self, m: &Value) -> Option<Value> {
-        let method = m.get("method").and_then(Value::as_str)?;
+        let Some(method) = m.get("method").and_then(Value::as_str) else {
+            // A reply of the client (a result or an error) gets no reply; a
+            // request with no method gets an error, so the client does not
+            // wait for ever.
+            return match m.get("id") {
+                Some(id) if m.get("result").is_none() && m.get("error").is_none() => {
+                    Some(error(id.clone(), -32600, "a request needs a method (text)"))
+                }
+                _ => None,
+            };
+        };
         // A message with no id is a notification: no reply.
         let id = m.get("id").cloned()?;
         let params = m.get("params").cloned().unwrap_or(json!({}));
@@ -154,7 +186,13 @@ impl Session {
     /// Calls `tool` with `args`: the result of the tool, or its error as a
     /// result with `isError` (the agent can correct its call).
     fn call(&mut self, tool: &Tool, args: &Map<String, Value>) -> Value {
-        let out = check_args(tool, args).and_then(|()| (tool.run)(self, &Args(args)));
+        // A fault (a panic) in a tool gives an error, and the session and
+        // its design stay (the audit of 2026-11-26: a color with a letter
+        // that is not ASCII stopped the server).
+        let out = check_args(tool, args).and_then(|()| {
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| (tool.run)(self, &Args(args))))
+                .unwrap_or_else(|_| Err(format!("{} stopped with a fault of the program.", tool.name)))
+        });
         match out {
             Ok(out) => {
                 let mut content = vec![json!({"type": "text", "text": out.value.to_string()})];
@@ -224,7 +262,7 @@ impl Session {
             "fabric": d.fabric,
             "size_mm": size,
             "objects": d.objects().len(),
-            "threads": d.threads.iter().map(|t| json!({"id": t.id.0, "name": t.name, "color": hex(t.color)})).collect::<Vec<_>>(),
+            "threads": d.threads.iter().map(|t| json!({"id": t.id.0, "name": t.name, "color": t.color.to_hex()})).collect::<Vec<_>>(),
             "stitches": numbers(d),
             "undo_steps": self.doc.undo_len(),
             "undo": self.doc.undo_label(),
@@ -438,7 +476,10 @@ impl Args<'_> {
 
 /// The ids, all of them in the design.
 fn objects_of(s: &Session, a: &Args) -> Result<Vec<ObjectId>, String> {
-    let ids = a.ids("ids")?;
+    let mut ids = a.ids("ids")?;
+    // An id two times moves, scales or turns its object one time.
+    let mut seen = std::collections::HashSet::new();
+    ids.retain(|id| seen.insert(*id));
     if ids.is_empty() {
         return Err("`ids` is empty: give the ids of the objects (list_objects)".into());
     }
@@ -534,7 +575,7 @@ static TOOLS: [Tool; 26] = [
             "The project file. Not needed if the design has a file.",
         )],
         reads: false,
-        destroys: false,
+        destroys: true,
         run: save_design,
     },
     Tool {
@@ -770,8 +811,8 @@ static TOOLS: [Tool; 26] = [
                 "The flat look (lines) in place of the 3D look.",
             ),
         ],
-        reads: true,
-        destroys: false,
+        reads: false,
+        destroys: true,
         run: picture,
     },
     Tool {
@@ -791,7 +832,7 @@ static TOOLS: [Tool; 26] = [
             p("picture", Kind::Flag, false, "The picture (PNG)."),
         ],
         reads: false,
-        destroys: false,
+        destroys: true,
         run: export,
     },
     Tool {
@@ -827,7 +868,7 @@ static TOOLS: [Tool; 26] = [
             p("path", Kind::Text, true, "The project file to write."),
         ],
         reads: false,
-        destroys: false,
+        destroys: true,
         run: test_swatches,
     },
     Tool {
@@ -914,7 +955,7 @@ static TOOLS: [Tool; 26] = [
             ),
         ],
         reads: false,
-        destroys: false,
+        destroys: true,
         run: fix_machine_file,
     },
     Tool {
@@ -1080,7 +1121,7 @@ fn list_objects(s: &mut Session, a: &Args) -> Result<Out, String> {
                 "id": o.id.0,
                 "fits_hoop": shape_fits_hoop(d, o.id),
                 "kind": o.type_name(),
-                "thread": {"id": o.thread.0, "color": thread.map(|t| hex(t.color))},
+                "thread": {"id": o.thread.0, "color": thread.map(|t| t.color.to_hex())},
                 "box_mm": b.map(box_value),
                 "settings": shown_settings(&o.kind),
             });
@@ -1146,7 +1187,10 @@ fn add_lettering(s: &mut Session, a: &Args) -> Result<Out, String> {
     if text.trim().is_empty() {
         return Err("`text` is empty".into());
     }
-    let family = a.text("font")?.unwrap_or("Block Sans");
+    if text.chars().count() > MAX_TEXT_CHARS {
+        return Err(format!("`text` has more than {MAX_TEXT_CHARS} characters"));
+    }
+    let family = a.text("font")?.unwrap_or(emb_letter::bundled::DEFAULT_EMBROIDERY);
     let font = emb_letter::bundled::embroidery(family)
         .ok_or_else(|| format!("no bundled embroidery font {family:?} (list_catalog fonts)"))?;
     let height = a.number("height_mm")?.unwrap_or(15.0);
@@ -1380,6 +1424,12 @@ fn check_design(s: &mut Session, _: &Args) -> Result<Out, String> {
 }
 
 fn picture(s: &mut Session, a: &Args) -> Result<Out, String> {
+    // A picture is written only to a PNG file (not over a project).
+    if let Some(path) = a.text("path")?
+        && !path.to_lowercase().ends_with(".png")
+    {
+        return Err(format!("`path` must be a .png file (it is {path:?})"));
+    }
     let d = s.design();
     let b = d.view_extents().ok_or("the design has nothing to show")?;
     let mut px = a.number("px_per_mm")?.unwrap_or(4.0).clamp(0.5, 20.0);
@@ -1422,22 +1472,7 @@ fn export(s: &mut Session, a: &Args) -> Result<Out, String> {
     let folder = PathBuf::from(a.need_text("folder")?);
     std::fs::create_dir_all(&folder).map_err(|e| format!("{}: {e}", folder.display()))?;
     let d = s.design();
-    let name: String = d
-        .name
-        .chars()
-        .map(|c| {
-            if c.is_alphanumeric() || " -_".contains(c) {
-                c
-            } else {
-                '_'
-            }
-        })
-        .collect();
-    let name = if name.trim().is_empty() {
-        "design".to_string()
-    } else {
-        name
-    };
+    let name = file_name_of(&d.name);
     let proj = folder.join(format!("{name}.{}", project::FILE_EXTENSION));
     project::save(d, &proj).map_err(|e| format!("{}: {e}", proj.display()))?;
     let o = crate::OutputOptions {
@@ -1571,7 +1606,7 @@ fn check_machine_file(_: &mut Session, a: &Args) -> Result<Out, String> {
         "stitches": st.stitch_count(),
         "colors": st.color_count(),
         "trims": st.trim_count(),
-        "threads": st.threads.iter().map(|t| json!({"color": hex(t.color), "name": t.name})).collect::<Vec<_>>(),
+        "threads": st.threads.iter().map(|t| json!({"color": t.color.to_hex(), "name": t.name})).collect::<Vec<_>>(),
     });
     if let Some(id) = a.text("hoop")? {
         let h = HoopCatalog::builtin()
@@ -1610,28 +1645,68 @@ fn fix_machine_file(_: &mut Session, a: &Args) -> Result<Out, String> {
 }
 
 fn show(s: &mut Session, _: &Args) -> Result<Out, String> {
-    let path = match &s.path {
-        Some(p) => p.clone(),
-        None => {
-            let dir = std::env::temp_dir().join("ShokujoDX agent");
-            std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-            dir.join(format!("{}.{}", s.design().name, project::FILE_EXTENSION))
+    let path = match (&s.path, &s.shown) {
+        (Some(p), _) => {
+            project::save(s.design(), p).map_err(|e| format!("{}: {e}", p.display()))?;
+            s.doc.mark_saved();
+            p.clone()
+        }
+        // A design with no file: a file of this session in the temp folder
+        // (a clean name, so it stays in the folder). The design stays not
+        // saved: save_design writes it where the agent says.
+        (None, shown) => {
+            let p = match shown {
+                Some(p) => p.clone(),
+                None => {
+                    let dir = std::env::temp_dir().join("ShokujoDX agent");
+                    std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+                    dir.join(format!(
+                        "{} {}.{}",
+                        file_name_of(&s.design().name),
+                        std::process::id(),
+                        project::FILE_EXTENSION
+                    ))
+                }
+            };
+            project::save(s.design(), &p).map_err(|e| format!("{}: {e}", p.display()))?;
+            s.shown = Some(p.clone());
+            p
         }
     };
-    project::save(s.design(), &path).map_err(|e| format!("{}: {e}", path.display()))?;
-    s.doc.mark_saved();
-    s.path = Some(path.clone());
     let program = program()?;
     // The program gives the file to the program that runs (its inbox, P22
     // Milestone 8), else it opens a window. Its output is not this output.
-    std::process::Command::new(&program)
-        .arg(&path)
+    let mut child = std::process::Command::new(&program)
+        .arg(std::path::absolute(&path).unwrap_or_else(|_| path.clone()))
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .spawn()
         .map_err(|e| format!("{}: {e}", program.display()))?;
+    // Its end is read, so it leaves no process entry behind.
+    std::thread::spawn(move || child.wait());
     out(json!({"shown": path.display().to_string()}))
+}
+
+/// A name for a file from the name of a design: letters, digits, spaces,
+/// `-` and `_` (other characters become `_`); "design" for a name with
+/// none of them.
+fn file_name_of(name: &str) -> String {
+    let clean: String = name
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || " -_".contains(c) {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    if clean.trim().is_empty() {
+        "design".to_string()
+    } else {
+        clean
+    }
 }
 
 /// The program ShokujoDX: `SHOKUJODX_PROGRAM`, else next to `emb-cli`.
@@ -1796,7 +1871,10 @@ fn box_value(b: BBox) -> Value {
 
 /// Moves, scales or rotates `ids` by `t` as one undo step.
 fn transform(s: &mut Session, label: &str, ids: &[ObjectId], t: Transform) -> Result<Out, String> {
-    s.change(label, |d| d.transform_objects(ids, &t))?;
+    // No undo step for a move of 0 (or a scale of 1).
+    if t != Transform::IDENTITY {
+        s.change(label, |d| d.transform_objects(ids, &t))?;
+    }
     let b = boxes(s.design(), ids);
     out(json!({
         "objects": ids.iter().map(|i| i.0).collect::<Vec<_>>(),
@@ -1958,6 +2036,9 @@ fn with_settings(kind: &ObjectKind, patch: &Map<String, Value>) -> Result<Object
     let mut new = kind.clone();
     put_settings(&mut new, Value::Object(all)).map_err(|e| format!("these settings do not fit: {e}"))?;
     if let ObjectKind::Lettering(l) = &mut new {
+        if l.text.chars().count() > MAX_TEXT_CHARS {
+            return Err(format!("`text` has more than {MAX_TEXT_CHARS} characters"));
+        }
         let font = emb_letter::bundled::embroidery(&l.font.family).ok_or_else(|| {
             format!(
                 "the font {:?} is not a bundled embroidery font: the tools lay out only those",
@@ -2055,17 +2136,9 @@ fn kind_box(k: &ObjectKind) -> Option<BBox> {
 }
 
 fn parse_color(s: &str) -> Result<Rgb, String> {
-    let h = s.trim().trim_start_matches('#');
-    let bad = || format!("{s:?} is not a color: use #rrggbb");
-    if h.len() != 6 {
-        return Err(bad());
-    }
-    let c = |i: usize| u8::from_str_radix(&h[i..i + 2], 16).map_err(|_| bad());
-    Ok(Rgb(c(0)?, c(2)?, c(4)?))
-}
-
-fn hex(c: Rgb) -> String {
-    format!("#{:02x}{:02x}{:02x}", c.0, c.1, c.2)
+    let h = s.trim();
+    Rgb::from_hex(&format!("#{}", h.strip_prefix('#').unwrap_or(h)))
+        .ok_or_else(|| format!("{s:?} is not a color: use #rrggbb"))
 }
 
 fn round(v: f64) -> f64 {
@@ -2132,5 +2205,102 @@ mod tests {
         let mut v = json!({"underlay": {"mode": "custom", "layers": [{"type": "center_walk"}]}});
         merge_value(&mut v, json!({"underlay": {"mode": "light"}}));
         assert_eq!(v, json!({"underlay": {"mode": "light"}}));
+    }
+
+    /// Lines that are not messages get an error, and the session goes on:
+    /// bytes that are not UTF-8, JSON that is not an object, a byte order
+    /// mark (the audit of 2026-11-26: a line that was not UTF-8 stopped the
+    /// server, and its design was lost).
+    #[test]
+    fn lines_that_are_not_messages_do_not_stop_the_server() {
+        let mut input = Vec::new();
+        input.extend_from_slice(b"\xff\xfe\n5\nnull\n");
+        input.extend_from_slice("\u{feff}{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}\n".as_bytes());
+        input.extend_from_slice(b"{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"ping\"}\n");
+        let mut out = Vec::new();
+        serve(std::io::Cursor::new(input), &mut out).unwrap();
+        let replies: Vec<Value> = String::from_utf8(out)
+            .unwrap()
+            .lines()
+            .map(|l| serde_json::from_str(l).unwrap())
+            .collect();
+        let codes: Vec<Value> = replies.iter().map(|r| r["error"]["code"].clone()).collect();
+        assert_eq!(
+            codes,
+            [json!(-32700), json!(-32600), json!(-32600), Value::Null, Value::Null]
+        );
+        assert_eq!(
+            (replies[3]["id"].clone(), replies[4]["id"].clone()),
+            (json!(1), json!(2))
+        );
+    }
+
+    /// A text of lettering longer than `MAX_TEXT_CHARS` is refused, as a new
+    /// object and as a setting.
+    #[test]
+    fn a_very_long_text_of_lettering_is_refused() {
+        let mut s = Session::new();
+        let mut call = |name: &str, args: Value| {
+            let m = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                "params": {"name": name, "arguments": args}});
+            s.handle(&m).unwrap()["result"].clone()
+        };
+        let long = "A".repeat(MAX_TEXT_CHARS + 1);
+        assert_eq!(call("add_lettering", json!({"text": long}))["isError"], true);
+        let r = call("add_lettering", json!({"text": "AB"}));
+        assert_eq!(r["isError"], false, "{r}");
+        let id = r["structuredContent"]["added"].clone();
+        let r = call("set_settings", json!({"ids": [id], "settings": {"text": long}}));
+        assert_eq!(r["isError"], true, "{r}");
+    }
+
+    /// Wrong calls that the audit of 2026-11-26 found: a color with a
+    /// letter that is not ASCII (a panic), an id two times (a move of two
+    /// times the distance), a move of 0 (an undo step), a picture over a
+    /// file that is not a PNG file, a request with no method (no reply).
+    #[test]
+    fn wrong_calls_found_by_the_audit() {
+        let mut s = Session::new();
+        let mut call = |name: &str, args: Value| {
+            let m = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                "params": {"name": name, "arguments": args}});
+            s.handle(&m).unwrap()["result"].clone()
+        };
+        for color in ["€abc", "#ab€c", "#12345", "ff00zz"] {
+            let r = call(
+                "add_shape",
+                json!({"svg_path": "M 0 0 L 10 0", "stitch": "run", "color": color}),
+            );
+            assert_eq!(r["isError"], true, "{color}: {r}");
+        }
+        let r = call(
+            "add_shape",
+            json!({"svg_path": "M 0 0 L 10 0", "stitch": "run", "color": "FF0000"}),
+        );
+        assert_eq!(r["isError"], false, "{r}");
+        let id = r["structuredContent"]["added"].clone();
+        let x = |r: &Value| r["structuredContent"]["box_mm"]["x"].as_f64().unwrap();
+        let moved = call("move_objects", json!({"ids": [id, id], "dx": 10}));
+        assert_eq!(x(&moved), 10.0, "{moved}");
+        let r = call("move_objects", json!({"ids": [id]}));
+        assert_eq!(r["isError"], false, "{r}");
+        assert_eq!(call("undo", json!({}))["structuredContent"]["undone"], "Move");
+        let r = call("undo", json!({}));
+        assert_eq!(r["structuredContent"]["undone"], "Add shape", "{r}");
+        let r = call("picture", json!({"path": "design.embproj"}));
+        assert_eq!(r["isError"], true, "{r}");
+        assert!(!std::path::Path::new("design.embproj").exists());
+        for m in [
+            json!({"jsonrpc": "2.0", "id": 4}),
+            json!({"jsonrpc": "2.0", "id": 5, "method": 7}),
+        ] {
+            let r = s.handle(&m).unwrap();
+            assert_eq!(r["error"]["code"], -32600, "{r}");
+        }
+        // A reply of the client gets no reply.
+        assert!(s.handle(&json!({"jsonrpc": "2.0", "id": 6, "result": {}})).is_none());
+        assert_eq!(file_name_of("a/b\\..\\c"), "a_b____c");
+        assert_eq!(file_name_of("../"), "___");
+        assert_eq!(file_name_of(" "), "design");
     }
 }

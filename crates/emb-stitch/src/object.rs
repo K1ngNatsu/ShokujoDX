@@ -715,12 +715,17 @@ fn thin_points(points: &mut Vec<Point>, min: f64) {
 /// along the edges where the font joins two parts: along the end edge of
 /// the part before to `p`, to `q` on the start edge of this part, and along
 /// that edge to the first point. The two points go into `run` as travel. Not
-/// when the straight line goes near them already, or when the parts that
-/// sew from now on (`unsewn`) cover the straight line.
-fn along_edges(run: &mut Run, needle: Point, p: Point, q: Point, unsewn: &[&ObjectKind]) {
+/// when the straight line goes near them already, when it goes along the
+/// two `edges` (two parts with one edge: a cut column), or when the parts
+/// that sew from now on (`unsewn`) cover the straight line.
+fn along_edges(run: &mut Run, needle: Point, (p, q): (Point, Point), edges: [Edge; 2], unsewn: &[&ObjectKind]) {
     let Some(&start) = run.points.first() else {
         return;
     };
+    let on_edges = |w: Point| edges.iter().any(|e| w.distance_to_segment(e.0, e.1) <= EDGE_WAY_MM);
+    if (0..=8).all(|i| on_edges(needle.lerp(start, f64::from(i) / 8.0))) {
+        return;
+    }
     let off = |w: Point| w.distance_to_segment(needle, start) > EDGE_WAY_MM;
     if !off(p) && !off(q) {
         return;
@@ -969,9 +974,12 @@ enum FixedJoin {
     /// With no trim: the end edge of the part before is near the start
     /// edge of this part (the first point and the second point are the
     /// nearest points of the two edges), or the parts that sew from now on
-    /// cover the way between them.
-    Near(Point, Point),
+    /// cover the way between them. With the two edges.
+    Near(Point, Point, [Edge; 2]),
 }
+
+/// An edge of a part: the end or the start of a column.
+type Edge = (Point, Point);
 
 /// A way along the edges is used when a point of it is farther than this
 /// from the straight line, mm (the half width of a thread and a groove).
@@ -1050,7 +1058,7 @@ impl LetterSewer<'_> {
             return;
         };
         let near = match fixed {
-            Some(FixedJoin::Near(p, q)) => Some((p, q)),
+            Some(FixedJoin::Near(p, q, edges)) => Some(((p, q), edges)),
             _ => None,
         };
         let joined = near.is_some();
@@ -1093,10 +1101,10 @@ impl LetterSewer<'_> {
             // point went across the column sewn before when the needle and
             // the first point are at far ends of the two edges: 11 mm in
             // a letter of Fat Face Serif at 42.5 mm (P22 Milestone 1).
-            if let Some((p, q)) = near
+            if let Some((pq, edges)) = near
                 && first.link == RunLink::Travel
             {
-                along_edges(first, self.needle, p, q, unsewn);
+                along_edges(first, self.needle, pq, edges, unsewn);
             }
         }
         // A run in a fixed letter is a travel run (the route makes it under
@@ -1186,14 +1194,14 @@ fn lettering_runs(l: &emb_model::Lettering, entry: Point, exit: Option<Point>) -
                 let edges = part_edges(part);
                 let join = anchor
                     .zip(edges)
-                    .map(|(a, (s, _))| nearest_points(a, s))
-                    .filter(|&(p, q)| {
+                    .map(|(a, (s, _))| (nearest_points(a, s), [a, s]))
+                    .filter(|&((p, q), _)| {
                         p.distance(q) <= l.trim_over_mm || {
                             let areas: Vec<Vec<Vec<Point>>> = unsewn.iter().map(|k| part_area(k)).collect();
                             hidden(p, q, &areas)
                         }
                     })
-                    .map_or(FixedJoin::Apart, |(p, q)| FixedJoin::Near(p, q));
+                    .map_or(FixedJoin::Apart, |((p, q), edges)| FixedJoin::Near(p, q, edges));
                 w.sew(part, from, to, &unsewn, true, Some(join));
                 anchor = edges.map(|(_, b)| b);
             }
@@ -1697,6 +1705,52 @@ mod tests {
             }
         }
         assert!(far > 0, "a case with the needle at the far end of the first column");
+    }
+
+    /// Two columns of a fixed letter with the same edge (a cut column): the
+    /// straight travel along the edge is the way, with no turn at a corner
+    /// of the edge (the audit of 2026-11-26).
+    #[test]
+    fn a_fixed_letter_with_one_edge_for_two_columns_goes_straight() {
+        let line = |p: [(f64, f64); 2]| {
+            Path::new()
+                .move_to(Point::new(p[0].0, p[0].1))
+                .line_to(Point::new(p[1].0, p[1].1))
+        };
+        let rails = |a: [(f64, f64); 2], b: [(f64, f64); 2]| ObjectKind::Satin {
+            geometry: emb_model::SatinGeometry {
+                rail_a: line(a),
+                rail_b: line(b),
+                rungs: Vec::new(),
+            },
+            params: Default::default(),
+        };
+        for swap in [false, true] {
+            for len in [10.0, 10.2, 10.4, 10.6] {
+                let (a2, b2) = ([(0.0, 0.0), (0.0, -10.0)], [(5.0, 0.0), (5.0, -10.0)]);
+                let (a2, b2) = if swap { (b2, a2) } else { (a2, b2) };
+                let mut l = emb_model::Lettering::new("I", Default::default(), 10.0, Point::ZERO);
+                l.letters = vec![emb_model::Letter {
+                    text: "I".into(),
+                    parts: vec![rails([(0.0, len), (0.0, 0.0)], [(5.0, len), (5.0, 0.0)]), rails(a2, b2)],
+                    fixed: true,
+                    ..Default::default()
+                }];
+                let runs = lettering_runs(&l, Point::new(0.0, len + 5.0), None);
+                assert_eq!(runs.len(), 2);
+                let needle = *runs[0].points.last().unwrap();
+                let k = runs[1].travel.first().map_or(0, |r| r.end);
+                let way: Vec<Point> = std::iter::once(needle)
+                    .chain(runs[1].points[..=k].iter().copied())
+                    .collect();
+                let length: f64 = way.windows(2).map(|w| w[0].distance(w[1])).sum();
+                let straight = needle.distance(runs[1].points[k]);
+                assert!(
+                    length <= straight + 0.5,
+                    "swap {swap}, len {len}: {length:.2} mm for {straight:.2} mm: {way:?}"
+                );
+            }
+        }
     }
 
     #[test]

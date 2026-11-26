@@ -22,21 +22,27 @@ use the program, with no AI in the program.
     2025-06-18, 2025-03-26 or 2024-11-05 gets that version; another
     version gets 2025-11-25.
   - `server/discover` of MCP 2026-07-28 (no handshake), `ping`,
-    `tools/list` and `tools/call`. The results have `resultType`
-    `complete` (2026-07-28 needs it; the versions before it do not read
-    it).
-  - A message that is not JSON is error -32700, a batch -32600, an
-    unknown method -32601, an unknown tool -32602. An error of a tool is
-    a result with `isError` true and the reason, so that the agent can
-    correct its call.
+    `tools/list` and `tools/call`. The results of `server/discover`,
+    `tools/list` and `tools/call` have `resultType` `complete` (2026-07-28
+    needs it; the versions before it do not read it).
+  - A message that is not JSON, or a line that is not UTF-8 text, is
+    error -32700; a batch, JSON that is not an object, and a request with
+    no method are -32600; an unknown method is -32601, an unknown tool
+    -32602. The session goes on after each of them. A reply of the client
+    (a result or an error) gets no reply. An error of a tool is a result
+    with `isError` true and the reason, so that the agent can correct its
+    call; a fault (a panic) in a tool is such an error too, and the
+    session and its design stay.
   - A result has the value of the tool as JSON text and as
     `structuredContent`; the picture is also an image (PNG in base64).
 - **One design.** The server keeps one design (`emb_model::Document` with
   its history). Each change is one `Document::edit`: one undo step. A
   change that the document refuses (ADR 0139) gives its reason
   (`Document::take_refused`). `new_design` and `open_design` do not take
-  the place of changes that are not saved unless `discard_changes` is
-  true.
+  the place of a design with objects and changes that are not saved
+  unless `discard_changes` is true (a design with no objects goes). A
+  move of 0 or a scale of 1 is no change (no undo step), and an id that
+  a call gives two times is one object.
 - **26 tools:** `new_design`, `set_design` (name, machine, hoop and
   fabric), `open_design`, `save_design`, `design_info`, `list_objects`, `add_shape`, `add_lettering`,
   `set_settings`, `set_thread`, `move_objects`, `scale_objects`,
@@ -47,7 +53,9 @@ use the program, with no AI in the program.
   right and y down; angles are degrees. The server instructions and the
   descriptions of the tools that take coordinates say so (a client can
   leave the instructions out).
-- **Boxes** are the boxes of the curves, not of their control points.
+- **Boxes** are the boxes of the curves, not of their control points
+  (the boxes of objects; the size of the design in `design_info` is the
+  size that the program shows).
   Lettering that is laid out again (a new text or size) keeps the middle
   of its box; `move_objects` also puts the middle of a box at x, y. Each
   object in a result says if its shape fits the hoop.
@@ -62,7 +70,12 @@ use the program, with no AI in the program.
   not take and names the ones that it takes, an argument that it needs
   and does not get, and a value of the wrong type (numbers must be real
   numbers). A tool that only reads has `readOnlyHint`, and its
-  description ends with "It only reads."
+  description ends with "It only reads." A tool that can take away work
+  (a design, objects, a file that it writes over: `picture` with a path,
+  `save_design`, `export`, `test_swatches`, `fix_machine_file`) has
+  `destructiveHint`. `picture` writes only a `.png` file. The text of
+  lettering has at most 2,000 characters (`MAX_TEXT_CHARS`: a text of
+  1 MB kept the server busy for more than 30 s).
 - **Shapes** come from SVG path text in mm: the SVG reader of the program
   reads it (all the commands of SVG, also arcs) with a viewBox of mm, and
   the coordinates are rounded to 0.1 µm (the reader keeps 32-bit
@@ -83,18 +96,23 @@ use the program, with no AI in the program.
   that it writes the file of the design. A picture shows the fabric of
   the design (its weave in its color, else white), a plain color, or
   nothing (`none`).
-- **Show.** `show` saves the design (to its file, else to the folder
-  `ShokujoDX agent` of the temporary files) and starts the program next
-  to `emb-cli` with the file (`SHOKUJODX_PROGRAM` names another program,
-  for the tests). That start gives the file to the program that runs
-  (the inbox of ADR 0175) or opens a window. The output of the program
-  does not go to the output of the server.
+- **Show.** `show` saves the design to its file, else to a file of the
+  session in the folder `ShokujoDX agent` of the temporary files (a clean
+  name of the design and the number of the process; the design stays not
+  saved), and starts the program next to `emb-cli` with the file
+  (`SHOKUJODX_PROGRAM` names another program, for the tests). That start
+  gives the file to the program that runs (the inbox of ADR 0175; a file
+  that is open already shows its tab) or opens a window. The output of
+  the program does not go to the output of the server.
 - **A file that another program saves.** The program knows the time of
   each file that it opened or saved (`file_watch.rs`, `file_known`). Each
   second it compares the file of the tab in front (`poll_file_changes`).
   A file that changed gets the question File Changed: Open Again puts the
   design of the file in the tab with a new history and a new id
-  (`AppState::replace_tab_design`), and Keep This Version keeps the tab.
+  (`AppState::replace_tab_design`), and Keep This Version keeps the tab
+  (not saved: a close asks). The files that a job of the program writes
+  (Output saves the project of the tab) are the program's own
+  (`files_written`), and no question comes while a job runs.
 - **Packages.** `emb-cli` is in each package next to the program (Windows,
   the macOS bundle, `usr/bin` on Linux), so the setup line of the help is
   the folder of the program and `emb-cli mcp`.

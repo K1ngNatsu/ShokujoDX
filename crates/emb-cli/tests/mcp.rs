@@ -154,12 +154,26 @@ fn an_agent_makes_a_badge_through_the_mcp_server() {
             "design_info",
             "list_objects",
             "check_design",
-            "picture",
             "check_machine_file",
             "list_catalog",
         ];
         assert_eq!(reads, reading.contains(&name), "{name}");
         assert_eq!(t["description"].as_str().unwrap().ends_with("It only reads."), reads);
+        // The tools that can take away work: a design, objects, a file
+        // that they write over (the audit of 2026-11-26).
+        let destroying = [
+            "new_design",
+            "open_design",
+            "save_design",
+            "delete_objects",
+            "picture",
+            "export",
+            "test_swatches",
+            "quicker_to_sew",
+            "fix_machine_file",
+        ];
+        let destroys = t["annotations"]["destructiveHint"].as_bool().unwrap();
+        assert_eq!(destroys, destroying.contains(&name), "{name}");
     }
 
     // The names to use.

@@ -52,8 +52,9 @@ el diseño, y una imagen pasa a ser la imagen de fondo.
   lienzo y la selección](canvas).
 - **Los paneles** de la derecha muestran el objeto seleccionado
   (Propiedades del objeto), el orden de bordado (Secuencia), los hilos,
-  los estilos, la información del diseño y más. Cada panel se cierra con
-  su ×. **Ver > Paneles** lo abre de nuevo.
+  los estilos, la información del diseño y más. Están en dos grupos; la
+  pestaña abierta de un grupo tiene una × que cierra su panel. **Ver >
+  Paneles** lo abre de nuevo.
 - **La barra de propiedades** bajo la cinta tiene los ajustes de la
   herramienta activa, por ejemplo la longitud de puntada de las líneas
   nuevas.

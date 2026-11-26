@@ -22,8 +22,8 @@
 //!   farther than one step across the stitches from the pair before it
 //!   ([`thin_across`], ADR 0180). Where the pairs are more than half a
 //!   step apart across the stitches, they do not change, but where a stitch
-//!   runs almost along a side (25° or less), pairs half a step apart go to
-//!   one step (ADR 0181).
+//!   runs almost along a side (less than 25°), the pairs that stay are 1 to
+//!   1.5 steps apart where they were half a step apart (ADR 0181).
 //! - Auto split: a stitch longer than `split_mm` (default 7 mm) gets needle points
 //!   along it. Their positions change from stitch to stitch, so they do not
 //!   make a line.
@@ -599,8 +599,10 @@ fn underlay_layer(col: &Column, layer: &UnderlayLayer) -> Vec<Point> {
 const ALONG_SIDE_SIN: f64 = 0.4226;
 /// Where a stitch runs almost along a side (the cap of a wide column end at
 /// a corner), the pairs that stay can be this many steps apart across the
-/// stitches (ADR 0181): pairs half a step apart across stay one step
-/// apart, as in the middle of the column.
+/// stitches (ADR 0181). The pairs that stay are from `ALONG_SIDE_GAP - a`
+/// to `ALONG_SIDE_GAP` steps apart, where `a` is the distance across of
+/// two pairs that follow: for pairs half a step apart, 1 to 1.5 steps (in
+/// the middle of the column: one step).
 const ALONG_SIDE_GAP: f64 = 1.5;
 
 /// The pairs of a column, made `step` apart, without those that the
@@ -620,9 +622,11 @@ const ALONG_SIDE_GAP: f64 = 1.5;
 /// side of the column ([`ALONG_SIDE_SIN`]: the cap of a wide column end
 /// that the tuning took to a corner), the pairs that stay can be
 /// [`ALONG_SIDE_GAP`] steps apart (ADR 0181): pairs that are half a step
-/// apart across the stitches there stay one step apart. A column whose
-/// stitches meet both sides at more than 25° (also one slanted 60° from
-/// square all along) keeps its pairs. The first and the last pair stay.
+/// apart across the stitches there stay 1 to 1.5 steps apart. A column
+/// whose stitches meet both sides at 25° or more (also one slanted 60°
+/// from square all along) keeps its pairs; a column slanted more than 65°
+/// all along sews up to 1.5 times lighter than its spacing. The first and
+/// the last pair stay.
 pub(crate) fn thin_across(pairs: Vec<(Point, Point)>, step: f64) -> Vec<(Point, Point)> {
     if pairs.len() < 3 {
         return pairs;

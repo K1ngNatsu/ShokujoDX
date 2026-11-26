@@ -1,7 +1,8 @@
 # Open work
 
 Date: 2026-11-24 (after the audit of P21 and the release of v0.5.0;
-ideas from zigzag added on 2026-11-25, and phase P22 made of them) ·
+ideas from zigzag added on 2026-11-25, and phase P22 made of them; made
+current by the audit of the work after P22, 2026-11-26) ·
 Status: Reference. One list of all the work that is not finished: from
 the roadmap, the plans of the phases, the audits and the inventory
 (`docs/design/feature-inventory.md`).
@@ -123,12 +124,33 @@ panel is narrow; Recognize Objects takes 0.4 s for a stitch file that
 sews one fill 500 times (28 s: the area of its rows made a piece for each
 pair of the same rows on a line).
 
-- The side panels are one group (the owner's choice of 2026-11-22), and
-  its eight tabs do not fit its tab bar, which scrolls: the tab at the
-  edge shows in part ("Styles" in 35 pictures of the windows, the same in
-  English, Spanish and Japanese). This is not a fault of the
-  translations. Two groups, or icons in place of the titles of the tabs
-  that are not open, would show all tabs: the owner decides.
+- Done (2026-11-26, the owner's choice): the side panels are two groups,
+  one over the other (`app::SIDE_GROUPS`), and only the open tab of a
+  group has its ×, so all the titles of each group show on a screen of
+  1366 points in each language (a test measures them). A group that the
+  user closes comes back as its group (the audit of 2026-11-26).
+
+### Left by the audit of the work after P22 (2026-11-26)
+
+The details are in the roadmap ("Audit of the work after P22").
+
+- A column slanted more than 65° all along sews up to 1.5 times lighter
+  than its spacing (`satin::ALONG_SIDE_GAP`, ADR 0181). A factor of about
+  1.25 gives one step on average; it needs the monogram probe again.
+- TrueType lettering in Auto chooses satin or tatami columns before the
+  envelope makes the text taller (`glyph::auto_stitches`), as embroidery
+  fonts did before ADR 0181.
+- The Japanese lesson asks for the font Noto Sans JP (the font of its
+  test); a user with another Japanese font clicks **Skip** at that step.
+- On Windows, the program that `show` of `emb-cli mcp` starts can keep
+  the pipes of `emb-cli` open (the handles that a new process gets), so a
+  client can wait for the end of the output until the program closes.
+  Not measured.
+- `check_machine_file` of the MCP server says if a file fits a hoop from
+  the coordinates of the file: a file whose origin is not its middle gets
+  a wrong answer.
+- The search of the Clipart panel finds a translated name only as one
+  part of the search text (words in English: each word).
 
 ### Ideas from zigzag (2026-11-25)
 

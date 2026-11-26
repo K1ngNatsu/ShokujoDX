@@ -276,8 +276,9 @@ fn letter_parts(
             // The font chooses columns or fills by the size that the letter
             // has in the design: with the scale of its edit and the most
             // that the envelope makes the text taller (a monogram makes the
-            // middle initial larger so; ADR 0181).
-            let warp = if l.baseline.is_straight() {
+            // middle initial larger so; ADR 0181). Stacked text has no
+            // envelope.
+            let warp = if l.baseline.is_straight() && !l.direction.is_stacked() {
                 l.envelope.max_stretch()
             } else {
                 1.0

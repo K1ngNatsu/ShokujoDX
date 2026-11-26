@@ -1259,7 +1259,7 @@ fn show_card(ui: &mut egui::Ui, id: &str, card: &Card, all: &[Topic], place: Opt
                 let tip = tr("Do this tutorial in the program: the lesson shows one step at a time, marks what to click and checks the design.");
                 if let Some(at) = place {
                     if ui
-                        .button(crate::i18n::fill("Go On at Step {}", &[&(at + 1)]))
+                        .button(crate::i18n::fill("Go On at Step {}", &[&at.saturating_add(1)]))
                         .on_hover_text(tip)
                         .clicked()
                     {

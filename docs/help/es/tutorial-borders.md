@@ -61,7 +61,7 @@ propio.
 1. En la ventana **Motivos**, haga clic en **Familias…**. Se abre la
    ventana **Familias**.
 2. Haga clic en **Clipart** y después en **Estrella de seis puntas** (un elemento
-   incluido de la familia Star).
+   incluido de la familia Estrella).
 3. Cambie **Puntas** o **Parte interior** para cambiar la estrella. La
    imagen muestra el elemento.
 

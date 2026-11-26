@@ -25,9 +25,11 @@ steps are only for the test (an Esc that closes a menu).
    heading is found by its place among the `##` headings. A step with
    only `item` is a stage that the user only reads (work at the
    machine). Each numbered item of the sections before "If it does not
-   look right" is in a stage. The markers of the 31 step files were
-   written for this milestone (three agents, each with a set of files,
-   checked by the tests below).
+   look right" is in a stage (a script checked the 31 step files in the
+   audit of 2026-11-26; no test checks this rule). The markers of the 31
+   step files were written for this milestone (three agents, each with a
+   set of files; the tests below check that the lesson marks and sees
+   each step).
 2. **Steps for the test only.** `test_only = true` marks a step that
    the test needs and the topic does not ask for (an Esc that closes the
    menu of Thread Look, a Cancel where the user saves a file, a second
@@ -41,11 +43,13 @@ steps are only for the test (an Esc that closes a menu).
    (`lesson::Eyes`) keeps the tree of each frame, and the clicks, keys
    and text of the user before the program takes them. The screen reader
    tree is on while a lesson shows (and stays on if a screen reader had
-   it on before). The ribbon keeps the places of its buttons while a
-   lesson shows (`ribbon::RECORD`, `ribbon::button_rect`). The widgets
-   of the lesson window and the Help window do not count: their texts
-   name the buttons of the steps. The runs of text in a label are not
-   widgets (`Role::TextRun`).
+   it on before: the plugin looks from the first frame of the program,
+   and the tree of the frame in which a lesson stops does not count). The
+   ribbon keeps the places of its buttons while a lesson shows
+   (`ribbon::RECORD`, `ribbon::button_rect`). The widgets of the lesson
+   window and the Help window do not count: their texts name the buttons
+   of the steps (a widget of another window under them counts). The runs
+   of text in a label are not widgets (`Role::TextRun`).
 4. **A step is done** when the user did it and the design is as its
    `expect` says. Did it: a click in the mark (a button, a field, the
    item of an open list), a command that ran (`AppState::run`), a start
@@ -71,8 +75,10 @@ steps are only for the test (an Esc that closes a menu).
    of a lesson that stops is `Settings::lessons`; the card of the
    tutorial then has **Go On at Step n** and **Start Again**.
 7. **Ways to start.** **Start the Lesson** on the card of each tutorial
-   in the Help window (a link `lesson:<id>`, also in the topic "All
-   tutorials"), and "Your first design as a lesson" on the start page.
+   in the Help window (a link `lesson:<id>`, or `lesson:<id>@<stage>`
+   for Go On at Step; also in the topic "All tutorials" and in the Next
+   list of a finished lesson), and "Your first design as a lesson" on the
+   start page.
    The Help window closes when a lesson starts. The lesson window docks
    at the bottom right corner of the canvas (`dock::docked_at`).
 
@@ -103,3 +109,12 @@ steps are only for the test (an Esc that closes a menu).
   select the lettering before it sets the height.
 - Lessons of the user and of shops (Part 1, Milestone 3, item 4) are not
   in this milestone.
+- The audit of 2026-11-26: after the first lesson stopped, the screen
+  reader tree stayed on for good (or went off for a screen reader that
+  used it); a finished lesson marked a step; a stage that the design did
+  already went on by itself after **◀ Back** (now it waits for **Next
+  ▶**, also after Go On at Step); a click on a marked button that is off
+  did the step; a widget of a window under the Lesson window did not
+  count; a lesson link in the lesson window opened no lesson. A command
+  on a folded ribbon has the mark on its tab, and in Simple mode the
+  window has **Full Ribbon** (Simple mode hides commands of the steps).

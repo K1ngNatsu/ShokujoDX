@@ -76,12 +76,16 @@ These faults were still open. The measure of travel that shows (ADR
 4. **Thread that builds up.**
    - The lace ornament template is lighter: the spokes start at the
      outer edge of the center ring and the side branches at the side of
-     their spoke, each 0.3 mm into it (`lace::JOIN`), and the loop lies
-     on the outer half of the border ring, not on the mesh.
+     their spoke, each 0.3 mm into it at the middle of its start
+     (`lace::JOIN`; the start edge of a branch is at 40°, so one corner
+     goes about 0.2 mm into the spoke), and the loop lies on the outer
+     half of the border ring, not on the mesh.
    - Free-standing lace and puff are dense by design: Design info allows
      `DENSE_BY_DESIGN` (3) layers more than the limit of the settings in
      a lace design and at a puff object (`info::build_up_limit`). The
-     density map shows the limit of the settings, as before.
+     density map shows the limit of the settings, as before. A place
+     there has the area over the higher limit (the audit of 2026-11-26:
+     it had the area over the limit of the settings).
    - Monograms: not changed. The places of the large styles are in one
      column whose end the tuning takes to a corner and the envelope
      bends (see `docs/design/open-work.md`); a limit that grows with the

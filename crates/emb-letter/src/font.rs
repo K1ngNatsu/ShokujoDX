@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use emb_geom::{Path, Point, Transform, text};
-use emb_model::{FontRef, ObjectKind, RunningParams, SatinGeometry, SatinParams};
+use emb_model::{FontRef, ObjectKind, SatinGeometry, SatinParams};
 use serde::{Deserialize, Serialize};
 use ttf_parser::gpos::{PairAdjustment, PositioningSubtable};
 use ttf_parser::{Face, GlyphId, Tag};
@@ -39,59 +39,71 @@ pub enum RouteMode {
     Off,
 }
 
-/// The routes of the letters of the fonts of the computer, kept on the
-/// disk (ADR 0179): a route made in one session is read in the next one,
-/// so a letter has its route at once. One folder for each font (a hash of
-/// its file, its face and the values of its axes), one file for each
-/// glyph. A store is for one build of the program: the store of another
-/// build is deleted, because a change of the stroke finder, of the tuning
-/// or of the route changes the routes.
+/// The routes of the letters of the TrueType fonts (of the computer and
+/// the bundled ones), kept on the disk (ADR 0179): a route made in one
+/// session is read in the next one, so a letter has its route at once. One
+/// folder for each build of the program, in it one folder for each font (a
+/// hash of its file, its face and the values of its axes), and one file for
+/// each glyph. A build reads and writes only its own folder, because a
+/// change of the stroke finder, of the tuning or of the route changes the
+/// routes; the folders of other builds are deleted.
 #[derive(Debug, Clone)]
 pub struct RouteStore {
     dir: PathBuf,
 }
 
-/// The file of a route store with the build of the program that made it.
-const STORE_BUILD: &str = "build.txt";
+/// The end of the name of a folder or a file of a route store that is
+/// deleted.
+const STORE_OLD: &str = ".old";
+
+/// The largest file of a route store that is read: a route of 64 parts is
+/// about 200 KB.
+const MAX_STORED_BYTES: u64 = 8 << 20;
 
 impl RouteStore {
     /// The store in the folder `dir` for the build `build` of the program
-    /// (a text that changes with each build). The store of another build is
-    /// moved out of the way and deleted on a thread. `None` if the folder
-    /// cannot be used.
+    /// (a text that changes with each build): the folder of the build in
+    /// `dir` (a hash of `build`). The other folders and files in `dir` (of
+    /// other builds) are moved out of the way and deleted on a thread. A
+    /// program of another build that runs at the same time makes its
+    /// folder again and writes there, not in this store (the audit of
+    /// 2026-11-26: with one folder for all builds, it wrote its routes into
+    /// the store of the new build). `None` if the folder cannot be used.
     pub fn open(dir: PathBuf, build: &str) -> Option<RouteStore> {
-        let file = dir.join(STORE_BUILD);
-        if std::fs::read_to_string(&file).ok().as_deref() != Some(build) {
-            let name = dir.file_name()?.to_string_lossy().into_owned();
-            let parent = dir.parent()?.to_path_buf();
-            let prefix = format!("{name}.old-");
-            // The stores of earlier builds, and those that a stopped
-            // program did not delete.
-            let mut old: Vec<PathBuf> = std::fs::read_dir(&parent)
-                .into_iter()
-                .flatten()
-                .flatten()
-                .map(|e| e.path())
-                .filter(|p| p.file_name().is_some_and(|n| n.to_string_lossy().starts_with(&prefix)))
-                .collect();
-            if dir.exists() {
-                let to = parent.join(format!("{prefix}{}", std::process::id()));
-                // A store that cannot move keeps the routes of another
-                // build: it is not used.
-                std::fs::rename(&dir, &to).ok()?;
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        build.hash(&mut h);
+        let id = format!("{:016x}", h.finish());
+        let mine = dir.join(&id);
+        std::fs::create_dir_all(&mine).ok()?;
+        let mut old = Vec::new();
+        for e in std::fs::read_dir(&dir).ok()?.flatten() {
+            let name = e.file_name().to_string_lossy().into_owned();
+            if name == id {
+                continue;
+            }
+            // Left by a program that stopped before it deleted them.
+            if name.ends_with(STORE_OLD) {
+                old.push(e.path());
+                continue;
+            }
+            let to = dir.join(format!("{name}.{}{STORE_OLD}", std::process::id()));
+            if std::fs::rename(e.path(), &to).is_ok() {
                 old.push(to);
             }
-            if !old.is_empty() {
-                std::thread::spawn(move || {
-                    for d in old {
-                        let _ = std::fs::remove_dir_all(d);
-                    }
-                });
-            }
-            std::fs::create_dir_all(&dir).ok()?;
-            std::fs::write(&file, build).ok()?;
         }
-        Some(RouteStore { dir })
+        if !old.is_empty() {
+            std::thread::spawn(move || {
+                for p in old {
+                    let _ = if p.is_dir() {
+                        std::fs::remove_dir_all(p)
+                    } else {
+                        std::fs::remove_file(p)
+                    };
+                }
+            });
+        }
+        Some(RouteStore { dir: mine })
     }
 }
 
@@ -102,14 +114,6 @@ impl RouteStore {
 enum StoredPart {
     Column(SatinGeometry),
     Run(Path),
-}
-
-/// The settings of a travel run of a route.
-fn run_params() -> RunningParams {
-    RunningParams {
-        stitch_length_mm: crate::route::RUN_STITCH_MM,
-        ..Default::default()
-    }
 }
 
 /// The glyph data and the caches of a font, which its route thread shares.
@@ -272,15 +276,35 @@ impl Shared {
     /// a glyph with no columns.
     fn stored(&self, glyph: u16) -> Option<Option<Arc<Vec<ObjectKind>>>> {
         let dir = self.store.lock().ok()?.clone()?;
-        let bytes = std::fs::read(dir.join(format!("{glyph}.json"))).ok()?;
+        let file = dir.join(format!("{glyph}.json"));
+        if std::fs::metadata(&file).ok()?.len() > MAX_STORED_BYTES {
+            return None;
+        }
+        let bytes = std::fs::read(file).ok()?;
         let parts: Option<Vec<StoredPart>> = serde_json::from_slice(&bytes).ok()?;
         let Some(parts) = parts else {
             return Some(None);
         };
-        // A route has fewer parts than this, in the box of its letter.
-        let far = 64.0 * self.units_per_em;
-        let fits = |p: &Point| p.x.is_finite() && p.y.is_finite() && p.x.abs() <= far && p.y.abs() <= far;
-        let ok = parts.len() <= 4096
+        // A route has parts (else a letter would sew nothing), fewer than
+        // this, in the box of the outline of its glyph and one em round it.
+        let rings = self.contours(glyph);
+        let mut points = rings.iter().flatten();
+        let first = *points.next()?;
+        let (lo, hi) = points.fold((first, first), |(lo, hi), p| {
+            (
+                Point::new(lo.x.min(p.x), lo.y.min(p.y)),
+                Point::new(hi.x.max(p.x), hi.y.max(p.y)),
+            )
+        });
+        let m = self.units_per_em;
+        let fits = |p: &Point| {
+            p.x.is_finite()
+                && p.y.is_finite()
+                && (lo.x - m..=hi.x + m).contains(&p.x)
+                && (lo.y - m..=hi.y + m).contains(&p.y)
+        };
+        let ok = !parts.is_empty()
+            && parts.len() <= 4096
             && parts.iter().all(|part| match part {
                 StoredPart::Column(g) => {
                     g.rail_a.points().all(|p| fits(&p))
@@ -301,7 +325,7 @@ impl Shared {
                 },
                 StoredPart::Run(path) => ObjectKind::Running {
                     path,
-                    params: run_params(),
+                    params: crate::route::run_params(),
                 },
             })
             .collect();
@@ -322,7 +346,7 @@ impl Shared {
                     ObjectKind::Satin { geometry, params } if *params == SatinParams::default() => {
                         Some(StoredPart::Column(geometry.clone()))
                     }
-                    ObjectKind::Running { path, params } if *params == run_params() => {
+                    ObjectKind::Running { path, params } if *params == crate::route::run_params() => {
                         Some(StoredPart::Run(path.clone()))
                     }
                     _ => None,
@@ -333,19 +357,20 @@ impl Shared {
         let Some(Ok(bytes)) = parts.map(|p| serde_json::to_vec(&p)) else {
             return;
         };
-        // A whole file or none: written to a file of its own, then moved.
+        // A whole file or none: written to a file of its own, then moved;
+        // a file that is not moved is deleted.
         let tmp = dir.join(format!("{glyph}.{}.tmp", std::process::id()));
-        if std::fs::create_dir_all(&dir).is_ok() && std::fs::write(&tmp, bytes).is_ok() {
-            let _ = std::fs::rename(&tmp, dir.join(format!("{glyph}.json")));
+        if std::fs::create_dir_all(&dir).is_ok()
+            && (std::fs::write(&tmp, bytes).is_err()
+                || std::fs::rename(&tmp, dir.join(format!("{glyph}.json"))).is_err())
+        {
+            let _ = std::fs::remove_file(&tmp);
         }
     }
 
-    /// The route of a glyph: from the route store, else made (and kept in
-    /// the store).
+    /// The route of a glyph, made now and kept in the route store (the
+    /// caller looks in the store first).
     fn route_of(&self, glyph: u16) -> Option<Arc<Vec<ObjectKind>>> {
-        if let Some(r) = self.stored(glyph) {
-            return r;
-        }
         let r = self.make_route(glyph);
         self.keep(glyph, &r);
         r
@@ -868,7 +893,7 @@ mod tests {
         first.set_route_store(&store);
         let h = first.glyph('H').unwrap();
         let made = first.route(h).expect("a route");
-        let files: Vec<_> = std::fs::read_dir(dir.join("routes"))
+        let files: Vec<_> = std::fs::read_dir(&store.dir)
             .unwrap()
             .flatten()
             .filter(|e| e.path().is_dir())
@@ -889,8 +914,8 @@ mod tests {
         v.as_array_mut().unwrap().pop();
         std::fs::write(&file, v.to_string()).unwrap();
         assert_eq!(again().map(|r| r.len()), Some(made.len() - 1));
-        // A damaged file, and a route with a point far out: the route is
-        // made again.
+        // A damaged file, a route with a point far out, a route with no
+        // parts and a file that is too large: the route is made again.
         fn far_out(v: &mut serde_json::Value) -> bool {
             match v {
                 serde_json::Value::Number(_) => {
@@ -906,7 +931,9 @@ mod tests {
         assert!(far_out(&mut far));
         // The file with the far point is a route in the form of the store.
         assert!(serde_json::from_value::<Option<Vec<super::StoredPart>>>(far.clone()).is_ok());
-        for bad in ["[{\"Column\": 3".to_string(), far.to_string()] {
+        let large = format!("[{}]", vec![r#"{"Run":[{"M":[0,0]}]}"#; 450_000].join(","));
+        assert!(large.len() as u64 > super::MAX_STORED_BYTES);
+        for bad in ["[{\"Column\": 3".to_string(), far.to_string(), "[]".into(), large] {
             std::fs::write(&file, &bad).unwrap();
             assert_eq!(again(), Some(made.clone()), "{bad}");
         }
@@ -921,7 +948,7 @@ mod tests {
         f.set_route_store(&store);
         f.route(f.glyph('H').unwrap());
         assert_eq!(
-            std::fs::read_dir(dir.join("routes"))
+            std::fs::read_dir(&store.dir)
                 .unwrap()
                 .flatten()
                 .filter(|e| e.path().is_dir())
@@ -932,30 +959,32 @@ mod tests {
     }
 
     /// A route store of another build is not used: its routes can be of
-    /// another stroke finder or route.
+    /// another stroke finder or route. A program of the old build that runs
+    /// on writes in its own folder, not in the new store.
     #[test]
     fn a_store_of_another_build_is_not_used() {
         let dir = store_dir("build");
         let routes = dir.join("routes");
-        let store = super::RouteStore::open(routes.clone(), "build 1").unwrap();
+        let one = super::RouteStore::open(routes.clone(), "build 1").unwrap();
         let f = bundled::font("Lato", "Bold").unwrap();
-        f.set_route_store(&store);
+        f.set_route_store(&one);
         f.route(f.glyph('H').unwrap());
-        let count = || {
-            std::fs::read_dir(&routes)
-                .unwrap()
-                .flatten()
-                .filter(|e| e.path().is_dir())
-                .count()
+        let fonts = |store: &super::RouteStore| {
+            std::fs::read_dir(&store.dir).map_or(0, |d| d.flatten().filter(|e| e.path().is_dir()).count())
         };
-        assert_eq!(count(), 1);
+        assert_eq!(fonts(&one), 1);
         // The same build: the store stays.
-        super::RouteStore::open(routes.clone(), "build 1").unwrap();
-        assert_eq!(count(), 1);
-        // Another build: an empty store.
-        super::RouteStore::open(routes.clone(), "build 2").unwrap();
-        assert_eq!(count(), 0);
-        assert_eq!(std::fs::read_to_string(routes.join("build.txt")).unwrap(), "build 2");
+        let again = super::RouteStore::open(routes.clone(), "build 1").unwrap();
+        assert_eq!((again.dir.clone(), fonts(&again)), (one.dir.clone(), 1));
+        // Another build: an empty store, and the store of the other build
+        // is out of the way.
+        let two = super::RouteStore::open(routes.clone(), "build 2").unwrap();
+        assert_ne!(two.dir, one.dir);
+        assert_eq!(fonts(&two), 0);
+        assert!(!one.dir.exists());
+        // The program of build 1 runs on: its routes go to its own folder.
+        f.route(f.glyph('E').unwrap());
+        assert_eq!(fonts(&two), 0);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
