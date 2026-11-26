@@ -10,6 +10,83 @@ Dieses Thema listet die Änderungen jeder Version, die neueste zuerst.
 **Hilfe > Was ist neu** öffnet es. Nach einem Update hat die Startseite
 einen Link dazu.
 
+## Version 0.6.0
+
+**Anleitungen und Lektionen.** Die Hilfe hat 31 Anleitungen in sieben
+Pfaden, vom ersten Design bis zur Produktion (**Hilfe > Alle
+Anleitungen**). Jede Anleitung hat Bilder und ein Startdesign, das ein
+Link öffnet. **Lektion beginnen** auf der Karte einer Anleitung macht sie
+zu einer Lektion im Programm: Das Fenster **Lektion** zeigt jeweils einen
+Schritt, markiert die Schaltfläche oder die Stelle auf der Arbeitsfläche,
+die Sie klicken, und prüft das Design, bevor es weitergeht. Das Fenster
+hat **◀ Zurück**, **Überspringen ▶** und **Lektion beenden**, und eine
+Lektion, die stoppt, behält ihre Stelle.
+
+**Prüfungen vor dem Sticken.** **Ansicht > Prüfen > Sichtbare
+Verbindungsstiche** markiert die Verbindungsstiche, die kein späterer
+Stich bedeckt, und Designinfo sagt, wie viel davon sichtbar ist.
+**Anordnen > Stickreihenfolge > Schneller sticken** führt Garne zusammen,
+die gleich aussehen, entfernt Objekte, die zu klein zum Sticken sind,
+bringt die Farbwechsel in eine bessere Reihenfolge und setzt den
+Schneideabstand des Designs, in einem Rückgängig-Schritt.
+
+**Testmuster.** **Design > Ausgabe > Testmuster** macht Kopien der
+ausgewählten Objekte mit einer Einstellung in Stufen (zum Beispiel der
+Dichte), jede mit einer Beschriftung ihres Werts. Sticken Sie das Blatt
+auf Ihrem Stoff, und verwenden Sie dann die Einstellung der besten
+Kopie.
+
+**Satinneigung und Bänder.** **Neigung** in den Objekteigenschaften
+neigt die Deckstiche einer Satinsäule. **Bearbeiten > Sticharten >
+Bänder** stickt eine Säule als Bänder aus Garnen nebeneinander, jedes in
+seiner Farbe.
+
+**Maschinendateien.** **Bearbeiten > Maschinenfunktionen > Stiche
+reparieren…** prüft die Stiche einer Maschinendatei, die Sie geöffnet
+haben, und repariert die Fehler, die es kann, zum Beispiel Farbwechsel
+zum selben Garn und Stiche, die kürzer sind als der kürzeste Stich der
+Maschine.
+
+**Ihre offenen Designs kommen zurück.** Beim Beenden behält das Programm
+die offenen Designs mit ihren nicht gespeicherten Änderungen und öffnet
+sie beim nächsten Start wieder (**Offene Tabs** in den Optionen, am
+Anfang an). Eine Datei, die Sie öffnen, während das Programm läuft,
+öffnet sich in einem Tab dieses Programms; `--new-window` startet ein
+zweites Programm.
+
+**Ihr eigener KI-Agent.** `emb-cli mcp` lässt Ihren eigenen KI-Agenten
+Designs machen, prüfen, exportieren und zeigen (Hilfethema **Agenten
+(MCP)**). Wenn ein anderes Programm eine Datei speichert, die in einem
+Tab offen ist, fragt das Programm: **Erneut öffnen** oder **Diese Version
+behalten**. Das Programm enthält keine KI und keinen Netzwerkcode.
+
+**Bessere Stiche.** Weniger Garn, wo sich die Teile eines Buchstabens
+treffen: Die Unterlage einer Säule hört auf, wo ein anderer Teil des
+Buchstabens sie bedeckt. Monogramme in großen Größen bauen weniger Garn
+auf, weil jeder Buchstabe Säulen oder Füllungen nach seiner Größe im
+Design wählt. Säulen, deren Stiche an ihren Seiten entlang laufen,
+sticken mit ihrem Abstand. Verbindungsstiche in einer Tatamifüllung
+laufen entlang ihrer Reihen, und in einem Buchstaben entlang der Kanten
+seiner Teile, sodass weniger davon sichtbar ist.
+
+**Bereiche und Felder.** Die Seitenbereiche sind zwei Gruppen,
+übereinander, sodass alle ihre Titel auf einem kleinen Bildschirm
+sichtbar sind; nur der offene Tab einer Gruppe hat sein ×. Ein Zahlenfeld
+nimmt ein Dezimalkomma (`2,5`); auf Englisch und Japanisch ist `5,000`
+fünftausend. Ein Feld liest auch Ziffern voller Breite. **Knoten
+bearbeiten** ist im Menü eines Objekts und in den Objekteigenschaften.
+
+**Namen in Ihrer Sprache.** Die Namen der eingebauten Motive,
+Teilungsmuster, Stempel, Bordüren, Clipart-Elemente und Familien zeigen
+sich in der Sprache des Programms, und die Suchen finden beide Namen.
+**Bearbeiten > Sticharten > Familien** öffnet das Fenster Familien.
+
+**Schneller und kleiner.** Die Stickreihenfolgen der Buchstaben einer
+Schrift Ihres Computers bleiben auf der Festplatte, sodass die Schrift
+beim nächsten Start wieder schnell ist. **Objekte erkennen** ist bei
+großen Dateien viel schneller. Das Programm ist etwa 7 MB kleiner: Die
+Bilder der Hilfe haben dieselben Pixel in kleineren Dateien.
+
 ## Version 0.5.0
 
 **Buchstaben, die die Form der Schrift behalten.** Das Programm macht
