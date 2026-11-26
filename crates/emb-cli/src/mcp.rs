@@ -922,7 +922,7 @@ static TOOLS: [Tool; 26] = [
                 "hoop",
                 Kind::Text,
                 false,
-                "The id of a hoop: the result says if the stitches fit its field.",
+                "The id of a hoop: the result says if the stitches fit its field with their middle at the middle of the hoop (as the machine puts them).",
             ),
         ],
         reads: true,
@@ -1613,10 +1613,20 @@ fn check_machine_file(_: &mut Session, a: &Args) -> Result<Out, String> {
             .get(id)
             .cloned()
             .ok_or_else(|| format!("no hoop {id:?} (list_catalog hoops)"))?;
-        // A machine file has its middle at the middle of the hoop.
-        v["fits_hoop"] = json!(needle.clone().all(|p| h.contains(p, 0.0)));
+        v["fits_hoop"] = json!(fits_centered(needle, &h));
     }
     out(v)
+}
+
+/// Returns `true` if the needle points fit the field of the hoop `h` when
+/// the middle of their box is at the middle of the hoop, as the machine
+/// puts a design. The origin of a machine file is not always its middle:
+/// it can be the first stitch or a corner (the audit of 2026-11-26).
+fn fits_centered(needle: impl Iterator<Item = Point> + Clone, h: &emb_model::HoopPreset) -> bool {
+    BBox::from_points(needle.clone()).is_some_and(|b| {
+        let c = b.center();
+        needle.into_iter().all(|p| h.contains(p - c, 0.0))
+    })
 }
 
 fn fix_machine_file(_: &mut Session, a: &Args) -> Result<Out, String> {
@@ -1676,16 +1686,70 @@ fn show(s: &mut Session, _: &Args) -> Result<Out, String> {
     let program = program()?;
     // The program gives the file to the program that runs (its inbox, P22
     // Milestone 8), else it opens a window. Its output is not this output.
-    let mut child = std::process::Command::new(&program)
-        .arg(std::path::absolute(&path).unwrap_or_else(|_| path.clone()))
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn()
+    start_program(&program, &std::path::absolute(&path).unwrap_or_else(|_| path.clone()))
         .map_err(|e| format!("{}: {e}", program.display()))?;
-    // Its end is read, so it leaves no process entry behind.
-    std::thread::spawn(move || child.wait());
     out(json!({"shown": path.display().to_string()}))
+}
+
+/// Starts `program` with the file `file`, and reads its end on a thread (so
+/// it leaves no process entry behind).
+#[cfg(not(windows))]
+fn start_program(program: &Path, file: &Path) -> std::io::Result<()> {
+    use std::process::{Command, Stdio};
+    let mut child = Command::new(program)
+        .arg(file)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()?;
+    std::thread::spawn(move || child.wait());
+    Ok(())
+}
+
+/// Starts `program` with the file `file` through the shell of Windows
+/// (PowerShell `Start-Process`). A process that `Command` starts gets each
+/// handle of this process that a child can take, also the pipes of the
+/// client: the client then sees no end of the output of the server until
+/// the program closes (the audit of 2026-11-26 measured it: 15 s for a
+/// program that ran 15 s). The shell starts the program with none of them
+/// (0.2 s). The paths go in environment variables, so no text of a path is
+/// read as a command.
+#[cfg(windows)]
+fn start_program(program: &Path, file: &Path) -> std::io::Result<()> {
+    use std::os::windows::process::CommandExt;
+    use std::process::{Command, Stdio};
+    /// No console window for PowerShell.
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let shell = std::env::var_os("SystemRoot").map_or_else(
+        || PathBuf::from("powershell.exe"),
+        |r| PathBuf::from(r).join(r"System32\WindowsPowerShell\v1.0\powershell.exe"),
+    );
+    let mut child = Command::new(shell)
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "Start-Process -FilePath $env:SHOKUJODX_SHOW_PROGRAM -ArgumentList $env:SHOKUJODX_SHOW_ARGUMENT -ErrorAction Stop",
+        ])
+        .env("SHOKUJODX_SHOW_PROGRAM", program)
+        .env("SHOKUJODX_SHOW_ARGUMENT", format!("\"{}\"", file.display()))
+        .creation_flags(CREATE_NO_WINDOW)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()?;
+    // PowerShell stops when the program has started: a program that does
+    // not start is an error of the tool. A shell that is slow goes on alone.
+    let start = std::time::Instant::now();
+    while start.elapsed() < std::time::Duration::from_secs(10) {
+        match child.try_wait()? {
+            Some(s) if s.success() => return Ok(()),
+            Some(s) => return Err(std::io::Error::other(format!("the program did not start ({s})"))),
+            None => std::thread::sleep(std::time::Duration::from_millis(20)),
+        }
+    }
+    std::thread::spawn(move || child.wait());
+    Ok(())
 }
 
 /// A name for a file from the name of a design: letters, digits, spaces,
@@ -2258,6 +2322,32 @@ mod tests {
     /// letter that is not ASCII (a panic), an id two times (a move of two
     /// times the distance), a move of 0 (an undo step), a picture over a
     /// file that is not a PNG file, a request with no method (no reply).
+    #[test]
+    fn a_machine_file_fits_with_its_middle_at_the_middle_of_the_hoop() {
+        let h = HoopCatalog::builtin().get("medium_130x180").cloned().unwrap();
+        // 120 x 170 mm with the origin at a corner (the first stitch).
+        let corner = [
+            Point::new(0.0, 0.0),
+            Point::new(120.0, 0.0),
+            Point::new(120.0, 170.0),
+            Point::new(0.0, 170.0),
+        ];
+        assert!(fits_centered(corner.into_iter(), &h));
+        let shifted = corner.map(|p| p + Point::new(-500.0, 300.0));
+        assert!(fits_centered(shifted.into_iter(), &h));
+        // One mm too wide is not in the field.
+        let wide = [Point::new(0.0, 0.0), Point::new(131.0, 10.0)];
+        assert!(!fits_centered(wide.into_iter(), &h));
+        assert!(!fits_centered(std::iter::empty(), &h), "no stitch fits no hoop");
+    }
+
+    #[test]
+    fn a_program_that_does_not_start_is_an_error() {
+        let dir = std::env::temp_dir();
+        let missing = dir.join("no such program 7f3a.exe");
+        assert!(start_program(&missing, &dir.join("x.embproj")).is_err());
+    }
+
     #[test]
     fn wrong_calls_found_by_the_audit() {
         let mut s = Session::new();

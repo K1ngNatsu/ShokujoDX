@@ -10,6 +10,84 @@ Este tema enumera los cambios de cada versión, la más reciente primero.
 **Ayuda > Novedades** lo abre. Después de una actualización, la página
 de inicio tiene un enlace a él.
 
+## Versión 0.6.0
+
+**Tutoriales y lecciones.** La ayuda tiene 31 tutoriales en siete rutas,
+desde el primer diseño hasta la producción (**Ayuda > Todos los
+tutoriales**). Cada tutorial tiene imágenes y un diseño inicial que un
+enlace abre. **Empezar la lección** en la tarjeta de un tutorial lo
+convierte en una lección dentro del programa: la ventana **Lección**
+muestra un paso cada vez, marca el botón o el lugar del lienzo en el que
+debe hacer clic y comprueba el diseño antes de continuar. La ventana
+tiene **◀ Atrás**, **Omitir ▶** y **Detener la lección**, y una lección que se
+detiene conserva su lugar.
+
+**Comprobaciones antes de bordar.** **Ver > Comprobar > Desplazamiento
+visible** marca las puntadas de desplazamiento que ninguna puntada
+posterior cubre, e Información del diseño dice cuánto desplazamiento se
+ve. **Organizar > Orden de bordado > Bordar más rápido** une los hilos
+que se ven iguales, quita los objetos demasiado pequeños para bordar,
+pone los cambios de color en un orden mejor y fija la distancia de
+corte del diseño, en un solo paso de deshacer.
+
+**Muestras de prueba.** **Diseño > Producción > Muestras de prueba** hace
+copias de los objetos seleccionados con un ajuste en pasos (por ejemplo
+la densidad), cada una con una etiqueta de su valor. Borde la hoja en su
+tela y luego use el ajuste de la mejor copia.
+
+**Inclinación del satén y bandas.** **Inclinación** en Propiedades del
+objeto inclina las puntadas superiores de una columna de satén. **Editar
+> Tipos de puntada > Bandas** borda una columna como bandas de hilos una
+al lado de otra, cada una en su color.
+
+**Archivos de máquina.** **Editar > Funciones de máquina > Reparar
+puntadas…** comprueba las puntadas de un archivo de máquina que usted
+abrió y repara los fallos que puede, por ejemplo los cambios de color al
+mismo hilo y las puntadas más cortas que la puntada más corta de la
+máquina.
+
+**Sus diseños abiertos vuelven.** Al salir, el programa conserva los
+diseños abiertos con sus cambios sin guardar y los abre de nuevo en el
+siguiente inicio (**Pestañas abiertas** en las Opciones, activado al
+principio). Un archivo que usted abre mientras el programa funciona se
+abre en una pestaña de ese programa; `--new-window` inicia un segundo
+programa.
+
+**Su propio agente de IA.** `emb-cli mcp` permite que su propio agente de
+IA haga, compruebe, exporte y muestre diseños (tema de ayuda **Agentes
+(MCP)**). Cuando otro programa guarda un archivo que está abierto en una
+pestaña, el programa pregunta: **Abrir de nuevo** o **Conservar esta
+versión**. El programa no tiene IA ni código de red.
+
+**Mejores puntadas.** Menos hilo donde se unen las partes de una letra:
+el relleno base de una columna se detiene donde otra parte de la letra
+lo cubre. Los monogramas grandes acumulan menos hilo, porque cada letra
+elige columnas o rellenos según su tamaño en el diseño. Las columnas
+cuyas puntadas van a lo largo de sus lados bordan con su espaciado. El
+desplazamiento en un relleno tatami va a lo largo de sus filas, y en una
+letra a lo largo de los bordes de sus partes, así que se ve menos
+desplazamiento.
+
+**Paneles y campos.** Los paneles laterales son dos grupos, uno sobre el
+otro, así que todos sus títulos se ven en una pantalla pequeña; solo la
+pestaña abierta de un grupo tiene su ×. Un campo numérico acepta una coma
+decimal (`2,5`); en inglés y en japonés, `5,000` es cinco mil. Un campo
+también lee dígitos de ancho completo. **Editar nodos** está en el menú
+de un objeto y en Propiedades del objeto.
+
+**Nombres en su idioma.** Los nombres de los motivos, patrones de
+división, sellos, bordes, elementos de clipart y familias integrados se
+muestran en el idioma del programa, y las búsquedas encuentran los dos
+nombres. **Editar > Tipos de puntada > Familias** abre la ventana
+Familias.
+
+**Más rápido y más pequeño.** Los órdenes de bordado de las letras de una
+fuente de su computadora se quedan en el disco, así que la fuente es
+rápida de nuevo en el siguiente inicio. **Reconocer objetos** es mucho
+más rápido con archivos grandes. El programa es unos 7 MB más pequeño:
+las imágenes de la ayuda tienen los mismos píxeles en archivos más
+pequeños.
+
 ## Versión 0.5.0
 
 **Letras que mantienen la forma de la fuente.** El programa crea mejores

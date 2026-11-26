@@ -39,17 +39,20 @@ layout, so a middle initial of 60 mm sewed as columns.
    parts are scaled as before. The stretch of the envelope is for the
    whole text, so the letters of an envelope are the same kind.
 2. **Stitches along a side of a column** (`satin::thin_across`): where a
-   stitch is less than 25° from a side, the pairs that stay can be 1.5
-   steps apart across the stitches (`ALONG_SIDE_GAP`), so pairs half a
-   step apart there stay 1 to 1.5 steps apart (from `1.5 - a` to 1.5
-   steps, where `a` is the distance across of two pairs that follow; in
-   the middle of the column: one step). A column whose stitches meet both
-   sides at 25° or more (also one slanted 60° all along) keeps its pairs:
-   a factor of 1.5 for all pairs would sew such a column lighter than its
-   spacing. A column slanted more than 65° all along (its stitches less
-   than 25° from its sides) sews up to 1.5 times lighter; a factor of
-   about 1.25 would give one step on average there (the audit of
-   2026-11-26), but it needs the monogram probe again.
+   stitch is less than 25° from a side, the pair that stays is the pair
+   nearer to one step across the stitches from the last pair that stays,
+   less what the pairs before went past one step. So pairs half a step
+   apart there stay one step apart, and pairs that are closer (a column
+   slanted more than 65° from square all along) stay one step apart on
+   average. A column whose stitches meet both sides at 25° or more (also
+   one slanted 60° all along) keeps its pairs. The first form of this
+   rule kept the first pair 1.5 steps from the last (`ALONG_SIDE_GAP`):
+   pairs that stayed were from `1.5 - a` to 1.5 steps apart (`a`: the
+   distance across of two pairs that follow), so a column slanted more
+   than 65° sewed up to 1.5 times lighter than its spacing. The audit of
+   2026-11-26 changed it; a rule of the nearest pair with no carry made a
+   column slanted 66° 1.2 times denser (the pairs are at equal steps, so
+   the same pair is the nearest each time).
 3. **Not done.** The underlay that stops short of the ends of a column
    (tried with 0.6 to 1.5 mm) took the worst place only from 8.4 to 7.9.
    Travel in a tatami fill that goes round the sewn rows (as in circular
@@ -71,8 +74,20 @@ layout, so a middle initial of 60 mm sewed as columns.
   the end of a section, and no way round is open.
 - The letter fault bench and the judged letters: the same to the eye.
 - The audit of 2026-11-26: stacked text has no envelope, so its
-  envelope does not choose columns or fills.
+  envelope does not choose columns or fills. Lettering in a TrueType font
+  with the stitch type Auto chooses satin or tatami columns after the
+  envelope (the layout measures the columns as they sew): a bar across
+  the stretch of an oval is wider (`auto_chooses_the_columns_after_the_envelope`).
+- The rule of the nearest pair (2026-11-26): the monogram probe (all its
+  cases) has the same warnings as before: build-up only at the joint of
+  "K" above. The judged letters are the same to the eye (480 of 496
+  clean; in TrueType lettering two layers 989 mm² and 21 trims as before,
+  open area 84.2 mm², 83.6 before). The corpus: 27 designs with lettering
+  sew 1 to 41 stitches more (at most 0.5 %), three have one trim less and
+  one has one trim more.
 - Tests: `stitches_along_a_side_are_one_step_apart`,
+  `a_column_slanted_far_sews_at_its_spacing` (66° to 85°: one step on
+  average, within 5 %),
   `the_most_stretch_of_an_envelope`, the letters by size in
   `a_font_has_fill_letters_for_large_lettering` (an edit and an envelope),
   `the_large_styles_build_up_no_thread` (Classic, Diamond and Oval at

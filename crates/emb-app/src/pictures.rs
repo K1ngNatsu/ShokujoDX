@@ -97,11 +97,37 @@ impl Picture {
     }
 
     pub(crate) fn save(&self, path: &Path) -> Result<(), String> {
+        if self.pixels.len() != self.width * self.height {
+            return Err("the picture has a wrong size".into());
+        }
         let bytes: Vec<u8> = self.pixels.iter().flatten().copied().collect();
-        let image = image::RgbaImage::from_raw(self.width as u32, self.height as u32, bytes)
-            .ok_or("the picture has a wrong size")?;
-        image.save(path).map_err(|e| format!("{}: {e}", path.display()))
+        write_png(path, self.width as u32, self.height as u32, &bytes)
     }
+}
+
+/// Writes RGBA pixels as a PNG file, as small as the encoder makes it with
+/// no change of a pixel: with no alpha channel when no pixel is
+/// see-through, and with the best compression. The pictures of the help
+/// are in the program (ADR 0162): so they were 16.1 MB, and are 9.2 MB (the
+/// audit of 2026-11-26).
+pub(crate) fn write_png(path: &Path, width: u32, height: u32, rgba: &[u8]) -> Result<(), String> {
+    use image::codecs::png::{CompressionType, FilterType, PngEncoder};
+    use image::{ExtendedColorType, ImageEncoder};
+    let fail = |e: &dyn std::fmt::Display| format!("{}: {e}", path.display());
+    let file = std::fs::File::create(path).map_err(|e| fail(&e))?;
+    let encoder = PngEncoder::new_with_quality(
+        std::io::BufWriter::new(file),
+        CompressionType::Best,
+        FilterType::Adaptive,
+    );
+    let pixels = rgba.as_chunks::<4>().0;
+    let written = if pixels.iter().all(|p| p[3] == 255) {
+        let rgb: Vec<u8> = pixels.iter().flat_map(|p| [p[0], p[1], p[2]]).collect();
+        encoder.write_image(&rgb, width, height, ExtendedColorType::Rgb8)
+    } else {
+        encoder.write_image(rgba, width, height, ExtendedColorType::Rgba8)
+    };
+    written.map_err(|e| fail(&e))
 }
 
 /// One corner of a triangle: its place in pixels, its place in the
@@ -1097,6 +1123,51 @@ fn out_dir() -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Writes the pictures of the help again with [`write_png`] where that
+    /// makes a file smaller; each pixel stays the same (the test reads the
+    /// new file and compares).
+    ///
+    /// ```text
+    /// cargo test --release -p emb-app -- --ignored write_help_pictures_smaller --nocapture
+    /// ```
+    #[test]
+    #[ignore = "writes the files of docs/help/pictures; run it by hand"]
+    fn write_help_pictures_smaller() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/help/pictures");
+        let mut files = Vec::new();
+        let mut todo = vec![dir];
+        while let Some(d) = todo.pop() {
+            for e in std::fs::read_dir(&d).unwrap().flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    todo.push(p);
+                } else if p.extension().is_some_and(|x| x == "png") {
+                    files.push(p);
+                }
+            }
+        }
+        let (mut before, mut after) = (0, 0);
+        let tmp = std::env::temp_dir().join(format!("help picture {}.png", std::process::id()));
+        for f in &files {
+            let old = std::fs::read(f).unwrap();
+            let image = image::load_from_memory(&old).unwrap().to_rgba8();
+            write_png(&tmp, image.width(), image.height(), image.as_raw()).unwrap();
+            let new = std::fs::read(&tmp).unwrap();
+            let again = image::load_from_memory(&new).unwrap().to_rgba8();
+            assert!(again == image, "{} changes", f.display());
+            before += old.len();
+            if new.len() < old.len() {
+                std::fs::write(f, &new).unwrap();
+                after += new.len();
+            } else {
+                after += old.len();
+            }
+        }
+        std::fs::remove_file(&tmp).ok();
+        println!("{} pictures: {before} bytes before, {after} bytes after", files.len());
+        assert!(!files.is_empty());
+    }
 
     /// The painter gives the colors that egui asks for: a plain area, an
     /// area with alpha over it, and text.

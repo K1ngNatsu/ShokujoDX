@@ -10,6 +10,76 @@ This topic lists the changes of each version, the newest first.
 **Help > What Is New** opens it. After an update, the start page has a
 link to it.
 
+## Version 0.6.0
+
+**Tutorials and lessons.** The help has 31 tutorials in seven paths, from
+the first design to production (**Help > All Tutorials**). Each tutorial
+has pictures and a start design that a link opens. **Start the Lesson**
+on the card of a tutorial makes it a lesson in the program: the
+**Lesson** window shows one step at a time, marks the button or the place
+on the canvas to click, and checks the design before it goes on. The
+window has **◀ Back**, **Skip ▶** and **Stop the Lesson**, and a lesson
+that stops keeps its place.
+
+**Checks before you sew.** **View > Check > Travel That Shows** marks the
+travel stitches that no later stitch covers, and Design Info says how
+much travel shows. **Arrange > Sew Order > Quicker to Sew** merges
+threads that look the same, removes objects that are too small to sew,
+puts the color changes in a better order and sets the trim distance of
+the design, in one undo step.
+
+**Test swatches.** **Design > Output > Test Swatches** makes copies of the
+selected objects with one setting in steps (for example the density),
+each with a label of its value. Sew the sheet on your fabric, then use
+the setting of the best copy.
+
+**Satin lean and bands.** **Lean** in Object Properties leans the top
+stitches of a satin column. **Edit > Stitch Types > Bands** sews a column
+as bands of threads side by side, each in its color.
+
+**Machine files.** **Edit > Machine Functions > Fix Stitches…** checks the
+stitches of a machine file that you opened and fixes the faults that it
+can, for example color changes to the same thread and stitches shorter
+than the shortest stitch of the machine.
+
+**Your open designs come back.** When you quit, the program keeps the
+open designs with their changes that are not saved, and opens them
+again at the next start (**Open tabs** in the Options, on at the start).
+A file that you open while the program runs opens in a tab of that
+program; `--new-window` starts a second program.
+
+**Your own AI agent.** `emb-cli mcp` lets your own AI agent make, check,
+export and show designs (help topic **Agents (MCP)**). When another
+program saves a file that is open in a tab, the program asks: **Open
+Again** or **Keep This Version**. The program has no AI in it and no
+network code.
+
+**Better stitches.** Less thread where the parts of a letter meet: the
+underlay of a column stops where another part of the letter covers it.
+Monograms at large sizes build up less thread, because each letter
+chooses columns or fills by its size in the design. Columns whose
+stitches run along their sides sew at their spacing. Travel in a tatami
+fill goes along its rows, and travel in a letter goes along the edges of
+its parts, so less travel shows.
+
+**Panels and fields.** The side panels are two groups, one over the
+other, so all their titles show on a small screen; only the open tab of
+a group has its ×. A number field takes a decimal comma (`2,5`); in
+English and Japanese, `5,000` is five thousand. A field also reads
+full-width digits. **Edit Nodes** is in the menu of an object and in
+Object Properties.
+
+**Names in your language.** The names of the built-in motifs, split
+patterns, stamps, borders, clipart items and families show in the
+language of the program, and the searches find both names. **Edit >
+Stitch Types > Families** opens the Families window.
+
+**Faster and smaller.** The sew orders of the letters of a font of your
+computer stay on the disk, so the font is quick again at the next start.
+**Recognize Objects** is much faster with large files. The program is
+about 7 MB smaller: the pictures of the help have the same pixels in
+smaller files.
+
 ## Version 0.5.0
 
 **Letters that keep the shape of the font.** The program makes better

@@ -61,7 +61,7 @@ and tests on other machines and systems.
 | More tutorials (P19 Part 2): seven paths, about 31 tutorials with start designs, pictures and step files (ADR 0162), and lessons in the program (ADR 0177) | Accepted (2026-11-24); done (2026-11-25): 31 tutorials, each also a lesson. Open: the test of the lessons with new users (P19 Part 1, Milestone 3), lessons of users and shops, and a few topics that can say their steps better (the list in the plan) | P19 Part 2, `docs/design/p19-plan.md` |
 | Checks, swatches and agents (P22): travel that shows, live numbers and Quicker to Sew, test swatches, satin lean and bands of threads, machine files (check, fix, a cross-check with pyembroidery), letter measures against the eye, overlapped strokes (a trial), the open tabs come back and one program, agents through MCP | Accepted (owner, 2026-11-25); Milestones 1 to 6 made (ADR 0167 to 0173); Milestone 7 measured and not adopted (ADR 0174); Milestone 8 made (ADR 0175); audited ("Audit of P22" in the roadmap); Milestone 9 made in the software (ADR 0176), the owner's test with an agent open. The findings of the agent test are fixed (the labels of test swatches: Soft Round; the travel between two letters on a fill: ADR 0178) | `docs/design/p22-plan.md` |
 | Monograms that build up thread at large sizes. Measured on 2026-11-26: the worst places were wide column ends whose cap the stitches meet at a small angle, in letters larger than the columns of the font go (ADR 0178, 0180). ADR 0180 and 0181: the pairs that the stitches do not need go, short stitches where stitches meet a side at a small angle, and a letter chooses columns or fills by its size in the design (the edit of the Classic middle initial, the envelope of Oval and Diamond). The probe (64 cases): no build-up in 63 (38 places before ADR 0180). | Open: the joint of the arm and the stem of "K" (JMK, Classic at 60 mm, towel: 6.1 layers on 4 mm², two satin columns on each other); a travel of 4 mm on the sewn rows of the fill letter "M" (JMK, Oval at 60 mm, cotton) | `crates/emb-app/src/monogram.rs` (`probe_monogram_warnings`), ADR 0180, ADR 0181 |
-| The pictures of the tutorials are 16 MB (154 files) after Milestone 5 of P19 Part 2, more than the 10 MB limit of ADR 0162 for a help package; the program file is about 100 MB | Later phase: the owner put the size work off (2026-11-24); then a help package, smaller pictures (lossless PNG optimization) or link-time optimization | `docs/help/pictures`, ADR 0162 |
+| The pictures of the tutorials were 16.1 MB (154 files) after Milestone 5 of P19 Part 2, more than the 10 MB limit of ADR 0162 for a help package; the program file is about 100 MB | The pictures are 9.2 MB since 2026-11-26 (written again with no change of a pixel: no alpha channel, the best compression; `pictures::write_png`). Open (later phase): a help package or link-time optimization for the size of the program; pictures with a palette of their colors would be 0.7 MB smaller (a direct use of the `png` crate) | `docs/help/pictures`, ADR 0162 |
 | Browser version | A trial on the branch `trial/browser`, on GitHub Pages for testers (2026-11-21 and 22: touch, phones, the loader; on 2026-11-24 it has the work of v0.5.0); step 2 (the web version for computers) not started | P15 in the roadmap, `docs/design/p15-trial-report.md` on the branch |
 | Touch in the desktop program (Windows touch screens) | Planned (owner, 2026-11-22). From the trial: two fingers pan and zoom, handles and targets for a finger, the touch bars (the draw tools and the sketch Dimension tool), the wider line between panels, the side panels under the canvas on a tall narrow screen. In the program today: the touch bar of the draw tools (Next or Finish), the ruler menu with a long press | P15 step 3 in the roadmap |
 | The assistant | Benched (owner) | P10 Milestone 9 |
@@ -134,21 +134,15 @@ pair of the same rows on a line).
 
 The details are in the roadmap ("Audit of the work after P22").
 
-- A column slanted more than 65° all along sews up to 1.5 times lighter
-  than its spacing (`satin::ALONG_SIDE_GAP`, ADR 0181). A factor of about
-  1.25 gives one step on average; it needs the monogram probe again.
-- TrueType lettering in Auto chooses satin or tatami columns before the
-  envelope makes the text taller (`glyph::auto_stitches`), as embroidery
-  fonts did before ADR 0181.
+- Fixed on 2026-11-26 (the owner's choice): a column slanted more than
+  65° sews at its spacing (ADR 0181: the pair nearer to one step, with
+  a carry); TrueType lettering in Auto chooses its columns after the
+  envelope; `show` of `emb-cli mcp` starts the program through
+  PowerShell on Windows, so the client gets the end of the output
+  (ADR 0176); `check_machine_file` puts the middle of the stitches at the
+  middle of the hoop.
 - The Japanese lesson asks for the font Noto Sans JP (the font of its
   test); a user with another Japanese font clicks **Skip** at that step.
-- On Windows, the program that `show` of `emb-cli mcp` starts can keep
-  the pipes of `emb-cli` open (the handles that a new process gets), so a
-  client can wait for the end of the output until the program closes.
-  Not measured.
-- `check_machine_file` of the MCP server says if a file fits a hoop from
-  the coordinates of the file: a file whose origin is not its middle gets
-  a wrong answer.
 - The search of the Clipart panel finds a translated name only as one
   part of the search text (words in English: each word).
 

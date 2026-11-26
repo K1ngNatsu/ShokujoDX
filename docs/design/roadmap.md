@@ -263,15 +263,18 @@ the documents against the code.
 
 **Left as it is** (in `docs/design/open-work.md`).
 
-- `satin::ALONG_SIDE_GAP` stays 1.5 (measured with the monogram probe):
-  a column slanted more than 65° all along sews up to 1.5 times lighter.
-- TrueType lettering in Auto chooses satin or tatami columns before the
-  envelope makes it taller.
+- Fixed after the audit (the owner's choice, 2026-11-26): a column
+  slanted more than 65° all along sewed up to 1.5 times lighter (now the
+  pair nearer to one step, with a carry: one step on average; the
+  monogram probe has the same warnings); TrueType lettering in Auto
+  chose its columns before the envelope; `show` on Windows kept the
+  pipes of `emb-cli` open for the life of the program (measured: 15 s for
+  a program of 15 s; now it starts through PowerShell `Start-Process`);
+  `check_machine_file` said if a file fits a hoop from the coordinates
+  of the file. The pictures of the tutorials went from 16.1 MB to 9.2 MB
+  with no change of a pixel.
 - The Japanese lesson asks for Noto Sans JP; another font needs Skip.
-- `show` on Windows: the program that it starts can keep the pipes of
-  `emb-cli` open (not measured). `check_machine_file` says if a file fits
-  a hoop from the coordinates of the file. A line of the MCP input has no
-  length limit.
+- A line of the MCP input has no length limit.
 - The Clipart search finds a translated name only as one part.
 - A field of whole numbers takes `2,5` as 2.
 - Code written two times that a change of it can change results: the

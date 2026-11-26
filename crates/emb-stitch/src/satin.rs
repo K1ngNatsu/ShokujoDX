@@ -597,14 +597,6 @@ fn underlay_layer(col: &Column, layer: &UnderlayLayer) -> Vec<Point> {
 /// The sine of the largest angle between a stitch and a side of the column
 /// at which the stitch runs almost along the side (25°).
 const ALONG_SIDE_SIN: f64 = 0.4226;
-/// Where a stitch runs almost along a side (the cap of a wide column end at
-/// a corner), the pairs that stay can be this many steps apart across the
-/// stitches (ADR 0181). The pairs that stay are from `ALONG_SIDE_GAP - a`
-/// to `ALONG_SIDE_GAP` steps apart, where `a` is the distance across of
-/// two pairs that follow: for pairs half a step apart, 1 to 1.5 steps (in
-/// the middle of the column: one step).
-const ALONG_SIDE_GAP: f64 = 1.5;
-
 /// The pairs of a column, made `step` apart, without those that the
 /// stitches do not need (ADR 0180): where the stitches run almost along
 /// the column, pairs that are one step apart along the middle are much
@@ -620,12 +612,14 @@ const ALONG_SIDE_GAP: f64 = 1.5;
 /// than half a step apart across the stitches (all columns with stitches
 /// across them), no pair is left out. Where a stitch runs almost along a
 /// side of the column ([`ALONG_SIDE_SIN`]: the cap of a wide column end
-/// that the tuning took to a corner), the pairs that stay can be
-/// [`ALONG_SIDE_GAP`] steps apart (ADR 0181): pairs that are half a step
-/// apart across the stitches there stay 1 to 1.5 steps apart. A column
-/// whose stitches meet both sides at 25° or more (also one slanted 60°
-/// from square all along) keeps its pairs; a column slanted more than 65°
-/// all along sews up to 1.5 times lighter than its spacing. The first and
+/// that the tuning took to a corner, a column slanted more than 65° from
+/// square), the pair that stays is the pair nearer to one step from the
+/// last pair that stays, less what the pairs before went past one step
+/// (ADR 0181): pairs that are half a step apart across the stitches there
+/// stay one step apart, and pairs that are closer stay one step apart on
+/// average (the audit of 2026-11-26: with the first pair past 1.5 steps,
+/// such a column sewed up to 1.5 times lighter than its spacing). A column whose stitches meet both sides at 25° or more (also
+/// one slanted 60° from square all along) keeps its pairs. The first and
 /// the last pair stay.
 pub(crate) fn thin_across(pairs: Vec<(Point, Point)>, step: f64) -> Vec<(Point, Point)> {
     if pairs.len() < 3 {
@@ -649,10 +643,29 @@ pub(crate) fn thin_across(pairs: Vec<(Point, Point)>, step: f64) -> Vec<(Point, 
     };
     let mut out = Vec::with_capacity(pairs.len());
     out.push(pairs[0]);
+    // Along the sides: how far the pairs that stay went past whole steps
+    // (in steps), so that the next pair makes up for it.
+    let mut carry: f64 = 0.0;
     for i in 1..pairs.len() - 1 {
-        let (pr, next) = (&pairs[i], &pairs[i + 1]);
-        let gap = if along_side(i) { ALONG_SIDE_GAP } else { 1.0 };
-        if across(&out[out.len() - 1], next) >= gap * mid(pr).distance(mid(next)).min(step) {
+        let (last, pr, next) = (&out[out.len() - 1], &pairs[i], &pairs[i + 1]);
+        let unit = mid(pr).distance(mid(next)).min(step);
+        let to_next = across(last, next);
+        let keep = if along_side(i) && unit > 1e-9 {
+            // The pair nearer to the target (one step, less what the pairs
+            // before went past it): `next` is farther past the target than
+            // `pr` is short of it.
+            let target = unit * (1.0 - carry).clamp(0.5, 1.5);
+            let to_pr = across(last, pr);
+            let keep = to_pr >= target || to_pr + to_next >= 2.0 * target;
+            if keep {
+                carry += to_pr / unit - 1.0;
+            }
+            keep
+        } else {
+            carry = 0.0;
+            to_next >= unit
+        };
+        if keep {
             out.push(*pr);
         }
     }
@@ -1395,11 +1408,10 @@ mod tests {
 
     /// Stitches that run almost along the column (ADR 0180): pairs one
     /// step apart along the middle are a seventh of a step apart across
-    /// the stitches. The pairs that stay are not less than half a step
-    /// apart across the stitches, and not more than one step, or
-    /// [`ALONG_SIDE_GAP`] steps where the stitches run along the sides
-    /// (8° here, ADR 0181); a column with stitches across it keeps all its
-    /// pairs.
+    /// the stitches. The stitches run along the sides here (8°, ADR 0181):
+    /// the pairs that stay are about one step apart across the stitches,
+    /// and one step on average (before the audit of 2026-11-26: up to 1.5
+    /// steps); a column with stitches across it keeps all its pairs.
     #[test]
     fn stitches_along_the_column_do_not_crowd() {
         let step = 0.2;
@@ -1408,10 +1420,12 @@ mod tests {
         let kept = thin_across(all.clone(), step);
         assert!(kept.len() * 5 < all.len(), "{} of {}", kept.len(), all.len());
         assert_eq!((kept[0], kept[kept.len() - 1]), (all[0], all[all.len() - 1]));
-        for w in kept[..kept.len() - 1].windows(2) {
-            let d = across(w[0], w[1]);
-            assert!(d > 0.5 * step && d < ALONG_SIDE_GAP * step + 1e-9, "{d}");
+        let gaps: Vec<f64> = kept[..kept.len() - 1].windows(2).map(|w| across(w[0], w[1])).collect();
+        for d in &gaps {
+            assert!(*d > 0.75 * step && *d < 1.25 * step, "{d}");
         }
+        let mean = gaps.iter().sum::<f64>() / gaps.len() as f64;
+        assert!((mean / step - 1.0).abs() < 0.03, "{mean}");
         // The top stitches: fewer needle points than a straight column,
         // also with the points that split the long stitches.
         let straight = satin(&slanted(0.0), &plain(0.4), Point::ZERO, None).unwrap();
@@ -1463,7 +1477,25 @@ mod tests {
         );
         for w in kept[..kept.len() - 1].windows(2) {
             let d = across(w[0], w[1]);
-            assert!(d > 0.9 * step && d < ALONG_SIDE_GAP * step + 1e-9, "{d}");
+            assert!(d > 0.9 * step && d < 1.1 * step, "{d}");
+        }
+    }
+
+    /// Columns slanted 66° to 85° from square all along (their stitches
+    /// meet both sides at less than 25°): the pairs that stay are one step
+    /// apart across the stitches on average, so the column sews at its
+    /// spacing (the audit of 2026-11-26: up to 1.5 times lighter).
+    #[test]
+    fn a_column_slanted_far_sews_at_its_spacing() {
+        let step = 0.2;
+        for deg in [66.0, 70.0, 75.0, 80.0, 85.0] {
+            let (s, c) = emb_geom::math::sin_cos_deg(deg);
+            let all = Column::new(&slanted(2.0 * s / c)).unwrap().pairs(step);
+            let kept = thin_across(all.clone(), step);
+            assert!(kept.len() < all.len(), "{deg}");
+            let gaps: Vec<f64> = kept[..kept.len() - 1].windows(2).map(|w| across(w[0], w[1])).collect();
+            let mean = gaps.iter().sum::<f64>() / gaps.len() as f64;
+            assert!((mean / step - 1.0).abs() < 0.05, "{deg}: {mean}");
         }
     }
 
