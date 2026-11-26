@@ -20,7 +20,7 @@ einen goldenen Kreis (eine Füllung) und eine marineblaue Linie darunter.
 1. Klicken Sie auf den Kreis, um ihn auszuwählen.
 2. Klicken Sie auf **Digitalisieren > Verzieren > Ränder**. Das Fenster
    **Ränder** öffnet sich. Es zeigt ein Bild von jedem Rand.
-3. Tippen Sie `hearts` in das Suchfeld, und klicken Sie auf **Hearts**.
+3. Tippen Sie `hearts` in das Suchfeld, und klicken Sie auf **Herzen**.
 4. Setzen Sie **Abstand um die Objekte** auf 3 mm.
 5. Klicken Sie auf **Rand hinzufügen**. Ein Rand aus Herzen geht um den
    Kreis. Wenn nichts ausgewählt ist, geht der Rand um das ganze Design.
@@ -42,10 +42,10 @@ Motivfüllung) wiederholt.
 1. Klicken Sie auf die marineblaue Linie, um sie auszuwählen.
 2. Klicken Sie auf **Bearbeiten > Sticharten > Motive**. Das Fenster
    **Motive** öffnet sich.
-3. Klicken Sie auf **Scallop**, dann auf **Für die Auswahl verwenden**.
+3. Klicken Sie auf **Bogenkante**, dann auf **Für die Auswahl verwenden**.
    Die Linie wird als Reihe von Bögen gestickt.
 4. Klicken Sie auf den Kreis, um ihn auszuwählen. Klicken Sie auf
-   **Bead**, dann auf **Für die Auswahl verwenden**. Der Kreis wird als
+   **Perle**, dann auf **Für die Auswahl verwenden**. Der Kreis wird als
    Reihen von Perlen gestickt.
 
 Die Objekteigenschaften legen die **Motivlänge** und die **Motivhöhe**
@@ -59,7 +59,7 @@ ist ein eigenes Design.
 
 1. Klicken Sie im Fenster **Motive** auf **Familien…**. Das Fenster
    **Familien** öffnet sich.
-2. Klicken Sie auf **Clipart**, dann auf **Six-point star** (ein
+2. Klicken Sie auf **Clipart**, dann auf **Sechszackiger Stern** (ein
    eingebautes Element der Familie Star).
 3. Ändern Sie **Spitzen** oder **Innerer Teil**, um den Stern zu ändern.
    Das Bild zeigt das Element.

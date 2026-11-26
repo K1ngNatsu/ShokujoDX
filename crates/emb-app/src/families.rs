@@ -3,7 +3,8 @@
 //! and its parameters (`emb_model::family`), see it, and use it for the
 //! selection or keep it in the library.
 //!
-//! The Motifs window, the pattern and stamp rows of Object Properties and
+//! The Families command of the ribbon (the Stitch Types panel) opens it;
+//! the Motifs window, the pattern and stamp rows of Object Properties and
 //! the Clipart tab open it for their kind.
 
 use std::path::PathBuf;
@@ -324,11 +325,11 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
             ui.label(tr("Family"));
             let mut pick = None;
             egui::ComboBox::from_id_salt("family")
-                .selected_text(f.name)
+                .selected_text(tr(f.name))
                 .height(320.0)
                 .show_ui(ui, |ui| {
                     for (i, g) in all.iter().enumerate() {
-                        if ui.selectable_label(i == w.family, g.name).clicked() {
+                        if ui.selectable_label(i == w.family, tr(g.name)).clicked() {
                             pick = Some(i);
                         }
                     }
@@ -342,7 +343,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
             ui.label(tr("Built-in items"));
             for (name, values) in f.preset_values() {
                 if ui
-                    .selectable_label(w.values == values, name)
+                    .selectable_label(w.values == values, tr(name))
                     .on_hover_text(f.description(&values))
                     .clicked()
                 {

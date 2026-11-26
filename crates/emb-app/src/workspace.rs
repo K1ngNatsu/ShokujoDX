@@ -1440,7 +1440,10 @@ pub fn options_window(ctx: &egui::Context, st: &mut AppState) {
                     ui.label(tr("Tools"));
                     ui.horizontal(|ui| {
                         ui.radio_value(&mut s.simple_mode, false, tr("All tools"));
-                        ui.radio_value(&mut s.simple_mode, true, tr("Simple mode (fewer tools, larger buttons)"));
+                        // The explanation is a tooltip: in a translation it
+                        // made the window much wider.
+                        ui.radio_value(&mut s.simple_mode, true, tr("Simple Mode"))
+                            .on_hover_text(tr("Fewer tools and larger buttons."));
                     });
                     ui.end_row();
                     ui.label(tr("Units"));
@@ -1561,7 +1564,8 @@ pub fn options_window(ctx: &egui::Context, st: &mut AppState) {
             ui.separator();
             crate::setup::calibration_ui(ui, &mut s);
             ui.separator();
-            ui.horizontal(|ui| {
+            // Wrapped: the note is long in a translation.
+            ui.horizontal_wrapped(|ui| {
                 if ui.button(tr("Reset to defaults")).clicked() {
                     let defaults = s.defaults.clone();
                     s = Settings::default();

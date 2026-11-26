@@ -188,7 +188,8 @@ pub fn properties(
     let mut drag = false;
     let mut slider =
         |ui: &mut egui::Ui, label: &str, v: &mut f64, range: std::ops::RangeInclusive<f64>, word: Option<Word>| {
-            ui.horizontal(|ui| {
+            // Wrapped: the word after the slider can be long in a translation.
+            ui.horizontal_wrapped(|ui| {
                 let l = ui.label(label);
                 if let Some((_, help)) = word {
                     l.on_hover_text(help);

@@ -184,14 +184,15 @@ las bandas** vuelve a hacer la columna de un solo hilo.
 ## Familias
 
 Una familia crea un elemento a partir de unos números: la familia
-**Waves** crea un motivo a partir del número de ondas y de su altura. La
+**Ondas** crea un motivo a partir del número de ondas y de su altura. La
 mayoría de los motivos, los patrones de división programada, los sellos de
 relieve y los elementos de clipart del programa vienen de familias, y
 usted puede crear un elemento propio.
 
-- **Familias…** abre la ventana Familias. El botón está en la ventana
-  Motivos, junto a las listas de los patrones y de los sellos en
-  Propiedades del objeto, y en el panel Clipart.
+- **Editar > Tipos de puntada > Familias** abre la ventana Familias. Un
+  botón **Familias…** está también en la ventana Motivos, junto a las
+  listas de los patrones y de los sellos en Propiedades del objeto, y en
+  el panel Clipart.
 - Elija el tipo y la **Familia**. **Elementos incluidos** son los elementos
   de la familia que están en las listas del programa. Cambie los números:
   la imagen muestra el elemento.

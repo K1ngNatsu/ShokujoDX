@@ -111,14 +111,24 @@ and tests on other machines and systems.
 
 ### Small gaps that the audits left
 
-- The names of the motifs, split patterns, stamps, borders, clipart items
-  and families are in English only.
-- The Families window has no ribbon command (the Motifs window, Object
-  Properties and the Clipart panel open it).
-- The titles of some dock tabs are cut in the translations, and the View
-  Options window is wider in German and in Spanish than in English.
-- Recognize Objects is slow for a stitch file that sews one fill many
-  times at one place (500 layers: 28 s).
+Done on 2026-11-26: the names of the built-in motifs, split patterns,
+stamps, borders, clipart items and families show in the language of the
+program (they stay English in the files; the Clipart and border searches
+find both names); the Families window has a ribbon command (Edit >
+Stitch Types > Families); the Options window is no wider than in English
+(Simple Mode and the paste choice have their explanation in a tooltip,
+and the last row wraps), and the words after the sliders of Object
+Properties and the values of Design Info go on a second line where the
+panel is narrow; Recognize Objects takes 0.4 s for a stitch file that
+sews one fill 500 times (28 s: the area of its rows made a piece for each
+pair of the same rows on a line).
+
+- The side panels are one group (the owner's choice of 2026-11-22), and
+  its eight tabs do not fit its tab bar, which scrolls: the tab at the
+  edge shows in part ("Styles" in 35 pictures of the windows, the same in
+  English, Spanish and Japanese). This is not a fault of the
+  translations. Two groups, or icons in place of the titles of the tabs
+  that are not open, would show all tabs: the owner decides.
 
 ### Ideas from zigzag (2026-11-25)
 

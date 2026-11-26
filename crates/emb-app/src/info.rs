@@ -578,7 +578,9 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
             .show(ui, |ui| {
                 let mut row = |k: &str, v: String| {
                     ui.label(k);
-                    ui.label(v);
+                    // A long value goes on more lines at the edge of the
+                    // panel (some are long in a translation).
+                    ui.add(egui::Label::new(v).wrap());
                     ui.end_row();
                 };
                 row(

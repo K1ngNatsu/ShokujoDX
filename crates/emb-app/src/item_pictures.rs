@@ -133,6 +133,9 @@ pub fn cell(
                 .rect_stroke(rect, 3.0, Stroke::new(width, accent), egui::StrokeKind::Inside);
         }
         draw(&ui.painter().with_clip_rect(rect), rect.shrink(5.0), ink);
+        // A built-in name shows in the language of the program (the name
+        // stays English in the design).
+        let name = crate::i18n::tr(name);
         let picture = crate::a11y::named(picture, name);
         let label = ui.add(egui::Button::selectable(selected, egui::RichText::new(name).small()).truncate());
         picture.union(label)

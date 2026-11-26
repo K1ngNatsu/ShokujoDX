@@ -180,14 +180,15 @@ macht die Säule wieder zu einer Säule mit einem Garn.
 
 ## Familien
 
-Eine Familie macht ein Element aus einigen Zahlen: Die Familie **Waves**
+Eine Familie macht ein Element aus einigen Zahlen: Die Familie **Wellen**
 macht ein Motiv aus der Anzahl der Wellen und ihrer Höhe. Die meisten
 Motive, Programmteilungs-Muster, Prägestempel und Clipart-Elemente des
 Programms kommen aus Familien, und Sie können ein eigenes Element machen.
 
-- **Familien…** öffnet das Fenster Familien. Die Schaltfläche ist im
-  Fenster Motive, neben den Listen der Muster und der Stempel in den
-  Objekteigenschaften und in der Gruppe Clipart.
+- **Bearbeiten > Sticharten > Familien** öffnet das Fenster Familien. Eine
+  Schaltfläche **Familien…** ist auch im Fenster Motive, neben den Listen
+  der Muster und der Stempel in den Objekteigenschaften und in der Gruppe
+  Clipart.
 - Wählen Sie die Art und die **Familie**. **Eingebaute Elemente** sind die
   Elemente der Familie, die in den Listen des Programms sind. Ändern Sie
   die Zahlen: Das Bild zeigt das Element.

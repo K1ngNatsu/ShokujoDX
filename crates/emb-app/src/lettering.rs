@@ -1908,7 +1908,8 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, l: &Letter
                        v: &mut f64,
                        range: std::ops::RangeInclusive<f64>,
                        word: crate::applique::Word| {
-            ui.horizontal(|ui| {
+            // Wrapped: the word after the slider can be long in a translation.
+            ui.horizontal_wrapped(|ui| {
                 ui.label(label).on_hover_text(word.1);
                 let r = ui.add(
                     crate::workspace::slider(v, range)
@@ -1939,7 +1940,7 @@ pub fn properties(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, l: &Letter
     if fills > 0 {
         ui.separator();
         ui.strong(tr("Fill"));
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             ui.label(tr("Density")).on_hover_text(tr(words::DENSITY_HELP));
             let r = ui.add(
                 crate::workspace::slider(&mut n.fill.spacing_mm, 0.2..=1.0)

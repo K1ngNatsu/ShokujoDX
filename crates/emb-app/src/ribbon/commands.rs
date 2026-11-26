@@ -469,6 +469,8 @@ pub enum Cmd {
     /// The Fix Stitches window: the check and the fix of stitch objects.
     FixStitches,
     Motifs,
+    /// The Families window: an item from a family of shapes and its numbers.
+    Families,
     Laydown,
     ClosestJoin,
     RemoveHoles,
@@ -1252,6 +1254,13 @@ impl Cmd {
                 tr(
                     "The motif library: use a motif for the selected lines, columns or fills, or make a motif \
                  from the selected objects.",
+                ),
+            ),
+            Cmd::Families => (
+                g(ph::DNA),
+                tr("Families"),
+                tr(
+                    "Make a motif, a split pattern, a carving stamp or a clipart item from a family of shapes: change its numbers to make an item of your own.",
                 ),
             ),
             Cmd::SplitLines => (

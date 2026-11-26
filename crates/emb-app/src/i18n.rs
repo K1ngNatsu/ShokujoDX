@@ -451,6 +451,22 @@ pub(crate) mod tests {
                 out.insert(f.description.clone());
             }
         }
+        // The names of the built-in motifs, split patterns, stamps, borders,
+        // clipart items and families: they stay English in the designs and
+        // the files, and show through `tr(name)`.
+        out.extend(emb_model::motif::builtin().into_iter().map(|m| m.name));
+        out.extend(emb_model::split::split_patterns().into_iter().map(|p| p.name));
+        out.extend(emb_model::split::stamps().into_iter().map(|s| s.name));
+        out.extend(emb_model::decor::frames().into_iter().map(|f| f.name));
+        out.extend(
+            crate::clipart::builtins()
+                .into_iter()
+                .map(|(name, _, _)| name.to_string()),
+        );
+        for f in emb_model::family::families() {
+            out.insert(f.name.to_string());
+            out.extend(f.preset_values().into_iter().map(|(name, _)| name.to_string()));
+        }
         out
     }
 

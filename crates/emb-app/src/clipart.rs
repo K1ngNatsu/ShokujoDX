@@ -289,9 +289,20 @@ impl AppState {
         }
         let q = Query::parse(&self.clipart.text, &self.hoops);
         let c = &mut self.clipart;
-        let mut found: Vec<usize> = q
-            .run(&c.index)
-            .into_iter()
+        let mut hit = vec![false; c.index.entries.len()];
+        for i in q.run(&c.index) {
+            hit[i] = true;
+        }
+        // A built-in item is found by its name in the language of the
+        // program too (the name in the file is English).
+        let text = c.text.trim().to_lowercase();
+        if !text.is_empty() {
+            for (i, e) in c.index.entries.iter().enumerate() {
+                hit[i] |= tr(&e.name).to_lowercase().contains(&text);
+            }
+        }
+        let mut found: Vec<usize> = (0..hit.len())
+            .filter(|&i| hit[i])
             .filter(|&i| c.index.entries[i].format == project::FILE_EXTENSION && c.index.entries[i].error.is_none())
             .collect();
         emb_library::sort(&c.index, &mut found, SortKey::Name, false);
@@ -363,7 +374,7 @@ impl AppState {
         };
         let objects: Vec<DesignObject> = item.objects().iter().map(|o| (**o).clone()).collect();
         if objects.is_empty() {
-            self.message = crate::i18n::fill("The clipart \"{}\" has no objects.", &[&item.name]);
+            self.message = crate::i18n::fill("The clipart \"{}\" has no objects.", &[&tr(&item.name)]);
             return;
         }
         let target = at.unwrap_or_else(|| {
@@ -380,7 +391,7 @@ impl AppState {
             d.center_objects_at(&ids, target);
             ids
         });
-        self.message = crate::i18n::fill("Inserted the clipart \"{}\"", &[&item.name]);
+        self.message = crate::i18n::fill("Inserted the clipart \"{}\"", &[&tr(&item.name)]);
         self.selection.set_all(ids);
     }
 }
@@ -465,10 +476,12 @@ pub fn panel(ui: &mut egui::Ui, st: &mut AppState) {
 fn card(ui: &mut egui::Ui, st: &mut AppState, ctx: &egui::Context, i: usize, budget: &mut usize) {
     let e = st.clipart.index.entries[i].clone();
     let (rect, resp) = ui.allocate_exact_size(CARD, Sense::click_and_drag());
+    // A built-in name shows in the language of the program.
+    let name = tr(&e.name).to_string();
     let resp = resp.on_hover_text(if e.notes.is_empty() {
-        e.name.clone()
+        name.clone()
     } else {
-        format!("{}\n{}", e.name, e.notes)
+        format!("{}\n{}", name, e.notes)
     });
     if resp.drag_started() {
         resp.dnd_set_drag_payload(ClipartDrag(e.path.clone()));
@@ -519,7 +532,7 @@ fn card(ui: &mut egui::Ui, st: &mut AppState, ctx: &egui::Context, i: usize, bud
         );
     }
     let mut job = egui::text::LayoutJob::single_section(
-        e.name.clone(),
+        name,
         egui::TextFormat {
             font_id: egui::FontId::proportional(12.0),
             color: v.text_color(),

@@ -20,7 +20,7 @@ círculo dorado (un relleno) y una línea azul marino debajo de él.
 1. Haga clic en el círculo para seleccionarlo.
 2. Haga clic en **Digitalizar > Decorar > Bordes**. Se abre la ventana
    **Bordes**. Muestra una imagen de cada borde.
-3. Escriba `hearts` en el campo de búsqueda y haga clic en **Hearts**.
+3. Escriba `hearts` en el campo de búsqueda y haga clic en **Corazones**.
 4. Ponga **Espacio alrededor de los objetos** en 3 mm.
 5. Haga clic en **Añadir el borde**. Un borde de corazones va alrededor
    del círculo. Sin nada seleccionado, el borde va alrededor de todo el
@@ -43,9 +43,9 @@ hilera de motivos), a lo largo de una columna, o en filas sobre un área
 1. Haga clic en la línea azul marino para seleccionarla.
 2. Haga clic en **Editar > Tipos de puntada > Motivos**. Se abre la
    ventana **Motivos**.
-3. Haga clic en **Scallop** y después en **Usar para la selección**. La
+3. Haga clic en **Festón ondulado** y después en **Usar para la selección**. La
    línea se borda como una hilera de festones.
-4. Haga clic en el círculo para seleccionarlo. Haga clic en **Bead** y
+4. Haga clic en el círculo para seleccionarlo. Haga clic en **Cuenta** y
    después en **Usar para la selección**. El círculo se borda como filas
    de cuentas.
 
@@ -60,7 +60,7 @@ propio.
 
 1. En la ventana **Motivos**, haga clic en **Familias…**. Se abre la
    ventana **Familias**.
-2. Haga clic en **Clipart** y después en **Six-point star** (un elemento
+2. Haga clic en **Clipart** y después en **Estrella de seis puntas** (un elemento
    incluido de la familia Star).
 3. Cambie **Puntas** o **Parte interior** para cambiar la estrella. La
    imagen muestra el elemento.

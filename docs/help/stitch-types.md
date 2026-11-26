@@ -177,9 +177,10 @@ motif from the number of the waves and their height. Most of the motifs,
 the program-split patterns, the carving stamps and the clipart items of
 the program come from families, and you can make an item of your own.
 
-- **Families…** opens the Families window. The button is in the Motifs
-  window, next to the lists of the patterns and of the stamps in Object
-  Properties, and in the Clipart panel.
+- **Edit > Stitch Types > Families** opens the Families window. A
+  **Families…** button is also in the Motifs window, next to the lists of
+  the patterns and of the stamps in Object Properties, and in the Clipart
+  panel.
 - Choose the kind and the **Family**. **Built-in items** are the items of
   the family that are in the lists of the program. Change the numbers: the
   picture shows the item.

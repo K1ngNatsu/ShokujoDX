@@ -386,6 +386,7 @@ fn borders_window(ctx: &egui::Context, st: &mut AppState) {
             .filter(|&i| {
                 search.is_empty()
                     || all[i].name.to_lowercase().contains(&search)
+                    || tr(&all[i].name).to_lowercase().contains(&search)
                     || tr(all[i].shape.name()).to_lowercase().contains(&search)
             })
             .collect();

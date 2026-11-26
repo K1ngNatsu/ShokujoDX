@@ -253,7 +253,7 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
     .default_width(420.0)
     .show(ctx, |ui| {
         if let Some(name) = &in_use {
-            ui.label(crate::i18n::fill("The selected object uses: {}", &[&name]));
+            ui.label(crate::i18n::fill("The selected object uses: {}", &[&tr(name)]));
         }
         let accent = ui.visuals().selection.bg_fill;
         let ink = ui.visuals().text_color();
@@ -264,9 +264,9 @@ pub fn window(ctx: &egui::Context, st: &mut AppState) {
                         let color = if i == w.selected { accent } else { ink };
                         let r = preview(ui, m, Vec2::new(90.0, 36.0), color);
                         let label = if path.is_some() {
-                            format!("{} (yours)", m.name)
+                            crate::i18n::fill("{} (yours)", &[&m.name])
                         } else {
-                            m.name.clone()
+                            tr(&m.name).to_string()
                         };
                         let l = ui.selectable_label(i == w.selected, label);
                         if r.clicked() || l.clicked() {

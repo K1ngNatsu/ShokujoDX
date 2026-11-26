@@ -105,7 +105,7 @@ impl AppState {
             Cmd::ExportOutlines | Cmd::ExportInkstitch => !d.objects().is_empty(),
             Cmd::FlorentineGuide => s.n == 2 && s.fills == 1 && s.lines == 1,
             Cmd::Laydown => !d.objects().is_empty(),
-            Cmd::Motifs | Cmd::Borders | Cmd::Buttonholes | Cmd::Blends => true,
+            Cmd::Motifs | Cmd::Families | Cmd::Borders | Cmd::Buttonholes | Cmd::Blends => true,
             Cmd::SplitLines | Cmd::GuideLines => s.fills == 1 && s.lines > 0 && s.n == 1 + s.lines,
             Cmd::Tartan | Cmd::Gradient | Cmd::ColumnBands => true,
             Cmd::FixStitches => d.objects().iter().any(|o| matches!(o.kind, ObjectKind::Stitches { .. })),
@@ -448,6 +448,7 @@ impl AppState {
                 crate::stitch_types::add_laydown(self);
             }
             Cmd::Motifs => self.motifs_window.open = true,
+            Cmd::Families => self.families_window.open = true,
             Cmd::Borders => self.decor.borders = true,
             Cmd::Buttonholes => self.open_buttonholes(),
             Cmd::Blends => self.decor.blends = true,

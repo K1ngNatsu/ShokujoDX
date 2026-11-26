@@ -40,7 +40,9 @@ fn param_slider(
         word: (word, help),
     } = param;
     let mut v = value;
-    ui.horizontal(|ui| {
+    // Wrapped: in a translation the word after the slider can go past the
+    // edge of the panel.
+    ui.horizontal_wrapped(|ui| {
         ui.label(label).on_hover_text(help);
         let resp = ui.add(
             crate::workspace::slider(&mut v, range)
@@ -1380,7 +1382,7 @@ fn fill_section(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, params: &Fil
     }
     if uses_angle && params.direction.is_none() {
         let mut angle = params.angle_deg;
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             ui.label(tr("Angle")).on_hover_text(tr(words::ANGLE_HELP));
             let resp = ui.add(
                 crate::workspace::slider(&mut angle, 0.0..=179.0)
@@ -1768,7 +1770,7 @@ fn split_pattern_ui(ui: &mut egui::Ui, st: &mut AppState, id: ObjectId, current:
     ui.horizontal(|ui| {
         ui.label(tr("Pattern")).on_hover_text(tr(words::SPLIT_PATTERN_HELP));
         egui::ComboBox::from_id_salt("split_pattern")
-            .selected_text(current)
+            .selected_text(tr(current))
             .height(360.0)
             .show_ui(ui, |ui| {
                 // A picture of each pattern: its needle points.
