@@ -21,7 +21,9 @@
 //!   the middle. There a pair is left out while the pair after it is not
 //!   farther than one step across the stitches from the pair before it
 //!   ([`thin_across`], ADR 0180). Where the pairs are more than half a
-//!   step apart across the stitches, they do not change.
+//!   step apart across the stitches, they do not change, but where a stitch
+//!   runs almost along a side (25° or less), pairs half a step apart go to
+//!   one step (ADR 0181).
 //! - Auto split: a stitch longer than `split_mm` (default 7 mm) gets needle points
 //!   along it. Their positions change from stitch to stitch, so they do not
 //!   make a line.
@@ -592,6 +594,15 @@ fn underlay_layer(col: &Column, layer: &UnderlayLayer) -> Vec<Point> {
     }
 }
 
+/// The sine of the largest angle between a stitch and a side of the column
+/// at which the stitch runs almost along the side (25°).
+const ALONG_SIDE_SIN: f64 = 0.4226;
+/// Where a stitch runs almost along a side (the cap of a wide column end at
+/// a corner), the pairs that stay can be this many steps apart across the
+/// stitches (ADR 0181): pairs half a step apart across stay one step
+/// apart, as in the middle of the column.
+const ALONG_SIDE_GAP: f64 = 1.5;
+
 /// The pairs of a column, made `step` apart, without those that the
 /// stitches do not need (ADR 0180): where the stitches run almost along
 /// the column, pairs that are one step apart along the middle are much
@@ -605,7 +616,13 @@ fn underlay_layer(col: &Column, layer: &UnderlayLayer) -> Vec<Point> {
 /// of two pairs across the stitches is the larger of the distances from
 /// the middle of each to the line of the other. Where the pairs are more
 /// than half a step apart across the stitches (all columns with stitches
-/// across them), no pair is left out. The first and the last pair stay.
+/// across them), no pair is left out. Where a stitch runs almost along a
+/// side of the column ([`ALONG_SIDE_SIN`]: the cap of a wide column end
+/// that the tuning took to a corner), the pairs that stay can be
+/// [`ALONG_SIDE_GAP`] steps apart (ADR 0181): pairs that are half a step
+/// apart across the stitches there stay one step apart. A column whose
+/// stitches meet both sides at more than 25° (also one slanted 60° from
+/// square all along) keeps its pairs. The first and the last pair stay.
 pub(crate) fn thin_across(pairs: Vec<(Point, Point)>, step: f64) -> Vec<(Point, Point)> {
     if pairs.len() < 3 {
         return pairs;
@@ -616,11 +633,22 @@ pub(crate) fn thin_across(pairs: Vec<(Point, Point)>, step: f64) -> Vec<(Point, 
         None => p.0.distance(m),
     };
     let across = |p: &(Point, Point), q: &(Point, Point)| to_line(p, mid(q)).max(to_line(q, mid(p)));
+    // The stitch of pair `i` runs almost along a side: the sine of its angle
+    // with the side (from the pairs before and after it) is small.
+    let along_side = |i: usize| {
+        let (p, q, r) = (pairs[i - 1], pairs[i], pairs[i + 1]);
+        let Some(u) = (q.1 - q.0).normalized() else {
+            return false;
+        };
+        let sin_to = |d: Point| d.normalized().is_some_and(|d| u.cross(d).abs() < ALONG_SIDE_SIN);
+        sin_to(r.0 - p.0) || sin_to(r.1 - p.1)
+    };
     let mut out = Vec::with_capacity(pairs.len());
     out.push(pairs[0]);
-    for w in pairs[1..].windows(2) {
-        let (pr, next) = (&w[0], &w[1]);
-        if across(&out[out.len() - 1], next) >= mid(pr).distance(mid(next)).min(step) {
+    for i in 1..pairs.len() - 1 {
+        let (pr, next) = (&pairs[i], &pairs[i + 1]);
+        let gap = if along_side(i) { ALONG_SIDE_GAP } else { 1.0 };
+        if across(&out[out.len() - 1], next) >= gap * mid(pr).distance(mid(next)).min(step) {
             out.push(*pr);
         }
     }
@@ -1363,9 +1391,11 @@ mod tests {
 
     /// Stitches that run almost along the column (ADR 0180): pairs one
     /// step apart along the middle are a seventh of a step apart across
-    /// the stitches. The pairs that stay are not more than one step apart
-    /// across the stitches, and not less than half a step; a column with
-    /// stitches across it keeps all its pairs.
+    /// the stitches. The pairs that stay are not less than half a step
+    /// apart across the stitches, and not more than one step, or
+    /// [`ALONG_SIDE_GAP`] steps where the stitches run along the sides
+    /// (8° here, ADR 0181); a column with stitches across it keeps all its
+    /// pairs.
     #[test]
     fn stitches_along_the_column_do_not_crowd() {
         let step = 0.2;
@@ -1376,7 +1406,7 @@ mod tests {
         assert_eq!((kept[0], kept[kept.len() - 1]), (all[0], all[all.len() - 1]));
         for w in kept[..kept.len() - 1].windows(2) {
             let d = across(w[0], w[1]);
-            assert!(d > 0.5 * step && d < step + 1e-9, "{d}");
+            assert!(d > 0.5 * step && d < ALONG_SIDE_GAP * step + 1e-9, "{d}");
         }
         // The top stitches: fewer needle points than a straight column,
         // also with the points that split the long stitches.
@@ -1388,6 +1418,48 @@ mod tests {
         for shift in [0.0, 1.0, 3.4] {
             let all = Column::new(&slanted(shift)).unwrap().pairs(step);
             assert_eq!(thin_across(all.clone(), step), all, "{shift}");
+        }
+    }
+
+    /// The cap of a wide column end at a corner (ADR 0181): the stitches
+    /// are parallel, side A is square to them and side B is 16° from them,
+    /// so pairs one step apart along the middle are half a step apart
+    /// across the stitches. Every second pair goes, and the pairs that stay
+    /// are about one step apart across the stitches.
+    #[test]
+    fn stitches_along_a_side_are_one_step_apart() {
+        let step = 0.2;
+        let u = Point::new(1.0, 0.0);
+        let (s16, c16) = emb_geom::math::sin_cos_deg(16.0);
+        let side_b = Point::new(c16, s16);
+        let start_b = Point::new(8.0, 0.0);
+        // Stitch i starts at (0, h i) on side A and goes along u to side B.
+        let h = 0.1;
+        let pairs: Vec<(Point, Point)> = (0..60)
+            .map(|i| {
+                let a = Point::new(0.0, h * f64::from(i));
+                // a + t u = start_b + s side_b: the y of both is a.y.
+                let s = a.y / side_b.y;
+                let b = start_b + side_b * s;
+                assert!((b - a).normalized().is_some_and(|d| d.distance(u) < 1e-9));
+                (a, b)
+            })
+            .collect();
+        let along = pairs[0]
+            .0
+            .midpoint(pairs[0].1)
+            .distance(pairs[1].0.midpoint(pairs[1].1));
+        assert!((along - step).abs() < 0.03, "{along}");
+        let kept = thin_across(pairs.clone(), step);
+        assert!(
+            kept.len() * 2 <= pairs.len() + 2 && kept.len() * 3 > pairs.len(),
+            "{} of {}",
+            kept.len(),
+            pairs.len()
+        );
+        for w in kept[..kept.len() - 1].windows(2) {
+            let d = across(w[0], w[1]);
+            assert!(d > 0.9 * step && d < ALONG_SIDE_GAP * step + 1e-9, "{d}");
         }
     }
 

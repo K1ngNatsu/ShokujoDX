@@ -146,6 +146,21 @@ impl Envelope {
         }
     }
 
+    /// The most that the envelope makes the text taller, as a factor (1:
+    /// not taller anywhere): the middle of the oval and the diamond is
+    /// `1 + amount` times as high as the text.
+    pub fn max_stretch(&self) -> f64 {
+        if self.is_none() {
+            return 1.0;
+        }
+        (0..=100)
+            .map(|i| {
+                let (up, down) = self.edges(f64::from(i) / 100.0);
+                1.0 + up + down
+            })
+            .fold(1.0, f64::max)
+    }
+
     /// The new top and bottom of box `b` at `x`.
     fn top_bottom(&self, b: &BBox, x: f64) -> (f64, f64) {
         let h = b.height();
@@ -237,6 +252,16 @@ pub fn map_points(kind: &mut ObjectKind, f: &dyn Fn(Point) -> Point) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_most_stretch_of_an_envelope() {
+        let e = |shape, amount| Envelope { shape, amount };
+        assert_eq!(e(EnvelopeShape::None, 0.5).max_stretch(), 1.0);
+        assert!((e(EnvelopeShape::Oval, 0.45).max_stretch() - 1.45).abs() < 1e-9);
+        assert!((e(EnvelopeShape::Diamond, 0.6).max_stretch() - 1.6).abs() < 1e-9);
+        // An envelope that makes the text only smaller: 1.
+        assert_eq!(e(EnvelopeShape::Pinch, 0.5).max_stretch(), 1.0);
+    }
 
     fn bx() -> BBox {
         BBox::new(Point::new(0.0, -10.0), Point::new(100.0, 0.0))

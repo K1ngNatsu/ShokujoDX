@@ -631,6 +631,37 @@ mod tests {
         assert!(bad.is_empty(), "{}", bad.join("\n"));
     }
 
+    /// The styles that make an initial larger (the middle of Classic, Oval
+    /// and Diamond) build up no thread at 60 mm, also on towel: a letter
+    /// that is larger than the columns of the font go sews as its fill
+    /// letter, and the stitches at the cap of a wide column end do not
+    /// crowd (ADR 0181). The initials with the most build-up before.
+    #[test]
+    fn the_large_styles_build_up_no_thread() {
+        let mut bad = Vec::new();
+        for style in [MonogramStyle::Classic, MonogramStyle::Diamond, MonogramStyle::Oval] {
+            let mut spec = MonogramSpec::new(default_font());
+            spec.style = style;
+            spec.height_mm = 60.0;
+            for initials in ["ABC", "SRW"] {
+                for fabric in ["cotton", "towel"] {
+                    let w = monogram_warnings(initials, &spec, fabric);
+                    if w.iter().any(|t| t.contains("builds up")) {
+                        bad.push(format!("{initials} on {fabric}, {}: {w:?}", style.name()));
+                    }
+                }
+            }
+        }
+        assert!(
+            bad.is_empty(),
+            "{}",
+            bad.join(
+                "
+"
+            )
+        );
+    }
+
     /// A monogram and new lettering get the settings of the fabric of the
     /// design, as the objects that the tools draw (ADR 0163).
     #[test]
