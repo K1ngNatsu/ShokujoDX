@@ -85,6 +85,10 @@ lipo -create -output "$appex/MacOS/emb-thumbnail-helper" \
 # no signature, and the extension and its helper need the sandbox.
 codesign --force --sign - --entitlements packaging/macos/thumbnails/helper.entitlements "$appex/MacOS/emb-thumbnail-helper"
 codesign --force --sign - --entitlements packaging/macos/thumbnails/extension.entitlements "$app/Contents/PlugIns/Thumbnails.appex"
+# A program in Contents/MacOS that is not the main program gets its own
+# signature first (else the signature of the app stops: "code object is
+# not signed at all", the practice build of v0.6.0).
+codesign --force --sign - "$app/Contents/MacOS/emb-cli"
 codesign --force --sign - "$app"
 codesign --verify --deep --strict "$app"
 
