@@ -50,8 +50,9 @@ pub use source::{AnyFont, LetterSource};
 pub mod bundled {
     use super::{EmbFont, Font};
 
-    /// (file name, bytes)
-    pub const FILES: [(&str, &[u8]); 7] = [
+    /// (file name, bytes). A `static`, not a `const`: each crate that uses
+    /// a `const` gets its own copy of the bytes of the fonts.
+    pub static FILES: [(&str, &[u8]); 7] = [
         (
             "Lato-Regular.ttf",
             include_bytes!("../../../data/fonts/Lato-Regular.ttf"),
@@ -97,8 +98,9 @@ pub mod bundled {
     /// text), and the fonts from [`P11_EMBROIDERY`] in P17 Milestone 7
     /// (ADR 0115). The fonts from [`P17_EMBROIDERY`] are the fill fonts
     /// (ADR 0117). Each one has a quality score of
-    /// [`crate::quality::LIMIT`] or more ([`quality`]).
-    pub const EMBROIDERY: [(&str, &[u8]); 68] = [
+    /// [`crate::quality::LIMIT`] or more ([`quality`]). A `static`, as
+    /// [`FILES`]: a `const` put the fonts two times in each program.
+    pub static EMBROIDERY: [(&str, &[u8]); 68] = [
         (
             "Block Sans",
             include_bytes!(concat!(env!("OUT_DIR"), "/block-sans.embfont.z")),

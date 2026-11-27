@@ -28,7 +28,7 @@ use rhai::{Array, Dynamic, Engine, EvalAltResult, Map, Scope};
 pub const FILE_EXTENSION: &str = "rhai";
 
 /// The sample scripts: file name and source.
-pub const SAMPLES: &[(&str, &str)] = &[
+pub static SAMPLES: &[(&str, &str)] = &[
     (
         "outline-fills.rhai",
         include_str!("../../../data/scripts/outline-fills.rhai"),

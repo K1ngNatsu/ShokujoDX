@@ -44,6 +44,66 @@ fn the_icons_have_their_sizes() {
     assert_eq!(icon.rgba.len(), 256 * 256 * 4);
 }
 
+/// The `.rs` files under a folder, at all depths.
+fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
+    for entry in std::fs::read_dir(dir).unwrap().flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            rust_files(&path, out);
+        } else if path.extension().is_some_and(|x| x == "rs") {
+            out.push(path);
+        }
+    }
+}
+
+/// A `pub` item with the bytes of a file in it (`include_bytes!`,
+/// `include_str!`) is a `static`, not a `const`. Each crate that uses a
+/// `const` gets its own copy of the bytes: the bundled fonts were two times
+/// in each program (22 MB in the program, 20 MB in `emb-cli` and in the
+/// browser version).
+#[test]
+fn built_in_files_are_statics() {
+    let mut files = Vec::new();
+    for entry in std::fs::read_dir(root().join("crates")).unwrap().flatten() {
+        let src = entry.path().join("src");
+        if src.is_dir() {
+            rust_files(&src, &mut files);
+        }
+    }
+    assert!(files.len() > 100, "the source files are found");
+    let mut consts = Vec::new();
+    for path in &files {
+        let text = std::fs::read_to_string(path).unwrap();
+        // The name of the `pub const` item that the line is in, if any.
+        let mut item: Option<String> = None;
+        for line in text.lines() {
+            let t = line.trim_start();
+            if let Some(rest) = t.strip_prefix("pub const ") {
+                item = Some(rest.split(':').next().unwrap_or(rest).to_string());
+            } else if t.starts_with("pub static ")
+                || t.starts_with("static ")
+                || t.starts_with("const ")
+                || t.starts_with("fn ")
+                || t.starts_with("pub fn ")
+                || t.starts_with("pub(crate) ")
+            {
+                item = None;
+            }
+            if let Some(name) = &item {
+                if t.contains("include_bytes!") || t.contains("include_str!") {
+                    let file = path.strip_prefix(root()).unwrap_or(path);
+                    consts.push(format!("{} {name}", file.display()));
+                }
+                if t.ends_with(';') {
+                    item = None;
+                }
+            }
+        }
+    }
+    consts.dedup();
+    assert!(consts.is_empty(), "make these `pub static`: {consts:?}");
+}
+
 /// The social preview of the repository (`tools/make-social-preview.py`):
 /// GitHub shows 1280 x 640 pixels and takes a file smaller than 1 MB.
 #[test]
