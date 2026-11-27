@@ -1,6 +1,7 @@
 # Plan: help and tutorials (phase P19)
 
-Date: 2026-11-18 · Status: Proposed; Part 2 made (2026-11-25). The owner wants much better
+Date: 2026-11-18 · Status: Proposed; Part 2 made (2026-11-25) and in v0.6.0
+(2026-11-26). The owner wants much better
 tutorials and help (2026-11-18); the owner selects the milestones and
 their order before the work starts. On 2026-11-24 the owner asked to
 expand the tutorials thoroughly: Part 2 (at the end) is that work. The

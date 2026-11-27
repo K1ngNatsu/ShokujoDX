@@ -13,6 +13,7 @@ chose the way of today (ADR 0174); the trial is on the branch
 `trial/overlapped-strokes`. Milestone 8 is made (ADR 0175). The audit
 of Milestones 1 to 8 is "Audit of P22" in the roadmap. Milestone 9 is made
 in the software (ADR 0176); the owner's test with an agent is open.
+Released in v0.6.0 (2026-11-26).
 
 ## Goal
 
