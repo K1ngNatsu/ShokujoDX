@@ -44,6 +44,17 @@ fn the_icons_have_their_sizes() {
     assert_eq!(icon.rgba.len(), 256 * 256 * 4);
 }
 
+/// The social preview of the repository (`tools/make-social-preview.py`):
+/// GitHub shows 1280 x 640 pixels and takes a file smaller than 1 MB.
+#[test]
+fn the_social_preview_fits_github() {
+    let path = root().join("data/icon/social-preview.png");
+    let img = image::open(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    assert_eq!((img.width(), img.height()), (1280, 640));
+    let bytes = std::fs::metadata(&path).unwrap().len();
+    assert!(bytes < 1024 * 1024, "{bytes} bytes: GitHub takes less than 1 MB");
+}
+
 #[test]
 fn the_linux_files_agree() {
     let id = crate::icons::APP_ID;
