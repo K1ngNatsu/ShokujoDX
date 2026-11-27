@@ -29,7 +29,7 @@ machines and systems.
 | P22 Milestone 3 | Sew a sheet of test swatches (Design > Output > Test Swatches, or `emb-cli swatch`) on the Topaz 20: the copies, the steps and the labels | ADR 0170 |
 | P22 Milestone 4 | Sew swatches of the lean (0° to 15°) and of the overlap of bands (0 to 0.6 mm) from the corpus design `satin-lean-bands` (`emb-cli corpus`, then Test Swatches or `emb-cli swatch --setting lean` and `--setting band-overlap`) on a knit and on a woven fabric | ADR 0171 |
 | Icon | The license of the logo (its maker and the owner) | ADR 0140 |
-| Release | Code signing of the Windows packages through the SignPath Foundation | ADR 0062 |
+| Release | Code signing of the Windows packages through the SignPath Foundation: the code signing policy is in the README (2026-11-27); the owner applies with the answers of the checklist | ADR 0062, `docs/design/code-signing-steps.md` |
 
 ## 2. Tests that need other people, machines or systems
 
