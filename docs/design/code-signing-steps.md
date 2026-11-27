@@ -38,7 +38,8 @@ section links to it. The section has:
 
 The terms also ask for the term "Code signing policy" on the download
 and release pages: the notes of each release end with a link to the
-section (from the first release after this step).
+section (the notes of v0.6.0 got it on 2026-11-27, before the
+application).
 
 ## 3. Apply (owner)
 
