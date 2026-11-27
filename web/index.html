@@ -66,6 +66,75 @@ then the browser keeps it.<br>On a phone or a tablet, "Add to Home Screen" makes
 that also works offline.</div>
 </div>
 <noscript>ShokujoDX needs JavaScript and WebAssembly.</noscript>
+<script>
+  // Safari on iOS can keep a scroll of the page after the phone turns (also
+  // the app on the Home Screen). The page shows no scroll, but a touch then
+  // lands lower than the finger until the app closes (the owner's report of
+  // 2026-11-26). The page has nothing to scroll: after each change of size
+  // or of the turn of the screen, it goes back to the top, also when the
+  // turn ends a little later.
+  (() => {
+    const toTop = () => {
+      const root = document.documentElement;
+      if (window.scrollX || window.scrollY || root.scrollTop || document.body?.scrollTop) {
+        window.scrollTo(0, 0);
+        root.scrollTop = 0;
+        if (document.body) document.body.scrollTop = 0;
+      }
+    };
+    const settle = () => {
+      toTop();
+      setTimeout(toTop, 250);
+      setTimeout(toTop, 750);
+    };
+    addEventListener("resize", settle);
+    addEventListener("orientationchange", settle);
+    addEventListener("scroll", toTop, { passive: true });
+    window.visualViewport?.addEventListener("resize", settle);
+  })();
+  // ?touch=1: a test of touches. A red dot where the browser says the
+  // finger is, a green dot where the program has it, and the numbers of the
+  // page (the sizes, the scroll, the canvas). Both dots under the finger:
+  // the touches are right.
+  if (new URLSearchParams(location.search).get("touch") === "1") {
+    addEventListener("DOMContentLoaded", () => {
+      const box = document.createElement("div");
+      box.style.cssText = "position:fixed;left:4px;top:40%;z-index:9;pointer-events:none;" +
+        "font:11px/1.35 monospace;color:#fff;background:rgba(0,0,0,.7);padding:4px 6px;white-space:pre";
+      const dot = (color) => {
+        const d = document.createElement("div");
+        d.style.cssText = "position:fixed;z-index:9;pointer-events:none;width:14px;height:14px;" +
+          "margin:-7px 0 0 -7px;border-radius:50%;border:2px solid #fff;background:" + color;
+        document.body.append(d);
+        return d;
+      };
+      document.body.append(box);
+      const red = dot("#e33"), green = dot("#2c4");
+      let touch = null;
+      const seen = (e) => {
+        const t = e.touches?.[0] ?? e.changedTouches?.[0];
+        if (t) touch = { cx: t.clientX, cy: t.clientY, py: t.pageY, sy: t.screenY };
+      };
+      for (const n of ["touchstart", "touchmove"]) addEventListener(n, seen, { capture: true, passive: true });
+      const r1 = (v) => Math.round(v * 10) / 10;
+      setInterval(() => {
+        const c = document.getElementById("shokujodx").getBoundingClientRect();
+        const vv = window.visualViewport;
+        let view = null;
+        try { view = JSON.parse(window.shokujodxView ?? "null"); } catch {}
+        const p = view?.pointer, zoom = view?.egui?.[0] ?? 1;
+        if (touch) Object.assign(red.style, { left: touch.cx + "px", top: touch.cy + "px" });
+        if (p) Object.assign(green.style, { left: c.left + p[0] * zoom + "px", top: c.top + p[1] * zoom + "px" });
+        box.textContent =
+          `inner ${innerWidth}x${innerHeight} scroll ${r1(scrollX)},${r1(scrollY)}\n` +
+          (vv ? `visual ${r1(vv.width)}x${r1(vv.height)} at ${r1(vv.offsetLeft)},${r1(vv.offsetTop)} scale ${r1(vv.scale)}\n` : "") +
+          `canvas ${r1(c.left)},${r1(c.top)} ${r1(c.width)}x${r1(c.height)} dpr ${devicePixelRatio}\n` +
+          (touch ? `touch client ${r1(touch.cx)},${r1(touch.cy)} page y ${r1(touch.py)} screen y ${r1(touch.sy)}\n` : "") +
+          (p ? `program ${r1(p[0])},${r1(p[1])} zoom ${zoom}` : "program: no pointer");
+      }, 100);
+    });
+  }
+</script>
 <script type="module">
   import init from "./emb-app.js?v=@VERSION@";
   // File > Check for Updates: the build of this page (tools/build-web.py

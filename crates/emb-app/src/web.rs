@@ -940,15 +940,22 @@ fn bench_frame(st: &mut AppState, ctx: &eframe::egui::Context) {
     ctx.request_repaint();
 }
 
-/// `?probe=1`: the state of the view for a test of the page
-/// (`window.shokujodxView`, JSON), each frame.
+/// `?probe=1` (also `?touch=1`, the test of touches of web/index.html): the
+/// state of the view for a test of the page (`window.shokujodxView`,
+/// JSON), each frame.
 static PROBE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
 
 fn probe(st: &AppState, ctx: &eframe::egui::Context) {
-    if !*PROBE.get_or_init(|| param("probe").is_some()) {
+    if !*PROBE.get_or_init(|| param("probe").is_some() || param("touch").is_some()) {
         return;
     }
-    let (touching, middle) = ctx.input(|i| (i.any_touches(), i.multi_touch().map(|t| t.center_pos)));
+    let (touching, middle, pointer) = ctx.input(|i| {
+        (
+            i.any_touches(),
+            i.multi_touch().map(|t| t.center_pos),
+            i.pointer.latest_pos(),
+        )
+    });
     let rect = ctx.content_rect();
     // The middle of each object on the screen (points), for a test to tap.
     let d = st.doc.design();
@@ -980,6 +987,7 @@ fn probe(st: &AppState, ctx: &eframe::egui::Context) {
         "middles": middles,
         "touching": touching,
         "middle": middle.map(|p| [p.x, p.y]),
+        "pointer": pointer.map(|p| [p.x, p.y]),
         "canvas": st.canvas_rect.map(|r| [r.min.x, r.min.y, r.max.x, r.max.y]),
         "egui": [ctx.zoom_factor(), ctx.pixels_per_point(), rect.width(), rect.height()],
     });
