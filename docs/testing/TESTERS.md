@@ -41,7 +41,7 @@ double-click on a design does not open it yet: use **File > Open**, the
 recent designs, or drag the file onto the window.
 
 **Linux** (64-bit). On Debian, Ubuntu or Linux Mint, install the `.deb`
-(double-click it, or `sudo apt install ./shokujodx_….deb`). On
+(double-click it, or `sudo apt install ./ShokujoDX-…-linux-amd64.deb`). On
 other systems, make the AppImage executable (`chmod +x …AppImage`) and
 start it.
 

@@ -133,7 +133,7 @@ No install: open [ShokujoDX in your browser](https://k1ngnatsu.github.io/Shokujo
 computer, a tablet or a phone. It is a trial of the browser version:
 **File > Open** uploads a design and **Save** and **Export** download a
 file, your designs stay on your device, and some commands need the
-desktop program. The first visit downloads about 35 MB, then the browser
+desktop program. The first visit downloads about 42 MB, then the browser
 keeps it. On a phone or a tablet, **Add to Home Screen** makes it an app
 that also works offline.
 
@@ -147,13 +147,14 @@ Get the file for your system from the
 | Windows 10 or 11 (64-bit) | `ShokujoDX-…-windows-setup.exe` | Start it and follow the steps. No administrator rights needed. |
 | Windows, no install | `ShokujoDX-…-windows-portable.zip` | Unzip the folder anywhere and start `ShokujoDX.exe`. |
 | macOS 10.15 or later | `ShokujoDX-…-macos.dmg` | Open it and drag **ShokujoDX** to **Applications**. |
-| Debian, Ubuntu, Linux Mint | `shokujodx_…_amd64.deb` | `sudo apt install ./shokujodx_…_amd64.deb` |
+| Debian, Ubuntu, Linux Mint | `ShokujoDX-…-linux-amd64.deb` | `sudo apt install ./ShokujoDX-…-linux-amd64.deb` |
 | Other Linux (64-bit) | `ShokujoDX-…-linux-x86_64.AppImage` | `chmod +x` the file, then start it. |
 
-The program has no paid code signature yet, so the system can warn you
-the first time. On Windows, click **More info**, then **Run anyway**. On
+The packages have no code signature yet, so the system can warn you the
+first time. On Windows, click **More info**, then **Run anyway**. On
 macOS, open **System Settings > Privacy & Security** and click **Open
-Anyway**.
+Anyway**. The Windows packages will get a free signature through the
+SignPath Foundation: see the [code signing policy](#code-signing-policy).
 
 ### Your first design
 
@@ -324,6 +325,39 @@ people asked her for skill in weaving and needlework. DX is for deluxe.
 - **Claude** (Anthropic, through [Claude Code](https://claude.com/claude-code)):
   most of the code, the tests and the documentation, made at the request
   and under the direction of the owner.
+
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io),
+certificate by [SignPath Foundation](https://signpath.org).
+
+The project has applied to the SignPath Foundation. From the first
+release after it accepts the project, the Windows files are signed: the
+program, the command-line tool `emb-cli`, the thumbnail handler and the
+installer. Until then, they have no signature. GitHub Actions builds
+each signed file from the source code in this repository
+(`.github/workflows/release.yml`), and each release is signed only after
+a manual approval. The macOS and Linux packages are not signed through
+SignPath.
+
+Team roles:
+
+- Committers and reviewers: [K1ngNatsu](https://github.com/K1ngNatsu),
+  the owner. A change from another person (a pull request) gets a review
+  before it is merged. The code that Claude writes (see
+  [Contributors](#contributors)) comes into the repository through the
+  owner, under the direction of the owner.
+- Approvers: [K1ngNatsu](https://github.com/K1ngNatsu).
+
+Privacy: This program will not transfer any information to other
+networked systems unless specifically requested by the user or the
+person installing or operating it. Its only use of the network is the
+update check: it asks GitHub for the newest release, only when the user
+turns the check on (the installer and the first start ask) or clicks
+**Help > Check for Updates**. It sends no data about the user or the
+designs. The
+[GitHub privacy statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement)
+applies to that request. The program has no other network code.
 
 ## Trademarks
 

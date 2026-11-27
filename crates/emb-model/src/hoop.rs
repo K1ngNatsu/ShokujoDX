@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::ModelError;
 
 /// The built-in presets, from `data/hoops.toml` at build time.
-pub const BUILTIN_HOOPS_TOML: &str = include_str!("../../../data/hoops.toml");
+pub static BUILTIN_HOOPS_TOML: &str = include_str!("../../../data/hoops.toml");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

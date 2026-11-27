@@ -10,6 +10,20 @@ Este tema enumera los cambios de cada versión, la más reciente primero.
 **Ayuda > Novedades** lo abre. Después de una actualización, la página
 de inicio tiene un enlace a él.
 
+## Versión 0.6.1
+
+**Un programa más pequeño.** Las fuentes incluidas estaban dos veces en
+cada archivo del programa. Ahora están una sola vez, y el programa hace el
+mismo trabajo que antes: el programa es 22 MB más pequeño, la herramienta
+de línea de comandos `emb-cli` es 20 MB más pequeña y la versión para el
+navegador descarga unos 20 MB menos en la primera visita. Los paquetes de
+la versión también son más pequeños.
+
+**Los archivos de una versión.** En la página de la versión, primero están
+los archivos del programa y después los paquetes de fuentes, que son
+opcionales. El paquete de Linux tiene un nombre nuevo:
+`ShokujoDX-0.6.1-linux-amd64.deb`.
+
 ## Versión 0.6.0
 
 **Tutoriales y lecciones.** La ayuda tiene 31 tutoriales en siete rutas,

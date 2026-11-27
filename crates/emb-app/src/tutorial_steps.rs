@@ -68,13 +68,19 @@ fn check_place(place: &[&str], file: &[String]) -> Result<(), String> {
     }
     if let [tab, panel] = place
         && let Some(t) = RibbonTab::ALL.iter().find(|t| t.label() == *tab)
-        && crate::ribbon::help_panels(*t, &egui::Context::default())
-            .iter()
-            .any(|p| p.title == *panel)
+        && PANEL_CONTEXT.with(|ctx| crate::ribbon::help_panels(*t, ctx).iter().any(|p| p.title == *panel))
     {
         return Ok(());
     }
     command_at(place).map(|_| ())
+}
+
+thread_local! {
+    /// A context after one frame, for the panels of the ribbon: on macOS
+    /// they read the fonts for the keys of their shortcuts (⌘, ⌥), and a
+    /// new context has no fonts (the practice build of v0.6.0 stopped
+    /// there).
+    static PANEL_CONTEXT: egui::Context = crate::test_util::ready_context();
 }
 
 /// The widgets of the screen reader tree of a frame.
@@ -934,6 +940,19 @@ mod tests {
         }
         crate::i18n::set_language("en");
         assert!(errors.is_empty(), "{}", errors.join("\n"));
+    }
+
+    /// The panels of each tab on a Mac (egui shows ⌘ and ⌥ there, from
+    /// the fonts): the check of the places reads them with no panic.
+    #[test]
+    fn the_panels_of_the_tabs_read_on_a_mac() {
+        PANEL_CONTEXT.with(|ctx| {
+            ctx.set_os(egui::os::OperatingSystem::Mac);
+            for t in RibbonTab::ALL {
+                crate::ribbon::help_panels(t, ctx);
+            }
+        });
+        assert!(check_place(&[RibbonTab::ALL[0].label(), "no such panel"], &[]).is_err());
     }
 
     #[test]

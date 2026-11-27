@@ -1224,7 +1224,7 @@ dependencies = [
 
 [[package]]
 name = "emb-app"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "chrono",
  "crc32fast",
@@ -1262,7 +1262,7 @@ dependencies = [
 
 [[package]]
 name = "emb-art"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "emb-geom",
  "emb-letter",
@@ -1273,7 +1273,7 @@ dependencies = [
 
 [[package]]
 name = "emb-cli"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "chrono",
  "emb-art",
@@ -1292,7 +1292,7 @@ dependencies = [
 
 [[package]]
 name = "emb-formats"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "emb-geom",
  "emb-model",
@@ -1305,7 +1305,7 @@ dependencies = [
 
 [[package]]
 name = "emb-geom"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "geo",
  "i_overlay",
@@ -1317,7 +1317,7 @@ dependencies = [
 
 [[package]]
 name = "emb-letter"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "emb-formats",
  "emb-geom",
@@ -1334,7 +1334,7 @@ dependencies = [
 
 [[package]]
 name = "emb-library"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "emb-formats",
  "emb-geom",
@@ -1348,7 +1348,7 @@ dependencies = [
 
 [[package]]
 name = "emb-model"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "base64",
  "emb-geom",
@@ -1361,7 +1361,7 @@ dependencies = [
 
 [[package]]
 name = "emb-render"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "emb-geom",
  "emb-model",
@@ -1372,7 +1372,7 @@ dependencies = [
 
 [[package]]
 name = "emb-script"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "emb-geom",
  "emb-model",
@@ -1384,7 +1384,7 @@ dependencies = [
 
 [[package]]
 name = "emb-sketch"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "emb-geom",
  "proptest",
@@ -1395,7 +1395,7 @@ dependencies = [
 
 [[package]]
 name = "emb-stitch"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "emb-geom",
  "emb-model",
@@ -1406,7 +1406,7 @@ dependencies = [
 
 [[package]]
 name = "emb-thumbnail"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "emb-library",
  "emb-model",

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Makes the Linux packages (ADR 0043):
-#   dist/shokujodx_<version>_<arch>.deb   for Debian, Ubuntu and Linux Mint
-#   dist/<name>-linux-<arch>.AppImage                runs on most other systems
+#   dist/<name>-linux-<deb arch>.deb    for Debian, Ubuntu and Linux Mint
+#   dist/<name>-linux-<arch>.AppImage   runs on most other systems
 #
 # <name> is ShokujoDX-<version> for a commit with the tag v<version>,
 # else ShokujoDX-<version>-<commit> (a test build). The .deb gets
@@ -102,7 +102,10 @@ Description: Embroidery digitizer
  artwork. The program makes the stitches and writes the files of
  embroidery machines (DST, PES, VP3, JEF, EXP and more).
 EOF
-out="dist/shokujodx_${deb_version}_${deb_arch}.deb"
+# The name starts as the names of the other packages, so that the files
+# of the program are together in the list of a release (the font
+# packages come after them).
+out="dist/$name-linux-${deb_arch}.deb"
 dpkg-deb --build --root-owner-group "$deb" "$out"
 echo "Wrote $out"
 

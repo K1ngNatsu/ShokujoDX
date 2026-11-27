@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use crate::{Design, FillParams, ModelError, ObjectId, ObjectKind, SatinParams, Underlay};
 
 /// The built-in presets, from `data/fabrics.toml` at build time.
-pub const BUILTIN_FABRICS_TOML: &str = include_str!("../../../data/fabrics.toml");
+pub static BUILTIN_FABRICS_TOML: &str = include_str!("../../../data/fabrics.toml");
 
 /// How much automatic underlay a fabric needs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]

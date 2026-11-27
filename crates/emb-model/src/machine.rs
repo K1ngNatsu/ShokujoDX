@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::{HoopCatalog, ModelError};
 
 /// The built-in profiles, from `data/machines.toml` at build time.
-pub const BUILTIN_MACHINES_TOML: &str = include_str!("../../../data/machines.toml");
+pub static BUILTIN_MACHINES_TOML: &str = include_str!("../../../data/machines.toml");
 
 /// File format ids that a profile can name. Lowercase file extensions.
 pub const KNOWN_FORMATS: &[&str] = &[

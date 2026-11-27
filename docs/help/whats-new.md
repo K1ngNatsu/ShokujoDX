@@ -10,6 +10,18 @@ This topic lists the changes of each version, the newest first.
 **Help > What Is New** opens it. After an update, the start page has a
 link to it.
 
+## Version 0.6.1
+
+**A smaller program.** The bundled fonts were two times in each program
+file. Now they are in it one time, and the program does the same work as
+before: the program is 22 MB smaller, the command-line tool `emb-cli` is
+20 MB smaller, and the browser version downloads about 20 MB less on its
+first visit. The packages of the release are smaller too.
+
+**The files of a release.** On the release page, the files of the program
+come first, and the font packages, which are optional, come after them.
+The Linux package has a new name: `ShokujoDX-0.6.1-linux-amd64.deb`.
+
 ## Version 0.6.0
 
 **Tutorials and lessons.** The help has 31 tutorials in seven paths, from

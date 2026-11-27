@@ -12,7 +12,7 @@ use eframe::egui::{self, Align2, Color32, FontId, Painter, Pos2, Rect, Stroke, V
 pub const APP_ID: &str = "shokujodx";
 
 /// The icon of the program (`data/icon`, made by `tools/make-icon.py`).
-pub const APP_ICON_PNG: &[u8] = include_bytes!("../../../data/icon/icon-256.png");
+pub static APP_ICON_PNG: &[u8] = include_bytes!("../../../data/icon/icon-256.png");
 
 /// The icon of the window and the task bar.
 pub fn window_icon() -> Option<egui::IconData> {

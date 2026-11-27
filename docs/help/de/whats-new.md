@@ -10,6 +10,19 @@ Dieses Thema listet die Änderungen jeder Version, die neueste zuerst.
 **Hilfe > Was ist neu** öffnet es. Nach einem Update hat die Startseite
 einen Link dazu.
 
+## Version 0.6.1
+
+**Ein kleineres Programm.** Die mitgelieferten Schriften waren zweimal in
+jeder Programmdatei. Jetzt sind sie nur einmal darin, und das Programm
+arbeitet wie vorher: Das Programm ist 22 MB kleiner, das
+Befehlszeilenwerkzeug `emb-cli` ist 20 MB kleiner, und die Browserversion
+lädt beim ersten Besuch etwa 20 MB weniger. Auch die Pakete der Version
+sind kleiner.
+
+**Die Dateien einer Version.** Auf der Seite der Version stehen zuerst die
+Dateien des Programms und danach die Schriftpakete, die optional sind.
+Das Linux-Paket hat einen neuen Namen: `ShokujoDX-0.6.1-linux-amd64.deb`.
+
 ## Version 0.6.0
 
 **Anleitungen und Lektionen.** Die Hilfe hat 31 Anleitungen in sieben
