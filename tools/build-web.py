@@ -15,6 +15,7 @@
 
 import copy
 import datetime
+import gzip
 import hashlib
 import json
 import os
@@ -120,6 +121,11 @@ def main():
     # The size of the program after the browser unpacks it: the loader of
     # the page counts the download against it.
     wasm_bytes = os.path.getsize(os.path.join(OUT, "emb-app_bg.wasm"))
+    # The size of the first download, in whole MB: the server sends the
+    # program compressed with gzip. The note of the page says it, so the
+    # number is always the number of this build.
+    with open(os.path.join(OUT, "emb-app_bg.wasm"), "rb") as f:
+        download_mb = round(len(gzip.compress(f.read(), 6)) / 1e6)
     # The logo of the loader: the logo of the program with no tile behind
     # it, and its parts (the hoop, the needle with its thread, the star).
     logos = logo_parts()
@@ -136,6 +142,7 @@ def main():
         "@BUILT@": built,
         "@COMMIT@": commit,
         "@WASM_BYTES@": str(wasm_bytes),
+        "@DOWNLOAD_MB@": str(download_mb),
         "@FILES@": json.dumps(files, indent=2),
     }
     for name in web:
