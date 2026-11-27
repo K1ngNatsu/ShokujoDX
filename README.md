@@ -147,7 +147,7 @@ Get the file for your system from the
 | Windows 10 or 11 (64-bit) | `ShokujoDX-…-windows-setup.exe` | Start it and follow the steps. No administrator rights needed. |
 | Windows, no install | `ShokujoDX-…-windows-portable.zip` | Unzip the folder anywhere and start `ShokujoDX.exe`. |
 | macOS 10.15 or later | `ShokujoDX-…-macos.dmg` | Open it and drag **ShokujoDX** to **Applications**. |
-| Debian, Ubuntu, Linux Mint | `shokujodx_…_amd64.deb` | `sudo apt install ./shokujodx_…_amd64.deb` |
+| Debian, Ubuntu, Linux Mint | `ShokujoDX-…-linux-amd64.deb` | `sudo apt install ./ShokujoDX-…-linux-amd64.deb` |
 | Other Linux (64-bit) | `ShokujoDX-…-linux-x86_64.AppImage` | `chmod +x` the file, then start it. |
 
 The packages have no code signature yet, so the system can warn you the

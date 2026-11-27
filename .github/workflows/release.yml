@@ -135,7 +135,7 @@ jobs:
         run: tools/package-linux.sh
       - name: The packages install and the program starts
         run: |
-          sudo apt-get install -y ./dist/shokujodx_*.deb
+          sudo apt-get install -y ./dist/*.deb
           shokujodx --version
           test -f /usr/share/thumbnailers/shokujodx.thumbnailer
           # The packages have no sample designs (ADR 0080): a test design of the repository.
